@@ -1,4 +1,5 @@
-export const mulberry32 = (seed: number) => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+import { mulberry32 } from '@genesis/core/determinism.js';
+export { mulberry32 };
 export interface Clock { now(): number; }
 /** Privacy-minimal payload: 32-dim landmark summary ONLY. No raw frames, no images, no video. */
 export interface FaceTelemetryPayload {

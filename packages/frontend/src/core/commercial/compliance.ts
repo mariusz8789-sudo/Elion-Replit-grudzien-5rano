@@ -13,7 +13,7 @@ const VERTICAL_NOTES: Readonly<Record<string, readonly string[]>> = {
     'Any candidate this repo surfaces as a WINNER still requires independent institutional review before any action is taken on it — see core/agent/practicalCandidateGate.ts.',
   ],
   PHYSICS: [
-    'All physics results in this repo are toy/pipeline-validation models (core/physicsWorld) unless a real backend (PYTHIA/Geant4) is wired in, which it is not in this pass.',
+    'All physics results in this repo are toy/pipeline-validation models unless a real backend (PYTHIA/Geant4) is wired in, which it is not in this pass.',
   ],
   GENERIC: [
     'No payment is processed by this repo — core/commercial ships contracts and a fail-closed ledger only, with no PaymentAdapter implementation.',

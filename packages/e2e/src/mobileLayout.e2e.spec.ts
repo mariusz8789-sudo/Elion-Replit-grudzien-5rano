@@ -79,12 +79,14 @@ for (const viewport of VIEWPORTS) {
       expect(drawerBox.y + drawerBox.height, 'drawer must end above mobile navigation').toBeLessThanOrEqual(navigationBox.y + 1);
     }
 
-    const nextMove = drawer.getByLabel('Next Move');
-    await expect(nextMove).toBeVisible();
-    const nextMoveBox = await nextMove.boundingBox();
-    if (drawerBox && nextMoveBox) {
-      expect(nextMoveBox.y).toBeGreaterThanOrEqual(drawerBox.y);
-      expect(nextMoveBox.y + nextMoveBox.height).toBeLessThanOrEqual(drawerBox.y + drawerBox.height + 1);
+    // The simplified mobile conversation (273607a4) has no Next Move panel any more; the composer is
+    // the drawer's working surface, so it is what must stay inside the drawer.
+    const composer = drawer.getByLabel('Wiadomość do Science Chat');
+    await expect(composer).toBeVisible();
+    const composerBox = await composer.boundingBox();
+    if (drawerBox && composerBox) {
+      expect(composerBox.y).toBeGreaterThanOrEqual(drawerBox.y);
+      expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(drawerBox.y + drawerBox.height + 1);
     }
     await expectInsideViewport(page);
     await drawer.getByRole('button', { name: 'Zamknij Science Chat' }).click();

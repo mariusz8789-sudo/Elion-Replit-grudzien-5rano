@@ -15,6 +15,7 @@ import type { WorldFrame, WorldFrameEntity } from '../three/graphics/worldFrame'
 import type { EntityVisualSpec } from '../three/graphics/worldFrameRenderer';
 import { buildCharacter, paletteFromSeed } from '../three/characterRig';
 import { loadHumanTwinBody, type LoadedHumanTwinBody } from '../three/humanTwinAsset';
+import { fnv1aUint } from '@genesis/core/determinism.js';
 
 const FLOOR_HEIGHT_M = 3.5;
 const FACADE_TINTS = [0x8f5749, 0x736357, 0x827267, 0x655b58, 0x786956, 0x59635e] as const;
@@ -39,12 +40,7 @@ export interface TemporalCinematicVisualResolverHandle {
 }
 
 function seedFromId(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i += 1) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+  return fnv1aUint(id);
 }
 
 function personLike(entity: WorldModelEntity): boolean {

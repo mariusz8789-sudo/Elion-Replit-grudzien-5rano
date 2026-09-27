@@ -1,0 +1,81 @@
+{
+  "executedAt": "2026-07-31T19:53:40.555Z",
+  "preregistrationRef": "campaigns/retrospective-benchmark-001/preregistration.json",
+  "preregistration": {
+    "verified": true,
+    "ref": "campaigns/retrospective-benchmark-001/preregistration.json",
+    "sha256": "b8f270e88da076c65dfe688f84a2484fd04266c1c971cf84cad525535fbefe6c",
+    "fingerprint": "a07a178614729b6c42b7135247e7391271aa302dce50df5f9889281e639dd89f",
+    "targets": 1,
+    "registeredAt": 1785527535000,
+    "orderingOk": true,
+    "statement": "Pre-registered 1 target(s); document sha256 b8f270e88da0…, target-set fingerprint a07a17861472…. The document's self-reported timestamp precedes the first ingest, which is consistent with pre-registration but does not prove it — cite the git commit that introduced the file."
+  },
+  "cutoffYear": 1985,
+  "corpus": {
+    "articles": 0,
+    "concepts": 0,
+    "pairs": 0,
+    "vocabularyEnforced": "no"
+  },
+  "leakage": {
+    "auditable": false,
+    "rate": 0,
+    "anachronisticConcepts": 0,
+    "statement": "No NLM descriptor release has been loaded, so vocabulary leakage CANNOT be audited. Load an NLM descriptor release before running any retrospective analysis — an unaudited corpus must not be described as historical."
+  },
+  "vocabulary": {
+    "release": null,
+    "matchesCutoff": false,
+    "statement": "No MeSH release has been loaded. Establishment dates are unavailable, so no analysis may be described as historical."
+  },
+  "targets": [
+    {
+      "target": {
+        "name": "Swanson 1986 — fish oil and Raynaud's syndrome",
+        "aUi": "D005395",
+        "cUi": "D011928",
+        "publishedYear": 1986,
+        "expectedBridgeUis": [
+          "D010974"
+        ],
+        "note": "All concepts existed at 1985.",
+        "identifierVerification": {
+          "D005395": "Fish Oils — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D005395, cross-checked against an independent web search that initially returned a wrong candidate ID (D005402), which was rejected rather than used.",
+          "D011928": "Raynaud Disease — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D011928.",
+          "D010974": "Platelet Aggregation — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D010974."
+        },
+        "contaminated": false,
+        "offendingConcepts": []
+      },
+      "disqualified": [
+        "Concept A (D005395) is absent from the corpus.",
+        "Concept C (D011928) is absent from the corpus."
+      ],
+      "rank": null,
+      "inTop20": false,
+      "bridges": [],
+      "bridgeMatched": null,
+      "contaminated": false,
+      "contaminationNote": "All concepts existed at 1985.",
+      "null": {
+        "controls": 0,
+        "ranked": 0,
+        "censored": 0,
+        "ranks": [],
+        "median": null,
+        "top20Rate": null
+      },
+      "countsAsHit": false
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "eligible": 0,
+    "contaminated": 0,
+    "disqualified": 1,
+    "hits": 0,
+    "hitRate": null
+  },
+  "verdict": "INVALID: No MeSH release has been loaded. Establishment dates are unavailable, so no analysis may be described as historical. Load a release through descriptorRelease.mjs, which records its checksum, and re-run."
+}

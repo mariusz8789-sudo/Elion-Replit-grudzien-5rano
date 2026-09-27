@@ -62,7 +62,7 @@ const capabilities: readonly GenesisCapability[] = [
   {
     id: 'chemistry-titration', label: 'Chemistry', description: 'Existing deterministic acid-base titration through Experiment Fabric and the Chemistry station.',
     userIntents: ['uruchom miareczkowanie', 'pokaż miareczkowanie', 'titration experiment', 'chemistry experiment'], domain: 'chemistry', selectionMode: 'FABRIC',
-    execution: { kind: 'fabric-model', id: 'chemistry-titration' }, readiness: 'AVAILABLE', epistemicLabel: 'LIVE_COMPUTATIONAL_EXPERIMENT', visualizationRoute: '#/lab/chemistry',
+    execution: { kind: 'fabric-model', id: 'chemistry-titration' }, readiness: 'AVAILABLE', epistemicLabel: 'LIVE_COMPUTATIONAL_EXPERIMENT', visualizationRoute: '#/scientific-worlds?station=st-titration',
     evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['Educational computational chemistry; not a physical measurement.'], showInShowcase: true,
   },
   {
@@ -128,7 +128,7 @@ const capabilities: readonly GenesisCapability[] = [
   {
     id: 'manifold-5d', label: '5D Manifold', description: 'Existing backend manifold evaluation shown in the Matrix Stage.',
     userIntents: ['pokaż silnik 5d', 'otwórz 5d', '5d manifold', 'matrix stage'], domain: 'advanced-worlds', selectionMode: 'FABRIC',
-    execution: { kind: 'fabric-model', id: 'math-manifold-5d' }, readiness: 'AVAILABLE', epistemicLabel: 'MODEL', visualizationRoute: '#/matrix-stage',
+    execution: { kind: 'fabric-model', id: 'math-manifold-5d' }, readiness: 'AVAILABLE', epistemicLabel: 'MODEL', visualizationRoute: null,
     evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['GEOMETRIC_MODEL in R⁵; no claim of a physical fifth dimension.'], runtimeStatusSource: '/api/manifold/evaluate',
   },
   {

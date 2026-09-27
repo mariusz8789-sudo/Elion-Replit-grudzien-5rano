@@ -1,3 +1,4 @@
+import type { ReplayVerdict as ReplayVocabulary } from '../matrixFoundation/replayVerdict';
 /**
  * EXTERNAL BENCHMARK HARNESS (A10) — generic types.
  *
@@ -122,4 +123,5 @@ export interface BenchmarkResult {
   readonly runFingerprint: string;
 }
 
-export type ReplayVerdict = 'MATCH' | 'MISMATCH';
+/** A benchmark replay reproduces the run fingerprint or drifts — the one replay vocabulary (matrixFoundation/replayVerdict). */
+export type ReplayVerdict = Extract<ReplayVocabulary, 'MATCH' | 'DRIFT'>;

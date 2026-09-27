@@ -288,6 +288,19 @@ async function handleBiotechSource(req, res, url) {
 }
 
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
+/**
+ * Every top-level segment `handleApi` (api.mjs) routes. ONE list, so a new API family cannot be
+ * implemented and then silently 404 at the HTTP layer — which is exactly what happened to
+ * /api/physics/cms-z (real CMS Open Data): handled in api.mjs, missing here. Guarded by
+ * serverApiPrefixes.test.mjs, which reads api.mjs and fails if the two ever diverge.
+ */
+export const PERSIST_API_SEGMENTS = Object.freeze(['auth', 'projects', 'compute', 'worlds', 'security', 'speculative', 'knowledge', 'quantum', 'manifold', 'system', 'physics', 'ingestion']);
+function isPersistApiPath(url) {
+  if (!url?.startsWith('/api/')) return false;
+  const first = url.slice(5).split(/[/?#]/, 1)[0];
+  return PERSIST_API_SEGMENTS.includes(first);
+}
+
 const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
 // Uploady źródłowe mogą zawierać duże, poprawne artefakty; nie dzielą jednak
 // budżetu, aby spam GIS nie blokował Knowledge Ingestion.
@@ -318,6 +331,10 @@ function handlePersistApi(req, res, url) {
   }
   if (isSpatialUpload && !spatialUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'spatial_upload_rate_limited', message: 'Limit uploadu artefaktów GIS: 6 na minutę.' });
+  }
+  // D-149: each live ingestion is an outbound request to a public scientific API — same budget as /api/biotech/source.
+  if (url.pathname === '/api/ingestion/source' && !biotechSourceLimiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
   const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
@@ -424,7 +441,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/worlds') || req.url?.startsWith('/api/security') || req.url?.startsWith('/api/speculative') || req.url?.startsWith('/api/knowledge') || req.url?.startsWith('/api/quantum') || req.url?.startsWith('/api/manifold') || req.url?.startsWith('/api/system')) {
+  if (isPersistApiPath(req.url)) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

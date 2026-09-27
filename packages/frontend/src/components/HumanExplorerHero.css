@@ -12,6 +12,7 @@
 .human-hero-heading h1 { color: #f0f8fc; font-size: clamp(28px, 3vw, 48px); line-height: 1.1; letter-spacing: -.045em; font-weight: 450; margin: 10px 0; }
 .human-hero-heading p { color: #b8c7ce; font-size: 13px; line-height: 1.5; max-width: 250px; margin: 0 0 12px; }
 .human-model-label { display: block; color: #9eabb6; font-size: 10px; }
+.human-target-context { color: #7dd3fc; margin-top: 4px; max-width: 64ch; }
 .human-hero-tools { position: absolute; top: 76px; right: 24px; display: flex; gap: 5px; pointer-events: auto; }
 .human-hero-tools .sw-chip { background: #06101de6; padding: 9px 12px; border-color: #54748565; font-size: 11px; }
 .human-hero-tools .sw-chip.is-on { background: #173940; border-color: #8ce0d6; }
@@ -114,3 +115,18 @@
   .human-inspector .sw-ex-head { display: flex; flex-wrap: wrap; }
   .human-inspector .sw-badge { white-space: normal; overflow-wrap: anywhere; }
 }
+/* HERO → Human Digital Twin (D-146): the finalist's context panel, one line per kind of knowledge. */
+.human-twin-context { margin: 10px 0 0; padding: 10px 12px; max-width: 64ch; border-left: 2px solid #7dd3fc; background: rgba(8, 47, 73, 0.55); border-radius: 0 6px 6px 0; color: #e2e8f0; font-size: 12px; }
+.human-twin-context.is-unresolved { border-left-color: #f87171; background: rgba(69, 10, 10, 0.5); }
+.human-twin-context header { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 10px; letter-spacing: 0.06em; color: #7dd3fc; margin-bottom: 6px; }
+.human-twin-context.is-unresolved header { color: #fca5a5; }
+.human-twin-context dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; }
+.human-twin-context dl > div { display: contents; }
+.human-twin-context dt { color: #94a3b8; }
+.human-twin-context dd { margin: 0; display: grid; gap: 1px; overflow-wrap: anywhere; }
+.human-twin-tag { font-size: 9px; letter-spacing: 0.05em; color: #93c5fd; }
+.human-twin-tag.is-not_validated { color: #fca5a5; }
+.human-twin-tag.is-model_prediction { color: #fcd34d; }
+.human-twin-tag.is-real_measurement { color: #86efac; }
+.human-twin-source { font-size: 9px; color: #94a3b8; }
+.human-twin-caveat { margin: 8px 0 0; font-size: 10px; letter-spacing: 0.04em; color: #7dd3fc; }

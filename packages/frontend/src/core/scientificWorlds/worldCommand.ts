@@ -213,3 +213,36 @@ export function isWorldCommandShape(value: unknown): value is WorldCommand {
     && (v.targetEntityId === undefined || typeof v.targetEntityId === 'string')
     && (v.parameters === undefined || (typeof v.parameters === 'object' && v.parameters !== null && Object.values(v.parameters as Record<string, unknown>).every(PRIMITIVE)));
 }
+
+/**
+ * PRODUCT HANDOFF → ONE STATION RUN.
+ *
+ * `#/scientific-worlds?station=<id>&<param>=<value>…` is how the chat, the research-mode menu and
+ * Experiment Fabric product routes open the ONE main Laboratory at a station. This turns that
+ * query into the same validated RUN_EXPERIMENT command the command bar would produce — the planner
+ * walks the agent there and the station's own runner executes; nothing here computes science.
+ * Returns null for anything that is not a known station of this catalog that runs an experiment.
+ */
+export function stationHandoffCommand(query: string, catalog: CommandCatalog, logicalTime: number): WorldCommand | null {
+  const normalized = query.startsWith('?') ? query.slice(1) : query;
+  const params = new URLSearchParams(normalized);
+  const stationId = params.get('station');
+  if (!stationId) return null;
+  const station = catalog.stations.find((s) => s.id === stationId);
+  if (!station?.experimentId) return null;
+  const parameters: Record<string, CommandParameterValue> = {};
+  for (const [key, raw] of params) {
+    if (key === 'station' || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) continue;
+    const numeric = raw.trim() !== '' && Number.isFinite(Number(raw)) ? Number(raw) : null;
+    parameters[key] = numeric ?? raw;
+  }
+  const text = `Uruchom ${station.label}`;
+  return {
+    commandId: `cmd-${fnv1a(`handoff|${stationId}|${normalized}|${logicalTime}`)}`,
+    text,
+    intent: 'RUN_EXPERIMENT',
+    targetEntityId: station.id,
+    ...(Object.keys(parameters).length ? { parameters } : {}),
+    requestedAtLogicalTime: logicalTime,
+  };
+}

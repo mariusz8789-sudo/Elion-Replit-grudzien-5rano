@@ -1,0 +1,18 @@
+{
+  "schema": "genesis-acquisition-attempt-log/1",
+  "campaignId": "real-scientific-campaign-001",
+  "attemptedAt": "2026-07-15T14:22:19Z",
+  "environment": "policy-restricted agent runtime (egress gateway)",
+  "method": "direct HTTPS GET to official public endpoints + the real builder (scripts/build-real-campaign-001-bundle.mjs)",
+  "results": [
+    { "sourceService": "UNIPROT", "host": "rest.uniprot.org", "endpoint": "https://rest.uniprot.org/uniprotkb/search?query=gene:BRAF+AND+organism_id:9606+AND+reviewed:true&format=json", "httpStatus": null, "curlCode": 56, "failureClass": "CONNECT_TUNNEL_REJECTED_403", "bytes": 0, "diagnosis": "gateway rejected CONNECT before TLS/HTTP — environment egress policy, not app/DNS/TLS/rate/auth" },
+    { "sourceService": "CHEMBL", "host": "www.ebi.ac.uk", "endpoint": "https://www.ebi.ac.uk/chembl/api/data/target/search.json?q=BRAF", "httpStatus": null, "curlCode": 56, "failureClass": "CONNECT_TUNNEL_REJECTED_403", "bytes": 0, "diagnosis": "same — CONNECT rejected at gateway" },
+    { "sourceService": "PUBCHEM", "host": "pubchem.ncbi.nlm.nih.gov", "endpoint": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/vemurafenib/property/CanonicalSMILES,InChIKey/JSON", "httpStatus": null, "curlCode": 56, "failureClass": "CONNECT_TUNNEL_REJECTED_403", "bytes": 0, "diagnosis": "same — CONNECT rejected at gateway" },
+    { "sourceService": "EUROPE_PMC", "host": "www.ebi.ac.uk", "endpoint": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=BRAF%20V600E%20inhibitor&format=json&pageSize=1", "httpStatus": null, "curlCode": 56, "failureClass": "CONNECT_TUNNEL_REJECTED_403", "bytes": 0, "diagnosis": "same — CONNECT rejected at gateway" },
+    { "sourceService": "RCSB_PDB", "host": "data.rcsb.org", "endpoint": "https://data.rcsb.org/rest/v1/core/entry/3OG7", "httpStatus": null, "curlCode": 56, "failureClass": "CONNECT_TUNNEL_REJECTED_403", "bytes": 0, "diagnosis": "same — CONNECT rejected at gateway" }
+  ],
+  "proxyEvidence": { "enabled": true, "recentRelayFailures": ["rest.uniprot.org:443 connect_rejected", "www.ebi.ac.uk:443 connect_rejected", "pubchem.ncbi.nlm.nih.gov:443 connect_rejected", "www.ebi.ac.uk:443 connect_rejected", "data.rcsb.org:443 connect_rejected"] },
+  "builderBehavior": { "ran": true, "payloadsFabricated": 0, "manifestWritten": false, "outcome": "FAIL_CLOSED — missing mandatory source(s): CHEMBL, PUBCHEM, UNIPROT. No usable bundle written.", "verdict": "correct — genuine attempt, never fabricates, fails closed" },
+  "conclusion": "REAL EXTERNAL ACQUISITION = CAPABILITY_BLOCKED by environment egress policy (allowlist = package registries + anthropic.com). Not bypassable and not attempted to bypass. Application code behaved correctly (fail-closed, no fabrication).",
+  "resume": "On a network-enabled machine: node scripts/build-real-campaign-001-bundle.mjs --out campaigns/real-scientific-campaign-001/bundle  →  verify  →  node scripts/genesis-campaign-001.mjs --bundle campaigns/real-scientific-campaign-001/bundle"
+}

@@ -1,0 +1,16 @@
+{
+  "activity_id": "ACT_TESTFIX",
+  "assay_chembl_id": "CHEMBL_TESTASSAY",
+  "molecule_chembl_id": "CHEMBL_TESTMOL",
+  "target_chembl_id": "CHEMBL_TESTTGT",
+  "standard_type": "IC50",
+  "standard_relation": "=",
+  "standard_value": 42,
+  "standard_units": "nM",
+  "assay_description": "SYNTHETIC binding assay (fixture)",
+  "assay_type": "B",
+  "target_organism": "Synthetica testfixtura",
+  "target_pref_name": "[TEST FIXTURE] synthetic target",
+  "confidence_score": 9,
+  "data_validity_comment": null
+}

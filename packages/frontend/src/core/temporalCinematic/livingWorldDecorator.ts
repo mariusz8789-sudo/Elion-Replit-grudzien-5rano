@@ -4,6 +4,7 @@ import type { HighFidelityMaterialPalette } from '../three/graphics/highFidelity
 import { createRoadMarkings, createSidewalk, createStreetBench, createStreetLight, createTrashBin } from '../three/graphics/streetKit';
 import { createTreeField, type VegetationFieldHandle } from '../three/graphics/vegetation';
 import { createVehicle, type VehicleHandle, type VehicleKind } from '../three/graphics/vehicleKit';
+import { fnv1aUint } from '@genesis/core/determinism.js';
 
 /**
  * V5.2 — LIVING WORLD DECORATOR.
@@ -46,12 +47,7 @@ export interface LivingWorldDecoratorHandle {
 }
 
 function hash32(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+  return fnv1aUint(input);
 }
 
 function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {

@@ -1,0 +1,209 @@
+{
+  "schema": "genesis-discovery-dossier/2",
+  "engine": {
+    "name": "Candidate Generation Engine",
+    "version": "genesis-candidate-gen/2",
+    "status": "COMPLETED_RANKED"
+  },
+  "scientificQuestion": "Deterministic computational triage of RDKit-enumerated analogues around benign seed scaffolds.",
+  "seeds": [
+    {
+      "name": "aspirin",
+      "smiles": "CC(=O)Oc1ccccc1C(=O)O"
+    },
+    {
+      "name": "benzamide",
+      "smiles": "NC(=O)c1ccccc1"
+    },
+    {
+      "name": "anisole",
+      "smiles": "COc1ccccc1"
+    },
+    {
+      "name": "aniline",
+      "smiles": "Nc1ccccc1"
+    }
+  ],
+  "engineMatrix": {
+    "RDKit": {
+      "status": "AVAILABLE"
+    },
+    "ADMET-AI": {
+      "status": "AVAILABLE"
+    }
+  },
+  "generation": {
+    "requested": 100,
+    "generated": 300,
+    "generationsUsed": 2,
+    "transformationCount": 6,
+    "byGeneration": {
+      "0": 4,
+      "1": 78,
+      "2": 218
+    }
+  },
+  "evaluation": {
+    "rdkitEvaluated": 300,
+    "admetEvaluated": 300,
+    "withStructuralAlerts": 268,
+    "failed": 0
+  },
+  "rankingPolicyVersion": "genesis-candidate-ranking/2",
+  "topCandidates": [
+    {
+      "rank": 1,
+      "candidateId": "candv2_f0214ce9732c",
+      "canonicalSmiles": "COc1ccc(Cl)cc1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.994556,
+      "permeability": 0.967036,
+      "admetQed": 0.585063,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.869485,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 2,
+      "candidateId": "candv2_8cc398ed5c51",
+      "canonicalSmiles": "NC(=O)c1ccc(Cl)cc1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.9673,
+      "permeability": 0.846107,
+      "admetQed": 0.655406,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.866998,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 3,
+      "candidateId": "candv2_c21202da8eaa",
+      "canonicalSmiles": "COc1ccccc1Cl",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.980422,
+      "permeability": 0.967036,
+      "admetQed": 0.585063,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.866659,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 4,
+      "candidateId": "candv2_95884ab8f55a",
+      "canonicalSmiles": "COc1cccc(Cl)c1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.975256,
+      "permeability": 0.967036,
+      "admetQed": 0.585063,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.865625,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 5,
+      "candidateId": "candv2_31dd3c0f1215",
+      "canonicalSmiles": "NC(=O)c1ccccc1Cl",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.956289,
+      "permeability": 0.846107,
+      "admetQed": 0.655406,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.864796,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 6,
+      "candidateId": "candv2_4d444a2ce83b",
+      "canonicalSmiles": "NC(=O)c1cccc(Cl)c1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.952489,
+      "permeability": 0.846107,
+      "admetQed": 0.655406,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.864036,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 7,
+      "candidateId": "candv2_22d5aee619f9",
+      "canonicalSmiles": "COc1ccc(O)cc1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.972622,
+      "permeability": 0.894786,
+      "admetQed": 0.612773,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.862574,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 8,
+      "candidateId": "candv2_7a57fe22a2ce",
+      "canonicalSmiles": "COc1ccccc1O",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.964578,
+      "permeability": 0.894786,
+      "admetQed": 0.612773,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.860965,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 9,
+      "candidateId": "candv2_4673ab99f8ed",
+      "canonicalSmiles": "COc1ccc(F)cc1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.992967,
+      "permeability": 0.967036,
+      "admetQed": 0.557432,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.860878,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    },
+    {
+      "rank": 10,
+      "candidateId": "candv2_f4719e8ff600",
+      "canonicalSmiles": "COc1ccc(C)cc1",
+      "generation": 1,
+      "druglikeness": 1,
+      "saAccessibility": 0.998889,
+      "permeability": 0.967036,
+      "admetQed": 0.553238,
+      "alertPenalty": 0,
+      "failurePenalty": 0,
+      "finalScore": 0.860805,
+      "rankingPolicyVersion": "genesis-candidate-ranking/2"
+    }
+  ],
+  "fullRankingCount": 300,
+  "reproducibility": {
+    "candidateGenVersion": "genesis-candidate-gen/2",
+    "rankingPolicyVersion": "genesis-candidate-ranking/2",
+    "note": "Same seeds + same RDKit transformation set + same policy versions reproduce the identical library and ranking (deterministic)."
+  },
+  "scientificLimitations": [
+    "Candidates are RDKit-enumerated analogues of benign seed scaffolds — COMPUTATIONAL CANDIDATES, not drugs.",
+    "ADMET values are MODEL_INFERRED (ADMET-AI), not measured. Docking/MD/QM were not executed.",
+    "The ranking is a computational drug-likeness ordering, NOT evidence of binding, activity, safety, or efficacy."
+  ],
+  "didGenesisDiscoverADrug": "NO",
+  "didGenesisDiscoverADrugExplanation": "The engine generated and ranked computational analogues using real RDKit + ADMET-AI. No target evidence, no docking, no experimental or clinical validation. That is not drug discovery.",
+  "dossierHash": "98de0cbd420a3bc148f3b1465ec5bb3f6ec892056b27f6f088728ab70f85427d"
+}

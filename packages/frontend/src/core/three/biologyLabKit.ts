@@ -10,6 +10,7 @@ import { applyRimLight, isRimPatched, selectionPulse, setMaterialRimIntensity, s
 import { createCutaway, measureCutawayBounds, setClippingOnObject, setSectionShellSides, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
 import type { LoadedHumanTwinBody, HumanTwinTier } from './humanTwinAsset';
 import type { ReferenceAnatomyPart } from './bodyParts3dPilot';
+import { FULL_ATLAS_HIDDEN_BY_DEFAULT, FULL_ATLAS_SYSTEM_COLOR, type LoadedFullAtlas } from './bodyParts3dFullAtlas';
 
 /**
  * GENESIS GRAPHICS ENGINE — HUMAN BIOLOGY LAB KIT (architecture + the twin).
@@ -224,6 +225,12 @@ export interface TwinHandle {
    * transform; geometry ownership stays with the caller, so a twin rebuild can reuse it.
    */
   applyReferenceAnatomy(parts: readonly ReferenceAnatomyPart[]): void;
+  /**
+   * The full BodyParts3D male reference body (2,234 meshes, merged per system) replaces the proxy and the
+   * clothed asset as the visible body. The organ proxies stay (picking, isolation, camera framing) inside it;
+   * the surface mode decides how much of it steps back. Geometry ownership stays with the caller.
+   */
+  applyFullAtlas(atlas: LoadedFullAtlas | null): void;
   /** Twin-local centre of an organ's CURRENT geometry (ellipsoid or reference mesh) — the camera framing target. */
   getOrganFocus(nodeId: string): { x: number; y: number; z: number } | null;
   update(t: number): void;
@@ -365,10 +372,26 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     FULL_ASSET: asset ? measureLod(asset.root) : measureLod(body.root),
     PROXY_LOW: measureLod(body.root),
   };
+  let atlasGroup: THREE_NS.Group | null = null;
+  const atlasMats = new Map<string, THREE_NS.MeshStandardMaterial>();
   const applyLod = (): void => {
     const full = lodLevel === 'FULL_ASSET' && Boolean(asset);
-    body.root.visible = !full;
-    if (asset) asset.root.visible = full;
+    // With the anatomy atlas in place, neither the proxy nor the clothed asset is drawn: one body on screen.
+    body.root.visible = !full && !atlasGroup;
+    if (asset) asset.root.visible = full && !atlasGroup;
+    if (cloud) cloud.visible = !atlasGroup;
+  };
+  /** How much of the atlas steps back: RTG keeps the skeleton and fades the rest; ghost and isolation fade everything. */
+  const applyAtlasSurface = (mode: TwinSurfaceMode): void => {
+    for (const [system, mat] of atlasMats) {
+      const opacity = mode === 'NORMAL' ? 1
+        : mode === 'XRAY' ? (system === 'skeletal' ? 0.9 : 0.07)
+          : mode === 'TRANSLUCENT' ? (system === 'skeletal' || system === 'nervous' ? 0.6 : 0.22)
+            : 0.08;
+      const transparent = opacity < 1;
+      if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
+      mat.opacity = opacity; mat.depthWrite = !transparent;
+    }
   };
   const blink = asset?.morphs.get('eyeBlinkLeft') ?? null;
   const blinkR = asset?.morphs.get('eyeBlinkRight') ?? null;
@@ -412,6 +435,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       } else setSurfaceMode(m, shellMode);
     }
     if (cloudMat) cloudMat.opacity = isolated.length || !bodyShown ? 0.1 : cloudMat.opacity;
+    if (atlasGroup) applyAtlasSurface(shellMode);
   };
 
   return {
@@ -437,6 +461,27 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
         m.userData = { ...m.userData, referenceAnatomy: part.provenance };
       }
     },
+    applyFullAtlas(atlas) {
+      if (atlasGroup) { g.remove(atlasGroup); atlasGroup = null; for (const m of atlasMats.values()) m.dispose(); atlasMats.clear(); }
+      if (atlas && atlas.systems.length) {
+        const group = new THREE.Group(); group.name = 'twin:bodyparts3d-full';
+        // The atlas is life-size in meters with the feet at y = 0; match the manifest's own body height.
+        group.scale.setScalar(manifest.parameters.heightMeters / atlas.heightMeters);
+        for (const sys of atlas.systems) {
+          const color = FULL_ATLAS_SYSTEM_COLOR[sys.system] ?? 0xc7a08a;
+          const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, emissive: color, emissiveIntensity: 0.06 });
+          atlasMats.set(sys.system, mat);
+          const mesh = new THREE.Mesh(sys.geometry, mat);
+          mesh.name = `atlas:${sys.system}`;
+          mesh.visible = !FULL_ATLAS_HIDDEN_BY_DEFAULT.includes(sys.system);
+          mesh.userData = { fullAtlasSystem: sys.system, structures: sys.partCount };
+          group.add(mesh);
+        }
+        atlasGroup = group; g.add(group);
+        if (cutawayOn) for (const m of atlasMats.values()) m.clippingPlanes = [cutaway.plane];
+      }
+      applyLod(); applyOrgans();
+    },
     getOrganFocus(nodeId) {
       const m = organs.get(nodeId);
       if (!m) return null;
@@ -461,6 +506,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
         mat.clippingPlanes = state.enabled ? [cutaway.plane] : null;
         mat.needsUpdate = true;
       }
+      for (const mat of atlasMats.values()) { mat.clippingPlanes = state.enabled ? [cutaway.plane] : null; mat.needsUpdate = true; }
       // An open cut shows the shell wall instead of a hole; closed, every material is single-sided again.
       setSectionShellSides(THREE, [...shellMaterials, ...organMats], state.enabled);
     },
@@ -499,6 +545,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     },
     dispose() {
       body.dispose(); skin.dispose(); sphere.dispose(); regionMat.dispose();
+      for (const m of atlasMats.values()) m.dispose();
       for (const m of organMats) m.dispose();
       cloud?.geometry.dispose(); cloudMat?.dispose(); cutaway.dispose();
     },

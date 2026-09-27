@@ -390,7 +390,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'chemistry-titration', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-charge-balance@1.0.0',
     parameters: [text('acid', 'Kwas', 'acetic'), number('vb', 'Objętość NaOH', 'mL', 0, 60, 0)],
-    route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    // Shown at the titration station of the ONE main Laboratory, which runs the same shared runner.
+    route: { kind: 'product-route', hash: '#/scientific-worlds?station=st-titration', parameterQueryKeys: ['acid', 'vb'] }, knowledgeSources: ['chemistry.md'],
     rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam bilans ładunku słabego kwasu i NaOH co Chemistry Lab dla czterech kanonicznych kwasów. Parametry laboratoryjne są ustalonym scenariuszem, nie danymi jednego pomiaru, automatyczną identyfikacją kwasu ani titracją dowolnej próbki.',
     capability: 'BACKEND_REAL_ENGINE',
   },
@@ -421,7 +422,7 @@ const ROUTER_MODELS: readonly RouterModel[] = [
       number('temporalStep', 'Krok współrzędnej t', '', 0, 10, 0.05),
       number('hyperspaceAmplitude', 'Amplituda współrzędnej w', '', 0, 10, 0.75),
     ],
-    route: { kind: 'product-route', hash: '#/matrix-stage', parameterQueryKeys: ['sampleCount', 'temporalStep', 'hyperspaceAmplitude'] }, knowledgeSources: ['mathematics.md'],
+    route: { kind: 'none' }, knowledgeSources: ['mathematics.md'],
     rationale: 'Istniejący deterministyczny silnik geometrii dyskretnej ścieżki w R⁵. Oblicza metrykę Grama, krzywiznę, przecięcia i SHA-256; nie modeluje fizycznego piątego wymiaru.',
   },
   {

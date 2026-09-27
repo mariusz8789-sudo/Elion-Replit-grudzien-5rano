@@ -9914,3 +9914,343 @@ proves.
 - **Not independently re-verified this session — environment-blocked, not a code defect:** `d109Trial2Readiness.test.mjs` tests 4–5 (the GIPR exact-count and scaffold-split assertions) fail in this sandbox with `RDKIT_UNAVAILABLE` because Python RDKit is not installed here (`python3 -c "import rdkit"` → `ModuleNotFoundError`), matching this project's own pre-existing, tracked pattern of optional-engine gaps per environment (see D-109's own "the skips are pre-existing" note). The original 2026-09-16 session recorded RDKit as "freshly installed" and reported these exact counts from a live run; that claim is carried forward as **unverified in this session**, not as newly confirmed, and the test file is committed as-is so it will assert for real the next time it runs somewhere RDKit is present — exactly the honest-boundary behaviour this codebase's own conventions require (fail closed, do not fabricate a pass).
 
 **Provenance.** Original bypass audit + comment fix: `main` commit `49cc9084` (D-109, kept as the one entry with that number). Original TRIAL_2_STATUS/GIPR-gap/dual-target audit: `claude/genesis-autonomous-completion-95bt4e` commit `4e28eaa6` (its own D-109, superseded in number by this entry, its unique content carried forward above). Reconciliation performed during C2 repository consolidation, 2026-09-21.
+
+---
+
+## D-132, D-135 – D-142 — retroactive entries (added 2026-09-27)
+
+**Why this block exists.** A read-only survey of all 106 remote branches (2026-09-27) found that the code on `main` cites D-132 and D-135 … D-141 (D-140 alone ~237 times in 36 files), but this log never had an entry for any of them. The decisions were real; only their written record was missing, because the sessions that made them recorded the reasoning in commit messages, in handoff packs, or on a branch that the 2026-09-25 consolidation did not carry forward. Each entry below is **reconstructed from the named primary source**, quoted or closely paraphrased, and says what is on `main` today. Nothing here is new reasoning; where a source is thin, the entry says so instead of filling the gap.
+
+### D-132 — Per-world visual grade (2026-09-19)
+
+**Source:** commit `11f54ec7` message (ancestor of `main`).
+The biology lab rendered near-white because it was the only scene still using the pipeline's generic `ambient: 'studio+hdri'` box on top of its own dark background. `core/three/graphics/worldGrade.ts` replaces scattered constants with one table of per-world identities (background, fog, ambient bounce, exposure, bloom, floor) and one function that applies a grade; ambient comes from a `room-probe` fired on the second rendered frame. Biology and physics were wired; cern, cosmos, molecular and hyperscope rows exist for later. Guarded by `worldGrade.test.ts` (no two worlds share a background or floor colour; every world keeps a black point; no fallback to the studio box). **On main:** yes (code and tests). No scientific change.
+
+### D-135 — Canonical Laboratory (7 rooms) and anatomy networks (2026-09-20)
+
+**Source:** commit `0efeb774` on `claude/genesis-c1-visual-snapshot`, file headers of `canonicalLaboratory.ts` and `anatomyNetworks.ts`, screenshot set `docs/evidence/d135/` on that branch.
+A fixed, deterministic 7-room / 6-door building for the human biology lab (pure data; geometry built by `canonicalLaboratoryGeometry.ts`), with a fix on integration: the delivered package imported the *physics* lab stations, so every placement resolved to nothing. Separately, vascular / neural / lymphatic network graphs and their THREE geometry. **On main:** the anatomy networks are recovered as of 2026-09-27 (`core/scientificWorlds/humanLab/anatomyNetworks.ts`, `core/three/anatomyNetworkGeometry.ts`, with tests), not yet mounted in a scene. The 7-room laboratory is **not** on main: it conflicts with the current single-laboratory direction and touches the Astra scene, so adopting it is an open product decision.
+
+### D-136 — Real medical-dataset boundary, flagship bridges and acceptance gates (2026-09-20)
+
+**Source:** commit `0efeb774`, `docs/D136_ACCEPTANCE_MATRIX.md`, `docs/D136_INSTITUTIONAL_PILOT_PROTOCOL.md` (both recovered to `main` 2026-09-27).
+A strict provenance / format / SHA-256 / licence gate for real medical volumes (NIfTI-1, DICOM Part-10 explicit-VR-LE), built before any UI consumes it; reconstructed volumes are `RECONSTRUCTED`, segmentations `MODEL` unless declared, only verified bytes may be `REAL_DATASET`. Flagship bridges compose this onto canonical services: `sessionEvidenceBridge` (every ledger append during a session becomes an `EVIDENCE_APPENDED` event), `evidenceManifest`, `mirrorTwinCommandBridge` (canonical `INTERACT` command → existing `mirrorTransition`), `d136AcceptanceGates`. **On main:** recovered 2026-09-27. One adaptation: `main`'s Mirror Twin now stops at `CONSENT_REQUIRED` after `ENTER_ZONE`, so the bridge gained `MIRROR_CONSENT_GRANTED` / `MIRROR_CONSENT_DECLINED` and its tests go through consent. The acceptance matrix's NOT_VERIFIED rows (a real scan, browser E2E, external pilot sign-off) remain not verified.
+
+### D-137 — Genesis Chemistry v0.2.1: SMILES parser, element and reaction data; docking and PK rejected (2026-09-20)
+
+**Source:** commit `0efeb774`, `packages/core/src/chemistry/*` headers, `CHEMISTRY_HARDENING_REPORT_v0.2.1.md`; rejection recorded in `docs/GENESIS_LIVE_EXPERIMENT_PLAN.md:40`.
+A SMILES parser, formula / element / species / reaction tables and a PL/ES terminology glossary as a pure core module. The same package shipped an in-browser `moleculeDockingEngine` and a pharmacokinetics adapter. **On main:** the parser, data and glossary are recovered 2026-09-27 (`packages/core/src/chemistry/`, with tests). Docking and PK are **not** recovered: `main` decided that docking runs only through the backend Vina engine, never a browser approximation.
+
+### D-138 — Multi-experiment analytical bench (2026-09-20)
+
+**Source:** code comments in `0efeb774` (`biologyLabWorld.ts:86`, `ChemistrySessionVisual.tsx`, `chemistryRunnersCanonicalIntegration.test.ts:132`). No longer write-up exists anywhere.
+The analytical bench became a multi-experiment station hosting the two D-137 chemistry experiments. **On main:** not carried forward (it depends on the D-137 in-browser docking/PK runners that were rejected). Note the collision below: `main`'s `packages/frontend/src/core/lab/genesisSolverBinding.ts:12` states that "neither D-138 nor D-139 exists in this repository"; that was true of the solver meaning of those numbers.
+
+### D-139 — numbering collision, two meanings
+
+**Sources:** (a) `docs/QWEN-D139-DICOM-NIFTI-ANATOMICAL-DATA-BRIEF.md` (recovered 2026-09-27) — an external-model brief asking Qwen/GPT/Gemini for genuinely licensed DICOM/NIfTI data or a reader, with the rule that "reader code only" is an acceptable result; (b) commits `d3d74979` / `6f15be24` (2026-09-21) — "World Generation + D-139 (Scientific Worlds / Human Digital Twin)" consolidation onto main.
+Resolution, following D-134's precedent for D-109: both meanings are recorded here under one number; no further decision may reuse D-139. **On main:** (b) is on main as code; (a) is on main as a brief, never answered.
+
+### D-140 — Laboratory / instrument package v2 bound to canonical infrastructure (2026-09-21)
+
+**Source:** commit `d48edeb0` message (ancestor of `main`); one line in `docs/GENESIS_PREDEPLOY_COMPLETENESS_2026-09-23.md:51`.
+The device / sensor / calibration / uncertainty / protocol / safety / HIL / digital-twin / solver / LIMS-ELN seams were bound to existing systems instead of duplicated: `LabEvidencePort` → the real `EvidenceLedger` (`genesisEvidencePort.ts`); visualization → `WorldGraph`/`TemporalEngine` (`genesisWorldVisualizationPort.ts`); solver → the real `SolverRouter` dispatching the existing `newtonianKinematicsSolver` (no solver was fabricated); persistence → `core/storage.ts`, proven restart-safe. Wired into production as `genesisLabProvider.ts` on the single `KernelProviderRegistry`. `core/e2e/realLabGenesisE2E.test.ts` runs the chain with a 20/20 E2E_VERIFIED matrix; `LAB_SCOPE_97_READY` stays false because no real hardware or external data pipeline exists. **On main:** yes (`packages/frontend/src/core/lab/*`).
+
+### D-141 — Meta-Cognition (2026-09-22)
+
+**Sources:** commit `ab7f10c3` message; `docs/GENESIS_DEPLOY_CANDIDATE_REPORT_2026-09-22.md` §"D-141 Meta-Cognition"; `codex-handoff/genesis-integration-mega-pack-v2/{CAPABILITY_MATRIX,MIGRATION_NOTES}.md` (archived 2026-09-27 under `docs/reference/codex-handoff/`).
+Eight canonical epistemic states; a derived, non-destructive `CONTRADICTED`; real `META_CONTRADICTION_DETECTED` and `META_OBSERVATION_RECORDED` events; capability introspection; a broadened guard against consciousness framing. Runtime data derives from canonical Evidence / Memory / provider inputs; no persistent meta-memory, goal registry or self-modifying mechanism was added, and goal capability is shown as partial because there is no canonical goal system. Wired into `runScientificIntegrationCampaign` per cycle with prediction-error / surprise / information-gain metrics and a DecisionTrace fingerprint; the `#/meta-cognition` route runs a bounded two-cycle campaign. **On main:** yes.
+
+### D-142 — Precision Intervention Bay (proposal only)
+
+**Source:** `codex-handoff/genesis-integration-mega-pack-v2/src/precisionBay` and `CAPABILITY_MATRIX.md` rows 22–23 (archived under `docs/reference/codex-handoff/`).
+An observe → localize → propose → simulate → compare → complete flow with an emergency-stop fix in `recordApproval()`. It exists only in the Codex handoff pack, standalone-tested, never bound to this repository. **On main:** no; adopting it is an open product decision. Recorded so the number is not reused.
+
+**Still without any entry:** D-064 … D-068 (no reference anywhere in the repository or its branches) and D-097 (one mention inside D-098). No source text exists for them.
+
+---
+
+## D-143 — the GLP-1R axis stays BLOCKED, and the reason is neither the featurization hypothesis nor the gate
+
+D-077a reported `MAE=1.1726 > MAX_MAE=1.0` and recorded, explicitly as a
+hypothesis rather than a finding, that the cause was featurization: 70% of the
+pinned rows are peptide-like and a Morgan r=2 512-bit fingerprint is a poor
+representation for a 30-residue peptide. It ranked the fixes, second of which
+was small-molecule-only stratification. **This entry runs that test and
+reports that it cannot be run on the data we have.** That is the result.
+
+Preregistered before the first number was computed:
+`packages/backend/src/campaign/glp1r-d143-stratification-prereg.json`,
+fingerprint `255c7b0d487a71f5` — partition rule, three arms, and one decision
+rule per possible outcome, including the outcome that arm A is simply too
+small to interpret. Sealed measurement:
+`glp1r-d143-stratification.sealed.json`, runner
+`scripts/glp1r-d143-stratification.mjs`, real RDKit 2026.03.6, the repo's own
+`trainAndValidate()`, the frozen gate unchanged at `d2f77a7e6042f0fc`.
+
+### The partition and the three arms
+
+A row is PEPTIDE_LIKE if `[NX3][CX3](=[OX1])` matches ≥ 10 times, else
+SMALL_MOLECULE. The cut was fixed in the preregistration, not after seeing a
+result: D-077a had already measured a median of 19 amide bonds in the
+peptide-like majority, so 10 sits well below that median and well above any
+ordinary small-molecule amide count.
+
+| arm | rows | molecules | nTrain/nCalib/nTest | MAE | RMSE | R² | gate |
+|---|---|---|---|---|---|---|---|
+| C — full set (control) | 287 | 214 | 178/64/45 | **1.1726** | 1.4534 | **0.4820** | BLOCKED (MAE) |
+| A — small molecule only | 70 | 56 | 54/10/6 | 0.9828 | 1.0637 | **−29.29** | BLOCKED (nTrain, nTest, R²) |
+| B — peptide only | 217 | 158 | 124/54/39 | 1.0818 | 1.4145 | 0.3385 | BLOCKED (nTrain, nTest, MAE) |
+
+The control arm reproduces D-077a to the digit — MAE, RMSE, R² and all three
+split sizes — so the harness is the same one and arms A and B are readable
+against it.
+
+### Arm A is the whole point, and arm A is a trap
+
+Arm A's MAE is **0.9828, under the 1.0 line**. Read alone, that number says
+the hypothesis was right and the axis can open. It is worthless, and the gate
+is what says so: the test set is **6 rows**, and R² is **−29.29** — the model
+is thirty times worse than predicting the training mean. A six-row MAE is a
+draw from a distribution whose width nobody measured. Per the
+preregistration's own rule, the outcome is `INSUFFICIENT_DATA_IN_SUBSET`: the
+featurization hypothesis is **UNTESTED**, neither supported nor refuted, and
+no model from this arm is used for anything.
+
+This is worth stating plainly because it is the exact shape of the over-claim
+this project's gates exist to catch. A ranked candidate list built on arm A
+would have looked authoritative and been meaningless. `MIN_TEST` and `MIN_R2`
+caught it without anyone needing to notice.
+
+Arm B is informative in the other direction: peptides alone score MAE 1.0818,
+barely better than the mixed set's 1.1726. If the peptide representation were
+the dominant error source, removing it should have helped more than it did.
+That weakens the hypothesis without testing it.
+
+### The label-noise explanation also fails to establish itself
+
+If repeat measurements of the same molecule disagreed by ~1 log unit, then
+`MAX_MAE=1.0` would be asking for predictions more precise than the labels,
+and no model could ever pass. D-105 measured exactly that for the CAMP readout
+family on the A1/A2 molecule set (`medianSd` 1.0005). So the same measurement
+was preregistered here, on these pinned rows.
+
+Grouped by (canonicalSmiles, standardType): **6 of 279 groups have replicates,
+covering 14 of 287 rows.** Median spread 1.1176, median SD 0.7084, max spread
+2.0. The verdict the preregistration fixed in advance is `BELOW_GATE` — but
+six groups is not an estimate of anything. **The noise-floor explanation is
+unestablished on this pin**, and the honest reading is that this dataset
+cannot answer the question either way. `MAX_MAE` was not raised, and the
+gate's fingerprint is still `d2f77a7e6042f0fc`.
+
+### What is actually binding
+
+Not the featurization, not the gate: **the number of small-molecule GLP-1R
+activity rows**. 56 small molecules cannot fill a 150-row training split, so
+the one experiment that would settle D-077a's hypothesis is unrunnable until
+more of them exist. D-077a's third option — more rows — turns out to be the
+precondition for its second, not an alternative to it.
+
+The rows exist publicly; this container cannot reach them. `www.ebi.ac.uk:443`
+is denied by the environment's network policy, so the remaining ChEMBL
+`CHEMBL1784` activity pages beyond the first 1000 (D-077a) could not be
+pulled here, and `bindingDbImport.mjs` has the same problem. This is a
+runtime limit, recorded as one — not a scientific finding.
+
+### Standing
+
+`GENESIS-MOL-01` remains `NO_WINNER`. `probeCapabilities().activityPredictor`
+is still `false` with `glp1rBlockedReason: 'GATE_NOT_MET'`. Nothing in this
+entry ranks a compound, and nothing in it is evidence about any compound's
+effect in any organism.
+
+---
+
+## D-144 — 351 GLP-1R rows were already in this repository, and the best result yet still misses the gate by 0.0118
+
+D-143 closed on "the binding constraint is the number of small-molecule rows",
+and recorded that the remaining ChEMBL pages were unreachable because the
+environment's network policy denies `www.ebi.ac.uk`. That framing was
+incomplete: **the repository already held a GLP-1R activity set the QSAR had
+never been given.** The text-transcription sets are here —
+`data/transcription/glp1r-a1` (757 activity rows, all seven chunks byte-verified),
+`glp1r-a2` (structure dictionary) and `glp1r-a3` (assay → target) — and D-105 and
+D-108 built them to close a noise floor, not to feed the model.
+
+Preregistered before the first metric: `glp1r-d144-expanded-prereg.json`,
+fingerprint `4cf8e88872ee888e`. Sealed measurement
+`glp1r-d144-expanded.sealed.json`, runner `scripts/glp1r-d144-expanded.mjs`,
+real RDKit 2026.03.6, the repo's own `trainAndValidate()`, the frozen gate
+unchanged at `d2f77a7e6042f0fc`, and the D-077 pin **not rewritten**.
+
+### What was checked before the set was built
+
+Three things, because the whole result rests on them:
+
+- **Target, read from the data.** All 90 assays A1 references appear in A3, and
+  every one resolves to `CHEMBL1784`. A1 has no target column, so nothing was
+  assumed from a conversation.
+- **Internal consistency of the transcription.** `pActivity` was recomputed as
+  `9 − log10(value in nM)` from the delivered numeric value rather than trusting
+  the transcribed two-decimal `pchembl_value`. Across all 757 rows the largest
+  disagreement between the two is **0.0053**, so the delivery's two independent
+  numeric fields corroborate each other. The preregistered filter (drop above
+  0.02) dropped nothing, and stays in the rule for the next delivery.
+- **Custody, unchanged.** A structure enters only via `usableSmiles()`
+  (chunk-verified A2 plus the frozen pin) or `rawVerifiedRows()` (a row whose own
+  received bytes hash to its declared value). A2 chunks 1, 2, 4, 7, 8 stay
+  excluded in full and the D-107 channel-corrected quarantine stays out. That
+  directory's README already establishes why: this channel can delete a run of
+  characters from a SMILES and leave something that still parses.
+
+Of 757 A1 rows, **351 were admitted**: 397 dropped for having no custody-verified
+structure, 9 as already in the pin, 0 for target, 0 for consistency, 0 for shape.
+Combined set: **638 rows**, 287 pinned + 351 new, 338 structures, 0
+unfingerprintable.
+
+### The four arms
+
+| arm | rows | nTrain/nCalib/nTest | MAE | RMSE | R² | gate |
+|---|---|---|---|---|---|---|
+| G — pin only (control) | 287 | 178/64/45 | 1.1726 | 1.4534 | 0.4820 | BLOCKED (MAE) |
+| H — combined | 638 | 426/125/87 | **1.0118** | 1.3973 | 0.4336 | BLOCKED (MAE) |
+| I — combined, small molecule | 246 | 183/26/37 | 0.9547 | 1.3832 | **−0.1352** | BLOCKED (nTest, R²) |
+| J — combined, peptide | 392 | 243/99/50 | 1.1364 | 1.6231 | 0.1656 | BLOCKED (MAE, R²) |
+
+The control reproduces D-077a to the digit, so the arms are readable against it.
+
+**Arm H is the best number this axis has ever produced and it still fails.**
+2.2x the rows moved MAE from 1.1726 to 1.0118 — 0.0118 above the line. Per the
+preregistration's rule that is `H_fails_on_MAE`: more rows of this kind do not
+close the gate on their own. The honest reading is narrower than that rule's
+wording, though, and both halves matter: the effect of data volume is large and
+real, and it was not enough. Held-out R² also fell slightly, 0.4820 to 0.4336,
+which is what one expects when the test set triples and stops being dominated by
+a few scaffolds.
+
+**Arm I answers D-143's open question, and the answer is not the hopeful one.**
+D-143's arm A failed on `nTrain=54 < 150`, so the featurization hypothesis went
+down as UNTESTED. Here `nTrain=183` **clears `MIN_TRAIN`** — the blocker D-143
+identified is gone — and the arm still fails: `nTest=37`, three short of 40, and
+R² **−0.1352**, meaning the model is worse than predicting the training mean on
+held-out small-molecule scaffolds. Its MAE of 0.9547 is under the line and is
+again the trap D-143 described; the small-molecule subset's pActivity spread is
+SD 1.416, so a low MAE there is cheap and R² is the number that reports skill.
+
+No preregistered decision rule covers "fails on nTest and R² while MAE passes",
+so that gap is recorded rather than papered over: the rules anticipated a size
+failure or an accuracy failure, not both at once. What the two small-molecule
+arms now say together — R² −29.29 on 6 test rows in D-143, R² −0.1352 on 37 in
+D-144 — is that a Morgan r=2 512-bit ridge model has **no** predictive power on
+GLP-1R small molecules, on two independent splits. That is evidence against
+D-077a's hypothesis in its optimistic form: the peptides are not what was
+holding the model back, and removing them does not produce a usable
+small-molecule model.
+
+Arm J points the same way from the other side. Peptides alone score worse than
+the mixture (MAE 1.1364, R² 0.1656), so neither subset carries the combined
+model's performance; the mixture does better than either half of it.
+
+### What this changes about the plan
+
+D-077a ranked three routes. After D-143 and D-144:
+
+1. **A peptide-appropriate representation** — still untried, and now the only
+   route with evidence behind it, since 2.2x the data got within 0.0118 and
+   both single-class models were worse than the mixture.
+2. **Small-molecule stratification** — attempted properly, `MIN_TRAIN` cleared,
+   result negative. This route is not promising and should not be retried on
+   Morgan fingerprints.
+3. **More rows** — measured rather than assumed: the effect is 0.16 MAE units
+   for 351 rows, which is substantial and still short.
+
+The next unit of work that has not already been shown not to work is a new
+representation, and that needs its own sealed gate, because `gate.algorithm`
+names `ridge-ecfp4-morgan-r2-512bit` and a different featurization is a
+different model, not a tuning of this one.
+
+### Standing
+
+`GENESIS-MOL-01` stays `NO_WINNER`. `probeCapabilities().activityPredictor` is
+still `false`. No threshold moved, the pin was not rewritten, no prediction was
+emitted, and no compound was ranked.
+
+## D-145 — the full BodyParts3D male body replaces the proxy and hologram as the twin's visible body
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (explicit consent in the film thread: "Zgoda na slorksmo/Human-Atlas").
+
+**Context.** genesis-physics.com showed "Pełny atlas męski · 2234 struktur · BodyParts3D", but no branch or commit of this repository ever held that atlas: it came from the MIT-licensed Human Atlas viewer (github.com/slorksmo/Human-Atlas, commit 5bb5713a), downloaded outside the repository. Main had only the five-organ BodyParts3D pilot (D-131 era), so the atlas would have been lost on the next deploy.
+
+**Decision.** Vendor the male reference data only (atlas.json + 15 gzip chunks, 34 MB) under `packages/frontend/public/assets/bodyparts3d/full/`, with the viewer's MIT licence and attribution file beside it. `core/three/bodyParts3dFullAtlas.ts` loads it and merges the 2,234 meshes into one geometry per system (15 draw calls). Every twin applies it: the procedural proxy, the clothed CC0 asset and the hologram shell are hidden, so exactly one body is on screen. Surface modes map onto it: Skóra = full body without skin or reproductive systems (hidden by default, as in the source viewer), RTG = skeleton opaque and the rest at 7 %, Duch/isolation = everything faded so the organ proxies inside stay pickable and visible. The Human Explorer shows "Pełny atlas męski · 2 234 struktur" with the CC BY 4.0 attribution once loaded.
+
+**What it is not.** A generic educational reference body (TARO MRI + illustration), not a patient and not a clinical model. The female reference body and the viewer's own UI code were not imported. A load failure leaves the previous body standing and is reported as FAILED; nothing is substituted.
+
+**Evidence.** `src/__tests__/bodyParts3dFullAtlas.test.ts` loads the committed files: 2,234 structures, 3,432 concepts, 2,288,268 triangles, height 1.73 m. Browser check on a local build: label after ~15 s under software WebGL; Skóra, RTG and Duch views rendered.
+
+## D-146 — the drug bench names where its docked target sits in the body, and the twin opens on that system
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval, "rób sam"); the coordinator asked for the link once the audit showed the bench and the body shared a screen but were not connected.
+
+**Context.** `ScientificWorldsScreen` hosts both the live drug bench (physics world) and the human twin (biology world), yet a run's docked protein never reached the body view: clicking an organ said nothing about the candidate, and "click the organ and see where your candidate acts" was not a claim the product could back.
+
+**Decision.** A curated reference table, `core/liveExperiment/targetAnatomy.ts`, keyed by the backend's own `targetId` (the RECEPTOR_PREPARED record), gives each shipped target the body system it sits in, a plain Polish site, and the public record that says so (UniProt accession plus the structure's citation). The bench panel shows "Cel dokowania: … · Gdzie w ciele: …" with the caption *MIEJSCE WYSTĘPOWANIA CELU · atlas referencyjny, nie symulacja działania leku w tkance*, and a link to `#/human-biology-lab?target=<id>`. Opening that route runs the systems rail's own FOCUS_ANATOMY command for that system and the Human Explorer heading repeats the protein, the site and the caption. A target the table does not know gets "brak zapisanej lokalizacji" and no link: the body never guesses an organ.
+
+**What it is not.** No tissue simulation, no pharmacokinetics, no claim that the drug acts where the protein is: ABL1 itself is expressed in most tissues; the entry says so and names the haematopoietic site of the BCR-ABL fusion imatinib targets. The CC BY 4.0 BodyParts3D attribution is untouched.
+
+**Evidence.** `src/__tests__/targetAnatomy.test.ts` (every entry names a twin system, a site and a `UniProt P…` basis, and never says "działa"); `humanExplorerVisualPolish.test.tsx` renders the caption from the table and confirms the default panel is unchanged without a target.
+
+**D-146 addendum (same day, owner's specification "DRUG CANDIDATE ↔ HUMAN DIGITAL TWIN INTEGRATION").** The link is now per finalist and identity-checked: `core/liveExperiment/twinContext.ts` resolves `finalist → target → documented anatomical association` from the canonical run only (`resolveTwinContext`): the candidate must exist in the run and stand on the finalists' stand (a docking score), the target in the route must equal the run's `RECEPTOR_PREPARED` target, and the association must be in `targetAnatomy.ts`; anything else is `UNRESOLVED — NO VERIFIED ANATOMICAL MAPPING` with its reason (NO_RUN, NO_TARGET, TARGET_MISMATCH, NO_CANDIDATE, CANDIDATE_NOT_FINALIST, NO_VERIFIED_ANATOMICAL_MAPPING) and the twin does not move. Each finalist on the bench gets "Pokaż w Human Digital Twin →" (`#/human-biology-lab?target=&campaign=&candidate=`); the biology world runs the systems rail's own FOCUS_ANATOMY for the documented system and the Human Explorer shows a panel whose every line carries its kind of knowledge — TARGET_ASSOCIATION, ANATOMICAL_CONTEXT, MODEL_PREDICTION (Vina, pose, ADMET, QM), REAL_MEASUREMENT (the PDB structure), PROVENANCE (finalist record, sealed record + Replay check, state hash) and NOT_VALIDATED ("Efekt leku w tym narządzie: nie policzony"). Evidence: `src/__tests__/twinContext.e2e.test.tsx` runs the whole chain over the persisted event shapes (6 candidates → 4 rejected → 1 finalist → same ids to the panel; FOCUS_ANATOMY on `system:cardiovascular`; no line says "lek działa") and the negative cases (unknown target, hand-typed target, foreign candidate, non-finalist, no run in session). Scientific boundary unchanged: the twin is an anatomical context layer, not a patient, not a clinical twin, not a prediction of organism response.
+
+## D-147 — the genuine-discovery layer (Phase F) gets one screen: `#/discovery-track`
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval); the coordinator asked for the tested-but-unreachable Phase F modules to be visible to a grant reviewer.
+
+**Context.** `genuineDiscoveryOrchestrator.ts`, `discoveryContracts.ts`, `discoveryReplicationEngine.ts`, `literatureNoveltyAdapter.ts` and `selfFalsificationBattery.ts` were complete, tested (5/5, 19/19, 12/12, 14/14, 22/22) and proven end to end by `scripts/genuine-discovery-e2e-01.mjs` (8/8), but reachable only from Node: `moduleReachability.test.ts` listed all five as documented orphans, and no route rendered the track "novelty L1–L6 → replication → 13 probes → DiscoveryStatus".
+
+**Decision.** `components/DiscoveryTrackScreen.tsx` at `#/discovery-track` (lazy route in `App.tsx`, one link on the start page next to the Reviewer Room door). It builds the two inputs exactly as the E2E-01 script does — Kepler with the declared public anchor (`KEPLER_MARS_ANCHOR_ID`), QE4 without one; rival model = constant; the caller's structural declaration clean; one hypothesis, no correction — and calls `runGenuineDiscoveryPipeline` in the reviewer's browser, once per page load. Every value on the page (L1–L6 levels, overall, replication block, the 13 probe verdicts with the module's own reason, `DiscoveryStatus`, `outcomeFingerprint`, `campaignFingerprint`, probe-report and prereg-freeze fingerprints) is read from the returned `DiscoveryRecord`; nothing is hardcoded. Literature L5/L6 use an injected `LiteratureSearchClient` that rejects with NO_ACCESS and never calls `fetch`; the page says so ("Literatura (OpenAlex/Crossref): NO_ACCESS w tym środowisku — dlatego status nie może przekroczyć UNKNOWN") and carries the epistemic line "Ścieżka deterministyczna, bez LLM; status końcowy nigdy nie jest promowany powyżej tego, co dowody pozwalają." Eight `ALLOWED_ORPHANS` entries were deleted because the screen now reaches them from `main.tsx`: the five Phase F modules above plus `domainAdapterRegistry.ts`, `campaignLabs.ts`, `qe4DatasetLaboratory.ts`.
+
+**What it is not.** No new science, no LLM, no network: every module is reused unmodified. Neither record is a discovery — on today's run Kepler comes out REPRODUCTION (overall KNOWN, anchor match) and QE4 UNKNOWN (overall NO_ACCESS), the same result the E2E-01 script prints; the test asserts only that QE4's rendered status equals what the pipeline returned and is not DISCOVERY. Independent replication does not run (no disjoint replication dataset exists), so DATASET_CONTAMINATION and HIDDEN_PREREG stay UNRESOLVED and the page says why. The seven STRUCTURAL_REVIEW probes judge the caller's declaration, not the data, and the page states that it is a declaration. The QE4 "discovery dataset" is the E2E-01 helper set (admitted x, y=0, σ=1), labelled on screen as such. `novelHypothesisGenerator.ts` is not part of the pipeline and stays a documented orphan.
+
+**Evidence.** `src/__tests__/discoveryTrackScreen.test.tsx` (both records rendered; QE4 status is the pipeline's and not DISCOVERY; 2×13 probe rows with the battery's verdicts; NO_ACCESS and epistemic caveats present; the stub client rejects without a network call; two computations render identical markup); `moduleReachability.test.ts` passes with the eight entries gone; `genuineDiscoveryOrchestrator.test.ts` unchanged.
+
+## D-148 — after a finalist, the bench does not say "success": Genesis tries to overturn its own result
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval); the coordinator asked for the grant "WOW moment": the moment a candidate reaches the finalists' stand, the same screen must show Genesis attacking that result, not announcing it.
+
+**Context.** The live drug bench (D-146) ended at a finalist with a Vina score, a sealed record and a link to the twin. The 13 self-falsification probes of Phase F existed (`core/agent/selfFalsificationBattery.ts`, shown on `#/discovery-track`, D-147) but never touched the drug run, and the bench had no place that said what was still unknown or what should be run next.
+
+**Decision.** `core/liveExperiment/finalistFalsification.ts` — a pure `finalistFalsification(run, candidateId)` over the canonical `LiveDrugRun` — is `RESOLVED` only for a candidate standing on the finalists' stand (`zoneOf === 'FINALIST'`) and `NOT_APPLICABLE` (NO_RUN, NO_CANDIDATE, CANDIDATE_NOT_FINALIST) otherwise. It always reports all 13 probes, in the battery's own order and vocabulary, reusing the battery's own rule functions (`structuralProbe`, `multipleTestingProbe`, `probe`, now exported) rather than a copy. Only three probes get a declaration, each read from a persisted record and naming it: **HIDDEN_PREREG** from the server's preregistration record (which the server refuses for an executed campaign) plus the server's own check of the sealed session (`MATCH` → PASS; `REFUSED` or a non-MATCH check → FAIL; no check yet → UNRESOLVED); **MULTIPLE_TESTING** from the number of docked candidates in the STAGE_RESULT records with no correction declared anywhere (one docked → PASS by the battery's rule, two or more → FAIL); **PREPROCESSING_ARTIFACT** from the receptor/source/pose sha256s, the Meeko version and the Science Run id on record. The other ten (TAUTOLOGY, OVERFITTING, ALTERNATIVE_MODEL, DATASET_CONTAMINATION, SELECTION_BIAS, LEAKAGE, CONFOUNDING, MEASUREMENT_ARTIFACT, NUMERICAL_ARTIFACT, TEMPORAL_LEAKAGE) need a fitted model, points, a rival model, a replication dataset or a caller's structural declaration the drug run does not hold, and stay UNRESOLVED with the battery's own reason — never assumed clean; CONFOUNDING is deliberately UNRESOLVED rather than the battery's empty-list PASS, because the run declares no list at all. "Czego jeszcze nie wiemy" lists every UNRESOLVED probe, every UNRESOLVED criterion of the frozen hypothesis (`evaluateDrugHypothesis`), and, when the target has a documented anatomy, the twin's own NOT_VALIDATED line "Efekt leku w tym narządzie: nie policzony". "Jaki eksperyment powinien być następny" is `drugHypothesis.ts::nextDrugExperiment` (the existing rule, unmodified) followed by one entry per UNRESOLVED probe naming the battery input field that would resolve it. `components/FinalistFalsificationPanel.tsx` renders this under every candidate on the bench (`data-testid="drug-finalist-falsification"`), so it appears for the finalist only, opening with "Genesis nie ogłasza sukcesu. To, co poniżej, to próba obalenia własnego wyniku."
+
+**What it is not.** No new science and no new verdict: the probes judge the run's declarations, not the binding; PASS on three probes means those records exist, not that the candidate works. The hypothesis verdict shown is the existing one (UNRESOLVED on the canonical fixture, whose ADMET record carries no AMES/hERG endpoints) and is never promoted. Next experiments are proposals, not runs. When no hypothesis was registered in the session the panel says the default criteria were used. No LLM, no network.
+
+**Evidence.** `src/__tests__/finalistFalsification.test.ts` (13 probes in order; PASS only with a named record; 10 UNRESOLVED with reasons; unknowns incl. the tissue line; next experiments = nextDrugExperiment + one per unresolved probe; NOT_APPLICABLE for c0/c2/c99/null; REFUSED prereg → FAIL, no sealed check → UNRESOLVED, two docked → FAIL; deterministic). `twinContext.e2e.test.tsx` renders the panel on the same fixture for c1 and asserts it renders nothing for the other five candidates and for no run. `moduleReachability.test.ts` unchanged: the new module is reached from `ScientificWorldsScreen.tsx`.
+
+## D-149 — live scientific ingestion with a sha256 on every fetch (PDB/RCSB, ChEMBL, UniProt, ClinicalTrials.gov)
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval); the coordinator asked for a grant-demo path that fetches from public scientific sources live, records a hash of what came back, and never dresses a blocked fetch as a live one.
+
+**Context.** The repo already had an allowlisted proxy for ChEMBL and PubChem (`biotechProxy.mjs`, D-085), hash-pinned fixtures with sidecar provenance (`activityDataset.mjs`, `dockingTargets.mjs` SOURCE.json, the A2 `meta.json`), and an evidence-connector registry on the frontend — but no single place where a reviewer could press one button and see, per source, whether the network answered and what the bytes hashed to.
+
+**Decision.** `packages/backend/src/scientificIngestion.mjs` — `ingestScientificSource({source, id}, {fetchImpl, now})`. The id is validated by a per-source grammar (PDB `^[1-9][A-Za-z0-9]{3}$`, ChEMBL `^CHEMBL[0-9]{1,9}$`, UniProt accession grammar, `^NCT[0-9]{8}$`) BEFORE any URL exists; the URL is built deterministically (`files.rcsb.org/download/<ID>.pdb`, `www.ebi.ac.uk/chembl/api/data/molecule/<ID>.json` through the existing biotech allowlist, `rest.uniprot.org/uniprotkb/<ACC>.json`, `clinicaltrials.gov/api/v2/studies/<NCT>`) and checked against a host + path-prefix allowlist; redirects are `manual` and re-validated per hop (max 3), like D-085. Every result carries `url`, `httpStatus`, `sha256` of the raw payload bytes, `bytes`, `fetchedAt`, and one of three access statuses: **LIVE** (HTTP 200, non-empty body — the hash is of those bytes and nothing else), **NO_ACCESS** (refused, timed out or non-200; `error` says which), **PINNED_FALLBACK** (the live attempt failed AND the repo holds a hash-recorded copy for that exact id: today only `1IEP` → `compute/targets/abl1-1iep/1iep_receptorH.pdb` and `NCT03987919` → `biotechData/a2-ozempic-substitute/reference-semaglutide-NCT03987919.json`). A pinned result keeps the failed live attempt's error on record, re-hashes the file on disk and compares it with the recorded sha256 (`matchesRecord`), and states what the file is: the 1IEP copy is the Vina-tutorial PREPARED receptor (ligand/waters removed, hydrogens added), not the raw RCSB file; the NCT copy is the narrowed extraction whose hash is `meta.narrowSha256`, while the raw payload hash recorded at fetch time (`1e72fb8d…`, 120327 bytes) belongs to bytes that are not in the repository. Nothing is cached: a later live success always wins over a pinned copy, and a NO_ACCESS is never turned into anything else. Routes: `GET /api/ingestion/source?source=&id=` (public, `biotechSourceLimiter` — 30/min like `/api/biotech/source`; the in-memory last result per source is the only state) and `GET /api/ingestion/status` (the four sources, allowlist, id grammar, pinned ids, last result). Frontend: `client.ts::ingestScientificSource / getScientificIngestionStatus`, `components/ScientificIngestionPanel.tsx` mounted on `#/reviewer-room` as the section "Ingestia na żywo z hashem" (rows 1IEP / CHEMBL941 / P00519 / NCT03987919, button "Pobierz na żywo", badge LIVE / NO_ACCESS / PINNED_FALLBACK, first 12 hash characters, fetchedAt, and the caveat "Bez sieci status to NO_ACCESS; wynik przypięty jest oznaczony osobno, nigdy nie udaje pobrania na żywo.").
+
+**What is claimed / not claimed.** Claimed: the code path from id validation to hash is real and tested with an injected fetch (LIVE hash equals the payload's sha256; 403 and a thrown network error give NO_ACCESS with the reason; an empty 200 is not LIVE; an off-allowlist redirect is never fetched; a pinned fallback appears only for the two pinned ids and never for a sibling id; a tampered pinned file reports `matchesRecord: false`). NOT claimed: that any of the four sources was verified live from this sandbox. One real call per source was run here on 2026-09-27 through the sandbox's egress proxy and every one returned **NO_ACCESS** (`http_403` — the proxy answers CONNECT with 403 for these hosts; `curl` shows "CONNECT tunnel failed, response 403"): `pdb 1IEP → PINNED_FALLBACK (http 403, sha 5f6aee6029f9…, matchesRecord true)`, `chembl CHEMBL941 → NO_ACCESS (http 403)`, `uniprot P00519 → NO_ACCESS (http 403)`, `clinicaltrials NCT03987919 → PINNED_FALLBACK (http 403, sha 385c58a1b7a1…, matchesRecord true)`. That is the honest evidence: the two pinned rows are pinned, the other two are blocked, none is LIVE. A LIVE result has to be produced from a runner with ordinary internet access (the CI runners that already re-fetch NIST/Kepler/QE4/CMS fixtures have it); until then the demo shows NO_ACCESS / PINNED_FALLBACK, and the panel says so. No ingested bytes are stored, parsed or fed into any ranking; the endpoint is status and custody only.
+
+**Evidence.** `packages/backend/src/scientificIngestion.test.mjs` (13 tests: grammar, URL builder, allowlist, rejection before fetch, LIVE hash, NO_ACCESS on 403 / network error / empty body, redirect custody, pinned-only-for-pinned-ids, live-beats-pinned, drift detection, status registry), `apiScientificIngestion.test.mjs` (6 tests on the two routes), `serverApiPrefixes.test.mjs` (the `ingestion` family is admitted by server.mjs), frontend `src/__tests__/scientificIngestionPanel.test.tsx` (default rows and caveat; stubbed client called for each default id; LIVE / NO_ACCESS / PINNED_FALLBACK rendered exactly as returned; a NO_ACCESS row shows no hash).
+
+## D-150 — the finalist's 13-probe self-falsification battery, resolved from real runs and existing benchmarks
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval): close the full 13-probe battery for the hero drug-discovery run — for every unresolved probe, find the engine, data, control or benchmark that can produce the evidence, run it if a real run is needed, write it to Evidence, and only then set PASS or FAIL; no hardcoded PASS, no threshold moved to make something pass, no manually typed evidence, evidence against the hypothesis is a FAIL and is shown.
+
+**Context.** D-148 ran the 13 probes of `selfFalsificationBattery.ts` over the live drug bench, but the run could only declare three of them (HIDDEN_PREREG from the server's preregistration record, MULTIPLE_TESTING from the docked count, PREPROCESSING_ARTIFACT from the receptor/pose checksums). The other ten stood UNRESOLVED because nothing in the repo held the numbers they need. Three of them needed a real run that had never been executed for the hero target; the rest needed integration of records that already existed (the Astex benchmark, the append-only event log, the stage counters).
+
+**The real run.** `scripts/finalist-falsification-evidence.py` → `docs/evidence/finalist-falsification-2026-09-27.json`. Protocol and thresholds are frozen in the script's `PROTOCOL` constant before any number is read (protocol fingerprint `90238cfa1174…`, body sha256 `cb34754a3220…`), and the one smoke redock executed while wiring the script is disclosed in the docstring and repeated as a numbered configuration. It drives the SAME `packages/backend/src/compute/dock_worker.py` the campaign docking stage and the Astex benchmark use (Meeko 0.8.0 receptor prep → RDKit 2026.03.6 ETKDGv3/MMFF ligand → AutoDock Vina 1.2.7 → symmetry-aware heavy-atom RMSD in the crystal frame) against the run's own vetted target (ABL1_1IEP, PDB 1IEP chain A, hash-checked shipped files): the co-crystallised ligand redocked at five (seed, exhaustiveness) settings — all five docked, best affinity −12.81 … −12.601 kcal/mol (spread **0.209** against a frozen bound of 1.0), RMSD **0.584 … 0.979 Å**, median **0.89 Å** against a frozen bound of 2.0 Å — plus a declared control set docked into the same prepared receptor: nilotinib (positive control, a further type-II ABL1 inhibitor) at **−13.48** kcal/mol and five unrelated approved drugs (aspirin, paracetamol, metformin, caffeine, ibuprofen), the weakest of which reaches **−8.814** kcal/mol, i.e. a separation of **3.996** kcal/mol against a frozen bound of 1.0.
+
+**Decision.** `core/liveExperiment/falsificationEvidence.ts` assembles, purely from the state and from records on disk, the evidence the battery needs, each with a resolvable identity (`sha256:…`, `fnv1a:…`, or a server record id): the recorded redock/control run (only for the target it was run against — it is never borrowed for another receptor), the Astex Diverse Set run under the current preregistered protocol (`core/reviewer/dockingBenchmark.ts`), and the run's own records. `core/liveExperiment/drugRunState.ts` gains `ordering` (`orderingOf`): the seq of the last generation event, of RECEPTOR_PREPARED and of the first scored docking result, plus any named ordering breach. `finalistFalsification.ts` now feeds every one of the 13 probes and returns, per probe, `{verdict, reasonPl, evidenceSource, evidenceId, blockerPl}` — an UNRESOLVED carries no evidence and always names its blocker, a PASS/FAIL always carries both a source and an identity. `FinalistFalsificationPanel.tsx` shows those four columns and lists the evidence records used.
+
+Per probe, resolved from: **NUMERICAL_ARTIFACT** score/pose spread across the five settings; **MEASUREMENT_ARTIFACT** median redock RMSD against the deposited X-ray coordinates (a channel sharing no code path with the Vina scoring function); **ALTERNATIVE_MODEL** separation from the weakest unrelated-drug control; **TAUTOLOGY** `tautologyGate.ts::assessTautology` over that declared prediction/observation pair (→ EMPIRICAL_TEST); **DATASET_CONTAMINATION** canonical-SMILES intersection of the campaign's candidates with the 85 Astex complexes; **LEAKAGE** the fact that that check was executed; **OVERFITTING** a two-proportion z-test (α = 0.05) of the benchmark's success rate across a deterministic fnv1a split of the 85 cases; **SELECTION_BIAS** the run's own generated-vs-docked counters; **CONFOUNDING** the confounders derivable from the persisted receptor/pose records; **TEMPORAL_LEAKAGE** `state.ordering.violations`; **HIDDEN_PREREG / MULTIPLE_TESTING / PREPROCESSING_ARTIFACT** unchanged from D-148.
+
+**What is claimed.** On the hero fixture (ABL1_1IEP, imatinib chemotype) all 13 probes are resolved: **10 PASS, 3 FAIL, 0 UNRESOLVED**, every row pinned to an identity. The three FAILs are real findings and are shown, not hidden: **DATASET_CONTAMINATION** fails because the campaign's own seed molecule (imatinib) IS Astex case 1T46, so the benchmark that validates the instrument contains what the campaign is testing; **SELECTION_BIAS** fails because only 1 of the generated candidates reached the docking instrument (a stage budget, not chemistry, decided what was measured), so the finalist is a selected molecule, not a representative sample; **CONFOUNDING** fails because the run's records show a rigid single-conformation receptor, an empirical scoring function with no explicit solvent or entropy term, and no molecular-dynamics run. A run docking into any other receptor loses the redock evidence and goes back to 4 UNRESOLVED with the blocker naming the missing run — tested.
+
+**What is NOT claimed.** No measured binding affinity and no therapeutic claim: every Vina number is MODEL_ESTIMATE. The negative controls are chemically unrelated approved drugs, **not** property-matched decoys (no offline decoy generator exists here), and the panel says so in the ALTERNATIVE_MODEL row. The redocked ligand is the target file's own crystal ligand, so MEASUREMENT_ARTIFACT validates the pipeline and this receptor, not a novel molecule. OVERFITTING is **not** a hold-out of a fitted model — no model is fitted; it tests whether the protocol's success rate is a property of the protocol or of the half it was amended on, and the reason text states that. Independent replication is **computational** replication (a redock of the same receptor at other seeds and exhaustiveness values by the same code); it is not an independent laboratory, not a different program and not a different receptor structure, and it satisfies NUMERICAL_ARTIFACT and MEASUREMENT_ARTIFACT only — not DATASET_CONTAMINATION, which is answered by the disjointness check and fails. **Not resolved in this environment and not wired to anything:** AMES and hERG as ADMET-AI endpoints — the endpoint table is read from the installed `admet_ai` package's own `resources/data/admet.csv` (`admet_worker.py::_endpoint_table`), `admet_ai` is not installed in this sandbox (`/api/health` reports `admet BLOCKED_BY_RUNTIME`), so which endpoint ids exist could not be confirmed from code and no safety endpoint feeds any probe; molecular dynamics — `openmmAdapter.mjs` and OpenMM 8.6.1 are present and the panel proposes MD as the next experiment, but no MD run was executed, so the rigid-receptor confounder stands; external literature novelty and live scientific ingestion — NO_ACCESS from this sandbox (D-149, the egress proxy answers CONNECT with 403), so nothing here rests on them. PySCF is `BLOCKED_BY_RUNTIME` here, so the quantum stage of the browser run is blocked and the spec records it.
+
+**Evidence.** `scripts/finalist-falsification-evidence.py` and its output `docs/evidence/finalist-falsification-2026-09-27.json` (body sha256 `cb34754a3220…`); frontend `src/__tests__/falsificationEvidence.test.ts` (10 tests: the recorded run is pinned by sha256 and not transferable to another receptor, the Astex overlap finds 1T46 and reports zero for a clean campaign, the split is deterministic and its successes sum to the run's own total, the confounders are derived from records, an ordering breach is named both ways, the bundle is pure); `src/__tests__/finalistFalsification.test.ts` (8 tests: all 13 probes, every verdict carries provenance, every UNRESOLVED carries a blocker, the three FAILs asserted by their real reasons, counts 10/3/0, and a foreign target falling back to 4 UNRESOLVED); `src/__tests__/twinContext.e2e.test.tsx` (the panel draws the four columns, the evidence identities and the blockers); `packages/e2e/src/finalistFalsification.e2e.spec.ts` (browser: start campaign → real RDKit/Vina engines → finalist → 13 rows each with verdict + reason + evidence source + evidence identity → unknowns → next experiments → evidence list → the server's scientific memory with preregistration seq 1 and preregCheck MATCH → replay MATCH; it asserts the contract, never a particular verdict, prints the engine statuses and the probe distribution, and records which stages were blocked because their engine is absent here).

@@ -1,0 +1,56 @@
+{
+  "schema": "genesis-supplied-inputs/1",
+  "bundleId": "real-scientific-campaign-001-bundle",
+  "campaignId": "real-scientific-campaign-001",
+  "ingestionMode": "VERIFIED_BUNDLE",
+  "note": "OFFLINE 'externally supplied official payloads' path. Download each OFFICIAL payload on a network-enabled machine per REAL_CAMPAIGN_INPUT_REQUIREMENTS.json, save the RAW response bytes as a file next to this manifest, and list it below. `file` is relative to this file's directory. Do NOT edit the payload bytes and do NOT hand-author contentHash — build-bundle-from-supplied.mjs computes real SHA-256 from the bytes, validates each payload actually parses to a usable entity of its claimed type, and FAILS CLOSED otherwise. Use ingestionMode VERIFIED_BUNDLE for genuine official payloads; use TEST_FIXTURE only for synthetic pipeline self-checks. CHEMBL + PUBCHEM + UNIPROT are mandatory (fail closed if missing).",
+  "inputs": [
+    {
+      "sourceService": "UNIPROT",
+      "sourceType": "protein",
+      "sourceId": "<UNIPROT_ACCESSION e.g. P15056>",
+      "file": "uniprot_<ACCESSION>.json",
+      "sourceUrl": "https://rest.uniprot.org/uniprotkb/<ACCESSION>.json",
+      "license": "CC-BY",
+      "sourceVersion": "<UniProt release, e.g. 2024_06>",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "sourceService": "CHEMBL",
+      "sourceType": "bioactivity",
+      "sourceId": "<CHEMBL_ACTIVITY_ID>",
+      "file": "chembl_activity_<ACTIVITY_ID>.json",
+      "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/<ACTIVITY_ID>.json",
+      "license": "CC-BY-SA",
+      "sourceVersion": "<ChEMBL release, e.g. CHEMBL_34>",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "sourceService": "PUBCHEM",
+      "sourceType": "compound",
+      "sourceId": "<CID>",
+      "file": "pubchem_cid_<CID>.json",
+      "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/<CID>/property/CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+      "license": "PUBLIC_DOMAIN",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "sourceService": "EUROPE_PMC",
+      "sourceType": "article",
+      "sourceId": "<PMID_OR_PMCID>",
+      "file": "epmc_<PMID>.json",
+      "sourceUrl": "https://europepmc.org/abstract/MED/<PMID>",
+      "license": "UNKNOWN",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "sourceService": "RCSB_PDB",
+      "sourceType": "structure",
+      "sourceId": "<PDB_ID>",
+      "file": "pdb_<PDB_ID>.json",
+      "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/<PDB_ID>",
+      "license": "CC0",
+      "retrievedAt": "<ISO8601_UTC>"
+    }
+  ]
+}

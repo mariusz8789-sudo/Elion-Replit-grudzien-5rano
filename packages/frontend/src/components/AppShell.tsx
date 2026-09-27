@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 
@@ -158,8 +158,15 @@ export function AppShell({ children, chat, chatInline = false }: {
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuCloseRef = useRef<HTMLButtonElement>(null);
-  /** The long tail of modules, collapsed by default — see MORE_ITEMS. */
+  /** The research mode, collapsed by default — see MORE_ITEMS. */
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Capabilities whose alternative screens (variants) are unfolded. */
+  const [openVariants, setOpenVariants] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleVariants = (id: string): void => setOpenVariants((open) => {
+    const next = new Set(open);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   useEffect(() => {
     const onHashChange = (): void => { setHash(window.location.hash || '#/'); setMenuOpen(false); };
@@ -208,15 +215,39 @@ export function AppShell({ children, chat, chatInline = false }: {
       <div className="shell-nav-section">
         <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
-          <span className="shell-nav-label">Biblioteka</span>
+          <span className="shell-nav-label">{RESEARCH_MODE_LABEL}</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
           {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
             <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
               <h3 className="shell-nav-subgroup-title" id={`${group.id}-title`}>{group.label}</h3>
-              {group.items.map((item) => (
-                <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
-              ))}
+              {group.items.map((item) => {
+                const variants = navVariants(item.id);
+                // The active screen being a variant keeps its capability unfolded, so the user sees where they are.
+                const unfolded = openVariants.has(item.id) || variants.some((v) => v.id === active);
+                return (
+                  <div className="shell-nav-capability" key={item.id}>
+                    <NavButton item={item} active={active === item.id} onNavigate={() => go(item)} />
+                    {variants.length > 0 && (
+                      <button
+                        className="shell-nav-variants-toggle"
+                        onClick={() => toggleVariants(item.id)}
+                        aria-expanded={unfolded}
+                        aria-label={`${unfolded ? 'Ukryj' : 'Pokaż'} inne widoki: ${item.label} (${variants.length})`}
+                      >
+                        {unfolded ? '−' : '+'} inne widoki ({variants.length})
+                      </button>
+                    )}
+                    {unfolded && variants.length > 0 && (
+                      <div className="shell-nav-variants">
+                        {variants.map((variant) => (
+                          <NavButton key={variant.id} item={variant} active={active === variant.id} onNavigate={() => go(variant)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </section>
           ))}
         </div>}

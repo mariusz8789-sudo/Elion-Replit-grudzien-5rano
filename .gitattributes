@@ -9,3 +9,16 @@
 /packages/backend/src/compute/cms-zmumu/Zmumu.csv -text
 /data/transcription/**/*.psv -text
 /data/transcription/**/*.rowhash -text
+# Pinned structure files (sha256 in each SOURCE.json) and captured tool logs are kept
+# byte-for-byte: their fixed-width padding / trailing blanks are data, not a style slip.
+/packages/backend/src/compute/targets/**/*.pdb -whitespace
+/packages/backend/src/compute/targets/**/*.sdf -whitespace
+/artifacts/human-twin-review/*.log -whitespace
+/artifacts/human-twin-review/*.txt -whitespace
+# Archive recovered verbatim from unmerged branches (legacy/, docs/legacy/, docs/reference/codex-handoff/,
+# docs/unreviewed-external/): kept byte-for-byte as it was on its branch, so no whitespace rewrite.
+/legacy/** -whitespace
+/docs/legacy/** -whitespace
+/docs/reference/codex-handoff/** -whitespace
+/docs/unreviewed-external/** -whitespace
+/packages/frontend/public/assets/bodyparts3d/full/** -text

@@ -17,6 +17,9 @@
  * realni ludzie; patogen jest ABSTRAKCYJNY („Pathogen X"); to symulacja
  * EDUKACYJNA, nie prognoza rzeczywistej epidemii.
  */
+import { mulberry32 } from '@genesis/core/determinism.js';
+/** Seeded PRNG — the ONE mulberry32 in @genesis/core/determinism. */
+export const makeRng: (seed: number) => () => number = mulberry32;
 
 export type AgentState = 'S' | 'E' | 'I' | 'R' | 'D';
 /** Widoczne zachowanie proceduralne (tylko warstwa wizualna/ruchu). */
@@ -84,16 +87,6 @@ export const DEFAULT_AGENT_PARAMS: AgentParams = {
   seed: 12345,
 };
 
-/** Deterministyczny generator liczb pseudolosowych (mulberry32). */
-export function makeRng(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Statyczny plan lotniska (strefy) — znormalizowany 0..1. */
 export const AIRPORT_ZONES: Zone[] = [

@@ -1,0 +1,2075 @@
+{
+ "kind": "GENESIS_ASTEX_REDOCK_BENCHMARK",
+ "protocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
+ "preregistrationSha256": "ad6e38ce51a22be5155085a4753f01f1b159937dfea6130360eff741d05cb291",
+ "finishedAt": "2026-09-27T02:50:31+00:00",
+ "versions": {
+  "vina": "1.2.7",
+  "meeko": "0.8.0",
+  "rdkit": "2026.03.6",
+  "biotite": "1.6.0",
+  "python": "3.11.15"
+ },
+ "summary": {
+  "cases": 85,
+  "docked": 46,
+  "successes": 23,
+  "successRate": 0.2706,
+  "successRateAmongDocked": 0.5,
+  "preparationOrDockingFailures": 39
+ },
+ "cases": [
+  {
+   "pdbId": "1G9V",
+   "listedLigand": "RQ3",
+   "inputSha256": "11a01950a2c1f4f016f3ad53a7b5451e6ca19964928e8119808cd1e154969a7c",
+   "ligandResidue": "RQ3",
+   "ligandHeavyAtoms": 25,
+   "ccdTemplate": "RQ3",
+   "center": [
+    16.966,
+    16.623,
+    41.744
+   ],
+   "boxSize": [
+    20.0,
+    23.331,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.898,
+   "vinaScoreKcalMol": -8.01,
+   "ligandSmiles": "Cc1cc(C)cc(NC(=O)Cc2ccc(OC(C)(C)C(=O)O)cc2)c1",
+   "poseSha256": "e131808a92c114ffee5cb73e857c8eeb761612dfb7b186ffdc3942fd534f1b76",
+   "receptorPdbqtSha256": "0e6c8feb7726a8b243951a2900ad59381c57935d1a132cedb34ead949c8d2dc7",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1GKC",
+   "listedLigand": "NFH",
+   "inputSha256": "3ad14593a716b8f87171278e6af9515c383e0f59d4be16e95adf7886a0295862",
+   "ligandResidue": "BUM",
+   "ligandHeavyAtoms": 10,
+   "ccdTemplate": "BUM",
+   "center": [
+    67.317,
+    32.356,
+    119.878
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 6.453,
+   "vinaScoreKcalMol": -5.354,
+   "ligandSmiles": "CNC(=O)[C@@H](N)C(C)(C)C",
+   "poseSha256": "5dec47f10f084081e77e528f64b8b67af55e27872077a0f8fa66ca379750674e",
+   "receptorPdbqtSha256": "3e838158d1adbd4ac664f3d4118e04e490f964a294e5115b5990eb0c9a0e6f8e",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1GM8",
+   "listedLigand": "SOX",
+   "inputSha256": "3df08e15e883c340291c76427205fb9e850f79277151a895bb890fa5df171f49",
+   "ligandResidue": "SOX",
+   "ligandHeavyAtoms": 24,
+   "ccdTemplate": "SOX",
+   "center": [
+    14.458,
+    -2.042,
+    3.683
+   ],
+   "boxSize": [
+    20.0,
+    20.598,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCGLH       heavy_miss=2 heavy_excess=1 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): B:16"
+  },
+  {
+   "pdbId": "1GPK",
+   "listedLigand": "HUP",
+   "inputSha256": "b3a7414a8b7fb6446f5c8034e904125f0ee159ece8f3950c61580db16fc3bac9",
+   "ligandResidue": "HUP",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "HUP",
+   "center": [
+    2.842,
+    67.452,
+    63.054
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCMET       heavy_miss=2 heavy_excess=1 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:52"
+  },
+  {
+   "pdbId": "1HNN",
+   "listedLigand": "SKF",
+   "inputSha256": "be989576472341d6cec10c6e4ea19ccbc0fd3ffaf8a53b1a8f6d332c78eed934",
+   "ligandResidue": "SKF",
+   "ligandHeavyAtoms": 14,
+   "ccdTemplate": "SKF",
+   "center": [
+    28.265,
+    44.149,
+    16.529
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCLEU       heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1HP0",
+   "listedLigand": "AD3",
+   "inputSha256": "97d93a9fa1b2a852b66a38b7b7d862e8429c8e23c4890216362508e276cebcc6",
+   "ligandResidue": "AD3",
+   "ligandHeavyAtoms": 19,
+   "ccdTemplate": "AD3",
+   "center": [
+    16.686,
+    25.497,
+    12.944
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCARG       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:32"
+  },
+  {
+   "pdbId": "1HQ2",
+   "listedLigand": "PH2",
+   "inputSha256": "163f8eab4010d477561418e6713030654715d45905466368036a95a3558eb156",
+   "ligandResidue": "HHP",
+   "ligandHeavyAtoms": 14,
+   "ccdTemplate": "HHP",
+   "center": [
+    -8.503,
+    7.946,
+    17.463
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.436,
+   "vinaScoreKcalMol": -8.7,
+   "ligandSmiles": "Nc1nc2c(c(=O)[nH]1)N=C(CO)CN2",
+   "poseSha256": "c07c271551708754bdb0d7410eb2e093d4545c13922d2cbc3681ce917f0434cc",
+   "receptorPdbqtSha256": "eae1a6ac2577ae6382ab05c9fd061ba2ae94c6e313cc65a60c9a4745c0913d50",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1HVY",
+   "listedLigand": "D16",
+   "inputSha256": "ff4ffd955dcab44c166dfdc9d1ccb2a915e23ae2b7a8b3fa2c9bafcdf57cfa46",
+   "ligandResidue": "D16",
+   "ligandHeavyAtoms": 32,
+   "ccdTemplate": "D16",
+   "center": [
+    0.401,
+    12.392,
+    17.766
+   ],
+   "boxSize": [
+    20.0,
+    24.773,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 10.041,
+   "vinaScoreKcalMol": -9.071,
+   "ligandSmiles": "Cc1nc(=O)c2cc(CN(C)c3ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)s3)ccc2[nH]1",
+   "poseSha256": "da898dfc726c6549a309e54e4113b6f337194591b209eef54f0227a4979e8cdf",
+   "receptorPdbqtSha256": "ff9c16ae0c369319eecc0218bd3ce53315a781ea35636ae5b900727f9091ecf4",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1HWI",
+   "listedLigand": "115",
+   "inputSha256": "92bf001dfd98b3cde350e19dd6f6d69952c46826af6702f8985668be171084f7",
+   "ligandResidue": "115",
+   "ligandHeavyAtoms": 30,
+   "ccdTemplate": "115",
+   "center": [
+    33.197,
+    -6.634,
+    -10.597
+   ],
+   "boxSize": [
+    20.0,
+    20.085,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 7.087,
+   "vinaScoreKcalMol": -6.331,
+   "ligandSmiles": "CC(C)n1c(C=C[C@@H](O)C[C@@H](O)CC(=O)O)c(-c2ccc(F)cc2)c2ccccc21",
+   "poseSha256": "07fc161779261acb187f4d5045b30a0fb0d2b3a56310a2ec12a4cb534245d9e9",
+   "receptorPdbqtSha256": "59d73252adc932684167ce32c62a3bcad867581a2187850e25b799d1d7eb8704",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1HWW",
+   "listedLigand": "SWA",
+   "inputSha256": "e646b407ab3a34ade4e62c85d3d4c1879ed16beac9c39700167891fb2ff11754",
+   "ligandResidue": "SWA",
+   "ligandHeavyAtoms": 12,
+   "ccdTemplate": "SWA",
+   "center": [
+    31.377,
+    66.383,
+    7.718
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.278,
+   "vinaScoreKcalMol": -6.98,
+   "ligandSmiles": "O[C@H]1[C@H]2[C@H](O)CCCN2C[C@H]1O",
+   "poseSha256": "bbfbd8514ae7d42980aee75010fa5c4ec32c63d9a3ab0504505fac164fd29847",
+   "receptorPdbqtSha256": "4628661937cf9bf0e30ca90f4afd2aa5925b9eccd9821879de97ad611404cfd4",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1IA1",
+   "listedLigand": "TQ3",
+   "inputSha256": "5614596ca0c1535ba7583332ead009b9b32668e2b1d27bdcc77ac8064b55c101",
+   "ligandResidue": "TQ3",
+   "ligandHeavyAtoms": 19,
+   "ccdTemplate": "TQ3",
+   "center": [
+    30.54,
+    -3.375,
+    1.901
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={1}\nNASH       heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={4}\n\nmatched with excess inter-residue bond(s): A:10"
+  },
+  {
+   "pdbId": "1IG3",
+   "listedLigand": "VIB",
+   "inputSha256": "f3fa91609ccab2f6ca988133b211d3e33ad1e20c7ecda3a27b6be51a8c74faf0",
+   "ligandResidue": "VIB",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "VIB",
+   "center": [
+    6.32,
+    70.358,
+    19.332
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    22.354
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 9.348,
+   "vinaScoreKcalMol": -6.595,
+   "ligandSmiles": "Cc1ncc(C[n+]2csc(CCO)c2C)c(N)n1",
+   "poseSha256": "3aa47892f631600b436ce86dc181ccb96f7e4473592c275d6413b0b50ec0798a",
+   "receptorPdbqtSha256": "422701df8e9b9570d015f32e6b1b43b6fc51a62b06847b457ead443299040c77",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1J3J",
+   "listedLigand": "CP6",
+   "inputSha256": "3fd8b72ff2da5675e8d55d939efec655d1caa2d7fab52dd5a0404c71e3902ea7",
+   "ligandResidue": "CP6",
+   "ligandHeavyAtoms": 17,
+   "ccdTemplate": "CP6",
+   "center": [
+    28.165,
+    5.311,
+    58.672
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.523,
+   "vinaScoreKcalMol": -7.535,
+   "ligandSmiles": "CCc1nc(N)nc(N)c1-c1ccc(Cl)cc1",
+   "poseSha256": "7735307da999158fb5a3904102ba041a7a7c2989f1f0127621d5ae28cd44ca3b",
+   "receptorPdbqtSha256": "bc592f3b18faf1467c2a093a2b2f8079a71a53fca6095ac213f67467abb7464c",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1JD0",
+   "listedLigand": "AZM",
+   "inputSha256": "bc15098d413dabd300627d49d79d8c49fa33297cc6a39d25854afaf6c9a2d53a",
+   "ligandResidue": "AZM",
+   "ligandHeavyAtoms": 13,
+   "ccdTemplate": "AZM",
+   "center": [
+    18.481,
+    6.524,
+    25.564
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 5.56,
+   "vinaScoreKcalMol": -6.258,
+   "ligandSmiles": "CC(=O)Nc1nnc(S(N)(=O)=O)s1",
+   "poseSha256": "28abfc09122250b6bda4ddb8a5077e9c1a3eb44cd44fde3c451a4a1d5d30e10f",
+   "receptorPdbqtSha256": "1c207cf55fd8f0c965774b3c68e2f9150263dfed6d3717e69a8e8a91e9adb075",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1JJE",
+   "listedLigand": "BYS",
+   "inputSha256": "b5575decfb5c1a313590c7b14cdefc2ed60a62cc94ba497391ac006f92f58e59",
+   "ligandResidue": "BYS",
+   "ligandHeavyAtoms": 25,
+   "ccdTemplate": "BYS",
+   "center": [
+    57.657,
+    24.777,
+    34.576
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    23.029
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: t() bond_excess={11, 4}\nCASN       heavy_miss=2 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1, 10}\n\nmatched with excess inter-residue bond(s): A:2"
+  },
+  {
+   "pdbId": "1JLA",
+   "listedLigand": "TNK",
+   "inputSha256": "fb2c948133a5f67d155a6ffc1f4a28cdf9cbbbaad2687d341a2d9c1869fc0a72",
+   "ligandResidue": "TNK",
+   "ligandHeavyAtoms": 27,
+   "ccdTemplate": "TNK",
+   "center": [
+    -3.08,
+    -35.284,
+    24.86
+   ],
+   "boxSize": [
+    20.248,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.59,
+   "vinaScoreKcalMol": -11.92,
+   "ligandSmiles": "CC(C)c1c(Cc2ccccc2)n(COCc2ccccc2)c(=O)[nH]c1=O",
+   "poseSha256": "4482b8fde10afa14cdaf27bdb351c0c1167ba0b69502c4ea52d94b75b4bd25a9",
+   "receptorPdbqtSha256": "e78dddea6e481eaa5b87f1f7fc7d6c184bffce2b90a115a615fc4cebd90f6912",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1K3U",
+   "listedLigand": "IAD",
+   "inputSha256": "79d0b0a4bb0588aa11e170676d76e06a2568ca16649e3f8ffd80cf6ded1a31d5",
+   "ligandResidue": "IAD",
+   "ligandHeavyAtoms": 21,
+   "ccdTemplate": "IAD",
+   "center": [
+    48.894,
+    27.243,
+    13.062
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: .. \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning)\nFailed building template from CCD for resname='NA"
+  },
+  {
+   "pdbId": "1KE5",
+   "listedLigand": "LS1",
+   "inputSha256": "11d215715d0b2db17d11e67e93b240d9a8485b7e2a9eb9a03a2499922a14ff3e",
+   "ligandResidue": "LS1",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "LS1",
+   "center": [
+    -9.51,
+    48.704,
+    38.092
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.548
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=6 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCPHE       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1KZK",
+   "listedLigand": "JE2",
+   "inputSha256": "8135b85ec0fd4796fbd7f5f5aaa2b751551fcf1c18b637926538305a823bcd35",
+   "ligandResidue": "JE2",
+   "ligandHeavyAtoms": 41,
+   "ccdTemplate": "JE2",
+   "center": [
+    19.859,
+    -1.74,
+    16.894
+   ],
+   "boxSize": [
+    22.12,
+    20.521,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: _pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue VAL corresponding to key B:6"
+  },
+  {
+   "pdbId": "1L2S",
+   "listedLigand": "STC",
+   "inputSha256": "8b009455d7e60dc36dd6f38bd9274160c04471bf6a260bb6dc3a6189263e980c",
+   "ligandResidue": "STC",
+   "ligandHeavyAtoms": 19,
+   "ccdTemplate": "STC",
+   "center": [
+    51.489,
+    -2.268,
+    22.3
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): B:29"
+  },
+  {
+   "pdbId": "1L7F",
+   "listedLigand": "BCZ",
+   "inputSha256": "c6f0eec8c50b934e00c8b8f97735627937624c9f703a6536547e653951fddd95",
+   "ligandResidue": "BCZ",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "BCZ",
+   "center": [
+    25.917,
+    17.175,
+    62.803
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.773,
+   "vinaScoreKcalMol": -7.742,
+   "ligandSmiles": "CCC(CC)[C@H](NC(C)=O)[C@@H]1[C@H](O)[C@@H](C(=O)O)C[C@H]1NC(=N)N",
+   "poseSha256": "cfa8c4aae3df1c8e0347af03a85f60922f749c37bf002a83c4996bb3191e3ed0",
+   "receptorPdbqtSha256": "174f3dac3ac75420056ba3db493a7e4e41c6e4cfaba018aa3160d170143ebb8f",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1LPZ",
+   "listedLigand": "CMB",
+   "inputSha256": "5eeb0f3e4ef4a9772d104f5c724513ff758a8909ba6c8da31fb611cb37f7af2c",
+   "ligandResidue": "CMB",
+   "ligandHeavyAtoms": 32,
+   "ccdTemplate": "CMB",
+   "center": [
+    7.335,
+    6.815,
+    22.976
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.487
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.689,
+   "vinaScoreKcalMol": -10.417,
+   "ligandSmiles": "Cc1cccc2c1cc(C(=O)NCc1cc(Cl)cc(Cl)c1)n2Cc1cccc(C(=N)N)c1",
+   "poseSha256": "050061359c3a386dea89c2d14092fd7f82e9562223b717e02f661a671d2ee954",
+   "receptorPdbqtSha256": "1ca44c657c3f61d542d892e0612ded6b6d0affd36fbcabdcbc3d2d081a9ddf2f",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1LRH",
+   "listedLigand": "NLA",
+   "inputSha256": "6c20eea080963b130f6481c5c4315dce99196ab15a042ba267850676485e8744",
+   "ligandResidue": "NLA",
+   "ligandHeavyAtoms": 14,
+   "ccdTemplate": "NLA",
+   "center": [
+    10.066,
+    56.969,
+    63.22
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.728,
+   "vinaScoreKcalMol": -7.886,
+   "ligandSmiles": "O=C(O)Cc1cccc2ccccc12",
+   "poseSha256": "ded7ce510a174720806e1765821d0a89689f6d3e39b29e593ee50827fe8ba9ac",
+   "receptorPdbqtSha256": "2bbcdff478e6347acc5de9f83b647008670e5ba390092ea7f4ade426c12796b4",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1M2Z",
+   "listedLigand": "DEX",
+   "inputSha256": "0254f566ee61dd093cda3ad1688ad3ba9228d98c3b796cbea19ba924f8fbf642",
+   "ligandResidue": "DEX",
+   "ligandHeavyAtoms": 28,
+   "ccdTemplate": "DEX",
+   "center": [
+    30.453,
+    7.022,
+    13.256
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.241
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.597,
+   "vinaScoreKcalMol": -10.604,
+   "ligandSmiles": "C[C@@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
+   "poseSha256": "aa8aed79b68002de32724aec3cf62c904e05299f0df3db426d13754b1914112b",
+   "receptorPdbqtSha256": "40540cb724d133bc552eafda986fc58eeb0e9d563f332e9793a6587f7de65049",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1MEH",
+   "listedLigand": "MOA",
+   "inputSha256": "34383344d7d1684cce3aa2d007321caeb1b8220a40bf7771023f815c5f8a9430",
+   "ligandResidue": "MOA",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "MOA",
+   "center": [
+    56.294,
+    55.996,
+    18.24
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: ... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning)\nFailed building template from CCD for resname='K"
+  },
+  {
+   "pdbId": "1MMV",
+   "listedLigand": "3AR",
+   "inputSha256": "109f073fa38616febff40ee691e87893d152d7773281ea7a3e826483229fa2d2",
+   "ligandResidue": "3AR",
+   "ligandHeavyAtoms": 15,
+   "ccdTemplate": "3AR",
+   "center": [
+    11.491,
+    -0.225,
+    23.58
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 6.023,
+   "vinaScoreKcalMol": -5.839,
+   "ligandSmiles": "CCCNC(=[NH2+])NCCC[C@H](N)C(=O)O",
+   "poseSha256": "170ff5d5d0571db776b217ae222569e8a89b7ac92f60bfc12dd33f2bd14f5bd5",
+   "receptorPdbqtSha256": "30591429f0ccec450b03e1bfa62ad80771e0e52ae2d0b6f46d5ff087874ec1e0",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1MZC",
+   "listedLigand": "BNE",
+   "inputSha256": "cb59626ff1147e6b36aa0319715d6e174369c18c50072ef379f9ab259fcbe9cc",
+   "ligandResidue": "BNE",
+   "ligandHeavyAtoms": 35,
+   "ccdTemplate": "BNE",
+   "center": [
+    17.14,
+    133.836,
+    -2.639
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    21.442
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.434,
+   "vinaScoreKcalMol": -8.023,
+   "ligandSmiles": "CC[C@@]1(c2cccc(Oc3cc([C@](C)(N)c4cncn4C)ccc3C#N)c2)CCCCN(C)C1=O",
+   "poseSha256": "90a0c700a7b08f143db0c89ead800cfbbb8022cd2e7123fa441b34504cbcda4f",
+   "receptorPdbqtSha256": "e18c72a86658a50f90781ef63f2d472d3e5bf0b4f16477e606be614ebba1c21d",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1N1M",
+   "listedLigand": "A3M",
+   "inputSha256": "8484c1b5033c28ca3057c3911a69e9a6a9b4f60f259a64916729b639349d3bba",
+   "ligandResidue": "A3M",
+   "ligandHeavyAtoms": 12,
+   "ccdTemplate": "A3M",
+   "center": [
+    81.621,
+    75.002,
+    97.963
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.89,
+   "vinaScoreKcalMol": -5.796,
+   "ligandSmiles": "CC(C)[C@H](N)C(=O)N1CCCC1",
+   "poseSha256": "1f9899a65f85cae15f7a98489f650600ea4ded5759f6d5f498a73cb2854a5262",
+   "receptorPdbqtSha256": "ba00e2f0bf04057f1d5e8004e20ab2810a709723cb0422ea6561d95ce1d9330b",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1N2J",
+   "listedLigand": "PAF",
+   "inputSha256": "5c4bbf4d10f04f02f6f64190b93af06fba2a8b9c98026bcd7d18b1800723a985",
+   "ligandResidue": "PAF",
+   "ligandHeavyAtoms": 10,
+   "ccdTemplate": "PAF",
+   "center": [
+    32.685,
+    33.843,
+    47.379
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 7.029,
+   "vinaScoreKcalMol": -4.496,
+   "ligandSmiles": "CC(C)(CO)[C@@H](O)C(=O)[O-]",
+   "poseSha256": "6eaf82017447ee46682f722623399f035727d79647b2f10f1675dbef42279810",
+   "receptorPdbqtSha256": "f282317400bfc4e423a1176c36f49a9a9c6ee8875478e6bdea29bafb9e48324d",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1N2V",
+   "listedLigand": "BDI",
+   "inputSha256": "d554471b1e50dfb23e7d469fd23126a9ddf6c92dc4df8567aa60d1268f42c35d",
+   "ligandResidue": "BDI",
+   "ligandHeavyAtoms": 15,
+   "ccdTemplate": "BDI",
+   "center": [
+    16.229,
+    17.404,
+    20.877
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 2.809,
+   "vinaScoreKcalMol": -7.229,
+   "ligandSmiles": "CCCCc1nc2c(=O)[nH][nH]c(=O)c2[nH]1",
+   "poseSha256": "2ea64711b080321a6e24bc1389f6a4e5c8d9f35e0bd5d75505208f3f97ec3c70",
+   "receptorPdbqtSha256": "98685979073ce17ffc4c932b093185bbd945edf9de9b2560f651ebe363414866",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1N46",
+   "listedLigand": "PFA",
+   "inputSha256": "787736f1ae2d909670a935d0af5a4e06a824b9930409fee8ca803cfcb21ade04",
+   "ligandResidue": "PFA",
+   "ligandHeavyAtoms": 27,
+   "ccdTemplate": "PFA",
+   "center": [
+    20.784,
+    6.68,
+    2.904
+   ],
+   "boxSize": [
+    20.0,
+    20.4,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.517,
+   "vinaScoreKcalMol": -11.954,
+   "ligandSmiles": "Cc1cc(-n2ncc(=O)[nH]c2=O)cc(C)c1Oc1ccc(O)c(C(C)C)c1",
+   "poseSha256": "c3cd76203b7b7b485ac9f9991b1a554ad6ea397ddfd93597cc89987c691fc094",
+   "receptorPdbqtSha256": "9a31a20e5d374fc6ae7801f7e4d214c20ca97dbb54dfb5433409a3780f24f14c",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1NAV",
+   "listedLigand": "IH5",
+   "inputSha256": "8eb25223cdd973001d2635ab9bf6804b89ef1fe999482c2a7bd07dbc56c53fce",
+   "ligandResidue": "IH5",
+   "ligandHeavyAtoms": 23,
+   "status": "PREPARATION_FAILED",
+   "success": false,
+   "error": "No matching found"
+  },
+  {
+   "pdbId": "1OF1",
+   "listedLigand": "SCT",
+   "inputSha256": "2372aec67677eb1726dc7645c80446f3fdb0e6cf41f7501c4a8ce96fb71863ef",
+   "ligandResidue": "SCT",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "SCT",
+   "center": [
+    47.288,
+    33.765,
+    0.087
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCALA       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1OF6",
+   "listedLigand": "DTY",
+   "inputSha256": "74e56ec09876bfa76e65147ce3459ad0611567f07f79517b0e8771a8848e8ad9",
+   "ligandResidue": "DTY",
+   "ligandHeavyAtoms": 13,
+   "ccdTemplate": "DTY",
+   "center": [
+    31.64,
+    -1.272,
+    49.771
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCGLH       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:32"
+  },
+  {
+   "pdbId": "1OPK",
+   "listedLigand": "P16",
+   "inputSha256": "cb35307f8e73aac50f820d0d53b31abb95d559f8af23c6ceb53ae82e0b1fd425",
+   "ligandResidue": "P16",
+   "ligandHeavyAtoms": 29,
+   "ccdTemplate": "P16",
+   "center": [
+    46.447,
+    18.007,
+    17.919
+   ],
+   "boxSize": [
+    20.0,
+    22.326,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.762,
+   "vinaScoreKcalMol": -11.958,
+   "ligandSmiles": "Cn1c(=O)c(-c2c(Cl)cccc2Cl)cc2cnc(Nc3cccc(CO)c3)nc21",
+   "poseSha256": "1b810e1bb8782b89a412cef847722926e9a23a819cfbb2bb96573e64eb21b393",
+   "receptorPdbqtSha256": "10007a4accdbfd3417de1930dd79ae0704b593e3d0c263ac86a5f7398b07c04e",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1OQ5",
+   "listedLigand": "CEL",
+   "inputSha256": "9205b77c63c941560c603bf0d780692b384eaa62c3c435949e87b115a0eaa1e0",
+   "ligandResidue": "CEL",
+   "ligandHeavyAtoms": 26,
+   "ccdTemplate": "CEL",
+   "center": [
+    17.014,
+    6.827,
+    13.637
+   ],
+   "boxSize": [
+    20.0,
+    20.005,
+    20.004
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: d_miss=set() bond_excess={4}\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:"
+  },
+  {
+   "pdbId": "1OWE",
+   "listedLigand": "675",
+   "inputSha256": "3dd62017d4686f8288b3fa437b24c8cc54636f1114feedb983085780ec6fb915",
+   "ligandResidue": "675",
+   "ligandHeavyAtoms": 22,
+   "ccdTemplate": "675",
+   "center": [
+    22.64,
+    15.905,
+    32.533
+   ],
+   "boxSize": [
+    20.355,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: _miss={10} bond_excess={1}\nCCYX-      heavy_miss=2 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:13"
+  },
+  {
+   "pdbId": "1OYT",
+   "listedLigand": "FSN",
+   "inputSha256": "6a1267a4540bb8bff338beffacbed8ed02be633bfc75ba7df2485a93bbf0c74c",
+   "ligandResidue": "FSN",
+   "ligandHeavyAtoms": 30,
+   "ccdTemplate": "FSN",
+   "center": [
+    16.793,
+    -12.378,
+    21.829
+   ],
+   "boxSize": [
+    21.695,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: .. \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning)\nFailed building template from CCD for resname='NA"
+  },
+  {
+   "pdbId": "1P2Y",
+   "listedLigand": "NCT",
+   "inputSha256": "2e27b0edd7e4ba295173e8eb4bc57269569bbd47ea8cf242dfd8413650c21ee0",
+   "ligandResidue": "NCT",
+   "ligandHeavyAtoms": 12,
+   "ccdTemplate": "NCT",
+   "center": [
+    16.332,
+    12.716,
+    41.045
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.313,
+   "vinaScoreKcalMol": -5.935,
+   "ligandSmiles": "CN1CCC[C@H]1c1cccnc1",
+   "poseSha256": "42baf884e4d855fb327de0cedec4de7f3d8d74a2ee662c4c35b04b6d593c49c4",
+   "receptorPdbqtSha256": "7d530fc54aba74ec7277f0783cd628064f715708316398899f1d94530244a731",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1P62",
+   "listedLigand": "GEO",
+   "inputSha256": "71cc67311337ebf0e41557fdfbdd253db3a64d2949af2b969fb98febabdf8129",
+   "ligandResidue": "GEO",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "GEO",
+   "center": [
+    68.707,
+    34.922,
+    19.397
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): B:22"
+  },
+  {
+   "pdbId": "1PMN",
+   "listedLigand": "984",
+   "inputSha256": "8e818cd13b9082f525850567ab7710bcaca4d368df8bfbd486caed4a2c304dd4",
+   "ligandResidue": "984",
+   "ligandHeavyAtoms": 33,
+   "ccdTemplate": "984",
+   "center": [
+    22.145,
+    10.709,
+    31.938
+   ],
+   "boxSize": [
+    20.0,
+    21.61,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCARG       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:38"
+  },
+  {
+   "pdbId": "1Q1G",
+   "listedLigand": "MTI",
+   "inputSha256": "fd465fb35da463e3518c3ef405a9b3a86057d7cb9633ff59d2a505f7616f044d",
+   "ligandResidue": "MTI",
+   "ligandHeavyAtoms": 20,
+   "ccdTemplate": "MTI",
+   "center": [
+    8.685,
+    4.806,
+    92.751
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 6.285,
+   "vinaScoreKcalMol": -7.564,
+   "ligandSmiles": "CSC[C@H]1[NH2+][C@@H](c2c[nH]c3c(=O)[nH]cnc23)[C@H](O)[C@@H]1O",
+   "poseSha256": "3848567e641a9acbdff8ef06ee65e6e8dbce97c2037d72ef89f81a2eb263412e",
+   "receptorPdbqtSha256": "dd4dea826b586d2138f355bbeaa90abf5b3099dd21852b3c49096b19e4189bf2",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1Q41",
+   "listedLigand": "IXM",
+   "inputSha256": "49ea2a16f05460532420774e75ac8b9569f14252e32bf6ec0c1d0fa1bbb30848",
+   "ligandResidue": "IXM",
+   "ligandHeavyAtoms": 21,
+   "ccdTemplate": "IXM",
+   "center": [
+    39.632,
+    6.297,
+    36.269
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess=set()\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss={5} bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:29"
+  },
+  {
+   "pdbId": "1Q4G",
+   "listedLigand": "BFL",
+   "inputSha256": "45059e0dbfb7df50b7578c0ebc0dbd2b6697f0ba0d4d082ee10dba430fe4ed88",
+   "ligandResidue": "BFL",
+   "ligandHeavyAtoms": 17,
+   "ccdTemplate": "BFL",
+   "center": [
+    26.617,
+    33.7,
+    201.931
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.316,
+   "vinaScoreKcalMol": -9.139,
+   "ligandSmiles": "C[C@H](C(=O)O)c1ccc(-c2ccccc2)cc1",
+   "poseSha256": "589ed2246b1e980050ee5e276b9fbaaede8dff7e0c3c67c4028d1459104904ab",
+   "receptorPdbqtSha256": "c3ab563ead8bd54057c1d88a8e255db373829a6973ecb29763b4cf583555bc32",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1R1H",
+   "listedLigand": "BIR",
+   "inputSha256": "c38d494c98c489cd93c4ae4ba3183aedf4bd01c7d227ef42f5b2081b6a8fd862",
+   "ligandResidue": "BIR",
+   "ligandHeavyAtoms": 29,
+   "ccdTemplate": "BIR",
+   "center": [
+    31.251,
+    44.543,
+    34.611
+   ],
+   "boxSize": [
+    20.965,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.124,
+   "vinaScoreKcalMol": -10.036,
+   "ligandSmiles": "C[C@H](NC(=O)[C@H](Cc1ccc(-c2ccccc2)cc1)C[P@](=O)(O)[C@H](C)N)C(=O)O",
+   "poseSha256": "b0dc10406dbdedbed950afff4c0662bb2bd317895119e414d8ceea5d11ee87e7",
+   "receptorPdbqtSha256": "1dda6d1590e5046f6b39d7141409e2bacc54e412a7e4ea7dbbd437ed8b9af74b",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1R55",
+   "listedLigand": "097",
+   "inputSha256": "a1aebedf743d5d26c03c85377686dab6fe8dc1310cab52ccc1ab121672df99c2",
+   "ligandResidue": "097",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "097",
+   "center": [
+    9.381,
+    13.944,
+    25.293
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=1 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCSER       heavy_miss=2 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1R58",
+   "listedLigand": "AO5",
+   "inputSha256": "45c2a37c3c44cfd0dce68a6b26f5d5020c56ab1a1da65f0c979d480d77f34fad",
+   "ligandResidue": "AO5",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "AO5",
+   "center": [
+    17.636,
+    30.943,
+    17.197
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 3.51,
+   "vinaScoreKcalMol": -8.529,
+   "ligandSmiles": "CC(C)SCC[C@@H](N)[C@H](O)C(=O)NNC(=O)c1cccc(Cl)c1",
+   "poseSha256": "b65cebe0f7c4d7e2d178cfdbd333d12bca13ba0ba8816ce86dc10ceb5211018f",
+   "receptorPdbqtSha256": "e5b5978627c280ac5ad525396322773694c8cddcb0c9f180a95bb48c1ee5d9f7",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1R9O",
+   "listedLigand": "FLP",
+   "inputSha256": "52dfd64f6a5b44e5a005aca69dd413924378b02935117313ea1c930e3f4f38b4",
+   "ligandResidue": "FLP",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "FLP",
+   "center": [
+    8.636,
+    33.142,
+    -1.903
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 10.699,
+   "vinaScoreKcalMol": -8.2,
+   "ligandSmiles": "C[C@H](C(=O)O)c1ccc(-c2ccccc2)c(F)c1",
+   "poseSha256": "e0867708705eed1be2fb1bd1751887886b2658650d957d2489445e14574025f9",
+   "receptorPdbqtSha256": "45c75c523e291e161c0bb689cd5a50675802c80d0b6fec343c38d9510e860eb6",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1S19",
+   "listedLigand": "MC9",
+   "inputSha256": "6aa22487acaa64c56ad1b0e127eaab6a387751527f7993c567dd422ccddb469a",
+   "ligandResidue": "MC9",
+   "ligandHeavyAtoms": 30,
+   "ccdTemplate": "MC9",
+   "center": [
+    11.597,
+    23.037,
+    34.284
+   ],
+   "boxSize": [
+    22.802,
+    21.289,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 9.348,
+   "vinaScoreKcalMol": -10.577,
+   "ligandSmiles": "C=C1C(=CC=C2CCC[C@]3(C)[C@@H]([C@H](C)C=C[C@@H](O)C4CC4)CC[C@@H]23)C[C@@H](O)C[C@@H]1O",
+   "poseSha256": "c663c2391a796f326f4a6a937537549df8338f21ea280b2ffb922f3de784a0f8",
+   "receptorPdbqtSha256": "3479b5b20ee7eee7a8d288cb4b3702a6aa6342d6c56def392c1faa0cd103648a",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1S3V",
+   "listedLigand": "TQD",
+   "inputSha256": "52d847bcf67cf472a83a8d157bd902a8c65c2cc0ef6be41f495f8961305c74a3",
+   "ligandResidue": "TQD",
+   "ligandHeavyAtoms": 27,
+   "ccdTemplate": "TQD",
+   "center": [
+    -2.707,
+    27.832,
+    3.43
+   ],
+   "boxSize": [
+    20.0,
+    21.37,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 6.468,
+   "vinaScoreKcalMol": -9.458,
+   "ligandSmiles": "COc1cc(N(C)C[C@@H]2CCC3=C(C2)C(N)=N[C@@H](N)N3)cc(OC)c1OC",
+   "poseSha256": "5f2f849fea821b35e26a3322cd2483dedf7a39dc2d59c817bf2d26b37fd4a914",
+   "receptorPdbqtSha256": "c86265337db2ead9131c9bd68a6a43c0622a37cce4d459f386a85a2bd7b1655b",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1SG0",
+   "listedLigand": "STL",
+   "inputSha256": "9e02d87ee3943a10aef0179b8cf20b5427f0e531817d3f459bdab2395871f603",
+   "ligandResidue": "STL",
+   "ligandHeavyAtoms": 17,
+   "ccdTemplate": "STL",
+   "center": [
+    26.201,
+    13.578,
+    5.275
+   ],
+   "boxSize": [
+    20.163,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 5.973,
+   "vinaScoreKcalMol": -6.238,
+   "ligandSmiles": "Oc1ccc(C=Cc2cc(O)cc(O)c2)cc1",
+   "poseSha256": "be811953c1951b33653f83d6fdf859a720f2ea5c6c30df01b414c6998d285b08",
+   "receptorPdbqtSha256": "e1d7e051ca602e42a98ee904efd6ecab3c3d666ac6b976f6af4419d2aabe20eb",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1SJ0",
+   "listedLigand": "E4D",
+   "inputSha256": "8135e22ca6553ac7c5d716190031f9c0b3ce28cd257a423b706c09a3d82f99d6",
+   "ligandResidue": "E4D",
+   "ligandHeavyAtoms": 33,
+   "ccdTemplate": "E4D",
+   "center": [
+    31.406,
+    -1.491,
+    25.297
+   ],
+   "boxSize": [
+    21.063,
+    20.0,
+    21.694
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCARG       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:33"
+  },
+  {
+   "pdbId": "1SQ5",
+   "listedLigand": "PAU",
+   "inputSha256": "4671e04ddc85962140d327343919f655e98a02eaf2a00e35a966fabbb00c8c42",
+   "ligandResidue": "PAU",
+   "ligandHeavyAtoms": 15,
+   "ccdTemplate": "PAU",
+   "center": [
+    52.214,
+    5.557,
+    7.472
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: iss=set() bond_excess={4}\nCGLH       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:126"
+  },
+  {
+   "pdbId": "1SQN",
+   "listedLigand": "NDR",
+   "inputSha256": "4ab0644c9c55379d2f63127bf589a0906d2f736bf5768f2f3cb77594c9d0edca",
+   "ligandResidue": "NDR",
+   "ligandHeavyAtoms": 22,
+   "ccdTemplate": "NDR",
+   "center": [
+    -2.454,
+    1.531,
+    25.555
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1T40",
+   "listedLigand": "ID5",
+   "inputSha256": "a21c526cfb46e6c2f99fc59e41c608d0f72da3c87360d0d183fac638c3d0e07c",
+   "ligandResidue": "ID5",
+   "ligandHeavyAtoms": 28,
+   "ccdTemplate": "ID5",
+   "center": [
+    16.632,
+    -6.701,
+    14.475
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.349
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.469,
+   "vinaScoreKcalMol": -11.19,
+   "ligandSmiles": "O=C(O)COc1cc(F)ccc1C(=O)NCc1nc2c(F)c(F)cc(F)c2s1",
+   "poseSha256": "b0ac7e046b1015daac49fc4cf7fb4fe74bc077dd0ed27d8f935851b445ebb161",
+   "receptorPdbqtSha256": "5bf8df87f671a3f6d449354dcf7d338ab818db1a80710c60c189415e415392d7",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1T46",
+   "listedLigand": "STI",
+   "inputSha256": "61094e9bf167bcb4fddedd191af2a9eaf4ffba073196bf72ffa3f01cdabcd7f2",
+   "ligandResidue": "STI",
+   "ligandHeavyAtoms": 37,
+   "ccdTemplate": "STI",
+   "center": [
+    26.181,
+    26.061,
+    40.364
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    27.226
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.75,
+   "vinaScoreKcalMol": -13.156,
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "poseSha256": "84abb4e175de1a9d130bae2741c3fb11a6e94de2de6947ff1e9e4798ad423388",
+   "receptorPdbqtSha256": "ce03cb3faf7ef1b483ec37c097982b3856eb0cdf48d21b2e927dfd1c33f38a2d",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1T9B",
+   "listedLigand": "1CS",
+   "inputSha256": "f6892abbf9fae6dcc3b805d2e78f22cd44a07e43b225ca5cd2bf25b583afc2fe",
+   "ligandResidue": "1CS",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "1CS",
+   "center": [
+    22.963,
+    25.212,
+    136.166
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: ... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning)\nFailed building template from CCD for resname='K"
+  },
+  {
+   "pdbId": "1TOW",
+   "listedLigand": "CRZ",
+   "inputSha256": "6db9cea806701269accea8cb470fd794ac27cf88053bbb210e8a81b774a2cd53",
+   "ligandResidue": "CRZ",
+   "ligandHeavyAtoms": 19,
+   "ccdTemplate": "CRZ",
+   "center": [
+    21.012,
+    4.954,
+    1.532
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.607,
+   "vinaScoreKcalMol": -7.83,
+   "ligandSmiles": "O=C(O)CCCn1c2ccccc2c2ccccc21",
+   "poseSha256": "bca543bf338c90fcaa092dc8ad0275333659131486e5d8d0db373df51089370b",
+   "receptorPdbqtSha256": "57146f83b79832855e06be50dad56d5543b3691133a168b8dd78d4e10286ed0a",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1TT1",
+   "listedLigand": "KAI",
+   "inputSha256": "6fdbb99f4b523929ee1e7b995d87e3f26c1a7f2da1f8b22f39547abe81ba81a1",
+   "ligandResidue": "KAI",
+   "ligandHeavyAtoms": 15,
+   "ccdTemplate": "KAI",
+   "center": [
+    2.312,
+    0.839,
+    26.37
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 3.65,
+   "vinaScoreKcalMol": -7.182,
+   "ligandSmiles": "C=C(C)[C@H]1CN[C@H](C(=O)O)[C@H]1CC(=O)O",
+   "poseSha256": "d44e77843d5f872343cf325158cae7a740d78a50d6ca48b36628908f986a474f",
+   "receptorPdbqtSha256": "85342e1028a885e1f7bacb819d11233080cd16d79337149931b4df4d76f10c11",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1TZ8",
+   "listedLigand": "DES",
+   "inputSha256": "14e6d5615c8ba209b8f58c8929b0ef531e3002bf88bc1b30afd22d695eb9cb58",
+   "ligandResidue": "DES",
+   "ligandHeavyAtoms": 20,
+   "ccdTemplate": "DES",
+   "center": [
+    16.61,
+    61.718,
+    34.948
+   ],
+   "boxSize": [
+    20.74,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=2 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCASN       heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1U1C",
+   "listedLigand": "BAU",
+   "inputSha256": "a894846f959dd895dd02b21cf62a88928dbc577448f42e571b78357c2416274f",
+   "ligandResidue": "BAU",
+   "ligandHeavyAtoms": 20,
+   "ccdTemplate": "BAU",
+   "center": [
+    14.081,
+    99.949,
+    72.855
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCLYN       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:24"
+  },
+  {
+   "pdbId": "1U4D",
+   "listedLigand": "DBQ",
+   "inputSha256": "868d02f6009784e13aba8bff0035f9ad12d761ceec0f31fae5bac025c7d95bad",
+   "ligandResidue": "DBQ",
+   "ligandHeavyAtoms": 18,
+   "ccdTemplate": "DBQ",
+   "center": [
+    22.887,
+    14.856,
+    56.335
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.21,
+   "vinaScoreKcalMol": -6.954,
+   "ligandSmiles": "NC1=NC(=C2CCNC(=O)c3[nH]ccc32)C(=O)N1",
+   "poseSha256": "78a1268024a14d527907e775c385f32e546f2c65e7ef44c13ec6932f82ed760b",
+   "receptorPdbqtSha256": "1d352ae8c640245450a9c5d1891246118ecba9d89d1a54ee48a9c06ea3cb345c",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1UML",
+   "listedLigand": "FR4",
+   "inputSha256": "00aa303d19a4915da7f8bc3a15055dc54cadd5b06b35a8d4dd172800e5ce2b4e",
+   "ligandResidue": "FR4",
+   "ligandHeavyAtoms": 33,
+   "ccdTemplate": "FR4",
+   "center": [
+    49.622,
+    53.586,
+    19.018
+   ],
+   "boxSize": [
+    20.0,
+    20.359,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.428,
+   "vinaScoreKcalMol": -9.786,
+   "ligandSmiles": "NC(=O)c1cn([C@@H](CO)CCn2ccc3ccc(NC(=O)CCc4ccccc4)cc32)cn1",
+   "poseSha256": "9efd8849af00afc196f9dbad4ea3b260c6619dea16c68dbc0f9ad5ba3f2fee22",
+   "receptorPdbqtSha256": "6f8b7a8cbac55b708f0bc9f2a52f2bcf8c3d4b684dae05863300199b8a20737b",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1UNL",
+   "listedLigand": "RRC",
+   "inputSha256": "ba684116555c6965d7d0e05cd26610f9c5fd422c1f95964379da58b19bcc5dcc",
+   "ligandResidue": "RRC",
+   "ligandHeavyAtoms": 26,
+   "ccdTemplate": "RRC",
+   "center": [
+    59.626,
+    28.97,
+    26.836
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCGLY       heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1UOU",
+   "listedLigand": "CMU",
+   "inputSha256": "4bdc38747b8282373bc90c66ae0af66de4a02d8f5bb2375436ce9fd01477f185",
+   "ligandResidue": "CMU",
+   "ligandHeavyAtoms": 16,
+   "ccdTemplate": "CMU",
+   "center": [
+    -3.483,
+    2.004,
+    29.185
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCARG       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:43"
+  },
+  {
+   "pdbId": "1V0P",
+   "listedLigand": "PVB",
+   "inputSha256": "b777d78d64637e81de93480224f27f194c08fc3863bbd18b955ee0a017e4910f",
+   "ligandResidue": "PVB",
+   "ligandHeavyAtoms": 30,
+   "ccdTemplate": "PVB",
+   "center": [
+    25.721,
+    -1.521,
+    34.9
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 3.176,
+   "vinaScoreKcalMol": -8.953,
+   "ligandSmiles": "CC(C)[C@H](CO)Nc1nc(Nc2ccc(C(=O)O)c(Cl)c2)c2ncn(C(C)C)c2n1",
+   "poseSha256": "819693294054059d882d67d5aeab7cb0e9d9bb5624aaad513f39757028ef8e8c",
+   "receptorPdbqtSha256": "651c109eeb5743e45ff1cd8016ce4a845176a937c9ba0dd3917fa89dce8127ae",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1V48",
+   "listedLigand": "HA1",
+   "inputSha256": "daad906f616be55000e091c0232443ec22ba80cde9d6df6469ad455907092a05",
+   "ligandResidue": "HA1",
+   "ligandHeavyAtoms": 22,
+   "ccdTemplate": "HA1",
+   "center": [
+    73.579,
+    45.084,
+    50.055
+   ],
+   "boxSize": [
+    20.0,
+    22.33,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCLYN       heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:27"
+  },
+  {
+   "pdbId": "1V4S",
+   "listedLigand": "MRK",
+   "inputSha256": "e7530bf111672aa8e1a7426746ab5bf8c44c8aa84f072be3bfc57fb10b81c9d1",
+   "ligandResidue": "MRK",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "MRK",
+   "center": [
+    40.21,
+    15.085,
+    61.973
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: .. \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning)\nFailed building template from CCD for resname='NA"
+  },
+  {
+   "pdbId": "1VCJ",
+   "listedLigand": "IBA",
+   "inputSha256": "851af66d355eaa4e2c31d4ae8ef3aa9f93fbface4667e36a594d6022bac20f66",
+   "ligandResidue": "IBA",
+   "ligandHeavyAtoms": 25,
+   "ccdTemplate": "IBA",
+   "center": [
+    31.77,
+    -9.362,
+    64.056
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.25,
+   "vinaScoreKcalMol": -8.083,
+   "ligandSmiles": "CCC(CC)Nc1cc(C(=O)O)ccc1N1C(=O)CC[C@@]1(CN)CO",
+   "poseSha256": "fe31d7dceefa0a33bb3dc6b0c6f1d84bfcb109973ce1b0d5c6cd072ab547a432",
+   "receptorPdbqtSha256": "87cd793c6676352e143424b9ece9237287faf130aa34afd05a256fb6e4377b14",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1W1P",
+   "listedLigand": "GIO",
+   "inputSha256": "ffd5675c509348de8e15a1035e741ace35dc8f4c02cd02a9b1a7f276dc044883",
+   "ligandResidue": "GIO",
+   "ligandHeavyAtoms": 11,
+   "ccdTemplate": "GIO",
+   "center": [
+    18.181,
+    44.287,
+    102.679
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCALA       heavy_miss=5 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1W2G",
+   "listedLigand": "THM",
+   "inputSha256": "c94b900c24c68b6f66e50d17dd307368119a3d6257be759c84476de374209b8d",
+   "ligandResidue": "THM",
+   "ligandHeavyAtoms": 17,
+   "ccdTemplate": "THM",
+   "center": [
+    32.749,
+    23.974,
+    86.281
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=6 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCPRO       heavy_miss=7 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1X8X",
+   "listedLigand": "TYR",
+   "inputSha256": "aa700669ef03193ca8ed60c6f0f2b6ee3be58c92e1bf8219b821b7d4b57378b4",
+   "ligandResidue": "TYP",
+   "ligandHeavyAtoms": 13,
+   "ccdTemplate": "TYR",
+   "center": [
+    8.685,
+    29.029,
+    16.283
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.585,
+   "vinaScoreKcalMol": -6.818,
+   "ligandSmiles": "N[C@@H](Cc1ccc(O)cc1)C(=O)O",
+   "poseSha256": "eed8e46bc8e819e552d92f97dd51b6ee10a99d5e32da9822fc4cddd35e4a96ba",
+   "receptorPdbqtSha256": "4a1edbd39a061e1d8d4409012f3d2e7696ef6e4fb2f263cf509c966ceb20be95",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1XM6",
+   "listedLigand": "5RM",
+   "inputSha256": "c9ebdc4132ae29261d2d500a285eaeb7fc0567854666cf5e2042b3b306681efb",
+   "ligandResidue": "5RM",
+   "ligandHeavyAtoms": 19,
+   "ccdTemplate": "5RM",
+   "center": [
+    46.371,
+    1.647,
+    -9.878
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 2.199,
+   "vinaScoreKcalMol": -8.977,
+   "ligandSmiles": "CCCOc1cc([C@]2(C)CNC(=O)O2)ccc1OC",
+   "poseSha256": "03ef159f714582355fe49ffb5d6d0977ea18aeedc2fb5cddfeba3d395225f68e",
+   "receptorPdbqtSha256": "04b603465cb2fe08858c1d1d10ad447291da28c68a05db7baa2ef70d4714a213",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1XOQ",
+   "listedLigand": "ROF",
+   "inputSha256": "7ab73cd5a6db1c940d90896ac7ee4c1e5d316a9cb2c6def1256079172beed9ba",
+   "ligandResidue": "ROF",
+   "ligandHeavyAtoms": 26,
+   "ccdTemplate": "ROF",
+   "center": [
+    14.117,
+    28.703,
+    53.487
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    21.33
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.578,
+   "vinaScoreKcalMol": -9.455,
+   "ligandSmiles": "O=C(Nc1c(Cl)cncc1Cl)c1ccc(OC(F)F)c(OCC2CC2)c1",
+   "poseSha256": "25e7761486a18a1e2983c7012d155f92fa1f5bafb23d3bd78af675ada305a7c6",
+   "receptorPdbqtSha256": "75d8603e106bb41051ecba60aa1f789227dbd171fbe62a7507bb3994bc08cc7c",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1XOZ",
+   "listedLigand": "CIA",
+   "inputSha256": "7a23edd27506236570b9cd25a2cc63ad731e0d52778c465b16ed10c1742586ff",
+   "ligandResidue": "CIA",
+   "ligandHeavyAtoms": 29,
+   "ccdTemplate": "CIA",
+   "center": [
+    47.315,
+    35.038,
+    12.047
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.358,
+   "vinaScoreKcalMol": -12.579,
+   "ligandSmiles": "CN1CC(=O)N2[C@H](c3ccc4c(c3)OCO4)c3[nH]c4ccccc4c3C[C@@H]2C1=O",
+   "poseSha256": "8d3b930bf0bd5d26f9ce681561e59c59dae3d11813acfc96f9793aa15afaf147",
+   "receptorPdbqtSha256": "015bf4d9f240cc4404faea9f6a4a35e610cad5dced384ed326de10f47c040699",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1Y6B",
+   "listedLigand": "AAX",
+   "inputSha256": "22b5b6221ed82da054c130fe11dc9ddf9101b8b713045f7fe7daa316e89a4078",
+   "ligandResidue": "AAX",
+   "ligandHeavyAtoms": 34,
+   "ccdTemplate": "AAX",
+   "center": [
+    0.389,
+    30.704,
+    17.317
+   ],
+   "boxSize": [
+    20.0,
+    22.086,
+    22.169
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.944,
+   "vinaScoreKcalMol": -9.52,
+   "ligandSmiles": "COc1ccc(S(=O)(=O)NCC2CC2)cc1Nc1ncc(-c2cccc(-c3cccnc3)c2)o1",
+   "poseSha256": "d791b66789b2b381caaac5caf93c093e5162965fb844640f888fdf1b205e3ec5",
+   "receptorPdbqtSha256": "c56b4921d5dbe0167c369708803a28a82a2f128f8cf8f34735c112f82c14420f",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1YGC",
+   "listedLigand": "905",
+   "inputSha256": "9c3b9cebe3c1638ff3397358c8cd545d1be3572b02f50d32f372f9a8966213d3",
+   "ligandResidue": "905",
+   "ligandHeavyAtoms": 38,
+   "ccdTemplate": "905",
+   "center": [
+    10.57,
+    41.478,
+    32.491
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    21.15
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.895,
+   "vinaScoreKcalMol": -10.002,
+   "ligandSmiles": "CCOc1cc(OCC)c(F)c([C@@H](Nc2ccc(C(=N)N)c(O)c2)C(=O)NS(=O)(=O)c2cccc(N)c2)c1",
+   "poseSha256": "e323bc1b58aee03016f33c923b2a9d57428200e834de15f770c801441163a241",
+   "receptorPdbqtSha256": "b514b25e7b0b6b213b9e38e2b229c4862c976dad0bec889c83ae575cea428d1c",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1YQY",
+   "listedLigand": "915",
+   "inputSha256": "6632e2daa5d5f0cf2a05810ab243faf56c1378ea2bb27fda7dd821634052b357",
+   "ligandResidue": "915",
+   "ligandHeavyAtoms": 23,
+   "ccdTemplate": "915",
+   "center": [
+    11.035,
+    18.68,
+    27.493
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess={4}\nCPRO       heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:36"
+  },
+  {
+   "pdbId": "1YV3",
+   "listedLigand": "BIT",
+   "inputSha256": "9de3a0990b790b7073fac9f7e7d6bea54653b80c1246d32b080b601f7ebacff1",
+   "ligandResidue": "BIT",
+   "ligandHeavyAtoms": 22,
+   "ccdTemplate": "BIT",
+   "center": [
+    22.322,
+    38.353,
+    37.231
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCARG       heavy_miss=4 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "1YVF",
+   "listedLigand": "PH7",
+   "inputSha256": "984fd1ff98a7ede91cfe1ceb4cc9a5036b6f50e6bd3e6c199326d0fbee586bf7",
+   "ligandResidue": "PH7",
+   "ligandHeavyAtoms": 28,
+   "ccdTemplate": "PH7",
+   "center": [
+    -10.913,
+    56.213,
+    49.762
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.234,
+   "vinaScoreKcalMol": -7.98,
+   "ligandSmiles": "O=C(O)C(=Cc1ccc(Oc2ccccc2Br)cc1)NC(=O)c1ccccc1",
+   "poseSha256": "93e08e83f63ff5f8c8ae7f3a423064f963c8b9ee580f592002a1008d314187b8",
+   "receptorPdbqtSha256": "fd5443fd81c44a8feb46fbf8577da679fadeeb750bafe1d7bd71257c9efb63b0",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1YWR",
+   "listedLigand": "LI9",
+   "inputSha256": "3acb758605090b74072513183c030c250b6cd615b5a3ad876c91503f0064ab28",
+   "ligandResidue": "LI9",
+   "ligandHeavyAtoms": 35,
+   "ccdTemplate": "LI9",
+   "center": [
+    2.724,
+    -0.956,
+    21.338
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    21.11
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: miss=set() bond_excess=set()\nCVAL       heavy_miss=3 heavy_excess=0 H_excess=[] bond_miss={5} bond_excess={1}\n\nmatched with excess inter-residue bond(s): A:18"
+  },
+  {
+   "pdbId": "1Z95",
+   "listedLigand": "198",
+   "inputSha256": "0d63f5c7250a50eda6d663c499bd01c5f9863cda986a7d0e87fd25483a6a13f1",
+   "ligandResidue": "198",
+   "ligandHeavyAtoms": 29,
+   "ccdTemplate": "198",
+   "center": [
+    27.977,
+    2.357,
+    6.252
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 0.745,
+   "vinaScoreKcalMol": -10.409,
+   "ligandSmiles": "C[C@](O)(CS(=O)(=O)c1ccc(F)cc1)C(=O)Nc1ccc(C#N)c(C(F)(F)F)c1",
+   "poseSha256": "1d22bda104812bc05de5467812dc8d69cd5fae9ba47ad77e9a375f3e96663ab0",
+   "receptorPdbqtSha256": "95b6353d9b7488473863cf9bb316a8ff833d00fd6d28002328593bf4c60b732f",
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "2BM2",
+   "listedLigand": "PM2",
+   "inputSha256": "e65df7ea6ad81d0d435f21e61216c084dc85af47dee4c82df152164ca8caab31",
+   "ligandResidue": "PM2",
+   "ligandHeavyAtoms": 30,
+   "ccdTemplate": "PM2",
+   "center": [
+    26.401,
+    75.883,
+    83.364
+   ],
+   "boxSize": [
+    23.39,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=8 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCLYN       heavy_miss=9 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "2BR1",
+   "listedLigand": "PFP",
+   "inputSha256": "97305901c0b33643108d921d09ca84db4aada3e78a8cbd8ba945a6cdf7033dce",
+   "ligandResidue": "PFP",
+   "ligandHeavyAtoms": 29,
+   "ccdTemplate": "PFP",
+   "center": [
+    17.671,
+    -2.981,
+    10.242
+   ],
+   "boxSize": [
+    22.425,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed:     heavy_miss=1 heavy_excess=0 H_excess=[] bond_miss={0} bond_excess={4}\nCPRO       heavy_miss=2 heavy_excess=0 H_excess=[] bond_miss=set() bond_excess=set()"
+  },
+  {
+   "pdbId": "2BSM",
+   "listedLigand": "BSM",
+   "inputSha256": "ef9ff7a8e6fa1c20f2eeb37fdbab636ccb946a1965225ccb28a3ae76ad08533a",
+   "ligandResidue": "BSM",
+   "ligandHeavyAtoms": 27,
+   "ccdTemplate": "BSM",
+   "center": [
+    32.07,
+    8.752,
+    25.23
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "status": "DOCKING_FAILED",
+   "success": false,
+   "error": "redock_failed: receptor_prep_failed: ond_miss={0} bond_excess={1}\nCLYN       heavy_miss=9 heavy_excess=0 H_excess=[] bond_miss={5} bond_excess={0}\n\nmatched with excess inter-residue bond(s): A:22"
+  }
+ ],
+ "run": "RUN 1 \u2014 protocol as frozen after amendment 2 (no receptor template tolerance)",
+ "preregistrationNote": "SHA-256 of astex-redock-prereg.json as it stood when run 1 started (before amendment 3 declared run 2)."
+}

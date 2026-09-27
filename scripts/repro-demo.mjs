@@ -164,7 +164,8 @@ record('P0.3 tożsamość wydania', build.commitSource !== 'unavailable', `commi
 const envUsed = new Set(
   execFileSync('git', ['grep', '-hoE', 'process\\.env\\.[A-Z_][A-Z0-9_]*', '--', 'packages/', 'scripts/'], { cwd: REPO, encoding: 'utf8' })
     .split('\n').map((l) => l.replace('process.env.', '').trim())
-    .filter((n) => n && !['NODE_ENV', 'CI', 'GITHUB_ACTIONS', 'npm_package_version'].includes(n)),
+    // Ta sama lista pominięć co envContract.test.mjs: zmienne platformy i systemowe katalogi profilu.
+    .filter((n) => n && !['NODE_ENV', 'CI', 'GITHUB_ACTIONS', 'npm_package_version', 'HOME', 'LOCALAPPDATA', 'USERPROFILE'].includes(n)),
 );
 const envDocumented = new Set(
   [...execFileSync('cat', ['.env.example'], { cwd: REPO, encoding: 'utf8' }).matchAll(/^([A-Z_][A-Z0-9_]*)=/gm)].map((m) => m[1]),

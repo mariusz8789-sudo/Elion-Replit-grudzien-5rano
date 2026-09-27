@@ -1,5 +1,6 @@
 import { sha256HexSync } from '@genesis/core/knowledge/sha256.js';
 import { canonicalJson } from '../events/hash';
+import type { ReplayVerdict as ReplayVocabulary } from '../matrixFoundation/replayVerdict';
 
 /**
  * SCIENTIFIC WORLDS — THE EXPERIMENT SESSION.
@@ -79,7 +80,8 @@ export interface SessionWithArtifact<A = unknown> {
   readonly artifact: A;
 }
 
-export type ReplayStatus = 'MATCH' | 'DRIFT';
+/** A session replay either reproduces the fingerprint or drifts — a subset of the one replay vocabulary. */
+export type ReplayStatus = Extract<ReplayVocabulary, 'MATCH' | 'DRIFT'>;
 
 export interface ReplayVerdict {
   readonly status: ReplayStatus;

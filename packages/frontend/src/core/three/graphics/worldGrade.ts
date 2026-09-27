@@ -48,7 +48,24 @@ export interface WorldGrade {
   readonly exposure: number;
   readonly bloom: { readonly strength: number; readonly radius: number; readonly threshold: number };
   /** The floor is the largest surface in most of these worlds, so it decides the whole image. */
-  readonly floor: { readonly color: number; readonly roughness: number; readonly metalness: number; readonly envMapIntensity: number };
+  readonly floor: {
+    readonly color: number; readonly roughness: number; readonly metalness: number; readonly envMapIntensity: number;
+    /**
+     * How much of the floor material's own surface relief survives the grade. The shared PBR floor
+     * carries a high-frequency normal map tuned for a matte, lit-from-above surface; on a dark,
+     * reflective grade that same relief reads as wet speckle rather than as a floor — it was the
+     * second thing that made the laboratory look cheap. 1 keeps the material as authored; lower
+     * values flatten the relief so the reflection, not the noise, carries the surface. Default 1.
+     */
+    readonly normalScale?: number;
+    /**
+     * Whether the floor keeps the shared material's roughness NOISE map. That map is what paints the
+     * speckle a dark reflective grade reads as standing water; three.js has no intensity on a
+     * roughness map, so the honest choice is per-world: keep it (a matte, worn floor wants it) or
+     * drop it and let the grade's own roughness carry a polished surface. Default true.
+     */
+    readonly roughnessDetail?: boolean;
+  };
 }
 
 /**
@@ -65,18 +82,27 @@ export const WORLD_GRADES: Readonly<Record<WorldGradeId, WorldGrade>> = {
     environmentIntensity: 1.35,
     exposure: 0.78,
     bloom: { strength: 0.16, radius: 0.45, threshold: 1.05 },
-    floor: { color: 0x202a33, roughness: 0.58, metalness: 0.04, envMapIntensity: 0.35 },
+    floor: { color: 0x202a33, roughness: 0.58, metalness: 0.04, envMapIntensity: 0.35, normalScale: 0.35, roughnessDetail: false },
   },
   physics: {
     id: 'physics',
+    // GFX-1 exposure pass. The hall fell to black everywhere the ceiling panels did not reach: the
+    // ambient bounce sat at 0.17 with fog eating the far wall, so the image had highlights and
+    // shadows and nothing in between — no midtones, no readable equipment, no readable scientist.
+    // The room keeps its mood (deep black point, visible falloff, atmosphere) and gains the middle:
+    // more bounce, lighter fog, a little more exposure, the probe carrying more of the room, and a
+    // higher bloom threshold so the panels stop blooming into clipped white. The ambient bounce stays
+    // at the guardrail this repo already enforces (≤ 0.22, exposure ≤ 1): ambient fills shadows, and a
+    // room with no shadows has no form — the midtones come from the room probe and the practicals
+    // instead, which keep their falloff.
     intent: 'Beton i metal, neutralne światło warsztatowe — cieplejsze i brudniejsze niż biologia.',
     background: 0x06080a,
-    fog: { color: 0x0b0f13, density: 0.030 },
-    hemisphere: { sky: 0xaab4c0, ground: 0x14171b, intensity: 0.17 },
-    environmentIntensity: 1.25,
-    exposure: 0.88,
-    bloom: { strength: 0.26, radius: 0.55, threshold: 0.9 },
-    floor: { color: 0x1a1d21, roughness: 0.42, metalness: 0.06, envMapIntensity: 0.7 },
+    fog: { color: 0x0b0f13, density: 0.019 },
+    hemisphere: { sky: 0xaab4c0, ground: 0x1b1f24, intensity: 0.22 },
+    environmentIntensity: 1.62,
+    exposure: 1.0,
+    bloom: { strength: 0.2, radius: 0.55, threshold: 1.02 },
+    floor: { color: 0x1a1d21, roughness: 0.42, metalness: 0.06, envMapIntensity: 0.7, normalScale: 0.22, roughnessDetail: false },
   },
   cern: {
     id: 'cern',
@@ -159,5 +185,10 @@ export function applyGradeFloor(material: THREE_NS.MeshStandardMaterial, grade: 
   material.roughness = grade.floor.roughness;
   material.metalness = grade.floor.metalness;
   material.envMapIntensity = grade.floor.envMapIntensity;
+  // The relief the grade wants, not the relief the shared material happens to carry.
+  const scale = grade.floor.normalScale;
+  if (scale !== undefined && material.normalMap && material.normalScale) material.normalScale.setScalar(scale);
+  // A polished floor: the grade's roughness alone, without the shared noise map's speckle.
+  if (grade.floor.roughnessDetail === false) material.roughnessMap = null;
   material.needsUpdate = true;
 }

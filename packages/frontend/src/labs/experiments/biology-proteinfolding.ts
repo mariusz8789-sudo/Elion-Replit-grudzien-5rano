@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { mulberry32 } from '@genesis/core/determinism.js';
 import {
   contactCount,
   contactEnergy,
@@ -47,16 +48,6 @@ export type ProteinFoldingScenarioInput = {
   seed?: number;
 };
 
-/** Seedowany PRNG dla odtwarzalnego runu Metropolisa; nie zmienia jego reguł ani energii HP. */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let value = Math.imul(state ^ (state >>> 15), 1 | state);
-    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /**
  * Współdzielony runner Fabric. Używa dokładnie istniejącego HP contactEnergy()

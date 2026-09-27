@@ -370,14 +370,18 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-glerror { position: absolute; z-index: 20; left: 50%; top: 40%; transform: translateX(-50%); max-width: 32rem; }
 /* The visor: helmet frame, glass sheen, breath condensation — DOM layers over the canvas, never over the HUD. */
 .sw-visor { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.sw-visor-frame { position: absolute; inset: -2%; border-radius: 46% / 40%; box-shadow: inset 0 0 0 1.5vmin rgba(6, 9, 14, 0.96), inset 0 0 12vmin 6vmin rgba(4, 7, 12, 0.85), inset 0 0 40vmin 12vmin rgba(4, 7, 12, 0.35); }
-.sw-visor-frame::after { content: ''; position: absolute; inset: 1.4vmin; border-radius: 46% / 40%; border: 1px solid rgba(143, 211, 255, 0.28); box-shadow: 0 0 18px rgba(143, 211, 255, 0.18) inset; }
+/* GFX-1: the visor is a helmet a scientist looks THROUGH, not a mask over the picture. The old
+   aperture (46%/40% with a 12vmin inner shadow) ate about two fifths of the frame and turned every
+   wide shot into a black oval — the first thing that made the laboratory look cheap. It is now a wide,
+   softly-feathered aperture: the helmet edge still reads at the corners, the room does not. */
+.sw-visor-frame { position: absolute; inset: -8%; border-radius: 30% / 26%; box-shadow: inset 0 0 0 0.7vmin rgba(6, 9, 14, 0.9), inset 0 0 7vmin 2.5vmin rgba(4, 7, 12, 0.55), inset 0 0 22vmin 5vmin rgba(4, 7, 12, 0.18); }
+.sw-visor-frame::after { content: ''; position: absolute; inset: 0.8vmin; border-radius: 30% / 26%; border: 1px solid rgba(143, 211, 255, 0.2); box-shadow: 0 0 22px rgba(143, 211, 255, 0.12) inset; }
 .sw-visor-glare { position: absolute; inset: 0; background:
   radial-gradient(ellipse 38% 22% at 22% 18%, rgba(190, 230, 255, 0.16), transparent 70%),
   radial-gradient(ellipse 26% 12% at 70% 12%, rgba(190, 230, 255, 0.10), transparent 70%),
   linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.045) 44%, transparent 50%);
   mix-blend-mode: screen; }
-.sw-visor-breath { position: absolute; left: 12%; right: 12%; bottom: -6%; height: 34%; border-radius: 50% 50% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(200, 225, 240, 0.22), rgba(200, 225, 240, 0.06) 45%, transparent 72%); filter: blur(10px); animation: sw-breath 5.2s ease-in-out infinite; }
+.sw-visor-breath { position: absolute; left: 18%; right: 18%; bottom: -10%; height: 22%; border-radius: 50% 50% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(200, 225, 240, 0.13), rgba(200, 225, 240, 0.04) 45%, transparent 72%); filter: blur(12px); animation: sw-breath 5.2s ease-in-out infinite; }
 @keyframes sw-breath { 0%, 100% { opacity: 0.35; transform: scaleY(0.92); } 45% { opacity: 0.75; transform: scaleY(1.06); } }
 .sw-reticle { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid rgba(98, 240, 163, 0.75); border-radius: 50%; box-shadow: 0 0 10px rgba(98, 240, 163, 0.5); }
 .sw-reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: #62f0a3; border-radius: 50%; }
@@ -460,7 +464,7 @@ input, select, textarea { background: transparent !important; border: 1px solid 
   .sw-transcript { max-height: 18vh; font-size: 0.72rem; }
   .sw-badge { font-size: 0.52rem; }
   .sw-btn, .sw-chip, .sw-input { min-height: 40px; }
-  .sw-visor-frame { border-radius: 40% / 34%; }
+  .sw-visor-frame { border-radius: 26% / 22%; }
 }
 
 /* =====================================================================

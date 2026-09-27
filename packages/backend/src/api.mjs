@@ -95,6 +95,7 @@ import {
   buildVirtualExperimentEvidenceInput,
   buildVirtualLabDossier,
 } from './campaign/virtualLabClosedLoop.mjs';
+import { listDockingTargets } from './compute/dockingTargets.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
@@ -109,6 +110,10 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   listWorldSnapshots,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
+import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
+import { buildCandidateProtocol } from './campaign/candidateProtocol.mjs';
+import { planCandidateRoute } from './campaign/retrosynthesis.mjs';
+import { buildRetrosynthesisHandoff } from './campaign/retrosynthesisHandoff.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
@@ -120,6 +125,7 @@ import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
 import { detectRuntime as detectLocalVideoRuntime } from './cinematic/localVideoRuntime.mjs';
 import { planGeneration as planLocalVideoGeneration } from './cinematic/genesisVideoEngine.mjs';
 import { listSupportedCapabilities as listLocalVideoCapabilities } from './cinematic/videoControlContract.mjs';
+import { ingestScientificSource, ingestionStatus, recordIngestionResult } from './scientificIngestion.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -293,6 +299,20 @@ export function handleApi(db, ctx) {
   }
   if (seg[0] === 'system') {
     if (seg[1] === 'telemetry' && seg.length === 2 && method === 'GET') return ok(systemTelemetry());
+    return err(404, 'not_found');
+  }
+
+  // ---- D-149: live scientific ingestion (PDB/RCSB, ChEMBL, UniProt, ClinicalTrials.gov) with a sha256 per fetch ----
+  // Public, read-only, rate-limited in server.mjs like /api/biotech/source. Every result carries an honest access
+  // status (LIVE / NO_ACCESS / PINNED_FALLBACK); a fetch that fails is reported, never replaced by a cached success.
+  if (seg[0] === 'ingestion') {
+    if (seg[1] === 'status' && seg.length === 2 && method === 'GET') return ok(ingestionStatus());
+    if (seg[1] === 'source' && seg.length === 2 && method === 'GET') {
+      const query = ctx.query ?? {};
+      // `ctx.fetchImpl` exists so the route can be tested without a network; server.mjs never sets it.
+      return ingestScientificSource({ source: query.source, id: query.id }, ctx.fetchImpl ? { fetchImpl: ctx.fetchImpl } : {})
+        .then((r) => (r.ok ? ok({ result: recordIngestionResult(r.result) }) : err(r.status ?? 400, r.error, r.message)));
+    }
     return err(404, 'not_found');
   }
 
@@ -661,6 +681,46 @@ export function handleApi(db, ctx) {
           }
           return err(405, 'method_not_allowed');
         }
+        // /api/projects/:id/campaigns/:cid/experiment-memory — the campaign's scientific memory
+        // (viewer+): what was preregistered before the run, what was sealed after it, chain state.
+        if (seg[4] === 'experiment-memory' && method === 'GET') return ok({ memory: readExperimentMemory(db, campaignId) });
+        // /api/projects/:id/campaigns/:cid/protocol — THE final artefact of the experiment (viewer+):
+        // the reproducible computational candidate protocol plus the proposed physical-validation
+        // protocol. Assembled from persisted state only; it runs no engine.
+        if (seg[4] === 'protocol' && method === 'GET') {
+          const built = buildCandidateProtocol(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ protocol: built.protocol });
+        }
+        // /api/projects/:id/campaigns/:cid/retrosynthesis-handoff — the canonical identity of the
+        // finalist whose route is still owed (viewer+). Assembled from persisted state plus one
+        // capability probe; it starts no search and contains no route.
+        if (seg[4] === 'retrosynthesis-handoff' && method === 'GET') {
+          const built = buildRetrosynthesisHandoff(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ handoff: built.handoff });
+        }
+        // /api/projects/:id/campaigns/:cid/retrosynthesis (editor+) — runs the real route-search engine
+        // for one candidate and persists it as a Science Run. A blocked engine is reported as blocked;
+        // no route is ever written without the engine. It must sit above the GET-only guard below, or
+        // the POST is answered 405 and never reaches the engine.
+        if (seg[4] === 'retrosynthesis' && method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const result = planCandidateRoute(db, {
+            projectId, campaignId,
+            candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+            smiles: typeof body?.smiles === 'string' ? body.smiles : null,
+            options: {
+              iterationLimit: Number(body?.iterationLimit) || undefined,
+              timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,
+              maxRoutes: Number(body?.maxRoutes) || undefined,
+            },
+          });
+          if (!result.ok) {
+            return { status: result.error === 'BLOCKED_BY_RUNTIME' ? 503 : 400, body: { error: result.error, reason: result.reason ?? null, missingModelFiles: result.missingModelFiles ?? null } };
+          }
+          return ok({ scienceRun: result.run, solved: result.solved, routes: result.routes }, 201);
+        }
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {
@@ -668,7 +728,7 @@ export function handleApi(db, ctx) {
           return ok({ candidates: campaignStore.listCandidates(db, campaignId, Number.isFinite(gen) ? gen : null) });
         }
         if (seg[4] === 'decisions') return ok({ decisions: campaignStore.listDecisions(db, campaignId) });
-        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
+        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId, { afterSeq: ctx.query?.after }) });
         if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
         if (seg[4] === 'report') return ok({ report: buildCandidateResearchMatrix(db, campaignId) });
         if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});
@@ -676,6 +736,24 @@ export function handleApi(db, ctx) {
         if (seg[4] === 'conflicts') {
           const conflicts = campaignStore.listEvents(db, campaignId).filter((e) => e.type === 'MODEL_CONFLICT').map((e) => e.payload);
           return ok({ conflicts });
+        }
+        return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/experiment-memory/{preregistration,sessions} (editor+) —
+      // the two writes of scientific memory. Both are append-only: the preregistration is refused once
+      // the campaign has run or if it contradicts one already stored, and a sealed session is checked
+      // against it (fingerprint, criterion ids, server-derived verdict) before it is written.
+      if (seg.length === 6 && seg[4] === 'experiment-memory' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (seg[5] === 'preregistration') {
+          const result = preregisterExperiment(db, { projectId, campaign, hypothesis: body?.hypothesis, userId: user.id });
+          if (!result.ok) return { status: result.error === 'campaign_already_executed' || result.error === 'preregistration_immutable' ? 409 : 400, body: { error: result.error, reason: result.reason ?? null, record: result.record ?? null, recomputed: result.recomputed ?? null } };
+          return ok({ preregistration: result.record, status: result.status }, result.status === 'REGISTERED' ? 201 : 200);
+        }
+        if (seg[5] === 'sessions') {
+          const result = sealExperimentSession(db, { projectId, campaign, session: body?.session, userId: user.id });
+          if (!result.ok) return err(400, result.error);
+          return ok({ session: result.record, status: result.status, deduped: result.deduped }, result.deduped ? 200 : 201);
         }
         return err(404, 'not_found');
       }
@@ -1165,6 +1243,8 @@ function sanitizeStageConfig(body) {
       enabled: true,
       budget: clampInt(body.docking.budget, 1, 8, 2),
       mode: ['pareto', 'diverse', 'explicit'].includes(body.docking.mode) ? body.docking.mode : 'pareto',
+      // A vetted protein target is named by registry id only (files + hashes live in the backend).
+      ...(listDockingTargets().includes(body.docking.targetId) ? { targetId: body.docking.targetId } : {}),
       receptor: {
         // Tylko SMILES zastępnika lub gotowy PDBQT — brak wstrzykiwania dowolnych ścieżek.
         receptorSmiles: typeof r.receptorSmiles === 'string' ? r.receptorSmiles.slice(0, 200) : 'c1ccc2[nH]ccc2c1',

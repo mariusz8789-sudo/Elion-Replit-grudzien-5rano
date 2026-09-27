@@ -437,6 +437,22 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return { text: `Sprawdzam bazę dowodów dla: „${query}”. Odpowiedź niesie status źródeł; bez dowodów odpowiem „Nie wiem”.`, tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'evidenceAnswer', query } };
   }
   if (/^\s*\/dowody\s*$/i.test(message)) return { text: 'Podaj pytanie: `/dowody <o co pytasz>`. Odpowiadam wyłącznie z bazy dowodów (status źródła, poziom pewności) albo mówię „Nie wiem”.', tag: 'SYSTEM', intent: 'HELP' };
+  // --- LOOKING GLASS: `/świat <opis>` — the chat that answers with a world. The question is asked HERE,
+  //     in the one chat; the Looking Glass screen only renders the world `openLookingGlass` resolves.
+  const worldAsk = message.match(/^\s*\/(?:świat|swiat|looking-glass|lg)(?=\s|$)\s*([\s\S]*)$/i);
+  if (worldAsk) {
+    const question = worldAsk[1].trim();
+    if (!question) {
+      return { text: 'Opisz świat po komendzie: /świat <zjawisko, czas, perspektywa> — np. „/świat epidemia przez 60 dni z perspektywy człowieka na ulicy”.', tag: 'SYSTEM', intent: 'HELP' };
+    }
+    return {
+      text: 'Otwieram Looking Glass: odpowiedzią jest świat policzony przez istniejący model albo jawne „tego nie umiemy policzyć”.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: `#/looking-glass?q=${encodeURIComponent(question)}` },
+    };
+  }
+
   // --- D-128 Curiosity: `/ciekawość` (also "jakie pytania warto zadać", "co warto zbadać", "luki w dowodach").
   if (/^\s*\/ciekawo(s|ś)(c|ć)(?=\s|$)/i.test(message) || has(norm, 'jakie pytania warto', 'co warto zbadac', 'luki w dowodach', 'czego nie wiemy')) {
     const n = message.match(/\b(\d{1,2})\b/);

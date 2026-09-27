@@ -1,5 +1,6 @@
 import type { EntityRef } from '../../events/genesisEvent';
 import type { GeometryComponent } from '../ecs/geometry';
+import { mulberry32 } from '@genesis/core/determinism.js';
 import type {
   ChemicalComponent,
   DomainBindingComponent,
@@ -9,6 +10,7 @@ import type {
   SpatialComponent,
   Vector3,
 } from '../ecs/types';
+export { mulberry32 };
 
 /**
  * WORLD GENERATION 1.0 — WORLD BLUEPRINT.
@@ -33,16 +35,6 @@ import type {
  * blueprint with no such node is fully deterministic regardless of seed.
  */
 
-/** A generic seeded PRNG (mulberry32) — deterministic: the same seed always produces the same sequence. Never `Math.random()`. */
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function next(): number {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /**
  * Declarative bulk-generation of `count` structurally identical children

@@ -38,6 +38,12 @@ test.describe('Genesis Mirror — no OS/browser camera permission granted to thi
   test('the UI reports PERMISSION_DENIED/ERROR and never claims a connected camera', async ({ page }) => {
     const errors = collectErrors(page);
     await skipOnboarding(page);
+    // Headless Chromium cannot show the camera prompt, so an ungranted getUserMedia stays pending
+    // forever. A person who refuses clicks "Block", which the browser reports as NotAllowedError —
+    // that answer is what this test gives, so it exercises the UI's handling of a real refusal.
+    await page.addInitScript(() => {
+      if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
+    });
     await page.goto('/#/mirror');
     await expect(page.getByTestId('mirror-status')).toBeVisible();
     await expect(page.getByTestId('mirror-state')).toHaveText('MIRROR_IDLE');

@@ -1,11 +1,12 @@
 import { readJSON, writeJSON } from '../storage';
 import type { ScientificEvidencePack } from './evidencePack';
+import type { ReplayVerdict as ReplayVocabulary } from '../matrixFoundation/replayVerdict';
 
 const KEY = 'experiment-fabric/evidence-packs/v1';
 const MAX_PACKS = 50;
 
 export type StoredEvidencePackStatus = 'VALID' | 'INVALID_LOCAL_RECORD';
-export type ScientificEvidenceReplayVerdict = 'MATCH' | 'DRIFT' | 'BLOCKED';
+export type ScientificEvidenceReplayVerdict = Extract<ReplayVocabulary, 'MATCH' | 'DRIFT' | 'BLOCKED'>;
 
 export interface StoredEvidencePack {
   readonly savedAt: string;

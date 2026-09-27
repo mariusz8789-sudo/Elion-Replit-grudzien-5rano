@@ -14,7 +14,7 @@ const EMPTY_RESULT = (observable: string): BioResult => ({ observable, unit: 'no
  * The model's own `run()` is wrapped so any error it throws (e.g. a
  * required parameter silently omitted from the definition, which slips
  * past `validateParams` because it only checks params that ARE present —
- * the same hardening gap found and fixed in `core/physicsWorld/experiment.ts`,
+ * the same hardening gap found and fixed in the retired physicsWorld runtime (removed),
  * D-052) is re-surfaced as `FailClosedError('PARAMS', ...)`, not a raw,
  * untyped `Error`.
  */

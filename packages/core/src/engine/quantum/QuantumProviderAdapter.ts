@@ -19,6 +19,8 @@
 import { sha256hex, stableStringify } from '../../knowledge/EvidenceLedger.js';
 import { withRetry, HttpError, DEFAULT_RETRY, type HttpTransport, type Sleeper, type RetryPolicy } from '../../knowledge/ingestion/netUtils.js';
 import type { KeyProvider } from '../../knowledge/ingestion/YouTubeOfficialApiAdapter.js';
+import { mulberry32 } from '../../determinism.js';
+export { mulberry32 };
 
 export type { KeyProvider };
 
@@ -325,17 +327,6 @@ export function parseQasm3(text: string): ParsedQasm {
 // Deterministic statevector simulator
 // ---------------------------------------------------------------------------------------------
 
-/** mulberry32 — small, fast, fully determined by its 32-bit seed. */
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 /** 32-bit sampling seed derived from the circuit text AND the caller's seed: two circuits never share a stream, and the same (circuit, seed) always does. */
 export const samplingSeed = (qasm: string, seed: number): number => parseInt(sha256hex(qasm + ':' + String(seed)).slice(0, 8), 16) >>> 0;
 

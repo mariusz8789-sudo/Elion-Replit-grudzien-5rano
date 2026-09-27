@@ -61,4 +61,3 @@ export function ScientificResultInspector({ run, verification, onVerify }: Scien
     </article>
   );
 }
-

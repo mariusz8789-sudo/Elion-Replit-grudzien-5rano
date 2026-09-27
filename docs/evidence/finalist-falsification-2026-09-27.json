@@ -1,0 +1,281 @@
+{
+ "kind": "GENESIS_FINALIST_FALSIFICATION_EVIDENCE",
+ "contractVersion": 1,
+ "decision": "D-150",
+ "registered": true,
+ "protocol": {
+  "kind": "GENESIS_FINALIST_FALSIFICATION_PROTOCOL",
+  "decision": "D-150",
+  "target": "ABL1_1IEP",
+  "pdbId": "1IEP",
+  "chain": "A",
+  "receptorFile": "1iep_receptorH.pdb",
+  "crystalLigandFile": "1iep_ligand.sdf",
+  "pocketSource": "packages/backend/src/compute/targets/abl1-1iep/SOURCE.json (AutoDock Vina basic-docking tutorial box around the co-crystallised imatinib)",
+  "center": [
+   15.19,
+   53.903,
+   16.917
+  ],
+  "boxSize": [
+   20.0,
+   20.0,
+   20.0
+  ],
+  "engine": "packages/backend/src/compute/dock_worker.py \u2014 Meeko mk_prepare_receptor -> RDKit AddHs + ETKDGv3(randomSeed) + MMFF94 -> AutoDock Vina",
+  "redockConfigurations": [
+   {
+    "seed": 42,
+    "exhaustiveness": 8
+   },
+   {
+    "seed": 7,
+    "exhaustiveness": 8
+   },
+   {
+    "seed": 1234,
+    "exhaustiveness": 8
+   },
+   {
+    "seed": 42,
+    "exhaustiveness": 16
+   },
+   {
+    "seed": 7,
+    "exhaustiveness": 16
+   }
+  ],
+  "controls": [
+   {
+    "id": "nilotinib",
+    "role": "POSITIVE",
+    "smiles": "Cc1cn(-c2cc(NC(=O)c3ccc(C)c(Nc4nccc(-c5cccnc5)n4)c3)cc(C(F)(F)F)c2)cn1",
+    "why": "second-generation type-II ABL1 inhibitor, same DFG-out ATP-site mode as the reference ligand (Weisberg et al. 2005)"
+   },
+   {
+    "id": "aspirin",
+    "role": "NEGATIVE",
+    "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+    "why": "approved COX inhibitor, not a kinase inhibitor"
+   },
+   {
+    "id": "paracetamol",
+    "role": "NEGATIVE",
+    "smiles": "CC(=O)Nc1ccc(O)cc1",
+    "why": "approved analgesic, not a kinase inhibitor"
+   },
+   {
+    "id": "metformin",
+    "role": "NEGATIVE",
+    "smiles": "CN(C)C(=N)NC(N)=N",
+    "why": "approved biguanide, not a kinase inhibitor"
+   },
+   {
+    "id": "caffeine",
+    "role": "NEGATIVE",
+    "smiles": "Cn1cnc2c1c(=O)n(C)c(=O)n2C",
+    "why": "xanthine, purine-like but not an ABL1 inhibitor"
+   },
+   {
+    "id": "ibuprofen",
+    "role": "NEGATIVE",
+    "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "why": "approved NSAID, not a kinase inhibitor"
+   }
+  ],
+  "controlDockSettings": {
+   "seed": 42,
+   "exhaustiveness": 8,
+   "nPoses": 5
+  },
+  "thresholds": {
+   "redockSuccessRmsdA": 2.0,
+   "redockSuccessRmsdASource": "the 2 A heavy-atom RMSD convention of the Astex/PoseBusters redocking literature, already the criterion of docs/evidence/astex-redock-prereg.json \u2014 not chosen here",
+   "maxScoreSpreadKcalMol": 1.0,
+   "maxScoreSpreadSource": "stricter than AutoDock Vina's own reported ~2.85 kcal/mol scoring RMSE (Trott & Olson 2010); a spread above 1.0 kcal/mol across seeds means the reported single score is not stable",
+   "minControlSeparationKcalMol": 1.0,
+   "minControlSeparationSource": "one kcal/mol, the same magnitude as the spread bound: a claim must beat an unrelated drug by more than the method's own seed noise"
+  },
+  "verdictRules": {
+   "NUMERICAL_ARTIFACT": "PASS iff every configuration produced a pose AND max(bestAffinity) - min(bestAffinity) <= maxScoreSpreadKcalMol AND every configuration's rmsdA <= redockSuccessRmsdA; otherwise FAIL",
+   "MEASUREMENT_ARTIFACT": "PASS iff the median configuration's rmsdA <= redockSuccessRmsdA (the pipeline reproduces an independently measured crystal pose); otherwise FAIL",
+   "ALTERNATIVE_MODEL": "PASS iff the best redock affinity is at least minControlSeparationKcalMol better (more negative) than EVERY NEGATIVE control's best affinity; otherwise FAIL"
+  },
+  "limitations": [
+   "Vina scores are MODEL_ESTIMATE, never measured affinity; no therapeutic claim is made.",
+   "Negative controls are chemically unrelated approved drugs, not property-matched decoys; no offline decoy generator is available.",
+   "The redocked ligand is the deposited crystal ligand of the target file, so this validates the pipeline and the receptor, not a novel molecule.",
+   "The receptor is a single rigid crystal conformation; no receptor ensemble and no molecular dynamics are part of this protocol."
+  ]
+ },
+ "protocolFingerprint": "90238cfa11743e58a35d1e321aace756cad3e325e5d27674011e78576cfe9069",
+ "redocks": [
+  {
+   "seed": 42,
+   "exhaustiveness": 8,
+   "status": "DOCKED",
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "rmsdA": 0.584,
+   "bestAffinityKcalMol": -12.601,
+   "poseSha256": "554b6e41b8acccfae3cb0081221069ca73395d19c5db26bf575bf59089ab1f24",
+   "receptorPdbqtSha256": "58b39cbf705c170821931f5cbd1770bb9f4dc4389c4141356a3e6dda5d905ba4",
+   "sourceSha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+   "receptorAtoms": 2702,
+   "meekoVersion": "0.8.0",
+   "vinaVersion": "1.2.7"
+  },
+  {
+   "seed": 7,
+   "exhaustiveness": 8,
+   "status": "DOCKED",
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "rmsdA": 0.89,
+   "bestAffinityKcalMol": -12.76,
+   "poseSha256": "63b8d40b09a6e4f365358a62512e671b43f7e0221e8e5942cab7e1fcf611e044",
+   "receptorPdbqtSha256": "58b39cbf705c170821931f5cbd1770bb9f4dc4389c4141356a3e6dda5d905ba4",
+   "sourceSha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+   "receptorAtoms": 2702,
+   "meekoVersion": "0.8.0",
+   "vinaVersion": "1.2.7"
+  },
+  {
+   "seed": 1234,
+   "exhaustiveness": 8,
+   "status": "DOCKED",
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "rmsdA": 0.979,
+   "bestAffinityKcalMol": -12.81,
+   "poseSha256": "6a92590cce8d3301b37dfad0c11f6fd077dff67e7c2b3d36d2555140b2a2f492",
+   "receptorPdbqtSha256": "58b39cbf705c170821931f5cbd1770bb9f4dc4389c4141356a3e6dda5d905ba4",
+   "sourceSha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+   "receptorAtoms": 2702,
+   "meekoVersion": "0.8.0",
+   "vinaVersion": "1.2.7"
+  },
+  {
+   "seed": 42,
+   "exhaustiveness": 16,
+   "status": "DOCKED",
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "rmsdA": 0.584,
+   "bestAffinityKcalMol": -12.601,
+   "poseSha256": "554b6e41b8acccfae3cb0081221069ca73395d19c5db26bf575bf59089ab1f24",
+   "receptorPdbqtSha256": "58b39cbf705c170821931f5cbd1770bb9f4dc4389c4141356a3e6dda5d905ba4",
+   "sourceSha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+   "receptorAtoms": 2702,
+   "meekoVersion": "0.8.0",
+   "vinaVersion": "1.2.7"
+  },
+  {
+   "seed": 7,
+   "exhaustiveness": 16,
+   "status": "DOCKED",
+   "ligandSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+   "rmsdA": 0.89,
+   "bestAffinityKcalMol": -12.76,
+   "poseSha256": "63b8d40b09a6e4f365358a62512e671b43f7e0221e8e5942cab7e1fcf611e044",
+   "receptorPdbqtSha256": "58b39cbf705c170821931f5cbd1770bb9f4dc4389c4141356a3e6dda5d905ba4",
+   "sourceSha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+   "receptorAtoms": 2702,
+   "meekoVersion": "0.8.0",
+   "vinaVersion": "1.2.7"
+  }
+ ],
+ "controls": [
+  {
+   "id": "nilotinib",
+   "role": "POSITIVE",
+   "smiles": "Cc1cn(-c2cc(NC(=O)c3ccc(C)c(Nc4nccc(-c5cccnc5)n4)c3)cc(C(F)(F)F)c2)cn1",
+   "why": "second-generation type-II ABL1 inhibitor, same DFG-out ATP-site mode as the reference ligand (Weisberg et al. 2005)",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -13.48,
+   "poseSha256": "6fe99048b948932f1c3dff33e1f09406d4a7eb54098761ce607503eb66829312",
+   "ligandPdbqtSha256": "96def3ff5a2236230ebebee9f993caedbf86198577ff626c5f6f8dff97c6c5f6",
+   "ligandAtoms": 61
+  },
+  {
+   "id": "aspirin",
+   "role": "NEGATIVE",
+   "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+   "why": "approved COX inhibitor, not a kinase inhibitor",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -7.16,
+   "poseSha256": "7d80944a13acc8e07082fe1862bd20384f7e6cdec726b7336e4e0b98563da77e",
+   "ligandPdbqtSha256": "439096b027382a0b09f4799f6b73398d9100e589ab36ed6dec2b3751b4f2cf9e",
+   "ligandAtoms": 21
+  },
+  {
+   "id": "paracetamol",
+   "role": "NEGATIVE",
+   "smiles": "CC(=O)Nc1ccc(O)cc1",
+   "why": "approved analgesic, not a kinase inhibitor",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -6.723,
+   "poseSha256": "48f7b86794236aa84c40f7dec6967d56e783d21d5f29d4f57c4395100658f47b",
+   "ligandPdbqtSha256": "a47070ad83f50d6f62aff9096940de68d2a9a7f346b5a178c19fec1b0d3caaed",
+   "ligandAtoms": 20
+  },
+  {
+   "id": "metformin",
+   "role": "NEGATIVE",
+   "smiles": "CN(C)C(=N)NC(N)=N",
+   "why": "approved biguanide, not a kinase inhibitor",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -4.981,
+   "poseSha256": "aa90a7d0bb620ba0372ed48471b4d83fb998d99a57392b06f0e1099c9b41489b",
+   "ligandPdbqtSha256": "528d29d1c7e0b31f1ab5b1b83bdcfb0654480a4d2e84b2f7df2c572b87b66e92",
+   "ligandAtoms": 20
+  },
+  {
+   "id": "caffeine",
+   "role": "NEGATIVE",
+   "smiles": "Cn1cnc2c1c(=O)n(C)c(=O)n2C",
+   "why": "xanthine, purine-like but not an ABL1 inhibitor",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -5.92,
+   "poseSha256": "12c9c0a4183a020e94f1786c24326d46ad2f4948acd02e7523fcc675f85a05bc",
+   "ligandPdbqtSha256": "4e54e69de8b6448c83230c1674853dc29a05b89dddff73e759b6059f83349261",
+   "ligandAtoms": 24
+  },
+  {
+   "id": "ibuprofen",
+   "role": "NEGATIVE",
+   "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+   "why": "approved NSAID, not a kinase inhibitor",
+   "status": "DOCKED",
+   "bestAffinityKcalMol": -8.814,
+   "poseSha256": "63546cc0e5953d86a914c2c198a7f8c0270fa77ad847130fa9e4c16b73fb2cb1",
+   "ligandPdbqtSha256": "78f020075265029839f8c4130f8582c1d7685aea7aacdf70845220ed1f17bb3d",
+   "ligandAtoms": 33
+  }
+ ],
+ "summary": {
+  "configurations": 5,
+  "configurationsDocked": 5,
+  "bestAffinityKcalMolRange": [
+   -12.81,
+   -12.601
+  ],
+  "scoreSpreadKcalMol": 0.209,
+  "rmsdARange": [
+   0.584,
+   0.979
+  ],
+  "medianRmsdA": 0.89,
+  "positiveControlBestAffinityKcalMol": -13.48,
+  "weakestNegativeControlBestAffinityKcalMol": -8.814,
+  "separationFromWeakestNegativeKcalMol": 3.996
+ },
+ "probeVerdicts": {
+  "NUMERICAL_ARTIFACT": "PASS",
+  "MEASUREMENT_ARTIFACT": "PASS",
+  "ALTERNATIVE_MODEL": "PASS"
+ },
+ "engines": {
+  "vina": "1.2.7",
+  "meeko": "0.8.0",
+  "python": "3.11.15"
+ },
+ "finishedAt": "2026-09-27T17:10:39Z",
+ "bodySha256": "cb34754a32206efc4bd41d67c36ef794f68a258f62cc34a3322f3478e769b1f2"
+}

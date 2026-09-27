@@ -3306,13 +3306,9 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 }
 .lg-alternative b { color: #6f93b5; margin-right: 0.35rem; }
 
-.lg-composer { display: flex; gap: 0.6rem; align-items: flex-end; }
-.lg-input {
-  flex: 1; resize: none; padding: 0.75rem 0.9rem; border-radius: 0.75rem;
-  background: #0d1420; border: 1px solid #26344a; color: #e6eefa;
-  font: inherit; line-height: 1.5;
-}
-.lg-input:focus { outline: none; border-color: #3d7fbf; box-shadow: 0 0 0 3px #3d7fbf25; }
+.lg-composer { display: flex; gap: 0.6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.lg-hint { margin: 0; color: #9fb4cc; font-size: 0.9rem; }
+.lg-hint code { color: #cfe6ff; }
 .lg-send {
   padding: 0.72rem 1.2rem; border-radius: 0.7rem; border: 1px solid #3d7fbf60;
   background: #16283c; color: #cfe6ff; font-weight: 600; cursor: pointer;
@@ -4658,6 +4654,14 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .shell-nav-groups { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }
 .shell-nav-subgroup { display: grid; gap: .15rem; min-width: 0; }
 .shell-nav-subgroup + .shell-nav-subgroup { padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+/* Research mode: one entry per capability; its alternative screens fold under it. */
+.shell-nav-capability { display: grid; gap: .1rem; min-width: 0; }
+.shell-nav-variants-toggle {
+  justify-self: start; margin-left: 2.1rem; padding: .15rem .4rem; border-radius: var(--r-sm);
+  font: 600 .62rem/1.3 var(--font-mono); letter-spacing: .04em; color: var(--text-faint);
+}
+.shell-nav-variants-toggle:hover { color: var(--text-dim); }
+.shell-nav-variants { display: grid; gap: .1rem; margin-left: 1.4rem; padding-left: .5rem; border-left: 1px solid var(--border); }
 .shell-nav-subgroup-title {
   margin: 0; padding: .2rem .6rem; color: var(--text-faint);
   font: 700 .58rem/1.2 var(--font-mono); letter-spacing: .11em; text-transform: uppercase;
@@ -5871,3 +5875,181 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   .science-chat-form { align-items: stretch; }
   .science-chat-form .primary-btn { flex: 0 0 auto; }
 }
+
+/* One Evidence + Replay + Next Experiment panel (components/ScientificOutcomePanel) for every pillar. */
+.so-panel { display: grid; gap: .6rem; margin-top: .6rem; min-width: 0; }
+.so-block { border: 1px solid var(--border); border-radius: 8px; padding: .5rem .65rem; background: var(--bg-raised); min-width: 0; }
+.so-block h4 { margin: 0 0 .3rem; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.so-block p { margin: .2rem 0; overflow-wrap: anywhere; }
+.so-title { color: var(--text); font-weight: 600; }
+.so-dim { color: var(--text-dim); font-size: .85rem; }
+.so-mono { font-family: var(--font-mono); font-size: .75rem; overflow-wrap: anywhere; }
+.so-ids { display: grid; gap: .25rem; margin: .3rem 0 0; }
+.so-id { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .5rem; min-width: 0; }
+.so-id dt { color: var(--text-faint); font-size: .75rem; }
+.so-id dd { margin: 0; min-width: 0; }
+.so-verdict-match { color: var(--green); }
+.so-verdict-drift { color: var(--red); }
+.so-next { border-color: var(--border-strong); }
+@media (max-width: 640px) { .so-id { grid-template-columns: 1fr; gap: 0; } }
+
+/* One place, several views (city 3D/2D, CERN hall/detector): the tab row under the TopBar. */
+.view-switch { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.4rem 1rem; }
+.view-switch .chip-btn[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+
+/* Drug journey: the frozen hypothesis and plan shown before the live lab run. */
+.journey-hypothesis { display: grid; gap: 0.45rem; padding: 0.75rem 0.9rem; border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 0.6rem; background: rgba(8, 18, 32, 0.6); }
+.journey-hypothesis > span { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--cyan, #67e8f9); }
+.journey-hypothesis p { margin: 0; }
+.journey-hypothesis .journey-target { font-size: 0.82rem; color: var(--cyan, #67e8f9); }
+.journey-hypothesis li em { font-style: normal; font-size: 0.72rem; opacity: 0.75; letter-spacing: 0.04em; }
+.journey-hypothesis ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }
+.journey-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Drug bench live panel in the laboratory. */
+/* The bench procedure sits on the LEFT of the canvas so it never covers the result panel's controls. */
+/* The panel is positioned against the VIEWPORT, not against the world area, so `left: 1rem` put it at
+   x=16 — underneath the 200px shell sidebar, which clipped the first third of every line ("…andydatów",
+   "…k Vina liczy"). Measured in the browser, not guessed. Above the sidebar's own breakpoint it starts
+   clear of it; below 900px the sidebar is hidden and 1rem is correct again. */
+.sw-drug-live { left: calc(200px + 1rem); right: auto; width: min(360px, calc(100vw - 200px - 2rem)); max-height: min(62vh, 620px); overflow: auto; }
+.sw-drug-live.is-compact { max-height: min(40vh, 380px); }
+@media (max-width: 900px) {
+  .sw-drug-live { left: 1rem; width: min(360px, calc(100vw - 2rem)); }
+}
+.sw-procedure { list-style: none; counter-reset: step; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.sw-procedure-step { counter-increment: step; display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.1rem 0.4rem; padding: 0.3rem 0.4rem; border-left: 2px solid rgba(148, 163, 184, 0.35); border-radius: 0 0.35rem 0.35rem 0; background: rgba(15, 23, 42, 0.45); }
+.sw-procedure-step::before { content: counter(step); grid-row: span 3; align-self: start; font: 600 0.7rem/1.5 var(--font-mono, monospace); color: #94a3b8; }
+.sw-procedure-step.is-active { border-left-color: #22d3ee; background: rgba(8, 47, 73, 0.55); }
+.sw-procedure-step.is-done { border-left-color: #4ade80; }
+.sw-procedure-step.is-blocked { border-left-color: #f87171; }
+.sw-procedure-title { font-size: 0.78rem; color: #e2e8f0; }
+.sw-procedure-label { font-size: 0.62rem; letter-spacing: 0.06em; color: #7dd3fc; }
+.sw-procedure-detail { font-size: 0.7rem; color: rgba(226, 232, 240, 0.78); overflow-wrap: anywhere; }
+.sw-drug-live .sw-drug-dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; margin: 0.4rem 0; }
+.sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
+.sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
+.sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }
+/* Where the docked target sits in the body: a reference location with its caveat, and the link to the twin. */
+.sw-target-anatomy { margin: 0.4rem 0; padding: 0.4rem 0.5rem; border-left: 2px solid #7dd3fc; background: rgba(8, 47, 73, 0.45); border-radius: 0 0.35rem 0.35rem 0; display: grid; gap: 0.25rem; }
+.sw-target-site { font-size: 0.78rem; color: #e2e8f0; margin: 0; overflow-wrap: anywhere; }
+.sw-target-link { justify-self: start; }
+.sw-twin-link { margin-top: 0.25rem; justify-self: start; }
+/* D-148: the finalist is not a success — the 13 probes over the run's real declarations, the unknowns, the next experiment. */
+.sw-finalist-falsification { margin: 0.4rem 0; padding: 0.4rem 0.5rem; border-left: 2px solid #fbbf24; background: rgba(69, 26, 3, 0.35); border-radius: 0 0.35rem 0.35rem 0; display: grid; gap: 0.25rem; }
+.sw-falsify-caveat { margin: 0; font-size: 0.78rem; font-weight: 600; color: #fde68a; }
+.sw-falsify-table { width: 100%; border-collapse: collapse; font-size: 0.66rem; color: #e2e8f0; }
+.sw-falsify-table th, .sw-falsify-table td { text-align: left; vertical-align: top; padding: 0.15rem 0.3rem; border-bottom: 1px solid rgba(251, 191, 36, 0.18); overflow-wrap: anywhere; }
+.sw-falsify-table th { color: #94a3b8; font-weight: 500; }
+.sw-falsify-verdict { font: 600 0.62rem/1.5 var(--font-mono, monospace); color: #cbd5e1; }
+.sw-falsify-verdict.is-pass { color: #86efac; }
+.sw-falsify-verdict.is-fail { color: #fca5a5; }
+.sw-falsify-verdict.is-unresolved { color: #fde68a; }
+.sw-falsify-list { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
+.sw-falsify-list li { display: grid; gap: 0.05rem; }
+.sw-falsify-item { font-size: 0.74rem; color: #e2e8f0; }
+/* D-150: the provenance columns. A source path or a hash must wrap, never widen the table off-screen. */
+.sw-falsify-table td code { font: 0.58rem/1.45 var(--font-mono, monospace); color: #a5b4fc; overflow-wrap: anywhere; }
+.sw-falsify-table tr[data-blocker="1"] td { background: rgba(120, 53, 15, 0.16); }
+@media (max-width: 720px) { .sw-falsify-table { display: block; overflow-x: auto; } }
+/* The frozen criteria, shown while the run is going. */
+.sw-prereg { display: grid; gap: 0.2rem; margin: 0.5rem 0 0.1rem; padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(34, 211, 238, 0.28); border-radius: 0.4rem; background: rgba(8, 47, 73, 0.35); }
+.sw-prereg-statement { margin: 0; font-size: 0.72rem; color: #e2e8f0; }
+.sw-prereg-list { list-style: none; margin: 0.15rem 0 0; padding: 0; display: grid; gap: 0.12rem; }
+.sw-prereg-list li { display: flex; justify-content: space-between; gap: 0.5rem; font: 0.66rem/1.5 var(--font-mono, monospace); }
+.sw-prereg-id { color: #cbd5e1; }
+.sw-prereg-thr { color: #7dd3fc; flex: none; }
+.sw-prereg-check { font: 600 0.64rem/1.5 var(--font-mono, monospace); color: #86efac; }
+.sw-prereg-check.is-mismatch, .sw-prereg-check.is-failed { color: #fca5a5; }
+/* The live candidate list: one row per candidate the run has produced, with what each engine said about
+   it and, when it was thrown out, why. */
+.sw-cand-wrap { margin: 0.55rem 0 0.2rem; }
+.sw-cand-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.sw-cand-head strong { font-size: 0.78rem; color: #e2e8f0; }
+.sw-cand-list { list-style: none; margin: 0.35rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.sw-cand { display: grid; gap: 0.15rem; padding: 0.35rem 0.45rem; border-left: 2px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0 0.35rem 0.35rem 0; background: rgba(15, 23, 42, 0.5); }
+.sw-cand.is-retained { border-left-color: #4ade80; }
+.sw-cand.is-rejected { border-left-color: #f87171; opacity: 0.82; }
+.sw-cand.is-focus { background: rgba(8, 47, 73, 0.6); box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.35); }
+.sw-cand-top { display: flex; align-items: baseline; gap: 0.35rem; min-width: 0; }
+.sw-cand-gen { font: 600 0.62rem/1.4 var(--font-mono, monospace); color: #94a3b8; flex: none; }
+.sw-cand-smiles { font: 0.66rem/1.4 var(--font-mono, monospace); color: #cbd5e1; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sw-cand-flag { flex: none; font: 600 0.55rem/1.5 var(--font-mono, monospace); letter-spacing: 0.06em;
+  color: #22d3ee; border: 1px solid rgba(34, 211, 238, 0.4); border-radius: 0.25rem; padding: 0 0.25rem; }
+.sw-cand-flag.is-warn { color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); }
+.sw-cand-stages { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+.sw-cand-stage { font: 0.62rem/1.5 var(--font-mono, monospace); color: #7dd3fc; }
+.sw-cand-stage.is-rejected, .sw-cand-stage.is-failed { color: #fca5a5; }
+.sw-cand-stage.is-passed, .sw-cand-stage.is-computed { color: #86efac; }
+.sw-cand-stage.is-none { color: #64748b; }
+.sw-cand-reject { font-size: 0.66rem; color: #fca5a5; overflow-wrap: anywhere; }
+
+/* The visible laboratory: what the scientist is doing right now, in words, beside the scene. */
+.sw-hand-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem; margin: 0.35rem 0 0; font-size: 0.78rem; color: rgba(226, 232, 240, 0.9); }
+.sw-hand-action { font-weight: 700; color: #fbbf24; letter-spacing: 0.02em; }
+.sw-hand-line .sw-procedure-label { flex-basis: 100%; }
+
+/* The final protocol, where the experiment happened: three parts, the third one executed by nobody. */
+.sw-protocol { margin-top: 0.6rem; border-top: 1px solid rgba(125, 211, 252, 0.25); padding-top: 0.5rem; }
+.sw-protocol h3 { margin: 0 0 0.3rem; font-size: 0.92rem; letter-spacing: 0.04em; color: #7dd3fc; }
+.sw-protocol h4 { margin: 0.5rem 0 0.2rem; font-size: 0.78rem; color: #fbbf24; letter-spacing: 0.03em; }
+.sw-protocol p { margin: 0.2rem 0; font-size: 0.78rem; overflow-wrap: anywhere; }
+.sw-protocol-q { color: rgba(226, 232, 240, 0.9); font-style: italic; }
+.sw-protocol-list { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; font-size: 0.76rem; display: grid; gap: 0.18rem; }
+.sw-protocol-list .sw-procedure-label { display: block; }
+
+
+/* ---------------------------------------------------------------------------
+   LABORATORIUM BEZ PANELI (tryb świata)
+   Domyślnie widać scenę, a nie pulpit: odczyty są na monitorach aparatury w 3D,
+   a całe 2D chowa się za jednym przyciskiem „Szczegóły". Nic nie jest usunięte —
+   dowody, powtórka i pochodzenie są o jedno kliknięcie dalej, bo bez nich wynik
+   nie jest wynikiem.
+   --------------------------------------------------------------------------- */
+.sw.sw-immersive .sw-hud-status,
+.sw.sw-immersive .sw-hud-evidence,
+.sw.sw-immersive .sw-chemistry-context,
+.sw.sw-immersive .sw-domain-rail,
+.sw.sw-immersive .sw-advanced-controls,
+.sw.sw-immersive .sw-progress { display: none; }
+
+/* Pytanie zostaje: to jedyny sposób, żeby poprosić o eksperyment. Bez ramki, bez etykiet. */
+.sw.sw-immersive .sw-hud-command { background: none; border: none; box-shadow: none; }
+.sw.sw-immersive .sw-lab-primary > button { display: none; }
+.sw.sw-immersive .sw-lab-chat label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sw.sw-immersive .sw-lab-chat .sw-input {
+  min-width: min(520px, 72vw); padding: 0.7rem 1rem; border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(6, 14, 26, 0.72); backdrop-filter: blur(10px);
+}
+
+.sw-world-controls { position: absolute; z-index: 14; right: 1rem; top: 1rem; }
+.sw-world-btn {
+  padding: 0.45rem 0.9rem; border-radius: 999px; font: 500 0.78rem/1.4 inherit; cursor: pointer;
+  color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.6); backdrop-filter: blur(8px);
+}
+.sw-world-btn:hover { color: #e2e8f0; border-color: rgba(34, 211, 238, 0.55); }
+
+/* ---- Waiting ring (LoadingStatus) -----------------------------------------
+   A circle cut into five ticks: one per fifth of the MEASURED estimate. Done
+   ticks are solid, the current one pulses, the rest are a faint track — so a
+   glance says how much of the wait is left. Without a measurement there is
+   nothing to count down, so the whole ring turns instead of filling. */
+.gx-loading { display: inline-flex; align-items: center; gap: 0.5rem; }
+.gx-ring { width: 1.15em; height: 1.15em; flex: none; overflow: visible; }
+.gx-ring-tick { stroke: var(--border-strong); transition: stroke 200ms linear; }
+.gx-ring-tick.is-done { stroke: var(--cyan); }
+.gx-ring-tick.is-active { stroke: var(--cyan); opacity: 0.55; animation: gx-ring-pulse 1s ease-in-out infinite; }
+.gx-ring.is-overrun .gx-ring-tick { stroke: var(--gold); opacity: 0.75; }
+.gx-ring.is-indeterminate { animation: gx-ring-spin 1.4s linear infinite; transform-origin: 50% 50%; }
+.gx-ring.is-indeterminate .gx-ring-tick:nth-child(1) { stroke: var(--cyan); }
+.gx-ring.is-indeterminate .gx-ring-tick:nth-child(2) { stroke: var(--cyan); opacity: 0.45; }
+@keyframes gx-ring-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes gx-ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gx-ring.is-indeterminate { animation: none; }
+  .gx-ring-tick.is-active { animation: none; opacity: 0.8; }
+}
+/* The ring is an estimate of TIME. This note keeps it from being read as progress. */
+.gx-loading-note { font-size: 0.72em; color: var(--text-faint); white-space: nowrap; }

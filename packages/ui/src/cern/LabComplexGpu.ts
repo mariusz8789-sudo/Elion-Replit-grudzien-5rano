@@ -32,9 +32,12 @@ void main(){ float line = floor(vUv.y*24.0); float blink = step(0.5, hash(vec2(l
 const SCREEN_VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
 export function createLabComplex(scene: THREE.Scene, camera: THREE.PerspectiveCamera, canvas: HTMLCanvasElement, tunnel: TunnelHandle | null, _seed = 21): LabComplexHandle {
   const group = new THREE.Group(); scene.add(group);
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x141a24, roughness: 0.85, metalness: 0.15, side: THREE.BackSide });
+  // The hub is lit by lamps and screens, and under ACES at 0.82 exposure a 0x141a24 wall returned
+  // nothing: the room read as void with instruments floating in it. Concrete-grey walls and a floor
+  // polished enough to carry the ceiling strips give the space its surfaces back.
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x28313e, roughness: 0.78, metalness: 0.12, side: THREE.BackSide });
   const hub = new THREE.Mesh(new THREE.BoxGeometry(14, 5, 14), wallMat); hub.position.set(0, 2.5, 0); group.add(hub);
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x0b0f16, roughness: 0.4, metalness: 0.5 });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a212b, roughness: 0.26, metalness: 0.58 });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.01; group.add(floor);
   interface Door { panels: THREE.Mesh[]; open: number; target: number; axis: THREE.Vector3; base: THREE.Vector3; }
   const doors: Door[] = [];
@@ -50,9 +53,11 @@ export function createLabComplex(scene: THREE.Scene, camera: THREE.PerspectiveCa
   mkDoor(7, 0, Math.PI / 2); mkDoor(-7, 0, Math.PI / 2); mkDoor(0, -7, 0);
   const bench = new THREE.Mesh(new THREE.BoxGeometry(3, 0.9, 1.2), new THREE.MeshStandardMaterial({ color: 0x1a2332, roughness: 0.6 }));
   bench.position.set(4.5, 0.45, 3); group.add(bench);
-  const crystalDisplay = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.18), new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.2, roughness: 0.15, emissive: 0x00ff9c, emissiveIntensity: 0.3 }), 24);
+  const crystalDisplay = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.18), new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.2, roughness: 0.15, emissive: 0x00ff9c, emissiveIntensity: 0.12 }), 24);
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3();
-  for (let i = 0; i < 24; i++) { M.compose(P.set(-4.5 + (i % 6) * 0.5, 1.2 + Math.floor(i / 6) * 0.5, 3 + ((i * 0.31) % 1 - 0.5)), Q, S.setScalar(0.6 + ((i * 0.618) % 1) * 0.8)); crystalDisplay.setMatrixAt(i, M); }
+  // The samples sit ON the bench (x 4.5, z 3), in two rows. They used to hang in mid-air on the other
+  // side of the hub, over nothing, which is what made the room look like floating debris.
+  for (let i = 0; i < 24; i++) { M.compose(P.set(3.4 + (i % 8) * 0.31, 0.99 + Math.floor(i / 8) * 0.0, 2.7 + Math.floor(i / 8) * 0.3), Q, S.setScalar(0.42 + ((i * 0.618) % 1) * 0.3)); crystalDisplay.setMatrixAt(i, M); }
   crystalDisplay.instanceMatrix.needsUpdate = true; group.add(crystalDisplay);
   const consoles: THREE.Mesh[] = [];
   const screens: THREE.Mesh[] = [];

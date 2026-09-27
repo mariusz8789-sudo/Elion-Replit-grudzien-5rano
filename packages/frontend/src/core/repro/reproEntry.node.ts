@@ -647,7 +647,7 @@ export interface ReproA10BenchmarkReport {
   readonly reasoningValidityRate: number | null;
   readonly datasetFingerprint: string;
   readonly runFingerprint: string;
-  readonly replay: 'MATCH' | 'MISMATCH';
+  readonly replay: 'MATCH' | 'DRIFT';
   readonly officialMetricStatus: string;
 }
 

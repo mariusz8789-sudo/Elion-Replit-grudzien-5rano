@@ -152,7 +152,7 @@ export function TemporalCinematicScreen() {
   }, [sim, outcome, loading, failed]);
 
   if (!route) {
-    return <div className="app" style={{ padding: 32, color: '#d7e2ee' }}><h2>Temporal Cinematic Engine</h2><p>Missing required <code>place</code>/<code>year</code> query params.</p></div>;
+    return <div className="app" style={{ padding: 32, color: '#d7e2ee' }}><h2>Temporal Cinematic Engine</h2><p>Missing required <code>place</code>/<code>year</code> query params.</p><p><button type="button" className="chip-btn" onClick={() => { window.location.hash = '#/world-director'; }}>Wybierz miejsce i rok w World Director</button></p></div>;
   }
   if (outcome?.kind === 'blocked') {
     return <div className="app" style={{ padding: 32, color: '#d7e2ee' }}><h2>Temporal Cinematic Engine — BLOCKED_BY_RUNTIME</h2><p>{outcome.reason}</p></div>;

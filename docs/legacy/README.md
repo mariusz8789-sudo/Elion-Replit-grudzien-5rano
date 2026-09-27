@@ -1,0 +1,9 @@
+# docs/legacy/ — dokumenty odzyskane z niescalonych gałęzi (27.09.2026)
+
+**Status: ARCHIWUM, bajt w bajt z gałęzi.** Opisują stan z dnia swojej gałęzi; mogą być nieaktualne względem `main`. Kod z tych samych gałęzi: `legacy/README.md`.
+
+- `genesis-2026-07/` — z `genesis/main` (31.07): 12 dokumentów z głównego katalogu (API, CAMPAIGNS, COMMERCIALIZATION, GRANTS, GROUNDING, PROVENANCE, KNOWN_LIMITATIONS, ROADMAP, FUTURE_WORK, CITATION_BRIEF, SCIENTIFIC_ENGINE, DEPLOYMENT), 14 × `ZEFIR_*`, 13 × `COGNITIVE_*`, DISCOVERY_OS_ARCHITECTURE, GENESIS_KNOWLEDGE_BASE_ACQUISITION, SCIENTIFIC_VERSION_CONTROL i inne; `campaigns/` (walidacja naukowa z tabelami CSV, benchmark retrospektywny, dossier blokad pobierania danych), `citations/candidates.json`, `deploy/genesis-k8s.yaml`, 3 raporty gotowości z `docs/history/`. Do tego pełne stare wersje `SECURITY.md` (sekcja o bezpieczeństwie backendu komercyjnego: scrypt, podpisy webhooków Stripe, RBAC) i `CHANGELOG.md` (77 linii historii z lipca), których `main` nie ma.
+- `audits/` — pełne raporty z gałęzi audytowych (sierpień), których `main` ma tylko skróty albo wcale: specyfikacja zderzacza + niezależny przegląd red-team, Atom/Bohr Option D (opcja odrzucona), audyty gotowości hadron/matrix, pary model↔obserwacja, USGS, trzęsienie ziemi, 3 raporty ekstrakcji kwantowej, audyty gałęzi. `audits/fuller-versions/` — dłuższe starsze wersje 5 plików, które `main` skrócił (nazwa pliku = `NAZWA__gałąź.md`).
+- `elion-omega-2025-12/` — jedyny ślad projektu „ELION OMEGA” (gałąź `events`, 15.12.2025): opis, bez kodu (kodu nie było na gałęzi).
+
+Inne miejsca: `docs/reference/codex-handoff/` (dokumenty paczek Codexa), `docs/unreviewed-external/qwen-cyber-foundation/` (surowe paczki Qwen z własnym werdyktem odrzucenia), `docs/HUMAN_VISUAL_CEILING_REVIEW.md` i `docs/HUMAN_INSTRUMENTS_REVIEW.md` (Astra), `docs/CLAUDE_10H_BASELINE.md` i `docs/CLAUDE_10H_HANDOFF.md`, dokumenty D-136 w `docs/`.

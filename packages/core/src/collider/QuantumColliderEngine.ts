@@ -1,6 +1,7 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { stableStringify, sha256hex, type EvidenceLedger, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
-export const mulberry32 = (seed: number) => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+import { mulberry32 } from '../determinism.js';
+export { mulberry32 };
 /** PDG-style masses in GeV/c^2 (PDG 2022 rounded). B-field in Tesla (CMS-like). */
 export const PHYS = Object.freeze({ PROTON_MASS: 0.938272088, PION_CH: 0.13957039, PION0: 0.1349768, MUON: 0.105658375, ELECTRON: 0.00051099895, Z_MASS: 91.1876, W_MASS: 80.379, HIGGS_MASS: 125.25, LAMBDA_QCD: 0.2, NF: 5, PT_MIN: 20, Y_MAX: 2.5, B_FIELD: 3.8 } as const);
 export interface FourVec { readonly e: number; readonly px: number; readonly py: number; readonly pz: number; }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MORE_ITEMS, NAV_ITEMS, NAV_SECTIONS, activeNavId } from '../core/navigation';
+import { MORE_ITEMS, MORE_SECTIONS, NAV_ITEMS, NAV_SECTIONS, activeNavId, navVariants } from '../core/navigation';
 
 /**
  * NAVIGATION ↔ ROUTER CONSISTENCY.
@@ -40,7 +40,8 @@ describe('navigation entries point at routes the router actually has', () => {
       .filter((item) => item.hash !== undefined && item.hash !== '#/')
       .filter((item) => {
         const hash = item.hash!;
-        // A router entry may match exactly or by prefix (`#/timeline?mode=…`).
+        // A router entry may match exactly or by prefix (`#/timeline?mode=…`); `#/lab/<id>` is the router's lab pattern.
+        if (/^#\/lab\/[\w-]+$/.test(hash) && APP.includes('h.match(/^#\\/lab\\/([\\w-]+)/)')) return false;
         return ![...routes].some((r) => r === hash || hash.startsWith(r));
       })
       .map((item) => `${item.id} -> ${item.hash}`);
@@ -76,5 +77,45 @@ describe('navigation entries point at routes the router actually has', () => {
         expect(activeNavId(item.hash), `${item.id}`).toBe(item.id);
       }
     }
+  });
+});
+
+describe('research mode shows one entry per capability; alternative screens fold under it', () => {
+  const top = MORE_ITEMS.filter((item) => item.variantOf === undefined);
+  const variants = MORE_ITEMS.filter((item) => item.variantOf !== undefined);
+
+  it('every top-level entry sits in exactly one research-mode group, and no variant does', () => {
+    const grouped = MORE_SECTIONS.flatMap((section) => section.items.map((item) => item.id));
+    expect([...grouped].sort()).toEqual(top.map((item) => item.id).sort());
+    expect(new Set(grouped).size).toBe(grouped.length);
+  });
+
+  it('every variant folds under an existing top-level capability (no chains, no orphans)', () => {
+    for (const variant of variants) {
+      const parent = MORE_ITEMS.find((item) => item.id === variant.variantOf);
+      expect(parent, `${variant.id} -> ${variant.variantOf}`).toBeDefined();
+      expect(parent!.variantOf, `${variant.id} folds under another variant`).toBeUndefined();
+      expect(navVariants(parent!.id)).toContain(variant);
+    }
+  });
+
+  it('the known duplicate families collapse to one visible entry each', () => {
+    const family = (id: string) => [id, ...navVariants(id).map((v) => v.id)];
+    expect(family('science')).toEqual(expect.arrayContaining(['science', 'discover', 'campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
+    expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'evidence', 'discovery-log']));
+    expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-map', 'first-person-lab', 'world-director']));
+    // CMS Open Data (an offline analysis of one checksummed event file) and the CERN complex (a
+    // walk-through world) are two capabilities, not one with a spare view. Only the detector chamber
+    // is a view OF the complex, so only it folds.
+    expect(family('cms-open-data')).toEqual(['cms-open-data']);
+    expect(family('cern-complex')).toEqual(['cern-complex', 'collider']);
+    expect(top.length).toBeLessThanOrEqual(26);
+  });
+
+  it('chemistry and physics open the one main Laboratory at their station', () => {
+    expect(MORE_ITEMS.find((item) => item.id === 'chemistry')?.hash).toBe('#/scientific-worlds?station=st-titration');
+    expect(MORE_ITEMS.find((item) => item.id === 'physics')?.hash).toBe('#/scientific-worlds?station=st-window');
+    expect(activeNavId('#/scientific-worlds?station=st-titration')).toBe('chemistry');
+    expect(activeNavId('#/scientific-worlds')).toBe('scientific-worlds');
   });
 });

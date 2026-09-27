@@ -56,6 +56,12 @@ declare global {
   }
 }
 
+/** Temporal cinematic mode of this director (`TemporalCinematicScreen`): one street, a chosen year. */
+const TEMPORAL_PLACES: readonly { readonly place: string; readonly year: number; readonly label: string }[] = [
+  { place: 'Warsaw', year: 1900, label: 'Warszawa 1900' },
+  { place: 'Warsaw', year: 2026, label: 'Warszawa 2026' },
+];
+
 const CINEMATIC_PROMPT_SUGGESTIONS = [
   'Create a cinematic underwater research city.',
   'Generate an Einstein-Rosen bridge and create a cinematic flythrough.',
@@ -251,6 +257,18 @@ export function WorldDirectorScreen(): JSX.Element {
               onClick={() => { setWorldPrompt(suggestion); setSubmittedPrompt(suggestion); }}
             >
               {suggestion.replace(/^Create |^Generate /, '').replace(/\.$/, '')}
+            </button>
+          ))}
+        </div>
+        <div className="world-director-prompt-suggestions" aria-label="Film czasowy: to samo miejsce w innym roku" data-testid="world-director-temporal">
+          {TEMPORAL_PLACES.map(({ place, year, label }) => (
+            <button
+              type="button"
+              className="chip-btn tiny"
+              key={`${place}-${year}`}
+              onClick={() => { window.location.hash = `#/world-director?mode=temporal&place=${encodeURIComponent(place)}&year=${year}&road=1`; }}
+            >
+              Film czasowy: {label}
             </button>
           ))}
         </div>

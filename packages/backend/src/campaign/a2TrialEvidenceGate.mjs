@@ -34,16 +34,14 @@
  * so drift between the two copies fails a test rather than passing silently.
  */
 
-import { createHash } from 'node:crypto';
+import { sha256Hex } from '../determinism.mjs';
 
 /** Mirrors A2_PREREGISTRATION.candidateInclusion.trialEvidence.population — see this file's header. */
 export const TRIAL_EVIDENCE_POPULATION = ['Type 2 Diabetes', 'Obesity'];
 /** Mirrors A2_PREREGISTRATION.candidateInclusion.trialEvidence.requirePostedResults — see this file's header. */
 export const REQUIRE_POSTED_RESULTS = true;
 
-export function sha256Hex(text) {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
-}
+export { sha256Hex };
 
 /**
  * Every rejection this gate can produce, each a DISTINCT code — never a

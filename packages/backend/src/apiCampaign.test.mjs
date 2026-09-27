@@ -138,6 +138,16 @@ describe('campaign CRUD + RBAC + resource limits', () => {
     assert.deepEqual(created.body.campaign.constraints, []);
   });
 
+  test('POST .../retrosynthesis reaches the route-search handler (not the GET-only 405)', () => {
+    const owner = register('retro-route@lab.org');
+    const project = makeProject(owner.token);
+    const c = call('POST', `/api/projects/${project.id}/campaigns`, { token: owner.token, body: { objective: 'retro', startingSmiles: ['c1ccccc1'] } }).body.campaign;
+    // An unknown candidate is refused by the handler itself, before any engine runs.
+    const r = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/retrosynthesis`, { token: owner.token, body: { candidateId: 'no-such-candidate' } });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.error, 'candidate_not_found');
+  });
+
   test('viewer cannot create or start a campaign (RBAC)', () => {
     const owner = register('owner2@lab.org');
     const viewer = register('viewer2@lab.org');

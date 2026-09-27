@@ -1,0 +1,4 @@
+import { LEVEL_ORDER, type HumanHierarchyNode, type HumanScaleLevel } from './humanHierarchy';
+export interface HumanLodDecision { readonly requestedLevel:HumanScaleLevel; readonly visibleNodeIds:readonly string[]; readonly monotonic:boolean }
+export function selectHumanLod(nodes:readonly HumanHierarchyNode[],requestedLevel:HumanScaleLevel):HumanLodDecision{const idx=LEVEL_ORDER.indexOf(requestedLevel); const visible=nodes.filter(n=>LEVEL_ORDER.indexOf(n.level)===idx).map(n=>n.nodeId); const monotonic=nodes.every(n=>n.nominalSizeM>0&&n.resolutionM>0); return {requestedLevel,visibleNodeIds:visible,monotonic};}
+export function validateHierarchyScaleMonotonicity(nodes:readonly HumanHierarchyNode[]):boolean{const byId=new Map(nodes.map(n=>[n.nodeId,n])); for(const n of nodes){if(n.parentId){const p=byId.get(n.parentId); if(!p||n.nominalSizeM>=p.nominalSizeM) return false; if(LEVEL_ORDER.indexOf(n.level)<=LEVEL_ORDER.indexOf(p.level)) return false;}} return true;}

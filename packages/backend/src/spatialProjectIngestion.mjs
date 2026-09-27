@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { fnv1a } from './determinism.mjs';
 
 const MAX_ORIGINAL_BYTES = 7 * 1024 * 1024;
 const MAX_FEATURES = 50_000;
@@ -22,14 +23,6 @@ function validTimestamp(value) {
   return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
 }
 
-function fnv1a(input) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index++) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
 
 function validFeature(feature, expectedLayer) {
   if (!feature || typeof feature !== 'object' || feature.layer !== expectedLayer || typeof feature.sourceId !== 'string') return false;

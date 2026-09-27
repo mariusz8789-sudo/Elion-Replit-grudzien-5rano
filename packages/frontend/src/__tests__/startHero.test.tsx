@@ -19,6 +19,10 @@ describe('StartHero', () => {
     for (const id of ['door-ask', 'door-laboratory', 'door-guided-demo']) expect(html).toContain(`data-testid="${id}"`);
     expect(html).toContain('href="#/scientific-worlds"');
     expect(html).not.toContain('data-testid="door-discover"');
+    // The grant track leads: the reviewer's own check and one real drug experiment.
+    expect(html).toContain('data-testid="start-proof"');
+    expect(html).toContain('href="#/reviewer"');
+    expect(html).toContain('data-testid="door-proof-drug"');
     expect(html).toContain('Pytanie');
     expect(html).toContain('Evidence');
     expect(html).toContain('Replay');

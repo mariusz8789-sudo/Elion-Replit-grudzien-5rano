@@ -703,6 +703,63 @@ export interface DiscoveryGraph {
 
 export interface WhyAnswer { ok: boolean; answer?: string; reason?: string; evidence?: unknown; }
 
+/* ---------------- D-149: live scientific ingestion with a sha256 per fetch ---------------- */
+
+export type ScientificIngestionSource = 'pdb' | 'chembl' | 'uniprot' | 'clinicaltrials';
+/** LIVE = HTTP 200 from the allowlisted URL; NO_ACCESS = network refused / non-200; PINNED_FALLBACK = repo copy for that exact id. */
+export type ScientificIngestionStatus = 'LIVE' | 'NO_ACCESS' | 'PINNED_FALLBACK';
+
+export interface ScientificIngestionPinned {
+  path: string;
+  sha256: string;
+  bytes: number;
+  recordedSha256: string;
+  recordedIn: string;
+  matchesRecord: boolean;
+  nature: string;
+}
+
+export interface ScientificIngestionResult {
+  source: ScientificIngestionSource;
+  id: string;
+  url: string;
+  status: ScientificIngestionStatus;
+  httpStatus: number | null;
+  sha256: string | null;
+  bytes: number;
+  fetchedAt: string;
+  error?: string;
+  finalUrl?: string;
+  pinned?: ScientificIngestionPinned;
+  note?: string;
+}
+
+export interface ScientificIngestionSourceStatus {
+  source: ScientificIngestionSource;
+  label: string;
+  idPattern: string;
+  allowlist: string;
+  defaultId: string;
+  pinnedIds: string[];
+  lastResult: ScientificIngestionResult | null;
+}
+
+export interface ScientificIngestionStatusReport {
+  sources: ScientificIngestionSourceStatus[];
+  statuses: ScientificIngestionStatus[];
+  caveat: string;
+}
+
+export async function ingestScientificSource(source: ScientificIngestionSource, id: string): Promise<ApiResult<ScientificIngestionResult>> {
+  const params = new URLSearchParams({ source, id });
+  const r = await request<{ result: ScientificIngestionResult }>('GET', `/ingestion/source?${params.toString()}`);
+  return r.ok ? { ok: true, data: r.data.result } : r;
+}
+
+export function getScientificIngestionStatus(): Promise<ApiResult<ScientificIngestionStatusReport>> {
+  return request<ScientificIngestionStatusReport>('GET', '/ingestion/status');
+}
+
 export async function listToolchain(): Promise<ApiResult<ToolchainEntry[]>> {
   const r = await request<{ toolchain: ToolchainEntry[] }>('GET', '/compute/toolchain');
   return r.ok ? { ok: true, data: r.data.toolchain } : r;
@@ -743,6 +800,18 @@ export async function cancelCampaign(token: string, projectId: string, campaignI
 export async function listCampaignCandidates(token: string, projectId: string, campaignId: string): Promise<ApiResult<CampaignCandidate[]>> {
   const r = await request<{ candidates: CampaignCandidate[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/candidates`, { token });
   return r.ok ? { ok: true, data: r.data.candidates } : r;
+}
+
+export interface ProjectJob { id: string; type: string; status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'; progress: number; error: string | null }
+export async function getProjectJob(token: string, projectId: string, jobId: string): Promise<ApiResult<ProjectJob>> {
+  const r = await request<{ job: ProjectJob }>('GET', `/projects/${projectId}/jobs/${jobId}`, { token });
+  return r.ok ? { ok: true, data: r.data.job } : r;
+}
+
+/** Append-only campaign events after `afterSeq` (0 = all), in insertion order — the live run's source of truth. */
+export async function listCampaignEvents(token: string, projectId: string, campaignId: string, afterSeq = 0): Promise<ApiResult<import('../liveExperiment/drugRunState').CampaignEventRecord[]>> {
+  const r = await request<{ events: import('../liveExperiment/drugRunState').CampaignEventRecord[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/events?after=${Math.max(0, Math.floor(afterSeq))}`, { token });
+  return r.ok ? { ok: true, data: r.data.events } : r;
 }
 
 export async function listCampaignDecisions(token: string, projectId: string, campaignId: string): Promise<ApiResult<CampaignDecision[]>> {
@@ -850,6 +919,12 @@ export async function listCampaignConflicts(token: string, projectId: string, ca
  * compute — e.g. reloading the ADMET-AI model). Appends to an audit history,
  * never overwrites a prior verification.
  */
+/** One persisted Science Run (docking runs carry the top Vina pose and the pocket that lines it). */
+export async function getScienceRun(token: string, projectId: string, campaignId: string, runId: string): Promise<ApiResult<ScienceRun>> {
+  const r = await request<{ scienceRun: ScienceRun }>('GET', `/projects/${projectId}/campaigns/${campaignId}/science-runs/${runId}`, { token });
+  return r.ok ? { ok: true, data: r.data.scienceRun } : r;
+}
+
 export async function verifyScienceRun(
   token: string, projectId: string, campaignId: string, runId: string,
 ): Promise<ApiResult<ScienceRunVerification>> {
@@ -864,10 +939,82 @@ export async function listScienceRunVerifications(
   return r.ok ? { ok: true, data: r.data.verifications } : r;
 }
 
+/**
+ * SCIENTIFIC MEMORY (server side). `preregisterExperiment` must be called BEFORE the campaign starts
+ * — the server refuses a preregistration for a campaign whose engines already ran. `sealExperimentSession`
+ * writes the finished run; the server checks it against the preregistration and returns its own
+ * derivation of the verdict in the record, so what comes back is a verified record, not an echo.
+ */
+export interface ExperimentRecord {
+  readonly id: string;
+  readonly campaignId: string;
+  readonly kind: 'PREREGISTRATION' | 'SESSION';
+  readonly seq: number;
+  readonly fingerprint: string;
+  readonly contentHash: string;
+  readonly prevChainHash: string | null;
+  readonly chainHash: string;
+  readonly preregistrationId: string | null;
+  readonly preregCheck: string | null;
+  readonly body: Record<string, unknown>;
+  readonly createdAt: number;
+}
+
+export interface ExperimentMemory {
+  readonly preregistration: ExperimentRecord | null;
+  readonly sessions: readonly ExperimentRecord[];
+  readonly chain: { readonly ok: boolean; readonly length: number; readonly brokenAt: number | null; readonly reason: string | null };
+}
+
+export async function preregisterExperiment(
+  token: string, projectId: string, campaignId: string, hypothesis: unknown,
+): Promise<ApiResult<{ preregistration: ExperimentRecord; status: string }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory/preregistration`, { token, body: { hypothesis } });
+}
+
+export async function sealExperimentSession(
+  token: string, projectId: string, campaignId: string, session: unknown,
+): Promise<ApiResult<{ session: ExperimentRecord; status: string; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory/sessions`, { token, body: { session } });
+}
+
+export async function getExperimentMemory(token: string, projectId: string, campaignId: string): Promise<ApiResult<ExperimentMemory>> {
+  const r = await request<{ memory: ExperimentMemory }>('GET', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, { token });
+  return r.ok ? { ok: true, data: r.data.memory } : r;
+}
+
+/**
+ * THE FINAL PROTOCOL — the artefact the experiment ends with, assembled by the backend from persisted
+ * state only. The shape is deliberately loose here: the frontend shows what the record contains and
+ * never fills a gap in it, so a field the backend did not write simply does not appear on screen.
+ */
+export interface CandidateProtocol {
+  readonly kind: string;
+  readonly question?: string | null;
+  readonly status?: string | null;
+  readonly hypothesis?: { statement?: string | null; fingerprint?: string | null; registeredBeforeExecution?: boolean; criteria?: readonly { id: string; label?: string; critical?: boolean }[] } | null;
+  readonly verdict?: { server?: string | null; rule?: string | null; check?: string | null; criteria?: readonly { id: string; status: string; observed?: string }[] } | null;
+  readonly target?: Record<string, unknown> | null;
+  readonly engines?: readonly { engine?: string; version?: string | null; capability?: string; evidence?: string }[];
+  readonly funnel?: Record<string, unknown> | null;
+  readonly finalists?: readonly Record<string, unknown>[];
+  readonly synthesis?: Record<string, unknown> | null;
+  readonly proposedValidationProtocol?: Record<string, unknown> | null;
+  readonly nextStep?: string | null;
+  readonly boundary?: string | null;
+  readonly protocolFingerprint?: string | null;
+  readonly [key: string]: unknown;
+}
+
+export async function getCandidateProtocol(token: string, projectId: string, campaignId: string): Promise<ApiResult<CandidateProtocol>> {
+  const r = await request<{ protocol: CandidateProtocol }>('GET', `/projects/${projectId}/campaigns/${campaignId}/protocol`, { token });
+  return r.ok ? { ok: true, data: r.data.protocol } : r;
+}
+
 export async function runCampaignStage(
   token: string, projectId: string, campaignId: string,
   config: {
-    docking?: { enabled: boolean; budget?: number };
+    docking?: { enabled: boolean; budget?: number; targetId?: string; receptor?: { exhaustiveness?: number; nPoses?: number } };
     quantum?: { enabled: boolean; budget?: number };
     admet?: { enabled: boolean; thresholds?: Record<string, { max?: number; min?: number }> };
   },
@@ -1290,4 +1437,48 @@ export async function planLocalVideoGeneration(input: {
 }): Promise<ApiResult<LocalVideoPlan>> {
   const result = await request<{ plan: LocalVideoPlan }>('POST', '/compute/local-video/plan', { body: input });
   return result.ok ? { ok: true, data: result.data.plan } : result;
+}
+
+/* ---------------- Knowledge ingestion (Science Chat `/ingest <url>`): propose-only, human publishes ---------------- */
+
+export interface KnowledgeProposal {
+  proposalId: string;
+  status: 'pending' | 'published' | 'rejected';
+  approverId: string | null;
+  claim: string;
+  recordStatus: string;
+  sourceKind: string;
+  sourceUrl: string;
+  contentHash: string;
+}
+
+export interface KnowledgeProposalsListing {
+  proposals: KnowledgeProposal[];
+  activeRecords: number;
+  ledgerVersion: number;
+  ledgerOk: boolean;
+}
+
+/** No auth required — reading pending/published/rejected proposals is public, same as the backend route. */
+export async function listKnowledgeProposals(): Promise<ApiResult<KnowledgeProposalsListing>> {
+  return request<KnowledgeProposalsListing>('GET', '/knowledge/proposals');
+}
+
+export interface PublishedKnowledgeRecord {
+  id: string;
+  claim: string;
+  status: string;
+  contentHash: string;
+}
+
+/** Requires a signed-in approver — the backend returns 401 without a token. */
+export async function publishKnowledgeProposal(
+  token: string, proposalId: string,
+): Promise<ApiResult<{ published: PublishedKnowledgeRecord; activeRecords: number; ledgerOk: boolean }>> {
+  return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/publish`, { token });
+}
+
+/** Requires a signed-in approver — the backend returns 401 without a token. */
+export async function rejectKnowledgeProposal(token: string, proposalId: string): Promise<ApiResult<Record<string, never>>> {
+  return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/reject`, { token });
 }

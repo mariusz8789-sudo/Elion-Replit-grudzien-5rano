@@ -545,7 +545,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       setInput('');
       setTurns((turnsNow) => [...turnsNow, { role: 'user', text: msg }, {
         role: 'genesis',
-        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do canonical Research Intake i wybieram do trzech kandydatów do testu RDKit w Laboratorium.`,
+        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do Research Intake. Zanim uruchomię jakikolwiek silnik, pokażę hipotezę z zamrożonymi kryteriami i plan — eksperyment wykona się na żywo przy stanowisku leków w Laboratorium.`,
         tag: 'MODEL',
       }]);
       const token = getToken();
@@ -624,6 +624,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // commands cannot be swallowed by the broader Experiment Fabric domain parser.
     const preliminary = resolveCommand(msg, null);
     const isScientificIntegrationCommand = preliminary.action?.type === 'runScientificIntegration';
+    // `/świat …` is an explicit command: the question goes to Looking Glass even when it names a domain the Fabric knows.
+    const isLookingGlassCommand = preliminary.action?.type === 'openRoute' && preliminary.action.hash.startsWith('#/looking-glass?');
     const fabricRequest = parseScienceChatMessage(msg);
     // CHAT ENTRY FOR THE DISCOVERY LOOP. The Fabric parser recognises the DOMAIN of
     // nearly every declared research question and would plan ONE experiment for it,
@@ -634,7 +636,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // keeps its existing Fabric behaviour instead of being hijacked into a refusal.
     const isFabricRequest = (fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown')
       && !isDiscoveryLoopRequest(msg)
-      && !isScientificIntegrationCommand;
+      && !isScientificIntegrationCommand
+      && !isLookingGlassCommand;
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
@@ -657,7 +660,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         }
       : null;
 
-    const res: ChatResponse = isScientificIntegrationCommand ? preliminary : resolveCommand(msg, snapshot);
+    const res: ChatResponse = isScientificIntegrationCommand || isLookingGlassCommand ? preliminary : resolveCommand(msg, snapshot);
     setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });
@@ -1044,6 +1047,12 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           onActivateLaboratory={() => {
             setOpen(true);
             window.location.hash = '#/scientific-worlds';
+          }}
+          onOpenLiveLab={(hash) => {
+            // The live run happens in the laboratory: the chat steps aside so the bench is in view.
+            window.location.hash = hash;
+            window.dispatchEvent(new CustomEvent('genesis-product-route'));
+            if (!inline) setOpen(false);
           }}
         />
       )}

@@ -36,6 +36,31 @@ const waitState = async (page: Page, states: readonly string[], timeout = 240_00
   await expect.poll(async () => page.getByTestId('scientific-worlds').getAttribute('data-agent-state'), { timeout }).toMatch(new RegExp(`^(${states.join('|')})$`));
 };
 
+// The lab is world-first (d02c93fd): evidence and the command controls are collapsed until asked for.
+// The tests open them exactly as a user would — through their own toggles.
+const setPanel = async (page: Page, panel: 'evidence' | 'controls', open: boolean): Promise<void> => {
+  const toggle = panel === 'controls' ? page.getByTestId('sw-controls') : page.getByTestId('sw-evidence').locator('button[aria-expanded]').first();
+  if (((await toggle.getAttribute('aria-expanded')) === 'true') !== open) await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', String(open));
+};
+// Human Explorer (biology) keeps its tools in inspector tabs: explore (organs, zoom ladder), microscope,
+// section (cutaway, surface, twin camera) and research (commands, evidence) — the test opens the tab a
+// person would use for each step.
+const humanTab = async (page: Page, tab: 'explore' | 'microscope' | 'section' | 'research'): Promise<void> => {
+  const toggle = page.getByTestId('human-inspector-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  const tabButton = page.getByTestId(`human-tab-${tab}`);
+  if ((await tabButton.getAttribute('aria-selected')) !== 'true') await tabButton.click();
+  await expect(tabButton).toHaveAttribute('aria-selected', 'true');
+};
+
+/** The lab shows the world by default; the panels (evidence, status, readouts) live behind one control. */
+async function openLabDetails(page: import('@playwright/test').Page): Promise<void> {
+  const details = page.getByTestId('sw-details');
+  await details.waitFor({ state: 'visible', timeout: 120_000 });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
+}
+
 test.describe('Scientific Worlds — command → agent → session → evidence → replay', () => {
   test.setTimeout(1_500_000);
   test('desktop: the acceptance sentence end to end, through the visor', async ({ page }) => {
@@ -45,14 +70,17 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/scientific-worlds');
+    await openLabDetails(page);
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toBeVisible();
     await expect(page.getByTestId('sw-canvas')).toBeVisible();
+    await setPanel(page, 'evidence', true);
     await expect(page.getByTestId('sw-no-session')).toBeVisible();
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.visorIdle });
 
     // The acceptance sentence.
+    await setPanel(page, 'controls', true);
     await page.getByTestId('sw-input').fill('Idź do laboratorium i uruchom eksperyment na syntezie kryształu. Potem pokaż mi, co otrzymałeś i skąd to pochodzi.');
     await page.getByTestId('sw-send').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem 3 polecenia: NAVIGATE → ALIGN → REACH → INTERACT → EXECUTE → OBSERVE → REPORT');
@@ -112,8 +140,10 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/scientific-worlds');
+    await openLabDetails(page);
     await expect(page.getByTestId('scientific-worlds')).toBeVisible();
     await settled(page, 2);
+    await setPanel(page, 'controls', true);
     const input = page.getByTestId('sw-input');
     await expect(input).toBeVisible();
     const box = await input.boundingBox();
@@ -135,15 +165,20 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/human-biology-lab');
+    await openLabDetails(page);
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toHaveAttribute('data-world', 'biology');
-    await expect(page.getByTestId('sw-twin')).toContainText('NORMAL');
-    await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', 'PROXY_LOW');
+    // The proxy twin shows 'Ładowanie modelu człowieka…' until its first body is built (heavy in software GL).
+    await expect(page.getByTestId('sw-twin')).toContainText('NORMAL', { timeout: 400_000 });
+    // The twin starts on the proxy, or directly on the licensed body when that asset has already loaded (biologyLabKit).
+    await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', /^(PROXY_LOW|FULL_ASSET)$/);
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.bioIdle });
 
     // Run the two experiments as two observable stages. A single compound sentence is accepted,
     // but the second result can replace the first card before a learner has time to inspect it.
+    await humanTab(page, 'research');
+    await setPanel(page, 'controls', true);
     await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope i powiększ 5×.');
     await page.getByTestId('sw-send').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem');
@@ -181,7 +216,9 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await page.screenshot({ path: SHOTS.bioOrpheus });
     await page.getByTestId('sw-replay').click();
     await expect(page.getByTestId('sw-replay-verdict')).toHaveText(/MATCH/);
+    // The biology world opens on the twin camera (926e6b43); the camera button cycles TWIN → VISOR → SPECTATOR.
     await page.getByTestId('sw-camera').click();
+    if ((await root.getAttribute('data-camera')) !== 'SPECTATOR') await page.getByTestId('sw-camera').click();
     await expect(root).toHaveAttribute('data-camera', 'SPECTATOR');
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioSpectator });
@@ -196,9 +233,12 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
       await evidenceToggle.click();
       await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'false');
     }
+    await setPanel(page, 'controls', false);
+    await humanTab(page, 'explore');
     await page.getByTestId('sw-explorer-organ-heart').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
-    await expect(page.getByTestId('sw-explorer-organ')).toHaveAttribute('data-organ', 'heart');
+    // The organ card with data-organ was merged away (7c262fa9); the chosen organ is the selected chip.
+    await expect(page.getByTestId('sw-explorer-organ-heart')).toHaveAttribute('aria-selected', 'true');
     const cellRung = page.getByTestId('sw-explorer-rung-cell');
     await expect(cellRung).toBeDisabled({ timeout: 10_000 });
     await expect(cellRung).toBeEnabled({ timeout: 400_000 });
@@ -223,6 +263,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await expect(page.getByTestId('sw-explorer-tier')).toContainText('CC0');
     // Both agent cameras leave the twin a distant figure in its chamber; the twin camera frames the body,
     // which is the only way a screenshot can show whether the licensed asset actually rendered.
+    await humanTab(page, 'section');
     await page.getByTestId('sw-explorer-twin-camera').click();
     await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
     await expect(page.getByTestId('sw-camera-badge')).toContainText('BLIŹNIAK');

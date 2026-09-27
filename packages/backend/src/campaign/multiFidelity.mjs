@@ -14,11 +14,15 @@
 import * as store from './persistence.mjs';
 import { saveScienceRun, listScienceRuns, listScienceRunVerifications } from '../store.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
+import { prepareDockingTarget } from '../compute/dockingTargets.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
 import { embed3d } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 import { sha256Hex16 as sha16, snapshotEnvironment } from '../provenance.mjs';
+
+/** qm_worker.py refuses more atoms than this (hydrogens included). */
+const QM_MAX_ATOMS = 60;
 
 const scalar = (vec) => Object.values(vec).reduce((a, b) => a + (b ?? 0), 0);
 
@@ -72,46 +76,89 @@ export function selectForStage(candidates, { budget = 3, mode = 'pareto', explic
   return { selected, notSelected };
 }
 
-/** Real docking of one candidate against a receptor. Persists a Scientific Run. */
-export function dockCandidate(db, ctx, cand, receptor) {
+/**
+ * Output identity of a dock. Against a protein target the top pose itself (its PDBQT hash) is part of
+ * the result, so a replay must reproduce the pose, not only the scores.
+ */
+export function dockingOutputHash(data) {
+  return data.poseSha256 ? sha16({ poses: data.poses, poseSha256: data.poseSha256 }) : sha16(data.poses);
+}
+
+/**
+ * Real docking of one candidate against a receptor. Persists a Scientific Run.
+ * `receptor` is either a prepared protein target (`prepareDockingTarget`) or the legacy spec
+ * ({ receptorSmiles | receptorPdbqt, center }) kept for the software-validation stand-in.
+ * `ligandPdbqtPath` reuses a ligand the caller already prepared with the same routine and seed.
+ */
+export function dockCandidate(db, ctx, cand, receptor, { ligandPdbqtPath } = {}) {
   if (!capabilityAvailable('molecular-docking')) return { ok: false, error: 'BLOCKED_BY_RUNTIME', capability: 'molecular-docking' };
   const t0 = Date.now();
-  const dockSpec = {
-    ligandSmiles: cand.canonicalSmiles,
-    receptorSmiles: receptor?.receptorSmiles,
-    receptorPdbqt: receptor?.receptorPdbqt,
-    center: receptor?.center,
-    boxSize: receptor?.boxSize ?? [22, 22, 22],
-    exhaustiveness: receptor?.exhaustiveness ?? 8,
-    nPoses: receptor?.nPoses ?? 5,
-    seed: receptor?.seed ?? 42,
-  };
-  const r = docking.dock(dockSpec);
+  const target = receptor?.targetId ? receptor : null;
+  const dockSpec = target
+    ? {
+      ligandSmiles: cand.canonicalSmiles,
+      targetId: target.targetId,
+      receptorPdbqtSha256: target.receptorPdbqtSha256,
+      center: target.center,
+      boxSize: target.boxSize,
+      exhaustiveness: receptor.exhaustiveness ?? 8,
+      nPoses: receptor.nPoses ?? 5,
+      seed: receptor.seed ?? 42,
+    }
+    : {
+      ligandSmiles: cand.canonicalSmiles,
+      receptorSmiles: receptor?.receptorSmiles,
+      receptorPdbqt: receptor?.receptorPdbqt,
+      center: receptor?.center,
+      boxSize: receptor?.boxSize ?? [22, 22, 22],
+      exhaustiveness: receptor?.exhaustiveness ?? 8,
+      nPoses: receptor?.nPoses ?? 5,
+      seed: receptor?.seed ?? 42,
+    };
+  const r = docking.dock(target ? { ...dockSpec, receptorPdbqtPath: target.receptorPdbqtPath, ligandPdbqtPath } : dockSpec);
   if (!r.ok) return { ok: false, error: r.error, reason: r.reason };
+  const d = r.data;
+  const outputs = { bestAffinityKcalMol: d.bestAffinityKcalMol, nPoses: d.nPoses, poses: d.poses };
+  if (target) Object.assign(outputs, { pose: d.pose, pocket: d.pocket, posePdbqt: d.posePdbqt, poseSha256: d.poseSha256, ligandPdbqtSha256: d.ligandPdbqtSha256 });
   const run = saveScienceRun(db, {
     projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
-    engine: 'AutoDock Vina', engineVersion: r.data.vinaVersion, capability: 'molecular-docking',
-    method: `vina exhaustiveness=${r.data.exhaustiveness}`, status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+    engine: 'AutoDock Vina', engineVersion: d.vinaVersion, capability: 'molecular-docking',
+    method: `vina exhaustiveness=${d.exhaustiveness}`, status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
     // Full dock spec (receptor included) is stored so this run can be REPLAYED exactly — a category
     // label alone (receptorKind) is not enough to reproduce a dock issued against a custom receptor.
-    inputs: { ...dockSpec, receptorKind: r.data.receptorKind },
-    outputs: { bestAffinityKcalMol: r.data.bestAffinityKcalMol, nPoses: r.data.nPoses, poses: r.data.poses },
+    // A protein target is stored by registry id + the hash of the prepared receptor it was docked against.
+    inputs: { ...dockSpec, receptorKind: target ? 'protein_target' : d.receptorKind },
+    outputs,
     units: { bestAffinityKcalMol: 'kcal/mol' },
     warnings: [
-      ...(r.data.receptorKind === 'small_molecule_standin' ? ['receptor is a small-molecule rigid stand-in (software-validation), not a protein target'] : []),
-      ...(r.data.artifactDurability === 'EPHEMERAL_TEMP' ? ['docking artifacts are in an ephemeral temp directory; configure GENESIS_ARTIFACT_DIR on durable storage before production docking'] : []),
+      ...(d.receptorKind === 'small_molecule_standin' ? ['receptor is a small-molecule rigid stand-in (software-validation), not a protein target'] : []),
+      ...(target ? ['Vina score is an empirical scoring-function estimate, not a measured binding affinity; rigid receptor'] : []),
+      ...(d.artifactDurability === 'EPHEMERAL_TEMP' ? ['docking artifacts are in an ephemeral temp directory; configure GENESIS_ARTIFACT_DIR on durable storage before production docking'] : []),
     ],
-    provenance: { engine: `AutoDock Vina ${r.data.vinaVersion} + Meeko ${r.data.meekoVersion}`, receptorKind: r.data.receptorKind, artifactDurability: r.data.artifactDurability },
-    inputHash: r.data.inputHash, outputHash: sha16(r.data.poses),
-    artifacts: r.data.artifacts, durationMs: Date.now() - t0, environmentHash: envHash(),
+    provenance: {
+      engine: `AutoDock Vina ${d.vinaVersion} + Meeko ${d.meekoVersion}`,
+      receptorKind: target ? 'protein_target' : d.receptorKind,
+      artifactDurability: d.artifactDurability,
+      ...(target ? {
+        target: {
+          targetId: target.targetId, pdbId: target.pdbId, chain: target.chain, protein: target.protein,
+          referenceLigand: target.referenceLigand, sourceUrl: target.sourceFile?.url, sourceSha256: target.sourceSha256,
+          receptorPdbqtSha256: target.receptorPdbqtSha256, receptorAtoms: target.receptorAtoms,
+          preparation: target.preparation, meekoVersion: target.meekoVersion, pocketSource: target.pocketSource,
+        },
+        ligandPreparation: 'RDKit AddHs + ETKDGv3(randomSeed=seed) + MMFF94 (UFF fallback) -> Meeko MoleculePreparation -> PDBQT',
+      } : {}),
+    },
+    inputHash: d.inputHash, outputHash: dockingOutputHash(d),
+    artifacts: d.artifacts, durationMs: Date.now() - t0, environmentHash: envHash(),
   });
-  return { ok: true, run, bestAffinityKcalMol: r.data.bestAffinityKcalMol };
+  return { ok: true, run, bestAffinityKcalMol: d.bestAffinityKcalMol, poseSha256: d.poseSha256 ?? null };
 }
 
 /** Real quantum single-point of one candidate (3D embed via RDKit -> PySCF). */
-export function qmCandidate(db, ctx, cand, { method = 'RHF', basis = 'sto-3g' } = {}) {
+export function qmCandidate(db, ctx, cand, { method = 'RHF', basis = 'sto-3g', embedded = null } = {}) {
   if (!capabilityAvailable('quantum-chemistry')) return { ok: false, error: 'BLOCKED_BY_RUNTIME', capability: 'quantum-chemistry' };
-  const emb = embed3d(cand.canonicalSmiles);
+  const emb = embedded ?? embed3d(cand.canonicalSmiles);
   if (!emb.ok) return { ok: false, error: 'embed_failed', reason: emb.reason ?? emb.error };
   const t0 = Date.now();
   const r = qm.singlePoint({ atoms: emb.atoms, charge: emb.charge ?? 0, method, basis });
@@ -154,6 +201,12 @@ export function splitAdmetPrediction(full, categories = endpointCategories()) {
     else { admetOut[key] = value; admetUnits[key] = meta.units; }
   }
   return { admetOut, toxOut, admetUnits, toxUnits };
+}
+
+/** A few headline safety endpoints copied verbatim from the persisted prediction, for live observers. */
+const KEY_ENDPOINTS = ['AMES', 'hERG', 'DILI', 'ClinTox'];
+function keyEndpoints(full) {
+  return Object.fromEntries(KEY_ENDPOINTS.filter((k) => typeof full[k] === 'number').map((k) => [k, Number(full[k].toFixed(4))]));
 }
 
 /**
@@ -207,7 +260,7 @@ export function admetToxicityStage(db, ctx, candidates, { thresholds = null } = 
       inputHash: sha16({ s: cand.canonicalSmiles, kind: 'toxicity' }), outputHash: sha16(toxOut), artifacts: [],
       environmentHash,
     });
-    store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_COMPUTED, admetRunId: runAdmet.id, toxicityRunId: runTox.id } });
+    store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_COMPUTED, admetRunId: runAdmet.id, toxicityRunId: runTox.id, keyEndpoints: keyEndpoints(full) } });
 
     let violates = null;
     if (thresholds) {
@@ -292,17 +345,47 @@ export function runMultiFidelityStage(db, campaignId, config = {}, { log = () =>
       store.addEvent(db, { campaignId, generation: campaign.currentGeneration, type: 'STAGE_BLOCKED', payload: { stage: 'docking', blocker: 'BLOCKED_BY_RUNTIME' } });
     } else {
       const { selected, notSelected } = selectForStage(candidates, { budget: config.docking.budget ?? 2, mode: config.docking.mode ?? 'pareto', explicitIds: config.docking.explicitIds ?? [] });
+      // A protein target is prepared once per stage; every step below is persisted when it has
+      // actually completed, so a live observer sees the real progression, never a timer.
+      let receptor = config.docking.receptor ?? { receptorSmiles: 'c1ccc2[nH]ccc2c1', center: [0, 0, 0] };
+      let targetBlocked = null;
+      if (config.docking.targetId && selected.length) {
+        const t = prepareDockingTarget(config.docking.targetId);
+        if (!t.ok) {
+          targetBlocked = t.error;
+          store.addEvent(db, { campaignId, generation: campaign.currentGeneration, type: 'STAGE_BLOCKED', payload: { stage: 'docking', blocker: 'RECEPTOR_PREPARATION_FAILED', error: t.error } });
+        } else {
+          receptor = { ...t, exhaustiveness: config.docking.receptor?.exhaustiveness ?? 8, nPoses: config.docking.receptor?.nPoses ?? 5, seed: 42 };
+          store.addEvent(db, { campaignId, generation: campaign.currentGeneration, type: 'STAGE_PROGRESS', payload: {
+            stage: 'docking', step: 'RECEPTOR_PREPARED', targetId: t.targetId, pdbId: t.pdbId, chain: t.chain, protein: t.protein,
+            receptorPdbqtSha256: t.receptorPdbqtSha256, sourceSha256: t.sourceSha256, receptorAtoms: t.receptorAtoms,
+            center: t.center, boxSize: t.boxSize, meekoVersion: t.meekoVersion,
+          } });
+        }
+      }
       const docked = [];
-      for (const { cand, reason } of selected) {
+      for (const { cand, reason } of targetBlocked ? [] : selected) {
         store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.SELECTED_FOR_DOCKING, why: reason } });
         log('DOCKING', { candidate: cand.canonicalSmiles });
-        const dr = dockCandidate(db, ctx, cand, config.docking.receptor ?? { receptorSmiles: 'c1ccc2[nH]ccc2c1', center: [0, 0, 0] });
+        let ligandPdbqtPath;
+        if (receptor.targetId) {
+          const lig = docking.prepareLigand({ ligandSmiles: cand.canonicalSmiles, seed: receptor.seed });
+          if (!lig.ok) {
+            store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.DOCKING_FAILED, error: lig.error } });
+            docked.push({ candidateId: cand.id, smiles: cand.canonicalSmiles, failed: true, error: lig.error });
+            continue;
+          }
+          ligandPdbqtPath = lig.data.ligandPdbqtPath;
+          store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_PROGRESS', payload: { stage: 'docking', step: 'LIGAND_PREPARED', candidateId: cand.id, ligandPdbqtSha256: lig.data.ligandPdbqtSha256, atoms: lig.data.atoms } });
+          store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_PROGRESS', payload: { stage: 'docking', step: 'VINA_STARTED', candidateId: cand.id, targetId: receptor.targetId, exhaustiveness: receptor.exhaustiveness, seed: receptor.seed } });
+        }
+        const dr = dockCandidate(db, ctx, cand, receptor, { ligandPdbqtPath });
         if (!dr.ok) {
           store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.DOCKING_FAILED, error: dr.error } });
           docked.push({ candidateId: cand.id, smiles: cand.canonicalSmiles, failed: true, error: dr.error });
           continue;
         }
-        store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.DOCKING_RESULT_RETAINED, bestAffinityKcalMol: dr.bestAffinityKcalMol, runId: dr.run.id } });
+        store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.DOCKING_RESULT_RETAINED, bestAffinityKcalMol: dr.bestAffinityKcalMol, runId: dr.run.id, ...(receptor.targetId ? { targetId: receptor.targetId, poseSha256: dr.poseSha256 } : {}) } });
         const conflict = detectDescriptorDockingConflict(db, ctx, cand, dr.bestAffinityKcalMol);
         if (conflict) report.conflicts.push(conflict);
         docked.push({ candidateId: cand.id, smiles: cand.canonicalSmiles, bestAffinityKcalMol: dr.bestAffinityKcalMol, runId: dr.run.id });
@@ -310,7 +393,7 @@ export function runMultiFidelityStage(db, campaignId, config = {}, { log = () =>
       for (const { cand } of notSelected) {
         store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'docking', candidateId: cand.id, reason: STAGE_REASON.NOT_SELECTED_FOR_DOCKING } });
       }
-      report.docking = { executed: true, selected: selected.length, notSelected: notSelected.length, docked };
+      report.docking = { executed: true, selected: selected.length, notSelected: notSelected.length, docked, ...(targetBlocked ? { blocker: targetBlocked } : {}) };
     }
   }
 
@@ -321,12 +404,23 @@ export function runMultiFidelityStage(db, campaignId, config = {}, { log = () =>
       report.quantum = { executed: false, blocker: 'BLOCKED_BY_RUNTIME', capability: 'quantum-chemistry' };
       store.addEvent(db, { campaignId, generation: campaign.currentGeneration, type: 'STAGE_BLOCKED', payload: { stage: 'quantum', blocker: 'BLOCKED_BY_RUNTIME' } });
     } else {
-      const { selected } = selectForStage(candidates, { budget: config.quantum.budget ?? 1, mode: config.quantum.mode ?? 'pareto' });
+      // Walk the ranked candidates; one the QM worker cannot take (over its atom limit) is recorded as
+      // not selected, with the reason, and the next one is tried — the budget counts real attempts.
+      const budget = config.quantum.budget ?? 1;
+      const { selected: ranked } = selectForStage(candidates, { budget: candidates.length, mode: config.quantum.mode ?? 'pareto' });
       const computed = [];
-      for (const { cand } of selected) {
+      let attempts = 0;
+      for (const { cand } of ranked) {
+        if (attempts >= budget) break;
+        const embedded = embed3d(cand.canonicalSmiles);
+        if (embedded.ok && embedded.atoms.length > QM_MAX_ATOMS) {
+          store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'quantum', candidateId: cand.id, reason: 'NOT_SELECTED_FOR_QM', why: `${embedded.atoms.length} atoms incl. H exceed the PySCF worker limit (${QM_MAX_ATOMS})` } });
+          continue;
+        }
+        attempts += 1;
         store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'quantum', candidateId: cand.id, reason: STAGE_REASON.SELECTED_FOR_QM } });
         log('QUANTUM', { candidate: cand.canonicalSmiles });
-        const qr = qmCandidate(db, ctx, cand, { method: config.quantum.method, basis: config.quantum.basis });
+        const qr = qmCandidate(db, ctx, cand, { method: config.quantum.method, basis: config.quantum.basis, embedded: embedded.ok ? embedded : null });
         if (!qr.ok) {
           store.addEvent(db, { campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'quantum', candidateId: cand.id, reason: STAGE_REASON.QM_FAILED, error: qr.error } });
           computed.push({ candidateId: cand.id, smiles: cand.canonicalSmiles, failed: true, error: qr.error });

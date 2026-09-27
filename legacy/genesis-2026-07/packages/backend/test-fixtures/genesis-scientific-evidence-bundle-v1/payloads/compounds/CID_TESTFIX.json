@@ -1,0 +1,13 @@
+{
+  "PropertyTable": {
+    "Properties": [
+      {
+        "CID": 999999999,
+        "InChIKey": "TESTFIXKEYAAAAA-AAAAAAAAAA-N",
+        "CanonicalSMILES": "CC(=O)Oc1ccccc1C(=O)O",
+        "MolecularFormula": "C9H8O4",
+        "MolecularWeight": 180.16
+      }
+    ]
+  }
+}

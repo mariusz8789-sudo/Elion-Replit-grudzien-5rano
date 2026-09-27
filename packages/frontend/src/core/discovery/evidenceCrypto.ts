@@ -1,5 +1,6 @@
 import { serializeDiscoveryEvidencePack } from './discoveryEvidence';
 import type { DiscoveryEvidencePack } from './discoveryCase';
+import { sha256Hex as canonicalSha256Hex } from '@genesis/core/determinism.js';
 
 /**
  * EVIDENCE SHA-256 — cryptographic-grade digest, ADDED ALONGSIDE the existing
@@ -21,9 +22,8 @@ import type { DiscoveryEvidencePack } from './discoveryCase';
  * serialization (`serializeDiscoveryEvidencePack`, unchanged).
  */
 export async function sha256Hex(input: string): Promise<string> {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  // The ONE SHA-256 (isomorphic, bit-identical to WebCrypto); async signature kept for existing callers.
+  return canonicalSha256Hex(input);
 }
 
 /** SHA-256 of a completed evidence pack's canonical content. */

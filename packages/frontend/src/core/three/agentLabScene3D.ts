@@ -27,6 +27,7 @@ import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../sci
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type HumanTwinLodLevel, type HumanTwinLodState, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
 import { loadHumanTwinBodyResult, type HumanTwinTier, type HumanTwinPresentationState } from './humanTwinAsset';
+import { FULL_ATLAS_IDLE, loadFullAtlas, type FullAtlasState, type LoadedFullAtlas } from './bodyParts3dFullAtlas';
 import { REFERENCE_ANATOMY_IDLE, bodyParts3dStructure, loadBodyParts3dPilot, selectBodyParts3dLod, type ReferenceAnatomyPart, type ReferenceAnatomyState } from './bodyParts3dPilot';
 import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
@@ -160,6 +161,9 @@ export class AgentLabScene3D implements Sim3D {
   private referenceParts: readonly ReferenceAnatomyPart[] = [];
   private referenceState: ReferenceAnatomyState = REFERENCE_ANATOMY_IDLE;
   private referenceAbort: AbortController | null = null;
+  private fullAtlas: LoadedFullAtlas | null = null;
+  private fullAtlasAbort: AbortController | null = null;
+  private fullAtlasState: FullAtlasState = FULL_ATLAS_IDLE;
   private onReferenceAnatomy: ((state: ReferenceAnatomyState) => void) | null = null;
   private twinLodPreference: HumanTwinLodPreference = 'AUTO';
   private onTwinLod: ((state: HumanTwinLodState) => void) | null = null;
@@ -266,7 +270,37 @@ export class AgentLabScene3D implements Sim3D {
 
   getReferenceAnatomyState(): ReferenceAnatomyState { return this.referenceState; }
   setReferenceAnatomyListener(listener: ((state: ReferenceAnatomyState) => void) | null): void { this.onReferenceAnatomy = listener; }
-  private publishReferenceAnatomy(state: ReferenceAnatomyState): void { this.referenceState = state; this.onReferenceAnatomy?.(state); }
+  private publishReferenceAnatomy(state: ReferenceAnatomyState): void {
+    this.referenceState = { ...state, fullAtlas: this.fullAtlasState };
+    this.onReferenceAnatomy?.(this.referenceState);
+  }
+  getFullAtlasState(): FullAtlasState { return this.fullAtlasState; }
+  private publishFullAtlas(state: FullAtlasState): void {
+    this.fullAtlasState = state;
+    this.referenceState = { ...this.referenceState, fullAtlas: state };
+    this.onReferenceAnatomy?.(this.referenceState);
+  }
+
+  /**
+   * The full BodyParts3D male body (2,234 meshes): fetched once per scene and applied to every twin. A
+   * missing or undecodable file leaves the existing body standing and is reported as FAILED, never faked.
+   */
+  private ensureFullAtlas(THREE: typeof THREE_NS): void {
+    if (this.fullAtlasState.status !== 'IDLE' || typeof DecompressionStream === 'undefined') return;
+    const ownerScene = this.scene;
+    const abort = new AbortController(); this.fullAtlasAbort = abort;
+    this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'LOADING' });
+    loadFullAtlas(THREE, abort.signal).then((atlas) => {
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); return; }
+      this.fullAtlasAbort = null; this.fullAtlas = atlas;
+      for (const t of this.twins) t.applyFullAtlas(atlas);
+      this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'READY', structures: atlas.structures, concepts: atlas.concepts, triangles: atlas.triangles });
+    }).catch((error: unknown) => {
+      if (abort.signal.aborted) return;
+      this.fullAtlasAbort = null;
+      this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'FAILED', error: error instanceof Error ? error.message : String(error) });
+    });
+  }
 
   /**
    * Fetch the approved BodyParts3D pilot meshes once, at the level of detail this device should draw. Each file
@@ -510,7 +544,17 @@ export class AgentLabScene3D implements Sim3D {
     // Shell: floor, ceiling, walls.
     const floorMat = (palette.LAB_FLOOR as THREE_NS.MeshStandardMaterial).clone(); applyGradeFloor(floorMat, this.grade);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), palette.CONCRETE); ceiling.rotation.x = Math.PI / 2; ceiling.position.set(cx, CEILING_Y, cz); scene.add(ceiling);
+    // GFX-1: the ceiling is a large, barely-lit surface seen at a grazing angle in every wide shot,
+    // where the shared CONCRETE map's contrast reads as cloud rather than as a soffit. It gets its own
+    // instance with the detail maps calmed down: the light fixtures, not the texture, carry that half
+    // of the frame. Same material category, same palette — only this one mesh's copy is retuned.
+    const ceilingMat = (palette.CONCRETE as THREE_NS.MeshStandardMaterial).clone();
+    ceilingMat.roughnessMap = null;
+    ceilingMat.roughness = 0.94;
+    if (ceilingMat.normalMap && ceilingMat.normalScale) ceilingMat.normalScale.setScalar(0.12);
+    ceilingMat.color.setHex(0x171b20);
+    ceilingMat.needsUpdate = true;
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), ceilingMat); ceiling.rotation.x = Math.PI / 2; ceiling.position.set(cx, CEILING_Y, cz); scene.add(ceiling);
     const wallGeoX = new THREE.PlaneGeometry(W, CEILING_Y); const wallGeoZ = new THREE.PlaneGeometry(D, CEILING_Y);
     const back = new THREE.Mesh(wallGeoX, palette.LAB_WALL); back.position.set(cx, CEILING_Y / 2, this.room.minZ); scene.add(back);
     const front = new THREE.Mesh(wallGeoX, palette.LAB_WALL); front.position.set(cx, CEILING_Y / 2, this.room.maxZ); front.rotation.y = Math.PI; scene.add(front);
@@ -530,7 +574,10 @@ export class AgentLabScene3D implements Sim3D {
     const panelSpots: [number, number][] = [[-4, -2.5], [0, -2.5], [4, -2.5], [-4, 1.5], [0, 1.5], [4, 1.5]];
     for (const [x, z] of panelSpots) {
       const p = new THREE.Mesh(panelGeo, panelMat); p.position.set(x, CEILING_Y - 0.03, z); scene.add(p);
-      createPracticalLight(THREE, scene, { position: [x, CEILING_Y - 0.25, z], color: 0xdff3ff, intensity: 3.2, distance: 6.5, decay: 1.8 });
+      // GFX-1 exposure pass: the panels lit their own surroundings and nothing else. More reach and a
+      // softer falloff put light on the floor and the equipment between them, without touching the
+      // ambient guardrail — these are real lights, so the room keeps its shadows and its form.
+      createPracticalLight(THREE, scene, { position: [x, CEILING_Y - 0.25, z], color: 0xdff3ff, intensity: 4.6, distance: 11, decay: 1.45 });
     }
     // D-132: the ambient bounce now comes from the grade (applyWorldGrade). A second, brighter fill here
     // is what flattened the shadows — and a scene without shadows has no form.
@@ -575,6 +622,7 @@ export class AgentLabScene3D implements Sim3D {
     this.twinLodPreference = 'FULL';
     this.twinAnchor = chamber.anchor;
     void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
+    this.ensureFullAtlas(THREE);
     createHeroLight(THREE, scene, { target: [0, 1.3, 0.4], keyDistance: 3.4, rimDistance: 2.5, intensity: { key: 12, rim: 3.2 }, color: { key: 0xeaf4ff, rim: 0x7fdcff }, castShadow: false });
 
     // Stations from the typed world definition.
@@ -657,6 +705,7 @@ export class AgentLabScene3D implements Sim3D {
     // A refusal, a missing file or a decode error simply leaves the proxy standing — nothing is faked.
     this.twinAnchor = chamber.anchor;
     void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
+    this.ensureFullAtlas(THREE);
     // Two manipulators flank the chamber (reference 2), sharing the ORPHEUS arm builder.
     for (const [x, z, heading, phase] of [[-2.1, 0.9, Math.PI * 0.35, 0.8], [2.1, 0.9, -Math.PI * 0.35, 2.4]] as const) {
       const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
@@ -1034,6 +1083,7 @@ export class AgentLabScene3D implements Sim3D {
     if (!old) { disposeSceneResources(asset.root); return; }
     const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
     upgraded.applyReferenceAnatomy(this.referenceParts);
+    if (this.fullAtlas) upgraded.applyFullAtlas(this.fullAtlas);
     anchor.remove(old.group);
     this.spinners = this.spinners.filter((g) => g !== old.group);
     old.dispose();
@@ -1080,6 +1130,9 @@ export class AgentLabScene3D implements Sim3D {
     this.twinLoadGeneration++; this.twinAbort?.abort(); this.twinAbort = null; this.twinAnchor = null;
     // Reference meshes still attached to the scene are disposed by the traversal below; a load in flight is dropped.
     this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
+    this.fullAtlasAbort?.abort(); this.fullAtlasAbort = null; this.fullAtlasState = FULL_ATLAS_IDLE;
+    for (const sys of this.fullAtlas?.systems ?? []) sys.geometry.dispose();
+    this.fullAtlas = null;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
     this.researchCompanion?.dispose(); this.researchCompanion = null;

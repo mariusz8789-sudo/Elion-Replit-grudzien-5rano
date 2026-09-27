@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { requestOpenScienceChat } from '../../core/scienceChatBridge';
 import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGlass/scenarioSession';
 import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
@@ -430,26 +431,39 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
   );
 }
 
+/** The question this screen answers, carried in the hash (`#/looking-glass?q=…`) by the ONE Science Chat. */
+function questionFromHash(): string {
+  const query = window.location.hash.split('?')[1] ?? '';
+  return (new URLSearchParams(query).get('q') ?? '').trim();
+}
+
+/**
+ * The question is asked in the ONE Science Chat (`/świat …`); this screen only shows the world that
+ * answers it. No second composer: the chat navigates here with the question in the hash, and each
+ * new question is appended to the transcript below.
+ */
 export function LookingGlassChat(): JSX.Element {
   const [turns, setTurns] = useState<readonly Turn[]>([]);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const submit = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+  const show = useCallback((text: string) => {
+    if (!text) return;
     // Synchronous by construction: the models are deterministic, so there is
     // no spinner to fake and no streamed prose to wait for.
-    const session = openLookingGlass(trimmed);
-    setTurns((previous) => [...previous, { id: `${session.request.requestId}-${previous.length}`, text: trimmed, session }]);
-    setDraft('');
+    const session = openLookingGlass(text);
+    setTurns((previous) => (previous.at(-1)?.text === text
+      ? previous
+      : [...previous, { id: `${session.request.requestId}-${previous.length}`, text, session }]));
   }, []);
 
+  useEffect(() => {
+    show(questionFromHash());
+    const onHash = () => show(questionFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [show]);
+
   const empty = turns.length === 0;
-  const placeholder = useMemo(
-    () => 'Opisz świat, który chcesz zobaczyć — zjawisko, czas i perspektywę…',
-    [],
-  );
+  const ask = (text?: string) => requestOpenScienceChat(text ? `/świat ${text}` : undefined);
 
   return (
     <div className={`lg-root ${empty ? 'lg-root-empty' : ''}`}>
@@ -472,28 +486,15 @@ export function LookingGlassChat(): JSX.Element {
         ))}
       </div>
 
-      <form
-        className="lg-composer"
-        onSubmit={(event) => { event.preventDefault(); submit(draft); }}
-      >
-        <textarea
-          ref={inputRef}
-          className="lg-input"
-          rows={empty ? 3 : 2}
-          value={draft}
-          placeholder={placeholder}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(draft); }
-          }}
-        />
-        <button type="submit" className="lg-send" disabled={draft.trim().length === 0}>Uruchom</button>
-      </form>
+      <div className="lg-composer">
+        <p className="lg-hint">Pytanie zadajesz w Science Chat: <code>/świat</code> i opis zjawiska, czasu i perspektywy.</p>
+        <button type="button" className="lg-send" onClick={() => ask()}>Zapytaj w Science Chat</button>
+      </div>
 
       {empty ? (
         <div className="lg-examples">
           {EXAMPLES.map((example) => (
-            <button key={example} type="button" className="lg-example" onClick={() => submit(example)}>
+            <button key={example} type="button" className="lg-example" onClick={() => ask(example)}>
               {example}
             </button>
           ))}

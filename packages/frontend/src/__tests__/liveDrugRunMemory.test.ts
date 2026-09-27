@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls: string[] = [];
 const captured: { hypothesis: unknown; sessions: Record<string, unknown>[] } = { hypothesis: null, sessions: [] };
+let throttleJobReads = 0;
 let preregResult: { ok: boolean; data?: unknown; error?: string } = {
   ok: true, data: { status: 'REGISTERED', preregistration: { id: 'rec-prereg', chainHash: 'chain-1' } },
 };
@@ -22,7 +23,7 @@ vi.mock('../core/backend/client', () => ({
   },
   startCampaign: async () => { calls.push('startCampaign'); return { ok: true, data: { jobId: 'job-1' } }; },
   runCampaignStage: async () => { calls.push('runCampaignStage'); return { ok: true, data: { jobId: 'job-2' } }; },
-  getProjectJob: async () => ({ ok: true, data: { status: 'completed' } }),
+  getProjectJob: async () => { if (throttleJobReads > 0) { throttleJobReads -= 1; return { ok: false, status: 429, error: 'rate_limited' }; } return { ok: true, data: { status: 'completed' } }; },
   listCampaignEvents: async () => ({ ok: true, data: [] }),
   listCampaignCandidates: async () => ({ ok: true, data: [] }),
   getScienceRun: async () => ({ ok: false, error: 'not_used' }),
@@ -36,13 +37,22 @@ vi.mock('../core/backend/client', () => ({
 const { resetDrugHypothesesForTest, getDrugHypothesis } = await import('../core/liveExperiment/drugHypothesis');
 const { resetLiveDrugRunsForTest, startLiveDrugRun, replayDrugRunEngines, getLiveDrugRun } = await import('../core/liveExperiment/liveDrugRun');
 
-const start = () => startLiveDrugRun({ token: 't', projectId: 'p1', campaignId: 'c1', subject: 'imatynib', pollMs: 1 });
+const start = () => startLiveDrugRun({ token: 't', projectId: 'p1', campaignId: 'c1', subject: 'imatynib', pollMs: 1, rateLimitBackoffMs: 1 });
 
 describe('the live run writes to the server’s scientific memory', () => {
   beforeEach(() => {
     calls.length = 0; captured.sessions.length = 0; captured.hypothesis = null;
     preregResult = { ok: true, data: { status: 'REGISTERED', preregistration: { id: 'rec-prereg', chainHash: 'chain-1' } } };
+    throttleJobReads = 0;
     resetLiveDrugRunsForTest(); resetDrugHypothesesForTest();
+  });
+
+  it('a rate-limited job read backs off and keeps following the job instead of failing the run', async () => {
+    throttleJobReads = 3;
+    const run = await start();
+    expect(throttleJobReads).toBe(0);
+    expect(run.error).toBeNull();
+    expect(run.phase).toBe('DONE');
   });
 
   it('registers the criteria BEFORE the campaign starts, and seals the result after the run', async () => {

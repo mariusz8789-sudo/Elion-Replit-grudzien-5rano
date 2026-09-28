@@ -131,3 +131,37 @@ describe('auditCertificate — the five verdicts', () => {
     expect(after.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
   });
 });
+
+describe('the epistemic status is bound by the signature and never changed by it', () => {
+  const modelEstimate: UnsignedCertificateInput = { ...baseInput, claim: { ...baseInput.claim, epistemicStatus: 'MODEL_ESTIMATE' } };
+
+  async function signedModelEstimate(): Promise<{ cert: Certificate; publicKeyId: string }> {
+    const unsigned = await buildCertificate(modelEstimate);
+    const keys = await generateKeyPair();
+    const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, keys.privateKeyJwk);
+    const cert = await buildCertificate(modelEstimate, { algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(keys.publicKeyJwk), signatureValue, signedAt: modelEstimate.issuedAt });
+    return { cert, publicKeyId: await computePublicKeyId(keys.publicKeyJwk) };
+  }
+
+  it('a verified signature leaves a MODEL_ESTIMATE a MODEL_ESTIMATE, and names the signer key', async () => {
+    const { cert, publicKeyId } = await signedModelEstimate();
+    const result = await auditCertificate(cert, new Set([publicKeyId]));
+    expect(result.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
+    expect(result.signerKeyId).toBe(publicKeyId);
+    expect(cert.claim.epistemicStatus).toBe('MODEL_ESTIMATE');
+  });
+
+  it('relabelling a signed MODEL_ESTIMATE as REAL_MEASUREMENT is INTEGRITY_INVALID', async () => {
+    const { cert, publicKeyId } = await signedModelEstimate();
+    const promoted: Certificate = { ...cert, claim: { ...cert.claim, epistemicStatus: 'REAL_MEASUREMENT' } };
+    const result = await auditCertificate(promoted, new Set([publicKeyId]));
+    expect(result.verdict).toBe('INTEGRITY_INVALID');
+    expect(result.signerKeyId ?? null).toBeNull();
+    expect(result.errors.some((e) => e.includes('claimFingerprint mismatch'))).toBe(true);
+  });
+
+  it('a certificate without a status keeps its old fingerprint (the field is omitted, not null)', async () => {
+    const before = await buildCertificate(baseInput);
+    expect(Object.prototype.hasOwnProperty.call(before.claim, 'epistemicStatus')).toBe(false);
+  });
+});

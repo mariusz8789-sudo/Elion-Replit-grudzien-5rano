@@ -62,8 +62,10 @@ record('2. a concrete population reaches the answered branch, over the real A2 c
   answered.status === 'ANSWERED' && answered.answerRecord.totalCandidatesInSpace === 20 && answered.answerRecord.candidateViews.length === 12,
   `status=${answered.status} totalCandidates=${answered.status === 'ANSWERED' ? answered.answerRecord.totalCandidatesInSpace : 'n/a'}`);
 
-record('3. the recommendation honestly reuses A2\'s own CONFLICTING_EVIDENCE verdict -- no rosier government vocabulary invented',
-  answered.status === 'ANSWERED' && answered.answerRecord.recommendation.label === 'CONFLICTING_EVIDENCE',
+// Expected label is A2's post-D-115 verdict: D-115 (docs/DECISIONS.md) moved A2 and A3 from
+// CONFLICTING_EVIDENCE to NO_SUPERIOR_CANDIDATE by removing a misattributed dulaglutide observation.
+record('3. the recommendation honestly reuses A2\'s own NO_SUPERIOR_CANDIDATE verdict (since D-115) -- no rosier government vocabulary invented',
+  answered.status === 'ANSWERED' && answered.answerRecord.recommendation.label === 'NO_SUPERIOR_CANDIDATE',
   answered.status === 'ANSWERED' ? answered.answerRecord.recommendation.label : 'n/a');
 
 const mk0893 = answered.status === 'ANSWERED' ? answered.answerRecord.candidateViews.find((v) => v.report.summary.prefName === 'MK-0893') : undefined;
@@ -102,7 +104,7 @@ record('9. §7 safety-language: a vetoed candidate gets no reassuring label (nul
   tirzepatideView !== undefined && tirzepatideView.report.score.vetoed === true && tirzepatideView.safetyLabel === null,
   `TIRZEPATIDE safetyLabel=${tirzepatideView?.safetyLabel}`);
 
-record('10. AnswerRecord (TRUTH) vs ActionRecord (POLICY): no candidate is gated for action under CONFLICTING_EVIDENCE, but all 12 candidate views stay visible',
+record('10. AnswerRecord (TRUTH) vs ActionRecord (POLICY): no candidate is gated for action under NO_SUPERIOR_CANDIDATE, but all 12 candidate views stay visible',
   answered.status === 'ANSWERED' && answered.actionRecord.gatedCandidate === null && answered.actionRecord.surface === 'NONE' && answered.answerRecord.candidateViews.length === 12,
   answered.status === 'ANSWERED' ? `surface=${answered.actionRecord.surface} candidateViews=${answered.answerRecord.candidateViews.length}` : 'n/a');
 

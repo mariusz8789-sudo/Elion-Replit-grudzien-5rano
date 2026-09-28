@@ -4,6 +4,7 @@ import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import * as knowledgeApi from './knowledgeApi.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 /**
  * Genesis Virtual Lab Closed Loop — API layer. Proves RBAC, project/campaign
@@ -41,7 +42,7 @@ function seedCampaignAndCandidate(db, projectId, createdBy) {
 }
 
 describe('Test: full closed loop — plan -> execute -> Evidence proposal -> replay', () => {
-  test('a complete, honest round trip produces exactly the expected sequence of governed events', async () => {
+  test('a complete, honest round trip produces exactly the expected sequence of governed events', { skip: RDKIT_SKIP }, async () => {
     const owner = register('vlab-owner@lab.org');
     const project = makeProject(owner.token);
     const { campaignId, candidateId } = seedCampaignAndCandidate(db, project.id, owner.user.id);

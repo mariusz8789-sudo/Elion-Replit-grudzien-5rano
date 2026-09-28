@@ -5,6 +5,10 @@ import { realClaimCounts, runTamperChallenge, SURPASS2_PINNED_SHA256, type Tampe
 import { D063_CLAIM_TEXT } from '../core/govServices/govServiceRuns';
 import { DOCKING_SOURCE, RETRO_EVIDENCE, verifyDockingInputs, type FileCheck } from '../core/reviewer/drugEvidence';
 import { ASTEX_PREREG, ASTEX_RUNS, imatinibKitCase, type BenchmarkRun } from '../core/reviewer/dockingBenchmark';
+import {
+  REDOCK_RECORD, REDOCK_RECORD_TEXT, SIGNED_EVIDENCE_PATH, recordedBestScoreText, signCommittedEvidence, verifyEvidence, withEditedBestScore,
+  type EvidenceVerification, type SignedEvidence,
+} from '../core/reviewer/signedEvidence';
 import { ScientificIngestionPanel } from './ScientificIngestionPanel';
 import './reviewerRoom.css';
 
@@ -192,6 +196,88 @@ function DrugPipeline(): React.ReactElement {
   );
 }
 
+function VerificationBox({ title, v }: { title: string; v: EvidenceVerification }): React.ReactElement {
+  return (
+    <div className="rv-step">
+      <h3>{title}</h3>
+      <div className={`rv-verdict ${v.verified ? 'rv-good' : 'rv-bad'}`}>
+        <strong>{v.verified ? 'VERIFIED · evidence unaltered' : 'VERIFICATION FAILED'}</strong>
+        <span>Certificate audit: {v.verdict}</span>
+        <span>Evidence file: {v.fileMatches ? 'SHA-256 matches the signed fingerprint' : 'SHA-256 does NOT match the signed fingerprint'}</span>
+        <span>Classification: {v.epistemicStatus ?? 'none'} {v.verified ? '(unchanged by verification)' : '(as this certificate claims it; not accepted)'}</span>
+      </div>
+      <p className="rv-hash">
+        Signed file SHA-256 <code>{short(v.signedFileSha256)}</code><br />
+        Presented file SHA-256 <code>{short(v.presentedFileSha256)}</code><br />
+        Signer key id <code>{v.signerKeyId ? short(v.signerKeyId) : 'none (signature not verified)'}</code>
+      </p>
+    </div>
+  );
+}
+
+function SignedEvidenceChallenge(): React.ReactElement {
+  const recorded = recordedBestScoreText();
+  const [value, setValue] = useState(recorded);
+  const [busy, setBusy] = useState(false);
+  const [signed, setSigned] = useState<SignedEvidence | null>(null);
+  const [original, setOriginal] = useState<EvidenceVerification | null>(null);
+  const [edited, setEdited] = useState<EvidenceVerification | null>(null);
+  const [relabelled, setRelabelled] = useState<EvidenceVerification | null>(null);
+
+  const run = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const s = signed ?? (await signCommittedEvidence());
+      setSigned(s);
+      setOriginal(await verifyEvidence(s, REDOCK_RECORD_TEXT));
+      setEdited(await verifyEvidence(s, withEditedBestScore(value.trim() === '' ? recorded : value.trim())));
+      const promoted = { ...s.certificate, claim: { ...s.certificate.claim, epistemicStatus: 'REAL_MEASUREMENT' } };
+      setRelabelled(await verifyEvidence(s, REDOCK_RECORD_TEXT, promoted));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rv-card" aria-labelledby="rv-c7">
+      <p className="rv-kicker">Challenge 3 · signed evidence</p>
+      <h2 id="rv-c7">Change one number in the evidence. Watch the signature check fail.</h2>
+      <p>
+        The record is a real docking run: imatinib redocked into the ABL1 kinase (PDB {REDOCK_RECORD.protocol.pdbId}) with AutoDock Vina{' '}
+        {REDOCK_RECORD.engines.vina} and Meeko {REDOCK_RECORD.engines.meeko}, several seeds, positive and negative controls, the
+        protocol fixed before the run. Genesis certifies it with ECDSA P-256 over SHA-256 (the CSRN certificate layer): the claim, its
+        classification, the evidence identity and the chain protocol → run → committed file all enter the signed payload.
+      </p>
+      <div className="rv-controls">
+        <label>
+          Best Vina score in the file (recorded {recorded} kcal/mol)
+          <input type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+        </label>
+        <button type="button" className="rv-btn" disabled={busy} onClick={() => void run()}>{busy ? 'Signing and verifying…' : 'Sign, then verify'}</button>
+      </div>
+      {original && edited && relabelled && signed && (
+        <>
+          <p className="rv-hash">
+            Certificate <code>{signed.certificate.certId}</code> · signed payload <code>{short(signed.certificate.integrity.signedPayloadFingerprint)}</code>
+          </p>
+          <div className="rv-grid3">
+            <VerificationBox title="A · The committed file" v={original} />
+            <VerificationBox title={`B · The file with your value (${value.trim() || recorded})`} v={edited} />
+            <VerificationBox title="C · Same file, label changed to REAL_MEASUREMENT" v={relabelled} />
+          </div>
+        </>
+      )}
+      <p className="rv-note">
+        What a valid signature means: the evidence was not changed after it was signed. What it does not mean: that the score was
+        measured, or validated in a laboratory. A signed MODEL_ESTIMATE is still a MODEL_ESTIMATE, and in C the attempt to call it a
+        measurement breaks the certificate instead of upgrading it. The key pair is generated in your browser for this check; Genesis has
+        no published signing key yet, so the signature shows integrity, not who produced the record.
+      </p>
+      <p className="rv-foot">Record: <code>{SIGNED_EVIDENCE_PATH}</code> (run body SHA-256 <code>{short(REDOCK_RECORD.bodySha256)}</code>, protocol <code>{short(REDOCK_RECORD.protocolFingerprint)}</code>). Engines: <code>packages/csrn</code>, <code>core/reviewer/signedEvidence.ts</code>.</p>
+    </section>
+  );
+}
+
 function RunSummary({ run, label }: { run: BenchmarkRun; label: string }): React.ReactElement {
   const s = run.summary;
   const kit = imatinibKitCase(run);
@@ -217,7 +303,7 @@ function DockingBenchmark(): React.ReactElement {
   const by3 = new Map(run3.cases.map((c) => [c.pdbId, c]));
   return (
     <section className="rv-card" aria-labelledby="rv-c5">
-      <p className="rv-kicker">Challenge 3 · one example is an anecdote</p>
+      <p className="rv-kicker">Challenge 4 · one example is an anecdote</p>
       <h2 id="rv-c5">85 known drug–protein complexes, including every failure.</h2>
       <p>
         The Astex Diverse Set (Hartshorn et al., J. Med. Chem. 2007) is a standard test: 85 crystal structures where the true position
@@ -271,7 +357,8 @@ function Boundaries(): React.ReactElement {
       <h2 id="rv-c3">Negative and unfinished results, stated first.</h2>
       <ul className="rv-list">
         <li><strong>No new drug has been discovered.</strong> The one candidate ranked a winner so far, liraglutide, is already an approved medicine.</li>
-        <li><strong>The GLP-1 receptor model fails its own gate</strong> (error 1.17 against a limit of 1.0). It is not used to rank anything; the reason is documented in decision D-077a.</li>
+        <li><strong>The GLP-1 receptor model fails its own gate.</strong> Its best error is 1.0118 on 638 measured compounds against a limit of 1.0 (decision D-144; 1.17 on the first 287, D-077a). It is not used to rank anything.</li>
+        <li><strong>Docking scores are model estimates, not measured binding.</strong> A replay MATCH shows a computation reproduced; a valid signature shows the evidence was not altered. Neither is a laboratory result, and Genesis refuses to relabel a model estimate as a measurement on either basis.</li>
         <li><strong>No laboratory has tested a Genesis prediction yet.</strong> Every result here is computational, and labelled so.</li>
         <li>The cyber-security module has only been shown on a fictional test application. Medical-imaging readers have not yet been run on a real scan.</li>
       </ul>
@@ -306,6 +393,7 @@ export function ReviewerRoomScreen(): React.ReactElement {
       </header>
       <TamperChallenge />
       <DrugPipeline />
+      <SignedEvidenceChallenge />
       <DockingBenchmark />
       <ScientificIngestionPanel />
       <Boundaries />

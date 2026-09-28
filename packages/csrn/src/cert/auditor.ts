@@ -23,6 +23,12 @@ export interface AuditResult {
   readonly verdict: AuditVerdict;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
+  /**
+   * `computePublicKeyId` of the key whose signature verified — the signer
+   * identity a reviewer compares against a published key id. Present only for
+   * the two SIGNED verdicts; `null` otherwise (no signature, or one that failed).
+   */
+  readonly signerKeyId?: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -153,7 +159,7 @@ export async function auditCertificate(certificate: Certificate, trustedPublicKe
 
   const keyId = await computePublicKeyId(publicKeyJwk);
   if (trustedPublicKeys.has(keyId)) {
-    return { verdict: 'INTEGRITY_VALID_SIGNED_VERIFIED', errors: [], warnings: [] };
+    return { verdict: 'INTEGRITY_VALID_SIGNED_VERIFIED', errors: [], warnings: [], signerKeyId: keyId };
   }
-  return { verdict: 'INTEGRITY_VALID_SIGNED_UNTRUSTED', errors: [], warnings: ['signature is cryptographically valid, but the signing public key is not in the trust store'] };
+  return { verdict: 'INTEGRITY_VALID_SIGNED_UNTRUSTED', errors: [], warnings: ['signature is cryptographically valid, but the signing public key is not in the trust store'], signerKeyId: keyId };
 }

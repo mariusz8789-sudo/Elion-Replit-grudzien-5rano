@@ -249,7 +249,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <p className="human-prevention-warning">{preventionModel.warning}</p>
       </aside>}
       <div className="human-hero-tools" aria-label="Widok modelu">
-        {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
+        {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
         <button type="button" className="sw-chip human-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="human-inspector" onClick={() => setInspectorOpen(!inspectorOpen)} data-testid="human-inspector-toggle">{inspectorOpen ? 'Zamknij ×' : 'Instrumenty +'}</button>
       </div>
       <nav className="human-hero-path" aria-label="Od ciała do komórki">

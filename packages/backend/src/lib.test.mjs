@@ -122,6 +122,11 @@ describe('isHashedAsset', () => {
     assert.equal(isHashedAsset('manifest.webmanifest'), false);
     assert.equal(isHashedAsset('sw.js'), false);
   });
+
+  test('never treats /.well-known/ files as hashed (the CSRN key file changes in place)', () => {
+    assert.equal(isHashedAsset('/app/dist/.well-known/genesis-csrn-key.json'), false);
+    assert.equal(isHashedAsset('/app/dist/assets/index-CJ3HY2uy.css'), true);
+  });
 });
 
 describe('resolveStaticPath', () => {

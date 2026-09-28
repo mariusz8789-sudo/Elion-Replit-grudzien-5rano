@@ -6,8 +6,9 @@ import { D063_CLAIM_TEXT } from '../core/govServices/govServiceRuns';
 import { DOCKING_SOURCE, RETRO_EVIDENCE, verifyDockingInputs, type FileCheck } from '../core/reviewer/drugEvidence';
 import { ASTEX_PREREG, ASTEX_RUNS, imatinibKitCase, type BenchmarkRun } from '../core/reviewer/dockingBenchmark';
 import {
-  REDOCK_RECORD, REDOCK_RECORD_TEXT, SIGNED_EVIDENCE_PATH, recordedBestScoreText, signCommittedEvidence, verifyEvidence, withEditedBestScore,
-  type EvidenceVerification, type SignedEvidence,
+  COMMITTED_CERTIFICATE, GENESIS_KEY_FILE, REDOCK_CERTIFICATE_PATH, REDOCK_EVIDENCE_PATH, REDOCK_RECORD, REDOCK_RECORD_TEXT,
+  forgeCertificate, recordedBestScoreText, relabelled, verifyEvidence, withEditedBestScore,
+  type EvidenceVerification,
 } from '../core/reviewer/signedEvidence';
 import { ScientificIngestionPanel } from './ScientificIngestionPanel';
 import './reviewerRoom.css';
@@ -196,20 +197,32 @@ function DrugPipeline(): React.ReactElement {
   );
 }
 
+const SIGNER_TEXT: Record<EvidenceVerification['signer'], string> = {
+  SIGNED_BY_GENESIS_KEY: 'Signed by the published Genesis key',
+  SIGNED_UNTRUSTED: 'SIGNED_UNTRUSTED · valid signature, but NOT by the Genesis key',
+  UNSIGNED: 'Not signed yet · the Genesis key has not been generated',
+  NOT_CHECKED: 'Not checked · the evidence already failed',
+};
+
 function VerificationBox({ title, v }: { title: string; v: EvidenceVerification }): React.ReactElement {
+  const good = v.unaltered && v.signer !== 'SIGNED_UNTRUSTED';
   return (
     <div className="rv-step">
       <h3>{title}</h3>
-      <div className={`rv-verdict ${v.verified ? 'rv-good' : 'rv-bad'}`}>
-        <strong>{v.verified ? 'VERIFIED · evidence unaltered' : 'VERIFICATION FAILED'}</strong>
-        <span>Certificate audit: {v.verdict}</span>
-        <span>Evidence file: {v.fileMatches ? 'SHA-256 matches the signed fingerprint' : 'SHA-256 does NOT match the signed fingerprint'}</span>
-        <span>Classification: {v.epistemicStatus ?? 'none'} {v.verified ? '(unchanged by verification)' : '(as this certificate claims it; not accepted)'}</span>
+      <div className={`rv-verdict ${good ? 'rv-good' : 'rv-bad'}`}>
+        <strong>
+          {!v.unaltered ? 'VERIFICATION FAILED · evidence or certificate changed'
+            : v.signer === 'SIGNED_UNTRUSTED' ? 'NOT TRUSTED · hashes consistent, but signed by a key that is not Genesis\'s'
+              : 'Evidence unaltered'}
+        </strong>
+        <span>1 · Classification: {v.epistemicStatus ?? 'none'} {v.unaltered ? '(bound by the certificate, unchanged by verification)' : '(as this certificate claims it; not accepted)'}</span>
+        <span>2 · Unaltered: {v.unaltered ? 'yes' : 'no'} (certificate audit {v.auditVerdict}; file {v.fileMatches ? 'matches' : 'does NOT match'} the certified SHA-256)</span>
+        <span>3 · Signer: {SIGNER_TEXT[v.signer]}</span>
       </div>
       <p className="rv-hash">
-        Signed file SHA-256 <code>{short(v.signedFileSha256)}</code><br />
+        Certified file SHA-256 <code>{short(v.certifiedFileSha256)}</code><br />
         Presented file SHA-256 <code>{short(v.presentedFileSha256)}</code><br />
-        Signer key id <code>{v.signerKeyId ? short(v.signerKeyId) : 'none (signature not verified)'}</code>
+        Signer key id <code>{v.signerKeyId ? short(v.signerKeyId) : 'none'}</code>
       </p>
     </div>
   );
@@ -219,20 +232,19 @@ function SignedEvidenceChallenge(): React.ReactElement {
   const recorded = recordedBestScoreText();
   const [value, setValue] = useState(recorded);
   const [busy, setBusy] = useState(false);
-  const [signed, setSigned] = useState<SignedEvidence | null>(null);
-  const [original, setOriginal] = useState<EvidenceVerification | null>(null);
-  const [edited, setEdited] = useState<EvidenceVerification | null>(null);
-  const [relabelled, setRelabelled] = useState<EvidenceVerification | null>(null);
+  const [results, setResults] = useState<{ original: EvidenceVerification; edited: EvidenceVerification; promoted: EvidenceVerification; forged: EvidenceVerification } | null>(null);
+  const key = GENESIS_KEY_FILE;
 
   const run = async (): Promise<void> => {
     setBusy(true);
     try {
-      const s = signed ?? (await signCommittedEvidence());
-      setSigned(s);
-      setOriginal(await verifyEvidence(s, REDOCK_RECORD_TEXT));
-      setEdited(await verifyEvidence(s, withEditedBestScore(value.trim() === '' ? recorded : value.trim())));
-      const promoted = { ...s.certificate, claim: { ...s.certificate.claim, epistemicStatus: 'REAL_MEASUREMENT' } };
-      setRelabelled(await verifyEvidence(s, REDOCK_RECORD_TEXT, promoted));
+      const editedText = withEditedBestScore(value.trim() === '' ? recorded : value.trim());
+      setResults({
+        original: await verifyEvidence(REDOCK_RECORD_TEXT),
+        edited: await verifyEvidence(editedText),
+        promoted: await verifyEvidence(REDOCK_RECORD_TEXT, relabelled(COMMITTED_CERTIFICATE, 'REAL_MEASUREMENT')),
+        forged: await verifyEvidence(editedText, await forgeCertificate(editedText)),
+      });
     } finally {
       setBusy(false);
     }
@@ -241,39 +253,43 @@ function SignedEvidenceChallenge(): React.ReactElement {
   return (
     <section className="rv-card" aria-labelledby="rv-c7">
       <p className="rv-kicker">Challenge 3 · signed evidence</p>
-      <h2 id="rv-c7">Change one number in the evidence. Watch the signature check fail.</h2>
+      <h2 id="rv-c7">Change one number in the evidence. Watch the certificate check fail.</h2>
       <p>
         The record is a real docking run: imatinib redocked into the ABL1 kinase (PDB {REDOCK_RECORD.protocol.pdbId}) with AutoDock Vina{' '}
         {REDOCK_RECORD.engines.vina} and Meeko {REDOCK_RECORD.engines.meeko}, several seeds, positive and negative controls, the
-        protocol fixed before the run. Genesis certifies it with ECDSA P-256 over SHA-256 (the CSRN certificate layer): the claim, its
-        classification, the evidence identity and the chain protocol → run → committed file all enter the signed payload.
+        protocol fixed before the run. Its certificate is committed next to it and checked here, in your browser, with the CSRN
+        certificate layer (ECDSA P-256 over SHA-256). The claim, its classification, the evidence identity and the chain
+        protocol → run → committed file all enter the certified payload. Your browser verifies; it never signs on Genesis's behalf.
+      </p>
+      <p className="rv-hash">
+        Genesis key id{' '}
+        {key.status === 'ACTIVE' && key.keyId ? <code>{key.keyId}</code> : <strong>not generated yet (status {key.status})</strong>}
+        <br />Published at <code>/.well-known/genesis-csrn-key.json</code> and <code>docs/keys/genesis-csrn-signing-key.json</code>. Key id = {key.keyIdMethod}
+        <br />Certificate <code>{COMMITTED_CERTIFICATE.certId}</code> · certified payload <code>{short(COMMITTED_CERTIFICATE.integrity.signedPayloadFingerprint)}</code>
       </p>
       <div className="rv-controls">
         <label>
           Best Vina score in the file (recorded {recorded} kcal/mol)
           <input type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
         </label>
-        <button type="button" className="rv-btn" disabled={busy} onClick={() => void run()}>{busy ? 'Signing and verifying…' : 'Sign, then verify'}</button>
+        <button type="button" className="rv-btn" disabled={busy} onClick={() => void run()}>{busy ? 'Verifying…' : 'Verify'}</button>
       </div>
-      {original && edited && relabelled && signed && (
-        <>
-          <p className="rv-hash">
-            Certificate <code>{signed.certificate.certId}</code> · signed payload <code>{short(signed.certificate.integrity.signedPayloadFingerprint)}</code>
-          </p>
-          <div className="rv-grid3">
-            <VerificationBox title="A · The committed file" v={original} />
-            <VerificationBox title={`B · The file with your value (${value.trim() || recorded})`} v={edited} />
-            <VerificationBox title="C · Same file, label changed to REAL_MEASUREMENT" v={relabelled} />
-          </div>
-        </>
+      {results && (
+        <div className="rv-grid3">
+          <VerificationBox title="A · The committed file" v={results.original} />
+          <VerificationBox title={`B · The file with your value (${value.trim() || recorded})`} v={results.edited} />
+          <VerificationBox title="C · Same file, label changed to REAL_MEASUREMENT" v={results.promoted} />
+          <VerificationBox title="D · Your file, re-certified and signed by someone else's key" v={results.forged} />
+        </div>
       )}
       <p className="rv-note">
-        What a valid signature means: the evidence was not changed after it was signed. What it does not mean: that the score was
-        measured, or validated in a laboratory. A signed MODEL_ESTIMATE is still a MODEL_ESTIMATE, and in C the attempt to call it a
-        measurement breaks the certificate instead of upgrading it. The key pair is generated in your browser for this check; Genesis has
-        no published signing key yet, so the signature shows integrity, not who produced the record.
+        What the check means: the evidence was not changed after it was certified, and, once the Genesis key exists, that the holder
+        of that key certified it. What it does not mean: that the score was measured or validated in a laboratory. A certified
+        MODEL_ESTIMATE is still a MODEL_ESTIMATE, and in C the attempt to call it a measurement breaks the certificate instead of
+        upgrading it. In D the forger rebuilt every hash and signed correctly, but with a key that is not Genesis&apos;s, so it stays
+        SIGNED_UNTRUSTED. This is a technical integrity signature, not a qualified or legal electronic signature.
       </p>
-      <p className="rv-foot">Record: <code>{SIGNED_EVIDENCE_PATH}</code> (run body SHA-256 <code>{short(REDOCK_RECORD.bodySha256)}</code>, protocol <code>{short(REDOCK_RECORD.protocolFingerprint)}</code>). Engines: <code>packages/csrn</code>, <code>core/reviewer/signedEvidence.ts</code>.</p>
+      <p className="rv-foot">Record: <code>{REDOCK_EVIDENCE_PATH}</code> (run body SHA-256 <code>{short(REDOCK_RECORD.bodySha256)}</code>, protocol <code>{short(REDOCK_RECORD.protocolFingerprint)}</code>). Certificate: <code>{REDOCK_CERTIFICATE_PATH}</code>. Engines: <code>packages/csrn</code>, <code>core/reviewer/redockCertificate.ts</code>.</p>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import './labs/index';
 import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
@@ -365,8 +366,10 @@ export default function App() {
 
   const overlays = (
     <>
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
-      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      {/* Portaled to <body>: inside `.app` (its own z-index:1 stacking context) the chat panel and the
+          mobile bar, siblings of `.app`, painted over the backdrop and took the taps on phones. */}
+      {searchOpen && createPortal(<SearchOverlay onClose={() => setSearchOpen(false)} />, document.body)}
+      {helpOpen && createPortal(<HelpOverlay onClose={() => setHelpOpen(false)} />, document.body)}
       <ContextualRouteGuide surface={contextualGuideSurface} />
     </>
   );

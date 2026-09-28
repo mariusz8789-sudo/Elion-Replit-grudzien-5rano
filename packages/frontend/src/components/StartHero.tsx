@@ -2,17 +2,50 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
+import { CSRN_KEY } from '../core/home/homeFacts';
 import { AskGenesisMic } from './guide/AskGenesisMic';
+import { HomeImatinibPanel, HomeProofStrip } from './home/HomeProofStrip';
+import { HomeEngines } from './home/HomeEngines';
+import { HomePipeline } from './home/HomePipeline';
 
 /** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
 const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({ default: m.EngineCoreHolo })));
 
-/** START HERO — one conversation and one connected Laboratory. */
+/**
+ * START — the first 30–60 seconds for a grant reviewer, investor or scientist.
+ *
+ * Order: what Genesis is → the numbers → try to break it (Reviewer Room) →
+ * the engines → the pipeline → honest status (CSRN key, real lab) → the wider
+ * Scientific OS → the Science Chat, which the shell mounts right below this.
+ * Nothing here computes or certifies anything: numbers come from committed
+ * evidence (`core/home/homeFacts`), engine status from the backend toolchain,
+ * and every check links to the screen that really runs it.
+ */
 
 type Health = 'checking' | 'online' | 'no-key' | 'offline';
 
+const CHALLENGES: readonly { id: string; title: string; act: string; result: string }[] = [
+  { id: 'A', title: 'Change the result', act: 'edit the Vina score in the file', result: 'Verification fails' },
+  { id: 'B', title: 'Call a model a measurement', act: 'MODEL_ESTIMATE as REAL_MEASUREMENT', result: 'Rejected' },
+  { id: 'C', title: 'Sign with another key', act: 'valid signature, foreign key', result: 'SIGNED_UNTRUSTED' },
+];
+
+const BROADER: readonly { label: string; hash: string | null; note: string }[] = [
+  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'body → organ → cell · educational model' },
+  { label: 'Virtual Bio Lab', hash: '#/virtual-bio', note: 'in-silico toy models only' },
+  { label: 'Chemistry Live Lab', hash: '#/scientific-worlds?station=st-titration', note: 'titration, 118 elements, Replay' },
+  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: '10,000 real Z→μμ events (2011)' },
+  { label: 'CERN Complex', hash: '#/cern-complex', note: '3D walk-through · no PYTHIA/Geant4' },
+  { label: 'Quantum', hash: '#/lab/quantum', note: 'superposition, Bloch sphere, CHSH' },
+  { label: 'Space-Time', hash: '#/lab/spacetime', note: 'time dilation, light cone' },
+  { label: 'Black holes', hash: '#/geodesics', note: 'photon geodesics, RK4' },
+  { label: 'Reality Navigator', hash: '#/reality', note: 'exact formulas vs cinematic view' },
+  { label: 'World / Digital Twin', hash: '#/world-director', note: 'labelled SCENARIO' },
+  { label: 'Research Console', hash: '#/research-console', note: 'question → hypotheses → falsification' },
+  { label: 'Real Lab architecture', hash: null, note: 'no hardware connected yet' },
+];
+
 export function StartHero(): React.ReactElement {
-  const [ask, setAsk] = useState('');
   const [health, setHealth] = useState<Health>('checking');
   // Static render (tests, SSR) never mounts the WebGL hero; the browser turns it on after mount.
   const [holo, setHolo] = useState(false);
@@ -30,73 +63,116 @@ export function StartHero(): React.ReactElement {
 
   const submit = (text: string): void => {
     const t = text.trim();
-    if (!t) return;
-    setAsk('');
-    requestOpenScienceChat(t);
+    if (t) requestOpenScienceChat(t);
+  };
+  const focusChat = (): void => {
+    const input = document.querySelector<HTMLElement>('.science-chat-inline [aria-label="Wiadomość do Science Chat"]');
+    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    input?.focus({ preventScroll: true });
   };
 
-  const healthLabel = health === 'checking' ? 'sprawdzanie…' : health === 'online' ? 'online · AI gotowe' : health === 'no-key' ? 'online · AI bez klucza' : 'offline · tryb lokalny';
+  const healthLabel = health === 'checking' ? 'checking…' : health === 'online' ? 'online · AI ready' : health === 'no-key' ? 'online · AI without key' : 'offline · local mode';
 
   return (
-    <section className="start" aria-label="Start" data-testid="start-hero">
-      <div className="start-glow" aria-hidden="true" />
-      <header className="start-head">
-        <img className="start-brand" src="/brand/genesis-lockup.png" alt="Genesis Physics — Scientific OS" width={1200} height={400} decoding="async" />
-        <span className="gx-eyebrow">genesis-physics.com</span>
-        <h1 className="start-title">Zapytaj. Genesis przygotuje eksperyment.</h1>
-        <p className="start-lede">
-          Jeden dialog prowadzi do jednego laboratorium. Eksperyment, wynik, dowód i replay pozostają częścią tej samej sesji.
-        </p>
-        {/* The one track Genesis is judged on: computational drug checking whose evidence a reviewer
-            can verify alone. Everything else (physics, 3D worlds, cyber) stays behind "Poznaj Genesis od środka". */}
-        <div className="start-proof" data-testid="start-proof" aria-label="Sprawdź sam">
-          <p className="start-proof-title">Nie wierz na słowo. Sprawdź sam.</p>
-          <ul className="start-proof-facts">
-            <li>Prawdziwy lek (imatynib) zadokowany w białku 1IEP: poza zgodna z kryształem, RMSD poniżej 2 Å.</li>
-            <li>Droga syntezy z AiZynthFinder, dane z ChEMBL, PDB i ClinicalTrials.gov przypięte hashem SHA-256.</li>
-            <li>Replay liczy wynik od nowa; zmieniona liczba daje DRIFT albo odmowę certyfikatu.</li>
-          </ul>
-          <div className="start-proof-actions">
-            <a className="chip-btn primary" href="#/reviewer" data-testid="door-proof-reviewer">✓ Reviewer Room: spróbuj podrobić wynik</a>
-            <a className="chip-btn" href="#/discovery-track" data-testid="door-proof-discovery-track">◇ Ścieżka odkrycia: nowość → replikacja → 13 sond</a>
-            <button type="button" className="chip-btn" onClick={() => submit('Znajdź kandydatów dla BCR-ABL (cel imatynibu).')} data-testid="door-proof-drug">▶ Uruchom eksperyment na leku</button>
+    <div className="hp" data-testid="start-hero" lang="en" dir="ltr">
+      <section className="hp-hero" aria-labelledby="hp-title">
+        <div className="hp-hero-text">
+          <p className="hp-eyebrow">Genesis · Scientific OS</p>
+          <h1 id="hp-title" className="hp-title">Verifiable computational drug discovery.</h1>
+          <p className="hp-sub">Real scientific engines. Falsifiable results. Cryptographic evidence. Replay.</p>
+          <div className="hp-cta" data-testid="start-proof">
+            <a className="hp-btn hp-btn-primary" href="#/discovery-track" data-testid="door-proof-discovery-track">Explore a verified discovery</a>
+            <a className="hp-btn" href="#/reviewer" data-testid="door-proof-reviewer">Open Reviewer Room</a>
+            <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Znajdź kandydatów dla BCR-ABL (cel imatynibu).')} data-testid="door-proof-drug">Run the imatinib experiment</button>
           </div>
+          <p className="hp-honest">Every result is computational and labelled so. No Genesis prediction has been tested in a laboratory yet.</p>
         </div>
-      </header>
+        <div className="start-holo" aria-hidden="true">
+          <span className="start-holo-base" />
+          <span className="start-holo-ring start-holo-ring-a" />
+          <span className="start-holo-ring start-holo-ring-b" />
+          {holo && <Suspense fallback={null}><EngineCoreHolo /></Suspense>}
+        </div>
+      </section>
 
-      <div className="start-holo" aria-hidden="true">
-        <span className="start-holo-base" />
-        <span className="start-holo-ring start-holo-ring-a" />
-        <span className="start-holo-ring start-holo-ring-b" />
-        {holo && <Suspense fallback={null}><EngineCoreHolo /></Suspense>}
+      <div className="hp-dash">
+        <HomeProofStrip />
+
+        <section className="hp-panel hp-span-7" aria-labelledby="hp-verify-title" data-testid="home-verify">
+          <header className="hp-panel-head">
+            <h2 id="hp-verify-title">Don’t trust the claim. Verify it.</h2>
+            <span className="hp-panel-meta">runs in your browser</span>
+          </header>
+          <div className="hp-checks">
+            {CHALLENGES.map((c) => (
+              <a key={c.id} className="hp-check" href="#/reviewer?focus=rv-c7" data-testid={`home-challenge-${c.id}`}>
+                <span className="hp-check-id">{c.id}</span>
+                <span className="hp-check-text"><strong>{c.title}</strong><small>{c.act}</small></span>
+                <span className="hp-pill hp-pill-ok">{c.result}</span>
+              </a>
+            ))}
+          </div>
+          <p className="hp-replay">Replay verdicts: <code>MATCH</code> <code>DRIFT</code> <code>ENGINE_VERSION_CHANGED</code> <code>BLOCKED_BY_RUNTIME</code> · <a href="#/evidence">Evidence &amp; Replay</a></p>
+          <a className="hp-btn hp-btn-primary hp-btn-block" href="#/reviewer">Open Reviewer Room</a>
+        </section>
+
+        <HomeImatinibPanel />
+
+        <HomeEngines />
+
+        <section className="hp-panel hp-span-5" aria-labelledby="hp-status-title" data-testid="home-status">
+          <header className="hp-panel-head">
+            <h2 id="hp-status-title">Signed and pending</h2>
+            <span className="hp-panel-meta">from the records</span>
+          </header>
+          <div className="hp-status-item" data-testid="home-csrn">
+            <p className="hp-status-top"><strong>CSRN signature</strong>{CSRN_KEY.generated ? <span className="hp-pill hp-pill-ok">SIGNED</span> : <span className="hp-pill hp-pill-warn">PENDING</span>}</p>
+            {CSRN_KEY.generated
+              ? <p className="hp-status-line">Signed by the published Genesis key <span className="hp-mono">keyId: {CSRN_KEY.keyId}</span></p>
+              : <p className="hp-status-line">Genesis production signing key not generated yet.</p>}
+            <p className="hp-foot">Signature proves integrity/authorship. It does not turn a model estimate into laboratory truth.</p>
+          </div>
+          <div className="hp-status-item" data-testid="home-real-lab">
+            <p className="hp-status-top"><strong>Ready for physical validation</strong><span className="hp-pill hp-pill-warn">PENDING</span></p>
+            <p className="hp-status-line">Architecture ready for real measurements. First hardware-verified instrument connection pending.</p>
+            <p className="hp-foot">Read-only instrument adapter, calibration and provenance, Experiment Fabric bridge. No hardware-verified device adapter yet.</p>
+          </div>
+        </section>
+
+        <HomePipeline />
+
+        <section className="hp-panel hp-span-12" aria-labelledby="hp-broader-title" data-testid="home-broader">
+          <header className="hp-panel-head">
+            <h2 id="hp-broader-title">Built on a broader Scientific OS</h2>
+            <span className="hp-panel-meta">same evidence layer, other sciences</span>
+          </header>
+          <ul className="hp-broader-list">
+            {BROADER.map((b) => (
+              <li key={b.label}>
+                {b.hash ? <a href={b.hash}>{b.label}</a> : <span>{b.label}</span>}
+                <small>{b.note}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="hp-panel hp-span-12 hp-ask" aria-labelledby="hp-ask-title">
+          <header className="hp-panel-head">
+            <h2 id="hp-ask-title">Science Chat · ask in plain language</h2>
+            <span className="hp-panel-meta">below</span>
+          </header>
+          <div className="hp-cta hp-ask-actions">
+            <button type="button" className="hp-btn hp-btn-primary" onClick={focusChat} data-testid="door-ask">Ask Genesis</button>
+            <a className="hp-btn" href="#/scientific-worlds" data-testid="door-laboratory">Enter the laboratory</a>
+            <AskGenesisMic lang="pl" onText={submit} className="hp-btn" />
+            <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">See a ready example</button>
+          </div>
+          <ul className="hp-system" aria-label="System status">
+            <li><strong>{records}</strong> runs saved in Scientific Memory</li>
+            <li><strong className={`hp-health-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</strong> backend {healthLabel}</li>
+          </ul>
+        </section>
       </div>
-
-      <form className="start-ask" onSubmit={(e) => { e.preventDefault(); submit(ask); }} role="search" aria-label="Zapytaj Genesis">
-        <span className="start-ask-icon" aria-hidden="true">✦</span>
-        <input
-          className="start-ask-input"
-          value={ask}
-          onChange={(e) => setAsk(e.target.value)}
-          placeholder="Zapytaj zwykłym językiem…"
-          aria-label="Zapytaj Genesis"
-        />
-        <AskGenesisMic lang="pl" onText={(t) => setAsk(t)} className="chip-btn start-ask-mic" />
-        <button type="submit" className="chip-btn primary start-ask-send" disabled={!ask.trim()}>Zapytaj</button>
-      </form>
-      <div className="start-primary-actions" aria-label="Główne wejścia Genesis">
-        <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
-        <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
-        <button type="button" className="chip-btn start-guided-demo" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">▶ Zobacz gotowy przykład</button>
-      </div>
-
-      <ol className="start-journey" aria-label="Jak działa Genesis">
-        <li><span>01</span>Pytanie</li><li><span>02</span>Laboratorium</li><li><span>03</span>Wynik</li><li><span>04</span>Evidence</li><li><span>05</span>Replay</li><li><span>06</span>Następny eksperyment</li>
-      </ol>
-
-      <ul className="start-status" aria-label="Stan systemu">
-        <li><span className="start-status-value">{records}</span><span className="start-status-label">zapisanych przebiegów w Pamięci Naukowej</span></li>
-        <li><span className={`start-status-value start-status-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</span><span className="start-status-label">backend {healthLabel}</span></li>
-      </ul>
-    </section>
+    </div>
   );
 }

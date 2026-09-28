@@ -4,10 +4,25 @@ import { expect, test } from '@playwright/test';
 const chromiumPath = process.env.CHROME ?? process.env.GENESIS_CHROMIUM_PATH;
 test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } : {}) } });
 
-test('a new user sees one product story and enters the real Laboratory', async ({ page }) => {
+test('a new visitor on Start reads what Genesis is and its evidence, not the tour', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { window.localStorage.removeItem('genesis-os:onboarding/v1'); sessionStorage.setItem('seeded', '1'); } });
+  await page.goto('/');
+
+  await expect(page.getByRole('dialog', { name: 'Wprowadzenie do Genesis OS' })).toHaveCount(0);
+  const start = page.getByTestId('start-hero');
+  await expect(start.getByRole('heading', { level: 1 })).toHaveText('Verifiable computational drug discovery.');
+  await expect(page.getByTestId('home-astex-caveat')).toBeVisible();
+  // Start counts as the introduction: the tour does not ambush the next screen either.
+  await page.goto('/#/scientific-worlds');
+  await expect(page.getByTestId('scientific-worlds')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Wprowadzenie do Genesis OS' })).toHaveCount(0);
+});
+
+test('a new user entering on another screen sees one product story and enters the real Laboratory', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => window.localStorage.removeItem('genesis-os:onboarding/v1'));
-  await page.goto('/');
+  await page.goto('/#/research-console');
 
   const intro = page.getByRole('dialog', { name: 'Wprowadzenie do Genesis OS' });
   await expect(intro).toBeVisible();

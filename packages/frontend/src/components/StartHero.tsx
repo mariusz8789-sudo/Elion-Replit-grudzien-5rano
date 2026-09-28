@@ -31,11 +31,17 @@ const CHALLENGES: readonly { id: string; title: string; act: string; result: str
 ];
 
 const BROADER: readonly { label: string; hash: string | null; note: string }[] = [
-  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'drug effects not yet calculated' },
-  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: 'Z boson peak, public data' },
-  { label: 'Quantum', hash: '#/lab/quantum', note: 'quantum mechanics lab' },
-  { label: 'Physics', hash: '#/scientific-worlds', note: 'live models' },
+  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'body → organ → cell · educational model' },
+  { label: 'Virtual Bio Lab', hash: '#/virtual-bio', note: 'in-silico toy models only' },
+  { label: 'Chemistry Live Lab', hash: '#/scientific-worlds?station=st-titration', note: 'titration, 118 elements, Replay' },
+  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: '10,000 real Z→μμ events (2011)' },
+  { label: 'CERN Complex', hash: '#/cern-complex', note: '3D walk-through · no PYTHIA/Geant4' },
+  { label: 'Quantum', hash: '#/lab/quantum', note: 'superposition, Bloch sphere, CHSH' },
+  { label: 'Space-Time', hash: '#/lab/spacetime', note: 'time dilation, light cone' },
+  { label: 'Black holes', hash: '#/geodesics', note: 'photon geodesics, RK4' },
+  { label: 'Reality Navigator', hash: '#/reality', note: 'exact formulas vs cinematic view' },
   { label: 'World / Digital Twin', hash: '#/world-director', note: 'labelled SCENARIO' },
+  { label: 'Research Console', hash: '#/research-console', note: 'question → hypotheses → falsification' },
   { label: 'Real Lab architecture', hash: null, note: 'no hardware connected yet' },
 ];
 

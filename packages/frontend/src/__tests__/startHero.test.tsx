@@ -87,7 +87,8 @@ describe('StartHero', () => {
   it('the wider Scientific OS sits below the drug-discovery story, and hidden modules stay hidden', async () => {
     const html = await render();
     expect(html.indexOf('data-testid="home-broader"')).toBeGreaterThan(html.indexOf('data-testid="home-pipeline"'));
-    for (const label of ['Human Digital Twin', 'CERN / CMS Open Data', 'Quantum', 'Real Lab architecture']) expect(html).toContain(label);
+    for (const label of ['Human Digital Twin', 'CERN / CMS Open Data', 'CERN Complex', 'Chemistry Live Lab', 'Quantum', 'Black holes', 'Research Console', 'Real Lab architecture']) expect(html).toContain(label);
+    for (const href of ['#/human-biology-lab', '#/physics/cms-z', '#/cern-complex', '#/virtual-bio', '#/geodesics', '#/reality', '#/world-director']) expect(html).toContain(`href="${href}"`);
     expect(html).not.toMatch(/Cyber|Mirror|Myth Lab|DICOM|OMNICORE|MoveX/);
   });
 });

@@ -86,6 +86,19 @@ export interface RawMeasurement {
   readonly value: number;
   readonly unit: string;
   readonly capturedAt: string;
+  /**
+   * Instrument lineage, present only when the reading came through the D-140 lab ingest path
+   * (`core/lab/labExperimentFabricBridge.ts`). Absent for manually entered readings, so their
+   * run fingerprints are unchanged.
+   */
+  readonly instrument?: {
+    readonly sourceKind: 'REAL_INSTRUMENT' | 'RECORDED_MEASUREMENT';
+    readonly deviceId: string;
+    readonly measurementId: string;
+    readonly calibrationId: string;
+    readonly configurationFingerprint: string;
+    readonly ingestFingerprint: string;
+  };
 }
 
 /**

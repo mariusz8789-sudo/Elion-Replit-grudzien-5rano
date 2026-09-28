@@ -319,6 +319,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/lab/devicePorts.ts': 'D-140: device/sensor/actuator/measurement contracts. Reached only by its own test suite and the E2E tests; no screen yet.',
   'core/lab/digitalTwinSynchronizer.ts': 'D-140: prediction/measurement residual and sync status. Reached only by its own test suite and the E2E tests; no screen yet.',
   'core/lab/hardwareInLoopBridge.ts': 'D-140: hardware-in-loop device adapter bridge. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/labExperimentFabricBridge.ts': 'D-140 -> Experiment Fabric seam: VALID ingested REAL_INSTRUMENT/RECORDED_MEASUREMENT readings become the existing REAL_EXPERIMENTAL ExperimentRun; simulated readings refused. Reached only by readOnlyInstrumentPath.test.ts; no screen and no physical instrument yet.',
+  'core/lab/readOnlyInstrumentAdapter.ts': 'D-140: concrete read-only DeviceAdapter fed by an injected transport (webhook/MQTT style); never actuates, never fabricates a reading. Reached only by readOnlyInstrumentPath.test.ts; no physical instrument is wired to it yet.',
   'core/lab/labInstrumentRegistry.ts': 'D-140: device registry. Reached only by its own test suite and the E2E tests; no screen yet.',
   'core/lab/labSafetyInterlock.ts': 'D-140: safety veto interlock (target range, sensor quality, calibration, human approval, emergency stop). Reached only by its own test suite and the E2E tests; no screen yet.',
   'core/lab/materialDiscoveryRealityLoop.ts': 'D-140: materials-discovery predicted/measured residual gate (pure residual math, no solver-injection point). Reached only by its own test suite and the E2E tests; no screen yet.',

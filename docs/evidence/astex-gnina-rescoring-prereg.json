@@ -1,0 +1,87 @@
+{
+ "kind": "astex-gnina-rescoring-preregistration",
+ "frozenAt": "2026-09-28T18:05:01+00:00",
+ "protocolFingerprintSha256": "b19eab7b191f4ffe76e04f69d1f007dc84cd9d1fe3fde183f7dea0bfbc38f655",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+ "protocol": {
+  "id": "astex-gnina-rescoring-prereg",
+  "label": "Astex - GNINA CNN rescoring of the run-6 pooled poses (run 7, diagnostic)",
+  "status": "PREREGISTERED BEFORE ANY RESULT WAS COMPUTED - frozen protocol, amendments only by append",
+  "question": "Applied once, with no tuning, does GNINA's CNN score rank a native-like pose (RMSD < 2.0 A) first more often than Vina's own score (50/85) and than the frozen phase-4 linear rule (53/85), on exactly the poses run 6 already generated?",
+  "notAHeadline": "DIAGNOSTIC. The preregistered headline stays run 3's 46/85 top-1. This run produces no new headline and authorises no claim about generalisation.",
+  "scorerStatus": "GNINA is used here ONLY as an experimental benchmark scorer. It is NOT integrated into the product and must not be, until the GPL question and the licence of its training data are resolved.",
+  "inputs": {
+   "poses": "the run-6 pooled pose sets ONLY, already on disk at /tmp/claude-0/run6/work/<PDBID>/seed<SEED>/dock/docked.pdbqt for the five frozen seeds",
+   "integrityGate": "for every case, sha256 of every docked.pdbqt and of the effective receptor pdbqt MUST equal the value recorded in docs/evidence/astex-run6-multiseed-ensemble.json, and every per-pose sha256 and RMSD must be recomputed and match; a case whose files are missing or altered is reported UNAVAILABLE, is NOT re-docked and is NOT removed from the denominator",
+   "pooling": "identical to run 6 and phase 4: pool across the five seeds, deduplicate at 1.0 A symmetry-aware RMSD, tie-break by (seed index, rank)",
+   "denominator": "all 85 cases, always"
+  },
+  "forbidden": [
+   "any docking or re-docking",
+   "--minimize, --cnn_scoring refinement, --cnn_scoring all, or any option that can move a pose; only --score_only",
+   "any change to the receptor, the ligand, the pose coordinates, the box or the sampling",
+   "any change to the success threshold (RMSD < 2.0 A) or the denominator (85)",
+   "any per-target or per-PDB tuning, exception or parameter",
+   "evaluating more than one model or more than one ranking rule and keeping the best",
+   "any modification of runs 1-6, their evidence or any earlier preregistration",
+   "integrating GNINA into the product or adding it to any package manifest"
+  ],
+  "method": {
+   "engine": "gnina v1.3 master:97fa6bc+ (Built Oct 3 2024), prebuilt binary, CPU only (--no_gpu)",
+   "binarySha256": "c7e40b0258ff55941b0a0716d28ec9661b2917d809a04bcbab20c20a13b4beb9",
+   "model": "crossdock_default2018_ensemble, pinned by name before any result; chosen because it is GNINA's documented default model family, NOT because of any measurement on our data",
+   "invocation": "--score_only --no_gpu --cnn <model> with the run-6 receptor for that case and its pooled poses as a multi-molecule SDF; coordinates are never altered",
+   "rmsd": "recomputed with the identical RDKit symmetry-aware CalcRMS code path used by run 6 and phase 4, and asserted equal to the run-6 recorded value"
+  },
+  "rankingRule": {
+   "rule": "rank the pooled poses by GNINA CNNscore DESCENDING (higher is better)",
+   "tieBreak": "by the pooled order run 6 defines, i.e. Vina score ascending, then (seed index, rank) ascending",
+   "count": "ONE rule. No blend, no consensus, no second candidate, no selection step."
+  },
+  "prespecifiedMetrics": [
+   "top-1/3/5/10/20 over the GNINA-ordered pooled poses, denominator 85",
+   "recovered, lost and net against the Vina baseline of 50/85 on the same pooled poses",
+   "recovered, lost and net against the frozen phase-4 linear rule at 53/85",
+   "per-seed top-1 applying the same rule to each seed's own 20-pose set, comparable to Vina's 46, 49, 50, 47, 49",
+   "the full list of cases still failing, retained and published"
+  ],
+  "prespecifiedInterpretation": {
+   "positive": "top-1 >= 60/85",
+   "negative": "top-1 <= 56/85",
+   "inconclusive": "57 to 59, declared inconclusive in advance and reported as such",
+   "note": "whatever the number is, it is recorded exactly as measured; no attempt is made to reach any target"
+  },
+  "falsifiablePrediction": "top-1 will land between 54 and 62, centred near 58, and will NOT reach 69. Recorded before the run.",
+  "contamination": "Astex complexes appear in PDBbind, so this pretrained model has likely seen some of these structures. This is disclosed, is weaker than fitting on the test set as phase 4 had to, and still does not make the result an independent validation.",
+  "baseline": {
+   "run3PreregisteredTop1": "46/85",
+   "vinaOnPooledPoses": "50/85",
+   "phase4FrozenLinearRule": "53/85",
+   "run6SamplingCeiling": "81/85",
+   "hardSamplingFailures": [
+    "1HVY",
+    "1Q41",
+    "1T9B",
+    "1W1P"
+   ]
+  },
+  "codeIdentity": {
+   "gitHead": "981b1f9633ff89237de161e34c312165324cfebe",
+   "pinnedFileSha256": {
+    "scripts/astex-ranking-rule-select.py": "c8d50afbb89edd7daf3357750faf0f5001214db4608c8581ac88cb5dc5549e65",
+    "scripts/astex-multiseed-ensemble.py": "9fa303b0dd252ae2ed92a0455068e9223b312dfcdf5d5b1ae65db53bda911137",
+    "scripts/astex_phase2_prep.py": "8cf5e3dc2ce92d0ff05808896782efc527e89678548a5873f0c036e5203b8d67",
+    "scripts/astex-redock-benchmark.py": "81aa6e9bdb9724ccc637b9ba9fb3d638613339f4d4ebf81fad6f7db761fc6dd0",
+    "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e"
+   }
+  },
+  "versions": {
+   "gnina": "1.3",
+   "vina": "1.2.7",
+   "meeko": "0.8.0",
+   "rdkit": "2026.03.6",
+   "biotite": "1.6.0"
+  },
+  "amendments": []
+ }
+}

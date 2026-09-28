@@ -1,0 +1,2466 @@
+[
+ {
+  "pdbId": "5SAK",
+  "ligand": "ZRY",
+  "sourceCifSha256": "4142f5d94c0711598448d7d0f95cf823ef39d7971d45a9d5b2a2123dd8c23d47",
+  "receptorInputPdbSha256": "8e97c37b88223b43f1f2d465e077df148b6f4069c06710c0eef0d127a8316a38",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "5SB2",
+  "ligand": "1K2",
+  "sourceCifSha256": "5237544d66d612198b1e391a1e6984bbe27d98d34a4a60ef91e13da85ce8d741",
+  "receptorInputPdbSha256": "aef3bccbfb02a5a828455e5a055ad4c516da6d6e65b26464476446c422494edf",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "5SD5",
+  "ligand": "HWI",
+  "sourceCifSha256": "a50f84294845f0144ae6b32bbf443ddda0f2c2f1eb409db30bed0050a30412ff",
+  "receptorInputPdbSha256": "3307cdc2b4f0ff84c2186dfda7f8bfc19fbcf2dc5080320d0cb96b1ec1906bcf",
+  "ligandHeavyAtomsInCif": 29,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "5SIS",
+  "ligand": "JSM",
+  "sourceCifSha256": "288d0edf43f473854e2e0c49b07aed038a8e2c17482a9f3ae665e33d5110268a",
+  "receptorInputPdbSha256": "a4cabf461b2601a477d394ba2dd036c88c973ee245103343b451149963f7284e",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6M2B",
+  "ligand": "EZO",
+  "sourceCifSha256": "2a2e0b5caf9a3e4e47e08c9f9a2d09918f316cec62d9f426c3ebf7387de003ab",
+  "receptorInputPdbSha256": "f1ba4a1fa868dea5d9273d13ea483ed2b240fe55c9b35535b5a72d26dec8b2e4",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6M73",
+  "ligand": "FNR",
+  "sourceCifSha256": "db6c83422bd91dc26bc5e80d2c1ce68870d3aa25d1bc54a5fcebab89209b4e96",
+  "receptorInputPdbSha256": "80f50df7dbc0f3ac89f6474ad1cf705d4b037194a8e2f72c92544147881c3b15",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6T88",
+  "ligand": "MWQ",
+  "sourceCifSha256": "bad12a8cf87cf3ba28f8da2b1d03633da87306b225f11d27c3c179e33e2de992",
+  "receptorInputPdbSha256": "08a47d92af17c2acc0c0cdd6f2b7af0f63ec7769bab0676ee7840aa9cc160e7b",
+  "ligandHeavyAtomsInCif": 10,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6TW5",
+  "ligand": "9M2",
+  "sourceCifSha256": "b8f4ce42554ea5ef5166906e39655008334b8af6af3673ba1316553305365ca7",
+  "receptorInputPdbSha256": "1c99847bc1d4a204bbd1677fa61767d16a9c72147fc673c1ab21052694ba480b",
+  "ligandHeavyAtomsInCif": 93,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6TW7",
+  "ligand": "NZB",
+  "sourceCifSha256": "5be3ec87497e63ed98344b639162c8bca784242972fb87f0be402bee57e3101d",
+  "receptorInputPdbSha256": "2ab515ff574901ba65567beccef6341feb2b3d7193a6dcb32f2f5663a9898be0",
+  "ligandHeavyAtomsInCif": 29,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6VTA",
+  "ligand": "AKN",
+  "sourceCifSha256": "c75a9c6083bce8080babb17308622cb04d945b3d016d1b05ab01f0e9f18bde3d",
+  "receptorInputPdbSha256": "6df8cfc94a9826053f3f8df952e00048f3664a8669d716ec39b129936d70eba7",
+  "ligandHeavyAtomsInCif": 80,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6WTN",
+  "ligand": "RXT",
+  "sourceCifSha256": "c0204b888b4a8a39e2c90e57095c65f044f1976b0d4850a2acdd59a1b8c41772",
+  "receptorInputPdbSha256": "16997cb0c8908f82f8b2fcc802971dd621bd0ef5be5755a29243eb3f4e25853b",
+  "ligandHeavyAtomsInCif": 23,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6XBO",
+  "ligand": "5MC",
+  "sourceCifSha256": "03ef548a19523e8b55ebc360148f0c576e834b08d4ad0fc9727596eda75ae155",
+  "receptorInputPdbSha256": "d414d118b0a991a4af1f6bde1a0b898c986f7a9e692a2910e9ed6652003c71c6",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6XCT",
+  "ligand": "478",
+  "sourceCifSha256": "951f500fdfdd1816217b76b73a1b38cce842430adee8749587527e3b79123f63",
+  "receptorInputPdbSha256": "5191236a5909d31458becfc7bb703590419c895a734c8a441492ab3a629aa446",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6XG5",
+  "ligand": "TOP",
+  "sourceCifSha256": "cfd594bfbb9df0bf56673ccc7c74369744dade11ba85cdbab2a24e70afed8595",
+  "receptorInputPdbSha256": "2cfcdaec4ba326fe1b91ef4388e1ace2f639977d4ba53e3e6aa5fb9973089c57",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6XHT",
+  "ligand": "V2V",
+  "sourceCifSha256": "eb6438cec88ef2a2fe635ae55acba8174753b42fab4641f5d95bbebbba17895f",
+  "receptorInputPdbSha256": "857827eec8d0fb777229b8d0ae20e858f07b4da1540a177cd4342ef5cef432be",
+  "ligandHeavyAtomsInCif": 68,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6XM9",
+  "ligand": "V55",
+  "sourceCifSha256": "0fae96e22a680c51cbc271845ae4cd0279f2d305c598dcd71497e9157c3854ee",
+  "receptorInputPdbSha256": "212f489f0050464f4f244e229fdc093ca2737dc6d2fe968dbadd3ecb8f33bfe6",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YJA",
+  "ligand": "2BA",
+  "sourceCifSha256": "01747be4f0c3535793cb590ac318615af24578f1718dcef5222914f110141c1f",
+  "receptorInputPdbSha256": "49be46783e58a47d9c016c0ea7328683de7e9652f157a1c4541e580946129ff6",
+  "ligandHeavyAtomsInCif": 88,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YMS",
+  "ligand": "OZH",
+  "sourceCifSha256": "b0614a1685a652e25700d92a7917382cfa1194c7341feeb34904daa3a1d49937",
+  "receptorInputPdbSha256": "422158db2839312f9af5cce0fe73fb6c1071a77b580012ce31022e29b743b294",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YQV",
+  "ligand": "8K2",
+  "sourceCifSha256": "4797eedd3f19d541977716bbaf34a4bdeba11139c53175a52b70353d208c60c1",
+  "receptorInputPdbSha256": "30209d8845ad6c699231671203099ec3efe2e11d4865fb6a5c9917efc4e0bed0",
+  "ligandHeavyAtomsInCif": 10,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YQW",
+  "ligand": "82I",
+  "sourceCifSha256": "8e2d18b0330e7ebb93fc3af0f0d5ba62b78894110557fe24005224a8cd589a51",
+  "receptorInputPdbSha256": "0092229e4cb3b849643ca5025ad113d73606e4adf9e03ff497ebd78ac83338e2",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YR2",
+  "ligand": "T1C",
+  "sourceCifSha256": "6c0865a1f60786dbc19a90ddce53752f5b80c8dbf56eb087adcc898b4855e161",
+  "receptorInputPdbSha256": "2ffd251e1affc0688643018c0be9d91a1b8ecba8763f5886a1e8399d71aeb4f8",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YRV",
+  "ligand": "PJ8",
+  "sourceCifSha256": "39642f73b0012c5b1ad284c6eaf7747faff4be59db7b63ebe8ea310d0f2d358d",
+  "receptorInputPdbSha256": "0a602430ac57a74b7cae029afd66eaef343078c779c448beb1dde92d91d671e6",
+  "ligandHeavyAtomsInCif": 17,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YSP",
+  "ligand": "PAL",
+  "sourceCifSha256": "9f19791df8b2dc91056030b63fe3935b934de74db0b18a8b446ef273180d1aa5",
+  "receptorInputPdbSha256": "87dfb407b3931fc7cd85c148e4c5b4734686c82686b106bfbc7c154c71a10fa5",
+  "ligandHeavyAtomsInCif": 16,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YT6",
+  "ligand": "PKE",
+  "sourceCifSha256": "11c79298b7dc3171ed03af5fd80e9a91b84d44a895247005afc47a0ad44b7bb0",
+  "receptorInputPdbSha256": "2effacc3484362ec9038fb5e2555cf3b7ead7a73ed3d6a85c68eb9f0fec9ccc3",
+  "ligandHeavyAtomsInCif": 62,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6YYO",
+  "ligand": "Q1K",
+  "sourceCifSha256": "affcbbb834235180e2551ac8be22f4fe2f3e2d1ee287d268f1f7f52fb41e4ec8",
+  "receptorInputPdbSha256": "23442e07c9bc437ee1ea4148aba2e35ac545297d4dec4003cf2aac82ffa8b05a",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6Z0R",
+  "ligand": "Q4H",
+  "sourceCifSha256": "cd253cfbce01fb1c0325d7a0af83c7ce2dab01b55649f8edf57c5db07fa4fc5f",
+  "receptorInputPdbSha256": "41a6de184fdc7e576b3513fcd3f911a9dacf764bface72ad1a426453e113b357",
+  "ligandHeavyAtomsInCif": 9,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6Z14",
+  "ligand": "Q4Z",
+  "sourceCifSha256": "a02743520f9a01969881e790236d2b49f75cf4a934d27bffccdc3bab5fa05e3d",
+  "receptorInputPdbSha256": "7d6b1ecb35c8c11e13d97bdd394f55061e1f637d1164ed07520668c37cf9c9a3",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6Z1C",
+  "ligand": "7EY",
+  "sourceCifSha256": "0ee9336e1dbc8885ac71c2f5242e7e1507e4c4d82f464fbe0a8386a109ed0aa9",
+  "receptorInputPdbSha256": "0254bdb6a3e04d0f8dc2aaf64696f7089b509f4dd4a380cfe9926f58370cafe6",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6Z2C",
+  "ligand": "Q5E",
+  "sourceCifSha256": "8625ff8a4d7e6d48ab23f39fbe459b6da5e5b9c8e233b2356f8bf0acb74a3f95",
+  "receptorInputPdbSha256": "8fdec26756ca3722e50a85b2cce7a1233d73e21431ebcd6c5b5ba8436391274b",
+  "ligandHeavyAtomsInCif": 78,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6Z4N",
+  "ligand": "Q7B",
+  "sourceCifSha256": "25619c08a165f6f4db1cdf3a8ecc194e0ad0592f47446a34583a159adf194914",
+  "receptorInputPdbSha256": "05ed560951b21cae4db9558149571cbdfa17ab9e10f8f6013d754c862d783401",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6ZAE",
+  "ligand": "ACV",
+  "sourceCifSha256": "730e2e6b29106f07fffbe55879386b2a10b6a46df51c7cd24c9585d5831b62ed",
+  "receptorInputPdbSha256": "d635c36e8a2adf57863257f07d428c675702909cd8331678debd4dd89e3c9470",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "6ZC3",
+  "ligand": "JOR",
+  "sourceCifSha256": "49386400635d4d012d840d7e7036dd02442d92a8558e313f680630cbd2d72b2a",
+  "receptorInputPdbSha256": "ae6e21749c258f865e392d1bfcbfa59565f4fc383f6c21f42f3ed74c4cd5eb52",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6ZCY",
+  "ligand": "QF8",
+  "sourceCifSha256": "0b27b61c63d5eea3ddfb90f3cee28b36bc25d879fe785fdd9923ce7849e63303",
+  "receptorInputPdbSha256": "5fc610f6bdd6f8fb4e2c9252d1a148e1107e7201ff92b7d33153e7f85d559864",
+  "ligandHeavyAtomsInCif": 33,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6ZK5",
+  "ligand": "IMH",
+  "sourceCifSha256": "525a27774c70095fd2e9961fe516f54ce37e9aed59c0e9246485bcd6bc681930",
+  "receptorInputPdbSha256": "9efa20e0242d805a37c5352e9e033e14509fc327a07241f37648865833da7ff3",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "6ZPB",
+  "ligand": "3D1",
+  "sourceCifSha256": "36c146b3278e4afe00d8b52da7cc35c67685f0663fcdade538b72542bb9ac14c",
+  "receptorInputPdbSha256": "680549b2110cb8a6987f5f9162cb4842dc7ca739486405c1738b8056de0a1ce5",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7A1P",
+  "ligand": "QW2",
+  "sourceCifSha256": "d3e74f8829a3fc946306e93a7f713dddf0536a405cc4038d7933ef43c47d00d3",
+  "receptorInputPdbSha256": "db1c2302e776614aa98ed39ee04c57f33f66383488eed1b4f18bda9d7265b855",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7A9E",
+  "ligand": "R4W",
+  "sourceCifSha256": "6638007432ae654ea9d2ba6eaa87e302b8401ed285cc26e9e9e8c8b29cd9fe35",
+  "receptorInputPdbSha256": "da93aecb35bda09a3ecc4e5ddf83a6c07df7bef54914c3f18a23fc5466e7ad17",
+  "ligandHeavyAtomsInCif": 12,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7A9H",
+  "ligand": "TPP",
+  "sourceCifSha256": "bb0e2e386d32d4e1d7b2d2c904feed9e95bee9ea73a3c3e92aca218832c80d0f",
+  "receptorInputPdbSha256": "937189cbf2e6fce1e415b23b236c2fed5f15966446888f50de30856fcd715e01",
+  "ligandHeavyAtomsInCif": 52,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7AFX",
+  "ligand": "R9K",
+  "sourceCifSha256": "496d0aec9d0ef2f7d8254e70e46f2d401cc8cba13984ecc50af70eed8977d4be",
+  "receptorInputPdbSha256": "864bf9a743de7bb67fa22a8b2b41a7c5f3d65f2ab0ad9070440fed0f8fd3a732",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7AKL",
+  "ligand": "RK5",
+  "sourceCifSha256": "aa26627cb55a6b8e9fd7e8f98c32645a77f5635743ae24fdf97566ba0f5bb4e3",
+  "receptorInputPdbSha256": "4699e950040d0b6d25b68bc7ee761fbc1f421fa162774dc88c4f4850b5190e31",
+  "ligandHeavyAtomsInCif": 19,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7AN5",
+  "ligand": "RDH",
+  "sourceCifSha256": "b788345b26ed7200558b6a8cde8055fc587c046dbe230770647314c6ce414132",
+  "receptorInputPdbSha256": "c8d6f2c829d1f0249a824afbe013052f46847164de4d70a12c550a25b924459c",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7B2C",
+  "ligand": "TP7",
+  "sourceCifSha256": "c1c43e3bba62dc4c66a32d0fc653e4df1391ad844c80092353f7dd22ba218d23",
+  "receptorInputPdbSha256": "20505ec6be5fe96094751018c219002e33a8e5114d1d328ff36e7e968e039146",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7B94",
+  "ligand": "ANP",
+  "sourceCifSha256": "f33a14e106536e24876d1a58b86ada7f18e73698c8806ae6f5b7209489f716ed",
+  "receptorInputPdbSha256": "062fa287b9d5fcbdf79cf26a25d09c869abb152459f7bae4426081208473cc61",
+  "ligandHeavyAtomsInCif": 62,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BCP",
+  "ligand": "GCO",
+  "sourceCifSha256": "eb38fb0d22d0e27fb4ca73313a6728123d47b7c38e606d6a6946c46305525150",
+  "receptorInputPdbSha256": "c40a6f69e92881956c8c98a60d188fe32a84076dc80bc56f2027e5dbe9caadfa",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BJJ",
+  "ligand": "TVW",
+  "sourceCifSha256": "c07f910b3a190240f53b248c2778887dfb33cd4d879c9b7346233fbd3c075058",
+  "receptorInputPdbSha256": "a90456529fddd63f133868340c406042c3486e52ca7030829eaa5cf77bae876e",
+  "ligandHeavyAtomsInCif": 10,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BKA",
+  "ligand": "4JC",
+  "sourceCifSha256": "e69b03d2fc5b0df28f6bb2a87a3c407e5740ea7e77ddb9429664f65a3d3e4390",
+  "receptorInputPdbSha256": "a047e8230b5e80d8d2a8a287e08de5444b9556d90ec22eafe655da488438e368",
+  "ligandHeavyAtomsInCif": 60,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BMI",
+  "ligand": "U4B",
+  "sourceCifSha256": "0073e7203a5dd5aca1ff5485cab9012a06f58dfc01de90ec82229db2d499714a",
+  "receptorInputPdbSha256": "aa19d9eb333cdc50780789532c1a5c2b116fbaef439230578743453daaeb986e",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BNH",
+  "ligand": "BEZ",
+  "sourceCifSha256": "807a31d8c3e7e9a38f62d11ad7a745bf85563664c7c16f954b61b163ab78bba8",
+  "receptorInputPdbSha256": "03c385e78cae06779b8d04afd05c3bb684ba24553938d64f1484b32a339d55ed",
+  "ligandHeavyAtomsInCif": 9,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7BTT",
+  "ligand": "F8R",
+  "sourceCifSha256": "9dd61ddb8435c263dc59c95d2f0d3eed6e1682fe5bd1317ed8157764e74de0cc",
+  "receptorInputPdbSha256": "bfaa1561a6b69117a8f4756a4ec767abf86e63b502f75cb53624d206f89d0005",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7C0U",
+  "ligand": "FGO",
+  "sourceCifSha256": "c05a0280d1c65aac8d914a135d418c6bdc2160e40033ea2d6d6359b41fe3814d",
+  "receptorInputPdbSha256": "4ad3789a3a890dde88717d96bc748d1328d37018ef251faa1ea192c4ea4e6bab",
+  "ligandHeavyAtomsInCif": 86,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7C3U",
+  "ligand": "AZG",
+  "sourceCifSha256": "9b57fbfc1f40f4d14d6a02d0322ca1c09cd990590e11686ff857dafe4d90d38c",
+  "receptorInputPdbSha256": "8b2fe072b68f9edc6e2629faf5620caa9c0405377890126957069eb0553b73d1",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7C8Q",
+  "ligand": "DSG",
+  "sourceCifSha256": "7666068affd76cfd9b0dedafb1b840d58db01206f8b51ac9d65cff63a268a936",
+  "receptorInputPdbSha256": "ff524900dc5ad06053d2f839b45585868a2dac7f9545bebcdd3560ba7ca787e4",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CD9",
+  "ligand": "FVR",
+  "sourceCifSha256": "c184c03dd2ec48a6cfff45a65421fcd8ee9d18aaf84a49e045e2149a8167c9d6",
+  "receptorInputPdbSha256": "f997d5ecc181e1834bd1e0fe33ef5529a420727eef1ad3e751efcb5a00ecfe11",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CIJ",
+  "ligand": "G0C",
+  "sourceCifSha256": "84290745a8b93bd39732cbcf2d610025a68287915e2b72d38ab415c760d92703",
+  "receptorInputPdbSha256": "f25a22adf6fd5c5963d56efcb162fdd51b0c80ab291892fceea8adbea936ed3c",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CL8",
+  "ligand": "TES",
+  "sourceCifSha256": "32ae08aa659a25ca65daec0b2e100363935d7d85673d4b7207e870dfff746de1",
+  "receptorInputPdbSha256": "9255fca64c7fdc5c6207d04b4a5bfff2836f1f2440118fa79afd5ad5646b8c1f",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CNQ",
+  "ligand": "G8X",
+  "sourceCifSha256": "2930eaec84ca566844e0724ef1abc4a50127b1fb21ff8be6febe9746fc2ef598",
+  "receptorInputPdbSha256": "5bbdf49b9d01c6769654e98866d50ff7bcece65e71b08a33fb00954ec3a54b9a",
+  "ligandHeavyAtomsInCif": 36,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7CNS",
+  "ligand": "PMV",
+  "sourceCifSha256": "747e7a21b9006d31a4d3c1460c8195312ca8f695acbc4ec1dfcf75df5814ea12",
+  "receptorInputPdbSha256": "d1b8adb8201b65c1cb5d8ee2004605c78eb498f33b143ab598b466fdb7e12fce",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CTM",
+  "ligand": "BDP",
+  "sourceCifSha256": "6c59320d7b46c495737069835f73a8f22b44352b3fcf38b528e42d26bb5816bc",
+  "receptorInputPdbSha256": "6432293cd28fdb56a38f7d6848b42ddd2f477f355855a98c5ebe9560e4e3a757",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7CUO",
+  "ligand": "PHB",
+  "sourceCifSha256": "c117fb3f29fc8642fa7b7f46fca2dd2f673eb9c68f5299e75cb15c80ec242792",
+  "receptorInputPdbSha256": "61db05ccc3677e840a756af6a2c9216907465b5dd78f4f2f8ba04528bca7276a",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7D5C",
+  "ligand": "GV6",
+  "sourceCifSha256": "f0bb9742efda4356c1be2079176690c4166d2865aebc50867603275580c791b9",
+  "receptorInputPdbSha256": "b155a2ece285a80a1287ec78279ba31d5405d7eeb0d3df0a0fdea69249851193",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8J79",
+  "ligand": "MTE",
+  "sourceCifSha256": "e3b1a86328d158536e69764a9349e45fc8fa6b30c52064d571e0778fececcbee",
+  "receptorInputPdbSha256": "8851971405bc0b2f6fe95e050d34b6668c9c935bb9080813adf15623f62d4805",
+  "ligandHeavyAtomsInCif": 48,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7DKT",
+  "ligand": "GLF",
+  "sourceCifSha256": "1b15368a8f81e5cf7ecda54720720e9b95c06119630dd7cf0442eb2bf64f9a01",
+  "receptorInputPdbSha256": "57158487aabb8af4ede3be94193e2781e89c4cfb216cea8471b54107dcaa09f3",
+  "ligandHeavyAtomsInCif": 12,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7DQL",
+  "ligand": "4CL",
+  "sourceCifSha256": "524ba599e12c64003cc0eb64ae404279fa7b9f1dd686858b3f30aa08ac5444ef",
+  "receptorInputPdbSha256": "e65548dc1d67787638ba928a53e76eb7ea9563803b9b24328786c42a5ee8e49b",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7DUA",
+  "ligand": "HJ0",
+  "sourceCifSha256": "2a57c707e4151c12507b5f65c580146bb028a58938b7ca366bbd97f077f0067e",
+  "receptorInputPdbSha256": "039b77d6e7d49f8dfadfbcc51f3cc336012aa476b182e29ee1b838aec0ab1328",
+  "ligandHeavyAtomsInCif": 46,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7E4L",
+  "ligand": "MDN",
+  "sourceCifSha256": "25902db7fc63481da4c3d4d6836a0856b5a38c75be6fd7a390dd938bf6b821e8",
+  "receptorInputPdbSha256": "4dadfb6788de7c2dbd738dd017d909dd912664c1403b727f5869a69d12b11e7e",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7EBG",
+  "ligand": "J0L",
+  "sourceCifSha256": "fcbcbf77b80a86fc0b91fc6a3e9b155ebc5f463ce3cd16bb3c35bbd6f98da00d",
+  "receptorInputPdbSha256": "a57fcd903c0ea42e96d87a6d3d340adf8ea0f96b6b3345873f874ddedcd1adc4",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ECR",
+  "ligand": "SIN",
+  "sourceCifSha256": "d9ccfe7aaacbdbcf9689af2067888850c88df142c8442f653d06fb09905df256",
+  "receptorInputPdbSha256": "89cc3102f829447b2d3cd724789758742055e813c102d61400f028d68164a148",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ED2",
+  "ligand": "A3P",
+  "sourceCifSha256": "06fa942629947ed69f4ecbf7f50a6a2f4877ff7d57abbc3bf8ae389aa2b61466",
+  "receptorInputPdbSha256": "e5cd60fe2dfdf42e9ff7844b3accaeb02d0fd5c39ef766b01f84101f2b7f77e9",
+  "ligandHeavyAtomsInCif": 54,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ELT",
+  "ligand": "TYM",
+  "sourceCifSha256": "89b4fdf34b880bc58941ee0552eabb84c20d7552801ff2ea7e1e4d7cb35da793",
+  "receptorInputPdbSha256": "36bbe04ab45b2c5db8c8d238ac7e0ad070452f8db9267d887a1a262e5b621e47",
+  "ligandHeavyAtomsInCif": 37,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7EPV",
+  "ligand": "FDA",
+  "sourceCifSha256": "d43cadf2a5dcb2a24d19aa89ecb322feeea0541edf3192fb49068735f002afac",
+  "receptorInputPdbSha256": "58da901b8ac18e33cdf73925e2b8e364547b6b00154969a620899951bb1889a6",
+  "ligandHeavyAtomsInCif": 53,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ES1",
+  "ligand": "UDP",
+  "sourceCifSha256": "27e9c95acb6e2205f1d1b98d331882b4f19ee40fd1f300d935846ec99374d83c",
+  "receptorInputPdbSha256": "8bb3b380b8206fd455e36f512d19fc90deb598bb5c6ceae68621f72219e54bf8",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7F51",
+  "ligand": "BA7",
+  "sourceCifSha256": "70e0ce5cebcc9bbe27e970c9d6eb86a6a147ddbd4937ad885c11e6b100b6d071",
+  "receptorInputPdbSha256": "de162e612cd26e64c557bf72104ef4dc6e3b1d24e867b9bc57287a9248c9fa03",
+  "ligandHeavyAtomsInCif": 44,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7F5D",
+  "ligand": "EUO",
+  "sourceCifSha256": "60d1289c86ca06d86cdc2ff6a8ea877956194f540f8fb7c31a9ae3bef832192f",
+  "receptorInputPdbSha256": "27cbb3f31eb5c0bfcc8aa7c0e4f60022f77419517fce9435c4e27f5541ee2715",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7F8T",
+  "ligand": "FAD",
+  "sourceCifSha256": "b982b06ca5d8ee86cfb383ecd69f68d5f751fe522c1d86358b078e7d72163bc5",
+  "receptorInputPdbSha256": "fe88b43b3e2664dda8bb7001ef504e43cb566f6d4057319f8ab8eb96047d715f",
+  "ligandHeavyAtomsInCif": 53,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7FB7",
+  "ligand": "8NF",
+  "sourceCifSha256": "6d275bee2ca13f539cf0b2ad43bca1c8c160807393c8ebb38f7ad4fcb0cc7af9",
+  "receptorInputPdbSha256": "fa5420882f006596f309d1a67be1853850dfa5e4667bc8b1df60320f40365ac2",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7FHA",
+  "ligand": "ADX",
+  "sourceCifSha256": "8b86e0596eb3bab7bdb1f4d19475c161eb258fb48fe2e4a8b6364b4487fc5b3d",
+  "receptorInputPdbSha256": "6cf85a4e1c033057364c8e3b3b21b717d90c9d5bbd7603748f75530005de71aa",
+  "ligandHeavyAtomsInCif": 54,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7FRX",
+  "ligand": "O88",
+  "sourceCifSha256": "658107a6d978eda56e8d223bc72ff7d1c2c0598def54c6948b7b2bbba8a078c6",
+  "receptorInputPdbSha256": "92dc1c5e7ee8c4d0ea9ca13a8b5329d04eb11b94f5be95e2538306087a323c09",
+  "ligandHeavyAtomsInCif": 120,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7FT9",
+  "ligand": "4MB",
+  "sourceCifSha256": "861258fb58b408501de1a004fd2876c6b88c82980b86828c2d07dda96a6ab5fc",
+  "receptorInputPdbSha256": "db810081698abc6c34c5aef5a603f939c12b1019afa0052f4ed5c9f79cb9c55a",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7JG0",
+  "ligand": "GAR",
+  "sourceCifSha256": "b709871863d3efb645a71330546c09cb44e102f4def905260ea859cc85971103",
+  "receptorInputPdbSha256": "d34420a529105c07dbc335f2580a6c41cfe7e1e39773af085e5fc4fcb4d99e7f",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7JHQ",
+  "ligand": "VAJ",
+  "sourceCifSha256": "af77bcef272265712c197fa3016cb1fd388140ec08fcdf005d4070ab1c7402c0",
+  "receptorInputPdbSha256": "8ef6655faa376d10701fb64c5917e672f159fd023f19d28c9e2366aecebb0a3a",
+  "ligandHeavyAtomsInCif": 72,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7JMV",
+  "ligand": "4NC",
+  "sourceCifSha256": "762036a26bba7255b704d396c33489f37d6640412999ee58af9a292f9afe584b",
+  "receptorInputPdbSha256": "5b9069c0c649e4f0f25d51a10f1fd090b6b7be57bbcadb237ffbacea962edb20",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7JXX",
+  "ligand": "VP7",
+  "sourceCifSha256": "5e498f2c1c80c12a059a0f99e77da41e98b9c2716e99f9727cf5ad3d0a3e2c7e",
+  "receptorInputPdbSha256": "969abfecec0f9bd621ac2e882bff20f12b0f8b69216518dbd82581df3c3a84c0",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7JY3",
+  "ligand": "VUD",
+  "sourceCifSha256": "d3c0dc585d4a2adf3891117daa1ff30438a3b2aae9c605ea6e3e011e83912e27",
+  "receptorInputPdbSha256": "51fbd8f9816aa2a694112127c2a1717002773589ca66ce77ec39061d43f0ddd1",
+  "ligandHeavyAtomsInCif": 54,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7K0V",
+  "ligand": "VQP",
+  "sourceCifSha256": "1b82cdaf8759c4281cedd3ea620b29caed48afc897d02ae89f2feba2e74f1d76",
+  "receptorInputPdbSha256": "085917568a4a727f77d8c9b8d41a2d9562944a13a5e1de1fbd6fc04ad45c0962",
+  "ligandHeavyAtomsInCif": 128,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KB1",
+  "ligand": "WBJ",
+  "sourceCifSha256": "6c1810879a970e43f005f0cfc83693a928f9cfc360215bb59ff1907015da3325",
+  "receptorInputPdbSha256": "fc6ef713a25b484543cd025377790faeca7cb91a08c040ac049360dcf43e4bba",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KC5",
+  "ligand": "BJZ",
+  "sourceCifSha256": "63585f142f923b06e63b7f6aab14c93d65bed9afb279a61a6b065a10bdb221d0",
+  "receptorInputPdbSha256": "d615fbf96f77154fe9845addfaeb5a4f871014e19012014b64163658799286d8",
+  "ligandHeavyAtomsInCif": 74,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KM8",
+  "ligand": "WPD",
+  "sourceCifSha256": "db5730e093cfa296d98426c7661b10ad47c321da4dd04e351c8a06fc26325f35",
+  "receptorInputPdbSha256": "bef12c6d103f175d47efd3eb97d7b3cfe7622f85bf4d32dec8527844bc25dd1c",
+  "ligandHeavyAtomsInCif": 58,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KQU",
+  "ligand": "YOF",
+  "sourceCifSha256": "592a34c34d7c778ffba21adf7500743196d478e4c1539cb687cea79f8a340de4",
+  "receptorInputPdbSha256": "dd1f17cbd46b8f4b5e30f690a5e7c6eacc53a2d5e610b015f2394df45eaaa204",
+  "ligandHeavyAtomsInCif": 28,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KRU",
+  "ligand": "ATP",
+  "sourceCifSha256": "dcc9966ca3389a09f26f79bf7f3f22b49cf58babf43bb095734282ffd7b927c4",
+  "receptorInputPdbSha256": "a84d8eed66ba470f5242333af7aa84b86a00df9b0efa097d08e7ad5aa7208a33",
+  "ligandHeavyAtomsInCif": 62,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7KZ9",
+  "ligand": "XN7",
+  "sourceCifSha256": "16118c55bbd4e55f55863aa77d37b1a711cb88f7ff80193c09c9cb18442d8310",
+  "receptorInputPdbSha256": "1fe7f623d37731348fe39949a5c9c282a1ad030e383cb46c52a2dd99b08a7208",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7L00",
+  "ligand": "XCJ",
+  "sourceCifSha256": "2bc1288e22c1545c85e7ce06187c175ebb0132b2c5e795dbe9bfc66ac7c8c7b1",
+  "receptorInputPdbSha256": "1bb820042bc520e28c5ad44e562cb588463608be9657e6b3267423203729dcf4",
+  "ligandHeavyAtomsInCif": 108,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7L03",
+  "ligand": "F9F",
+  "sourceCifSha256": "e920ec9d4c2ed55688018d598d2ee3da6b5606d59bf6115ce31137ad24fdfd40",
+  "receptorInputPdbSha256": "feca5cc8b8a30486adeedb1ba230297bd211e7b2e55289b2ec1786bbf2e2995c",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7L5F",
+  "ligand": "XNG",
+  "sourceCifSha256": "88a8dde11455bd66fb8175691f46910cf987cad64f20f9220ef80bf7e26088cf",
+  "receptorInputPdbSha256": "cd5cf874e73b9458940f0d872c4c680c74a100c8a4c84116516e8d236521006c",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7L7C",
+  "ligand": "XQ1",
+  "sourceCifSha256": "275d902fb012e6224043d10f1e3596c5a9f087987dbc1429fe414b645180466b",
+  "receptorInputPdbSha256": "5dc483b0f72f67703ff93924a7c6f5e859f84f9b38092d77cda7274db442f177",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LCU",
+  "ligand": "XTA",
+  "sourceCifSha256": "905a0302ca2517a8f8ebcf4aa17c30e5cfc68a93aac663d37c0d81663aabf485",
+  "receptorInputPdbSha256": "52278eaf52ee66021c26f6bea18c0fa65abf1536a69866a3cd53d91083b6f764",
+  "ligandHeavyAtomsInCif": 39,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LEV",
+  "ligand": "0JO",
+  "sourceCifSha256": "4c24a39334d8230ba30829f6e16fad3e5229ff8dbbe46936651d439699f883e6",
+  "receptorInputPdbSha256": "08fa843891a882a2cd34cf085fa4f1496fb78daf161ed47651637b7beee90e39",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LJN",
+  "ligand": "GTP",
+  "sourceCifSha256": "bd3c8e58ea9961ba8e2776fd6db450c7d4b0ff3912ff653dff487601715a31c7",
+  "receptorInputPdbSha256": "37692a4dae3d253797aa8ab3427451f59f75848cbdb27c239f9ab90970ed708b",
+  "ligandHeavyAtomsInCif": 128,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LMO",
+  "ligand": "NYO",
+  "sourceCifSha256": "70e00b8e61cfdc2a41b89d34a77672675397edb54a0ac10cd5c7fc87be514326",
+  "receptorInputPdbSha256": "c539da3f4c620ea0a3647c7802f7df1d22d05677eb38b5d8c74f7637473b7782",
+  "ligandHeavyAtomsInCif": 37,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LOE",
+  "ligand": "Y84",
+  "sourceCifSha256": "175e89d785d10573045e27a450ba0dc44f1d1a953073b413a8f2fcbf5c67eef7",
+  "receptorInputPdbSha256": "8b38b5b409d1eb0ca2fa02d4403efc6735bafc02b360410c66273b4c6c12f39d",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LOU",
+  "ligand": "IFM",
+  "sourceCifSha256": "d29208bda17aa30973e67e2f563abe2d40eae5842d98f00be72cbdbd9915e3da",
+  "receptorInputPdbSha256": "0ecdc594c05eb1881de4dc85ceb0ece2bd0281147bc6678b2c85135acb941797",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LT0",
+  "ligand": "ONJ",
+  "sourceCifSha256": "9d32856a2bea5f3a26ab73bff993aac2902fe42d140c0ba0f288ae49d41b41d4",
+  "receptorInputPdbSha256": "8fc837cb74e0f9860e46cb31181d45318c004fe78a93b5c1026499ddc0f9a5f7",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7LZD",
+  "ligand": "YHY",
+  "sourceCifSha256": "6e0a6399c268a4ae9585e16d4c1eb2cbd5161d04d435d02b4535643f0c89c6b7",
+  "receptorInputPdbSha256": "6928246d7af7b92d3d2dfaa7aa7135f364ce16488eaca3ba140886b254499632",
+  "ligandHeavyAtomsInCif": 29,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7M31",
+  "ligand": "TDR",
+  "sourceCifSha256": "e11c5c77045063096fbeffbd61b5dae92cd9b46a40cccfdfdd158fb047f0be79",
+  "receptorInputPdbSha256": "10f871bfee3082f0e0117fed673b3a07939bac370bef1ff5a4dfec4cfafe0570",
+  "ligandHeavyAtomsInCif": 36,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7M3H",
+  "ligand": "YPV",
+  "sourceCifSha256": "0b8b3b66964e9003c6f2556b04a6117d1e167a8206b2e9324d73b074934c0b14",
+  "receptorInputPdbSha256": "87eb5bc392c33d1d35ffea94621784677e328a45959e2523df3da398136068ab",
+  "ligandHeavyAtomsInCif": 48,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7M6K",
+  "ligand": "YRJ",
+  "sourceCifSha256": "07ed6d3321d661d19573892b08d6405cece4cea518d85f3cb7d853dd444fffb2",
+  "receptorInputPdbSha256": "e32341ebcd375c2168952e4fa27ee82596da71803fcdb2bafda35b411f76fb3e",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MFP",
+  "ligand": "Z7P",
+  "sourceCifSha256": "409194400d62b9d293648751a63ca5800a5b2115d9c174bb20f78f3bd26dfb46",
+  "receptorInputPdbSha256": "3a7ba227ed193ca937664fc44f0c67d77f43129efb31206a387cfe20e6f04bbd",
+  "ligandHeavyAtomsInCif": 200,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MGT",
+  "ligand": "ZD4",
+  "sourceCifSha256": "e1f041e1fcad6570d4bfc3ad84df933f140e07dc162ac786a1226c13be086f9c",
+  "receptorInputPdbSha256": "1d216bb6a42c1f821611e3dd9a7842ddfce13eaf9b4c89e3cb74c4e3ba7d3159",
+  "ligandHeavyAtomsInCif": 28,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MGY",
+  "ligand": "ZD1",
+  "sourceCifSha256": "d5354eda52614caebef3eac39f6d0dd1eb9b861aaafa4c4176507a0760ae7bc7",
+  "receptorInputPdbSha256": "a23324c8787624858ab60eb52a175bd829a439a9ce90dacb0315c4a61aa0ade4",
+  "ligandHeavyAtomsInCif": 46,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MMH",
+  "ligand": "ZJY",
+  "sourceCifSha256": "2cd0a7ca5bb04b72e2ca3e1f5e1b9e31869c83dae9dc4943ced2e3f00d60b68f",
+  "receptorInputPdbSha256": "5532102577e76fa22e003b233b2655ee6d4db1bab6c37ab17f94f04673dea4ac",
+  "ligandHeavyAtomsInCif": 57,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MOI",
+  "ligand": "HPS",
+  "sourceCifSha256": "c7dec27a8d414954f633fac314e996abc11b731d4bde864e6f25c344db691deb",
+  "receptorInputPdbSha256": "270b2726e2502850054ba56a7b4675529b2aa79a2b90fc676c2cbf135058da32",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MSR",
+  "ligand": "DCA",
+  "sourceCifSha256": "8f6fa9762b4507d8fbac6a918a2cffb1fdfb29d4817b61e5d24f0c5ce0eecd25",
+  "receptorInputPdbSha256": "ce7d392535345a3ab1257f82a82fa0b5afb6b24ab2f40990e6dad426c7cdd79f",
+  "ligandHeavyAtomsInCif": 47,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MWN",
+  "ligand": "WI5",
+  "sourceCifSha256": "7e0b17d7dc6d9f6dfb17931ebe567ba1e097cd19fc83bc311084d89908efbf7f",
+  "receptorInputPdbSha256": "fa2d7fd842d2aaa62f49f1fb02830821fdcafcf9d5bc46d7f7df29b5c5f5d030",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MWU",
+  "ligand": "ZPM",
+  "sourceCifSha256": "397a290aeb94041ac77156f296a83e3c3e96fbba55ded5511823ec34aa8bdfce",
+  "receptorInputPdbSha256": "487f496d80befa30ad9117e73eb1cb75553392c59dcf52c12a8c428ec8f2d5a0",
+  "ligandHeavyAtomsInCif": 7,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MY1",
+  "ligand": "IPE",
+  "sourceCifSha256": "65615756428b7f5f139d0208212820acfbe6add4c40380849c1f200a2591e874",
+  "receptorInputPdbSha256": "d37d6a6f313d875e58c9261c33e92740b8074de6c661cfeaf0015aadb007dbef",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7MYU",
+  "ligand": "ZR7",
+  "sourceCifSha256": "c66b5ef36d87c4579cc3d1e50a93e6e59cce98e262016a6daf638c09d5619fc3",
+  "receptorInputPdbSha256": "35a53170a4e937821ff5b2f8ff3c02d66ae81fedc270a38ba761a997d375e804",
+  "ligandHeavyAtomsInCif": 70,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N03",
+  "ligand": "ZRP",
+  "sourceCifSha256": "444228cd7fa550e44fd40a168ff9ed7b396bed2600363187f4cc7b369110d389",
+  "receptorInputPdbSha256": "75f51db5fb7aff9a794d1a05edea2c16e4dffb665187028f185397a1237f6bec",
+  "ligandHeavyAtomsInCif": 28,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N4N",
+  "ligand": "0BK",
+  "sourceCifSha256": "8c881af6932432f7b0784836f0f8cd7b208d25c17011b58e864f241ea95918d3",
+  "receptorInputPdbSha256": "ace8aabd34e3272dd39515490cdd70e64331c959b689cfe30b6a2840178530a9",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N4W",
+  "ligand": "P4V",
+  "sourceCifSha256": "018560d68449773c4d26fd5fc8b9340336b30eb76c07acc3e9edc8ce84bdf23c",
+  "receptorInputPdbSha256": "b9d40835abfb0d7e170fe8091c7c31cc4ac715603b4dcb8ca008b98922623ddc",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N6F",
+  "ligand": "0I1",
+  "sourceCifSha256": "5b2a48193ff585db9efe751dc74ad6d0bf82e49cd3c210b3981c8969342178bb",
+  "receptorInputPdbSha256": "7121fb758c033bee59f9892453e3b4506ea0acca5f5827e97d465f71d7d9c3fe",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N7B",
+  "ligand": "T3F",
+  "sourceCifSha256": "342309f84efba192c0a903771df5210827a6ce45434098fa55532f0a4bcff6bc",
+  "receptorInputPdbSha256": "13c508f1ebf0306013ec12f2c160ece64cdb735addb737f5ae3bb903afee71c7",
+  "ligandHeavyAtomsInCif": 70,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7N7H",
+  "ligand": "CTP",
+  "sourceCifSha256": "588c33f20bf2abed5dbd001702967bbb6b471152d3e6e6ac76d7bb51120c51bf",
+  "receptorInputPdbSha256": "a0e2a70fa7d4bdabd446d26edb19bd240ce3e2f0f5648eac8f8cc9a99750d193",
+  "ligandHeavyAtomsInCif": 29,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NF0",
+  "ligand": "BYN",
+  "sourceCifSha256": "356f7e68d184d28ebf4ade4a25b5dffc4c54a9ca98fbd73504678c7d20ef1a28",
+  "receptorInputPdbSha256": "4ab086c9076a65cf64626ceaf4b412e3ea28b01bd916e980ad5adf695b4e2d3f",
+  "ligandHeavyAtomsInCif": 74,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7NF3",
+  "ligand": "4LU",
+  "sourceCifSha256": "64ef6e9a0761d03ab88c56589f48df219428f41572b6c157411d4a28914bcd3e",
+  "receptorInputPdbSha256": "ac93c33c601f9ed5925586e120c173ba52355ad52e8273d53cd01c1dbe0882a7",
+  "ligandHeavyAtomsInCif": 36,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7NFB",
+  "ligand": "GEN",
+  "sourceCifSha256": "271128198f75a6d097f218315a974c42f61fec1b60ad01cb82bdf148eadbf647",
+  "receptorInputPdbSha256": "24c8f18dcf182d0bc35b0eeefbc3ca31964c681e0027a784cae011ee031450e6",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NGW",
+  "ligand": "UAW",
+  "sourceCifSha256": "71da88fb52adf2f8c0ad03bb0f01e73220de8040f601b4792654627c943b26b6",
+  "receptorInputPdbSha256": "879467bb248aeee481d2cbbf8f221952f75106f2feac3eebe79168ac7162b4cb",
+  "ligandHeavyAtomsInCif": 17,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NLV",
+  "ligand": "UJE",
+  "sourceCifSha256": "b00c7acac55cc14e4d105c57fcbe9fcf6ae2461f015c74ed9a33792b77ee4237",
+  "receptorInputPdbSha256": "931976ce887bd3a61d470bb65e5e32b6011ba849b6c220f9cb1b9b4d1a56d432",
+  "ligandHeavyAtomsInCif": 84,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NP6",
+  "ligand": "UK8",
+  "sourceCifSha256": "7a78708d460f9f9e46bbceb2f424223d082ec49b9f771422e4930695d11d5a32",
+  "receptorInputPdbSha256": "f4140df280509d4023cc9befee0698495d44cdb8e11e6cce8708da4a70ad8fcc",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NPL",
+  "ligand": "UKZ",
+  "sourceCifSha256": "3f04e7793d23db17d4ac91c6f418df4e6e706e331e808b254e9cb54e0da2e097",
+  "receptorInputPdbSha256": "ddc0a82c5b7727bf7c58d1ee63b1661e22c31a40cd8f1818f70183708b6ca08d",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NR8",
+  "ligand": "UOE",
+  "sourceCifSha256": "9525e9bb865e5491976494be898be5740f438b0ae71f92dcd1e598304439c8ba",
+  "receptorInputPdbSha256": "e55715f2f981935d1cced1907d950869f18dd186ff8175caee8f55c6a6bbc0ce",
+  "ligandHeavyAtomsInCif": 45,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NSW",
+  "ligand": "HC4",
+  "sourceCifSha256": "9638778377f5a34f48389c391304c3124ea1873523dc3fb9721c52c0631dce24",
+  "receptorInputPdbSha256": "9c075c6b612e954cfc990d20600c3013632f94a5051757bb826e35333b049918",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NU0",
+  "ligand": "DCL",
+  "sourceCifSha256": "b2a28d5f8881c369df1a4a971caa87e93c13ad74b3f4c1a1bc151cdbb14c8e30",
+  "receptorInputPdbSha256": "8441ad0b3a620c968531367d7b67a18341bef0b8fd65640021ffdac0415f451b",
+  "ligandHeavyAtomsInCif": 8,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NUT",
+  "ligand": "GLP",
+  "sourceCifSha256": "d0c60decfa32994a67c813481e11dd5f027f65851d52154f18b600e3b940d542",
+  "receptorInputPdbSha256": "d9d5c860e351386534b4ceadc36cacc4cf13984758e057124482b4587831b892",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7NXO",
+  "ligand": "UU8",
+  "sourceCifSha256": "f8aa1e7e92fc3b6a67561396bbac8cae74bde71c11d71ab8f524f0eae8bcd254",
+  "receptorInputPdbSha256": "2a2e213cf65d16b4b7a7c63aa7288c2f1c2c83d751e6f4a15e02e172e375b9dc",
+  "ligandHeavyAtomsInCif": 68,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7O0N",
+  "ligand": "CDP",
+  "sourceCifSha256": "8331d9f52432bc6cf266dbf6c77be53a65faf7171a14485586f4389e1a2dc648",
+  "receptorInputPdbSha256": "7d108f6258ee085b6eb9f900d6e0e3ec3c9f62cadbb1bc7bbd0aefc4e3280a30",
+  "ligandHeavyAtomsInCif": 50,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7O1T",
+  "ligand": "5X8",
+  "sourceCifSha256": "5eeabc1adb0034cccd91ea0c87970fba92ff785983aa21d0218ca5d3d3e4f94c",
+  "receptorInputPdbSha256": "ee1e217c268a3881c2af95514f662eb92df3a6fa760a2b5b9a29c0bf62e957b4",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ODY",
+  "ligand": "DGI",
+  "sourceCifSha256": "4bc00965053e6a21e17c9b51921606681fe973accc98353b0f0180f8a932d562",
+  "receptorInputPdbSha256": "77913d9853e10f614fb106dc499af129d177a4a71f311fdc2905d3224d9af2f2",
+  "ligandHeavyAtomsInCif": 108,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OEO",
+  "ligand": "V9Z",
+  "sourceCifSha256": "bf0ca3f0c04f90c73fec33fcf2049f9f44b3f9378ae0de4bbfc1092e2fcf699e",
+  "receptorInputPdbSha256": "dd2d8d60491071aabaa1d90ff782da380b7e56a39a3858ac04dfa4149d5685d3",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OFF",
+  "ligand": "VCB",
+  "sourceCifSha256": "c6be560a96c8c853b026d0e01d4ff38ea05a6567a917415ddf1bb3e1ddc753f4",
+  "receptorInputPdbSha256": "9382290e743aff038f59eefe0cf10cc348c7b73d5eddd83c21ae9c7c10e35097",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OFK",
+  "ligand": "VCH",
+  "sourceCifSha256": "4bf836383a483699ee46e0e097f8989d21dc77c945afd6754d459ef132b0e21a",
+  "receptorInputPdbSha256": "bc4dc9395321414a64b7b32f802529e02b0590b0d8f98d86a67f01743c0882d5",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OLI",
+  "ligand": "8HG",
+  "sourceCifSha256": "e14ae6b0e149128c42ce57ee71b7ceab337026396cef6172483396ea024f85bf",
+  "receptorInputPdbSha256": "6bd061b6bb938e3d1f7f1f20ba80503edb9533409ed5e31cf49c9f024037cc8c",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OMX",
+  "ligand": "CNA",
+  "sourceCifSha256": "70f6f451310a30dc6e847939aa769ee2ceab2c5e01be7b1f7190cac14b4eba71",
+  "receptorInputPdbSha256": "8beca567eea4113fed5925bb97413a84cd9f292e626f7a44f8b87ae857a046ce",
+  "ligandHeavyAtomsInCif": 44,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OP9",
+  "ligand": "06K",
+  "sourceCifSha256": "5b69a462f11072c10bf89a175a1d3ab9181625de7f681ae87d10894b223794a7",
+  "receptorInputPdbSha256": "df895fff6573991b5641b065555effa0e280e98cf85deebba3f0ad692b736d0c",
+  "ligandHeavyAtomsInCif": 132,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7OPG",
+  "ligand": "06N",
+  "sourceCifSha256": "7706f97bc437763b86ed59685755e685b32b204d359cc4ce72742f13a73335e5",
+  "receptorInputPdbSha256": "f5a84c21f07f3c7f892458628c563429de05c98087c8027c6215658dd4a2e830",
+  "ligandHeavyAtomsInCif": 57,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OSO",
+  "ligand": "0V1",
+  "sourceCifSha256": "f8287526bca46384d045477a0725a302dbc20fb018edfb6cceca92105c2d12d2",
+  "receptorInputPdbSha256": "0cfa066b1a1c506c0cea6f41454dd0a5a24e5f222e5f468f91064c2cdf191f42",
+  "ligandHeavyAtomsInCif": 7,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OZ9",
+  "ligand": "NGK",
+  "sourceCifSha256": "0a9c928d6da4a28fa6eaefbb43b536457f3c6d43fc4d5a90dff44db1a3cef15b",
+  "receptorInputPdbSha256": "9a2d97fda017f4a0dfe64f1138d07aa5f050d50427cffae5ec82c5979d747008",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7OZC",
+  "ligand": "G6S",
+  "sourceCifSha256": "cd50aed4b7299a22dd5a397484856e598986c6b32e65ac1c9304219bbd78a837",
+  "receptorInputPdbSha256": "ace1705fe60349a69b9ae70d0da73dcbb45f044339995265d5d5e6f249fd10db",
+  "ligandHeavyAtomsInCif": 16,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7P1F",
+  "ligand": "KFN",
+  "sourceCifSha256": "e04594bf2d139a3c8c55f43bcb097e7c7c11297e366509bf1f60d11752f61d76",
+  "receptorInputPdbSha256": "a0ceae11ef546c7b0f6d6f1b4777a91ff25f4dff2578562de979e9c9cff71a4a",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7P1M",
+  "ligand": "4IU",
+  "sourceCifSha256": "13a3325978cf46ea6631878ea5bcca971b6d3e5e7c58378f9e4f068980f3ce81",
+  "receptorInputPdbSha256": "21c3687b001370c915c7783cd090310148e4491e4a06894836eb6df9c37457d8",
+  "ligandHeavyAtomsInCif": 48,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7P2I",
+  "ligand": "MFU",
+  "sourceCifSha256": "d10f1eb07ce74b2f534b22d5a10cc7ce14a481a71a168e9e8451b02bafc76be8",
+  "receptorInputPdbSha256": "0a87d7e433a2851aafe672e80bd5a197e0e288ad980165cd6be32b2a9e0d6e49",
+  "ligandHeavyAtomsInCif": 72,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7P4C",
+  "ligand": "5OV",
+  "sourceCifSha256": "4b44b7b14119dd88d98e8de5759f5c66ef20218cc87c94e3465b87e3fd4fd33c",
+  "receptorInputPdbSha256": "fa6952967b0deb7593d09c16714d59e1f8354ae61fca1606b1aff3c03edbcbc4",
+  "ligandHeavyAtomsInCif": 16,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7P5T",
+  "ligand": "5YG",
+  "sourceCifSha256": "8cae0f3c8f1753e6a1ab753813f30727b46d9b0c387cb16014991b306e01dd73",
+  "receptorInputPdbSha256": "325a1e3c0837faf07e245bd68b5bf5b382e0350054f7f29a4bf00c061417d3d9",
+  "ligandHeavyAtomsInCif": 23,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PGX",
+  "ligand": "FMN",
+  "sourceCifSha256": "03ab2f41b20e2899ee07f95c965d1fcab249fffd5e44f2bfc303c6f9fe170a55",
+  "receptorInputPdbSha256": "cac49cef7ac7def13587318a964f110f06d85c2716727c03b6aca7f5b8993a5a",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PIH",
+  "ligand": "7QW",
+  "sourceCifSha256": "d7c0daaa3c82be370bbf1307b7c0b56e966ee3b01c737d6d107ac732410a8eaa",
+  "receptorInputPdbSha256": "ef398e1f642d0fcdd6bd2a69c184e6ab0748ef571073cc134f6cd634bbcbf216",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PJQ",
+  "ligand": "OWH",
+  "sourceCifSha256": "6f546c065dc91a26aba72f0e0088cb8664c595487fb45155d4f7d3c66550db90",
+  "receptorInputPdbSha256": "4c77e8d7285d1a3f401824d74e47e9c4061d340a9787c1b120587133e8e2884a",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PK0",
+  "ligand": "BYC",
+  "sourceCifSha256": "2fcfbfd280fe7b4aed0ed96047402668797f5639a4fc8cbac421ba49c93c0425",
+  "receptorInputPdbSha256": "a34e966691e7aedcd270a9ee4ddb067ea426acc66fb104b56d3beed08294ca9a",
+  "ligandHeavyAtomsInCif": 56,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PL1",
+  "ligand": "SFG",
+  "sourceCifSha256": "609ebabc73d1e424c3a14681b9886be1188907a0cc3cd97f7416f8646f122d58",
+  "receptorInputPdbSha256": "aca1fc23da7e59615653c61292bb79424832fd5d5ff004f61dbe928685bcef7d",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7POM",
+  "ligand": "7VZ",
+  "sourceCifSha256": "eeb91e8c41eb4048d4988c0fe2383c83649fc7154ad5d3dff338524a08ffd36c",
+  "receptorInputPdbSha256": "648204403317c6dd6f25280e7f638b59621eb52d4025e94933e23c4f2ccee98d",
+  "ligandHeavyAtomsInCif": 88,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PRI",
+  "ligand": "7TI",
+  "sourceCifSha256": "59ca79d3bcdcd199b803f0562a26faf681541634451c1d23855ded2f6a5c0e7d",
+  "receptorInputPdbSha256": "2f04a0d55dbe8e990b08236a3b1e72abf9283ad857de8bf1f9224b1871a1dc42",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PRM",
+  "ligand": "81I",
+  "sourceCifSha256": "6c57025e3bff5c3f8cacbc87fd6a105ba662646436d8e8d725a8483c7a6246c3",
+  "receptorInputPdbSha256": "b6dea147e275f68f1cbd45ec6b304a3177622a2f7c33fcb0dfceac918a509e93",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PT3",
+  "ligand": "3KK",
+  "sourceCifSha256": "7e75816caa63df6a24d4246d84a32793ece54af485de0fbea1c699a7cfe3a906",
+  "receptorInputPdbSha256": "02821ab052c49bb206528011fa703123a973987bab8b83c4090807c2abcdb155",
+  "ligandHeavyAtomsInCif": 108,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7PUV",
+  "ligand": "84Z",
+  "sourceCifSha256": "28428c64260946045552f6ccd2252f47a469329620122d4acf52a64f5137d24f",
+  "receptorInputPdbSha256": "e16097bbc80f8a04f4ccd5634a9cfcee4e5d5bb9c4b69af3ec2621b28b9fd4e8",
+  "ligandHeavyAtomsInCif": 96,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Q25",
+  "ligand": "8J9",
+  "sourceCifSha256": "3895cf03f149430ea23394c79a05935542ec92a38814c5ef63948cf9a201aa14",
+  "receptorInputPdbSha256": "4fd20b0de506e6c7bd517248f7bf8d60793ce20dde9cacb6e04bacc139f1829b",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Q27",
+  "ligand": "8KC",
+  "sourceCifSha256": "42f0197fb8a6812a8c175cfaadfa984d3dcf6d889cb47347824e1e113f1c2114",
+  "receptorInputPdbSha256": "5c3088fd19548ff4b133d4d4ac31b2ab627062d2b76b5a0cce378d2d7d60467b",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Q2B",
+  "ligand": "M6H",
+  "sourceCifSha256": "a95ae7db7237ad4fa1ec34f5add6f8494cfda2f30b5ed83749bbbee5fdaffc80",
+  "receptorInputPdbSha256": "5a816db6575cd424f5caf6af34cd3649492d4e8d6cc123128eeed05f6e197398",
+  "ligandHeavyAtomsInCif": 12,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Q5I",
+  "ligand": "I0F",
+  "sourceCifSha256": "98bc71d989a451351da83d36a65a6b89ed4e1ed4352de66ad012a72e34877e7e",
+  "receptorInputPdbSha256": "2a1afc5abedd9fdd4426d2c18b5f144a24583bfe24623f1a411182220c2bc50a",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QE4",
+  "ligand": "NGA",
+  "sourceCifSha256": "d5b73f5aa626cb475fc2cb6aa62ebea6a181e87d05e7af8633ad9bc2f1688c83",
+  "receptorInputPdbSha256": "76044ca9fac5a38bb34457aa0c701d5c42db03c01641d5fd979f9793cdf9b1ae",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QF4",
+  "ligand": "RBF",
+  "sourceCifSha256": "91bc1d6ecea74aecf26b17bc237deee31a9d77df8f8522c479ebab6137e82b43",
+  "receptorInputPdbSha256": "26ef2665ebf2e981e00159603ffd8765ca90b037ae38f6a03d5b2cfebf272a28",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QFM",
+  "ligand": "AY3",
+  "sourceCifSha256": "42a5f28549bfe53bb27f0495b4e187932053efff910229f4d12d54c2fd5c9cd8",
+  "receptorInputPdbSha256": "e3fef0cee1ff4a0f3143c1fb3479715ae355ce9c45424189c46ef8d9d904fa3b",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QGP",
+  "ligand": "DJ8",
+  "sourceCifSha256": "14a5ac0a3333fd7685f58f9efd73aaf54ae9049525967504bf197c29e3995f46",
+  "receptorInputPdbSha256": "492dd5ace8bc54520eb2b457fba66ec93fbb47684a374c7c0095fe4fc420fc74",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QHG",
+  "ligand": "T3B",
+  "sourceCifSha256": "61ad73f17d55afd6ab74d2b1a94112ef270769a1938b9664368a3b8dcf039c15",
+  "receptorInputPdbSha256": "dfc5ba8357db871f489a2b56a5c839b5250c021802dfc3130066a4b9ff53b1ac",
+  "ligandHeavyAtomsInCif": 84,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QHL",
+  "ligand": "D5P",
+  "sourceCifSha256": "1245626f95df4c6c506c130f6fae3a936d1cdd6f21529bd82099cc9d61ccc04c",
+  "receptorInputPdbSha256": "40385bd3ce2048c5ad964c4162987093c1f28e5d82a7d03024c64455ff5af29a",
+  "ligandHeavyAtomsInCif": 60,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QPP",
+  "ligand": "VDX",
+  "sourceCifSha256": "04fa2cec939eafd532224d7325167d70bbc9f760ce5306d4cfb7f84596593b12",
+  "receptorInputPdbSha256": "b77dc3488795d5918d6bae756849c88d8bec925587340018a4ca26c495f8ca36",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7QTA",
+  "ligand": "URI",
+  "sourceCifSha256": "627e69c49c1352fa6300f70ad5242448e67191c07d4cb18ade0a537b82cba3aa",
+  "receptorInputPdbSha256": "d60fd2946207b9216b892acea5059b20e3807c9b085fef38317c4e727d73b095",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7R3D",
+  "ligand": "APR",
+  "sourceCifSha256": "a417dd1e40e6cea1afe8053b3e15b8f77ddb4c4c55393ca054cd99c88228f36e",
+  "receptorInputPdbSha256": "27a3a443e1c24ac8e00d303e91b70b3635441c5d4e9c17c5142c17ac8232a1d4",
+  "ligandHeavyAtomsInCif": 72,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7R59",
+  "ligand": "I5F",
+  "sourceCifSha256": "cd3f239e7cd5325e8395a7491fe922a3bdf0b3f059acbfe3abeea5e34528269f",
+  "receptorInputPdbSha256": "a9db645fea782e2e910a9192c51240fa4f97c8aea943972aa1674646752739c3",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7R6J",
+  "ligand": "2I7",
+  "sourceCifSha256": "d9a6b94a813c26f0f095b645bd108a3b4061ca8f4bcf74bbb9db90462f22d07a",
+  "receptorInputPdbSha256": "4092b9806d88dfa332db38fc249f69d4ebab216d5414a593b9d60f7b9886ecbf",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7R7R",
+  "ligand": "AWJ",
+  "sourceCifSha256": "a324f7d50ce61a84d4fb303de67bfc7a3f4f69be90aa77527e5f20b2be7125de",
+  "receptorInputPdbSha256": "c7456feae9a2e4269c76c6d54bf2fdaed10916db4b68d084b585e1b0b31ee520",
+  "ligandHeavyAtomsInCif": 33,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7R9N",
+  "ligand": "F97",
+  "sourceCifSha256": "68a5c9a18299f4ba015ff6db6d0d9293531185ab740a3380bbc23aeac8fc9b09",
+  "receptorInputPdbSha256": "ab72102e41a76638a039ce63ab9abe2a0bac8b5a84f92ac4457aa476c2204a96",
+  "ligandHeavyAtomsInCif": 62,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RC3",
+  "ligand": "SAH",
+  "sourceCifSha256": "efc210d7f4e3e1c1e12048b37c7543a9974b69e05271abea0d6193da54e62bf1",
+  "receptorInputPdbSha256": "8861716b500edee5bcfe29840cc9568922bca83ff2ef7a3c8f44be89dbbdab7c",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RH3",
+  "ligand": "59O",
+  "sourceCifSha256": "3cc39466b5d9588b9caa0795c6ebc351c0fb150d0a3c2ff40e71858f71b5f986",
+  "receptorInputPdbSha256": "e6b2f13f750a69806389559ef2c5999c6d590e6563caaa681efdadd289626ded",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RKW",
+  "ligand": "5TV",
+  "sourceCifSha256": "d0bd6b91b67f3592801eeeca43da126dcea224d9d847eb29c9e7b19e271e83fe",
+  "receptorInputPdbSha256": "87ce093cf14ced44314861b4937a545600af23157dd0be180068e6671e808739",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RNI",
+  "ligand": "60I",
+  "sourceCifSha256": "e5c10abe734b7b6092cd499efb123558343113c3839b71d98331a81c5cb3c5d7",
+  "receptorInputPdbSha256": "fa3a078083cf7d14a2b02433004c508fde42e792631e43da27d751c14e33ec75",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ROR",
+  "ligand": "69X",
+  "sourceCifSha256": "e00272cf46e56495a8fc8824e1f080d5c65e74c57a0ce5a38a151a140505f256",
+  "receptorInputPdbSha256": "784afe16a6e1a3b584ea6eaa401ce8505fdbcf256f2f4e992f7ef787059b6da0",
+  "ligandHeavyAtomsInCif": 70,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ROU",
+  "ligand": "66I",
+  "sourceCifSha256": "13b9c3572cf42549ca0bcac6481bd9331548e119409e6c89d33a7d5d83200c0e",
+  "receptorInputPdbSha256": "b05f337eb08ebbdd9c13e72238ebb238fd197e65fc71c01d9ffd08aaca857004",
+  "ligandHeavyAtomsInCif": 39,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RSV",
+  "ligand": "7IQ",
+  "sourceCifSha256": "d4eeb71781995b2edb8032468093b3b0df26735111c26009428fb86ae3ec440a",
+  "receptorInputPdbSha256": "e495b2bfc1011bd4f5edc6de8d9cdc507f0b57ed7bb1949357661b5626efa0e2",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RWS",
+  "ligand": "4UR",
+  "sourceCifSha256": "46d3e259e61d3259ea65ce4d61217f80ea8402c4e4816e7ad398fd3eb9760006",
+  "receptorInputPdbSha256": "7f6e87dd06c0a0b4f9dd15e9338e7b6f4ccca45954c84ab0d2b45fa256b95e0c",
+  "ligandHeavyAtomsInCif": 45,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7RZL",
+  "ligand": "NPO",
+  "sourceCifSha256": "7299bc01cd19afbcc02e6ecde2a049a56364032adcee422801a21e983aac0898",
+  "receptorInputPdbSha256": "b03730fbcecad1eef0b5080c0de91e4c534e9f2862674fedf162d167f1476712",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SCW",
+  "ligand": "GSP",
+  "sourceCifSha256": "f26c157f8ae83f07531179ff0f55d77cd1e99732591bfaba22d7f08fc80bc18e",
+  "receptorInputPdbSha256": "d5a582b111dcbf840494453d84151889efbbb087f429db3519149a3557314be4",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SDD",
+  "ligand": "4IP",
+  "sourceCifSha256": "7dead690a0f6729720c35d59e1668b1318537192dfc6a92ae5c60e830ff91d2d",
+  "receptorInputPdbSha256": "a29393d282e1444947c54a1a8b4942a67fc1a7f631dba39e9126bff3438490f1",
+  "ligandHeavyAtomsInCif": 28,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SFO",
+  "ligand": "98L",
+  "sourceCifSha256": "d0e20d65713d3b462b30d8cb99519328c95896bd89fd0975b1f46731636e8d38",
+  "receptorInputPdbSha256": "a9e3915553f10a70260b435bbba5cbb50376205ec39e392a5c47e69d1be32b7c",
+  "ligandHeavyAtomsInCif": 50,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SIU",
+  "ligand": "9ID",
+  "sourceCifSha256": "dac520c43f327f75186793dcab7c7c5602d0fd6a140cc1973d8da80e6a59e10e",
+  "receptorInputPdbSha256": "7aa5d36aef95e753a89325c45cc48bfd067aa1d001f4e6c3ae6c1f9be95c5c38",
+  "ligandHeavyAtomsInCif": 62,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SUC",
+  "ligand": "COM",
+  "sourceCifSha256": "745be8aca933e13561cbfcf8fe2e896aea677790d5edcf7ff7ca4936ba403d41",
+  "receptorInputPdbSha256": "2e33b9e41660b71c44e0147f915f2be6dde3473993f8e8421d7009bcd1320cb0",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7SZA",
+  "ligand": "DUI",
+  "sourceCifSha256": "98f9174f9d8a67ce96adc548778c820cf143912c5a1dbaed39d55ba312085722",
+  "receptorInputPdbSha256": "961bb57546a4896d008699bc3039402d6887d7035b72fd31725492c18650388e",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7T0D",
+  "ligand": "FPP",
+  "sourceCifSha256": "07c064ef323f2e483be6cc400e40d3e37061fdddb48163187d60aedb5e7bb6e7",
+  "receptorInputPdbSha256": "4cb3f74cf46784efb51371d4cd7c11e5eccb091d3e8d5a86d1c2b51d761d254b",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7T1D",
+  "ligand": "E7K",
+  "sourceCifSha256": "9f581aa25594d25c0a859384495138dcacda8c9ae079b60d9882e7e1db1c678b",
+  "receptorInputPdbSha256": "2915e41f56096a6da68990dcc4b9562943d025a403cb84aea0d4a12c7b6093b5",
+  "ligandHeavyAtomsInCif": 68,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7T3E",
+  "ligand": "SLB",
+  "sourceCifSha256": "09474c6df478321f1239c8cfa522d0a1c64fa1c8a29f7ee21009bf8ceffcbe77",
+  "receptorInputPdbSha256": "1651dd53ef4ae4641c40add98d4c19fd1e54ebf39dbcb3aa7586224086845f06",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TB0",
+  "ligand": "UD1",
+  "sourceCifSha256": "81da9d78b92f06416802c158d8b68d1e25d5ec7104324ffd31730f5d4e7ee3e7",
+  "receptorInputPdbSha256": "48420ebf0d7f9d58fd2fd4ef380c23731c120023d2bf6960ec5a85f5ad871c42",
+  "ligandHeavyAtomsInCif": 156,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TBU",
+  "ligand": "S3P",
+  "sourceCifSha256": "8dece5cf8a4ad95174fab7f8bda592472e0c4381455afcb19cdf1e47167769b9",
+  "receptorInputPdbSha256": "34e118ef4d0ffc98cd1c74c0a6d202577c5ceefad9a8af1d42feec74527904e4",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TE8",
+  "ligand": "P0T",
+  "sourceCifSha256": "e6c795454f4ce13fb1b0ad13b14d9f2dc9ba58ac8e7a22a28fe1ff5203209349",
+  "receptorInputPdbSha256": "58e9e247a5e8b79c87d142c40f004fcfe42ce00e2b20fdf6bd6725a540e1a835",
+  "ligandHeavyAtomsInCif": 46,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TH4",
+  "ligand": "FFO",
+  "sourceCifSha256": "96c7b10fc1fdc05c57493b116645356fd7ed74affc1b917ad677cf341c819674",
+  "receptorInputPdbSha256": "145191237281161136889bb734b6db43dab9b5766ca58abdc6f951a1e393f0a8",
+  "ligandHeavyAtomsInCif": 68,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7THI",
+  "ligand": "PGA",
+  "sourceCifSha256": "675b1bc2e0bc790efdaf795137a4b430e08f468fea7d44f2b87af2d129ef09c1",
+  "receptorInputPdbSha256": "055f80539a471663365b29cb1a02aa20732c7aaeacb3eb894f48f82547bc620c",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TM6",
+  "ligand": "GPJ",
+  "sourceCifSha256": "094eab723b62138fb017a8fc3f15acd422eeb7e4db120c527b157a46dd42635e",
+  "receptorInputPdbSha256": "f7b7581411c48fcdbe814b8d8d9861b2d2cd5c98b482c1ac6f5c329340fbc2ca",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TOM",
+  "ligand": "5AD",
+  "sourceCifSha256": "bbdbf83084f78f96f59a4a9497888b9fe40b348a4b40560a3e7e9e9cc7a17907",
+  "receptorInputPdbSha256": "016d8416f8cc26245e1c3180481f89c6d293cd913182d27d9eedaa3b3401ae43",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TS6",
+  "ligand": "KMI",
+  "sourceCifSha256": "9ce4fe55af1682e06941c746f16736503e109f7c2cc38444d6859975b14631cf",
+  "receptorInputPdbSha256": "3ba6ac9b87f60c60154658ecedd6d65b55ce0f48e10e4441feae8f08c19268e6",
+  "ligandHeavyAtomsInCif": 68,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TSF",
+  "ligand": "H4B",
+  "sourceCifSha256": "546fe38a9fd009cce9dd54e4c3ded06e8ba2f7b83a16cb2e212969fcce5555fd",
+  "receptorInputPdbSha256": "3ff52ca9d6cc576ac37ec9380214a321acafdf1719925355afe8ce7bbc875bf9",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TUO",
+  "ligand": "KL9",
+  "sourceCifSha256": "2c4b6374e3d9d854ceab5e0ab90cb2b2ea91667180b191acd00d87cfca54e977",
+  "receptorInputPdbSha256": "6447fea942390c94e58b4172588b3c0e2cda1bf81f1ba73615fc329d5e8c8614",
+  "ligandHeavyAtomsInCif": 60,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TXK",
+  "ligand": "LW8",
+  "sourceCifSha256": "35fe920f99be856fdaed8f4e7a7c19366f08d9f1e88e97529a389e0ca05f26d0",
+  "receptorInputPdbSha256": "11a3911ca9be0a55d69c88fabab07a030700e03297f26a17a8d254a23f12abe6",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7TYP",
+  "ligand": "KUR",
+  "sourceCifSha256": "06b856ec32653dc7cb5b8bb81fb422ba5b4a6ecc82891f5c05326db88cb34af7",
+  "receptorInputPdbSha256": "eb7c11c6be721fb6f32c07dfd04fc87ec192b46d035db597de0f66bb06335f35",
+  "ligandHeavyAtomsInCif": 74,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7U0U",
+  "ligand": "FK5",
+  "sourceCifSha256": "6694ed46c4775cd98e75bba6a80278198ccc81146e355af66584f558fb469ba4",
+  "receptorInputPdbSha256": "1ee96d39fd5032bac476fe89d63673a06b889d2e10b30167693c3ce1920f4693",
+  "ligandHeavyAtomsInCif": 57,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7U3J",
+  "ligand": "L6U",
+  "sourceCifSha256": "252474f915c42e9ffe1c52f7c40df969fafd95e990fe65dfb1228d2c14471b2c",
+  "receptorInputPdbSha256": "a06b0c7266e4e54ec9a277f0634b5d1a36d26827def413910e17f66c20fea499",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UAS",
+  "ligand": "MBU",
+  "sourceCifSha256": "6a86acc00c41c2ed2cb6a8ca5ddcfc891ef89a899e2237abfceff27fa4211203",
+  "receptorInputPdbSha256": "bb9fd9411c483d44d321fcc302064bc5833d22a965480d49c485596e9b602b2e",
+  "ligandHeavyAtomsInCif": 80,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UAW",
+  "ligand": "MF6",
+  "sourceCifSha256": "6f81277c49e8c27b5f13f0bb143b612448bc176704f0364217dc719e042ec19e",
+  "receptorInputPdbSha256": "37bf77430421a036ac66a9cc59812c13ac44ef5fbd2c81df83d05541f022cd1c",
+  "ligandHeavyAtomsInCif": 70,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UJ4",
+  "ligand": "OQ4",
+  "sourceCifSha256": "3512f94d3cb3cdc870398fb4e6aee39f3a9f54090b3bc3636644df60d71c67da",
+  "receptorInputPdbSha256": "db426729668ce9eb16b67a17ee88d244dc4f1d1038ceac0728ecb3183855a257",
+  "ligandHeavyAtomsInCif": 88,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UJ5",
+  "ligand": "DGL",
+  "sourceCifSha256": "0edee5f7a45af7ff773d82107034eb435093442a7ed19700052fb5547484d637",
+  "receptorInputPdbSha256": "569119a7634a1b8da6d459f9bd5219e255d4bfb0a4096aa303c0d1b5c15de156",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UJF",
+  "ligand": "R3V",
+  "sourceCifSha256": "a65106c5139570b8b274a4a4599c3dc4cc16b15152c8e2626c3418f35051f80f",
+  "receptorInputPdbSha256": "d334a4c21d77e74cd370ba9c0590f90155822ef9c5db2f5e6fddfd33ad62c17a",
+  "ligandHeavyAtomsInCif": 128,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ULC",
+  "ligand": "56B",
+  "sourceCifSha256": "543f79aeb722806b23a39d67c8bc6ff164dbd617013449d5a998e68c41b5a4cc",
+  "receptorInputPdbSha256": "84c8f8e8cb2e1b226281765685cc36bfd6544a7b18dcd1d43306c289308e455e",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UMW",
+  "ligand": "NAD",
+  "sourceCifSha256": "70981827478f44844370061a98c353c808798f9169d5fa40e4545d9f1899ec15",
+  "receptorInputPdbSha256": "3fca9a9927131cfc5aee8695f2f71b2e875e30684a63bfeb2c7140571d67b18d",
+  "ligandHeavyAtomsInCif": 88,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UQ3",
+  "ligand": "O2U",
+  "sourceCifSha256": "d6dcd30f5d06666b26524614ee6ca2bad39afd166317899d2bfb4ba0758ae13e",
+  "receptorInputPdbSha256": "4b4211c5acc6347e06bf181a5ac45edacee5b435497bba60e70ab4a946ad629c",
+  "ligandHeavyAtomsInCif": 12,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7USH",
+  "ligand": "82V",
+  "sourceCifSha256": "07155a4491978fbb8892d7d9c2b00b24d45ff2d4fedb7bbc438a6b878825181f",
+  "receptorInputPdbSha256": "fdfc35cf99f47274cf95e27b353eee789741d84c574c329b11ac00b48c0efbb7",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UTW",
+  "ligand": "NAI",
+  "sourceCifSha256": "e442ec6bcafe6362677eed0936ecafa570eb00c401c1809f9ac0efe0880506da",
+  "receptorInputPdbSha256": "aae760ce6e7b59c0d4943c842d093c0e99187ce1905d17593ac62ad01419161e",
+  "ligandHeavyAtomsInCif": 88,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UXS",
+  "ligand": "OJC",
+  "sourceCifSha256": "a6999302fa52738ceb6007c9121fd884d6bcadb80d95a9ad1b5645b4db62b03e",
+  "receptorInputPdbSha256": "4e6a1afbdaf39eeef3094a7a2198525a2c634e83de43e4333474fe2875ca05d8",
+  "ligandHeavyAtomsInCif": 70,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UY4",
+  "ligand": "SMI",
+  "sourceCifSha256": "226b53ee4155cc08212a60334025674c243d6da09342fa6f5b172bdabb059571",
+  "receptorInputPdbSha256": "ad0339da49d7312cfa323175d687c09a150614136bc69d30e9151e7d8b3aef2b",
+  "ligandHeavyAtomsInCif": 48,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7UYB",
+  "ligand": "OK0",
+  "sourceCifSha256": "2211b2768dad5356a7f4a954bdc51846fc88373270dbe131ffa57142664e0dd2",
+  "receptorInputPdbSha256": "ae472bc2bbc59a70b42e314535b5e5502622fb38e6ba9776eea53faaf848c784",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7V14",
+  "ligand": "ORU",
+  "sourceCifSha256": "3b247291b4984e1f7244a8724eb03835bde827b07f651cf089c591596a198255",
+  "receptorInputPdbSha256": "a560d4225298f33a66b1df5bcaafbefbf3c359fe14e6675fdf721681655de6d9",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7V3N",
+  "ligand": "AKG",
+  "sourceCifSha256": "dc7d9486aaafbb6ca2fb1e24319aba8ae02a886d33cbeaad760b28e7f7b806bc",
+  "receptorInputPdbSha256": "43076f7831f17e24a592aa248d057e31dfc9a0c1a628ca26c5b30541a9551e0a",
+  "ligandHeavyAtomsInCif": 10,
+  "preparation": "PREPARATION_FAILED"
+ },
+ {
+  "pdbId": "7V3S",
+  "ligand": "5I9",
+  "sourceCifSha256": "257c1b0a00e9ce861e858c802b74058b5edc8b0f48600749cbb1ae00b1875122",
+  "receptorInputPdbSha256": "3c34e7817b95274dcc9beed5be0ecf137ae64d8d6392aa6c22d347759249f598",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7V43",
+  "ligand": "C4O",
+  "sourceCifSha256": "02d8141f19d69f58537a10c17e68fed77da54536613e4531aa4f5c09373dd86e",
+  "receptorInputPdbSha256": "cda969ad7cbdb8092977845675d3248052e0063a142424a3f50877cd84888656",
+  "ligandHeavyAtomsInCif": 8,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VB8",
+  "ligand": "STL",
+  "sourceCifSha256": "1a9797b126a69f2b1938679280fa239b901862244cf2861aa2e68d0b0dcc493c",
+  "receptorInputPdbSha256": "968bd8b0305c89595c2ef0b476a0876775068241404cdd031ddf810088199df8",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VBU",
+  "ligand": "6I4",
+  "sourceCifSha256": "bd877c368fa010245bf20623cf6476999953017fd9fe81dc4595c2378f1d2195",
+  "receptorInputPdbSha256": "cd9de4e7fbe063c8ae45c2cc06ca17d1de08049b3d97c3ec4abbbcf01f1d7cba",
+  "ligandHeavyAtomsInCif": 17,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VC5",
+  "ligand": "9SF",
+  "sourceCifSha256": "041f5e39c75858bf11f55154d1bfa6cccfe32734c2b359a98b885747b0cb73be",
+  "receptorInputPdbSha256": "47605c4cc3de749b3169c114b709cd4da63865dac20d7301a377a3e59bf42df8",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VKZ",
+  "ligand": "NOJ",
+  "sourceCifSha256": "a971d857043cd4a44ac19ee9b151b68f4758b2e840e6ffdfb786e67facc2328a",
+  "receptorInputPdbSha256": "3113798e1774660b04057344be9d1e36c4ac473d1bd465ac0b733ceda7fcb438",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VQ9",
+  "ligand": "ISY",
+  "sourceCifSha256": "a2a3a9308044dd9703b6b33de8b621439c781d2735de8eede2f2142deba14f21",
+  "receptorInputPdbSha256": "08a2664766ffa9db0644eece2a283f7767a4b4d9d15ad50e23c01d57c43d8344",
+  "ligandHeavyAtomsInCif": 28,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VWF",
+  "ligand": "K55",
+  "sourceCifSha256": "b6c7c7596da82a7b0c181cc04593173553a20960cbe4fcf96cf0c7ed2eda5cd3",
+  "receptorInputPdbSha256": "da7f826c435059734edccf3209fc91ecba8ba272fac561811a99785ed5f8ae2c",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7VYJ",
+  "ligand": "CA0",
+  "sourceCifSha256": "bef782c683a5cd4118817044212d1f7b026ca3224f9d3be87c9e2517dc75c79a",
+  "receptorInputPdbSha256": "3d64567f23ccd093e9e4f3b6c834464e256a3de3e202f9d6d8e5f5f31e68734b",
+  "ligandHeavyAtomsInCif": 52,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7W05",
+  "ligand": "GMP",
+  "sourceCifSha256": "16f65c196c148bb031580f7a12d6f087c66d959aebb799b021af33d919e51ccd",
+  "receptorInputPdbSha256": "a04ac892b926e2b1edc0085adde62c82fcedb1e58308899ed5ec74b3290a4dc9",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7W06",
+  "ligand": "ITN",
+  "sourceCifSha256": "70145d8f2db9152782a0f2de9f8c239b238330c8a97ffe4112d21f3f9db816de",
+  "receptorInputPdbSha256": "8f5308b5c170717a6bf51aff22cd30b5d0623bee297cb4829c492a7318275213",
+  "ligandHeavyAtomsInCif": 9,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WCF",
+  "ligand": "ACP",
+  "sourceCifSha256": "234bca185177c25a2b210041e54ff1914a0436e22cc351728ea40d1b2ee2ee83",
+  "receptorInputPdbSha256": "d2438bc7a97c311163c643b8343d4eea77ee9682aff7ec9a3b0c21e5061b827f",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WDT",
+  "ligand": "NGS",
+  "sourceCifSha256": "5e104c0c76cca913332ac1e9417f97647d32925a84d62bc48cb5512dcc0a6cfe",
+  "receptorInputPdbSha256": "5089f6d9f0408d5a403e6ee355e5bfe69a61fda59a676069e3019bdf33d71144",
+  "ligandHeavyAtomsInCif": 19,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WJB",
+  "ligand": "BGC",
+  "sourceCifSha256": "0db16fe4ec13f80685c4ac608531de856c415f7c62f845c7953869a6b7579fae",
+  "receptorInputPdbSha256": "181c746e0a0513323056e91fc34bf3a9f414b3615f0c174cbbf2d9c79c26853e",
+  "ligandHeavyAtomsInCif": 12,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WKL",
+  "ligand": "CAQ",
+  "sourceCifSha256": "7c219412f966fd0d04776e7985e7d5b1ae69c4f108394b455b2c84e4fd1b1c88",
+  "receptorInputPdbSha256": "eedebf7b511a39e5371f277eca149dccabc5cdc5671475617f5a6533984232b3",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WL4",
+  "ligand": "JFU",
+  "sourceCifSha256": "3d65d62bf0ce36079f9b337331c12736ab6aaa655cb21b7c8ff1c9fa8304a852",
+  "receptorInputPdbSha256": "33344a6e381eb78a050d2a0fdaf6700923c31129ec44ffd5499190a6aef8d875",
+  "ligandHeavyAtomsInCif": 136,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WPW",
+  "ligand": "F15",
+  "sourceCifSha256": "7217861d815e8a92b5833e439c971c02d1f785c51508d8073b13238048e40924",
+  "receptorInputPdbSha256": "b720262ec9fd26f74e21756f661169f5efde1ad77efc3040a532636ad1a66fd0",
+  "ligandHeavyAtomsInCif": 17,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WQQ",
+  "ligand": "5Z6",
+  "sourceCifSha256": "79938124c39e390c540caf1bc78334f1209bc96d53bf4cc43b5da92fe091adb0",
+  "receptorInputPdbSha256": "07a7e4cc4672849f5e029d02b1c3472c6d6da0f4f4f7201e3c90891bca314a3f",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WUX",
+  "ligand": "6OI",
+  "sourceCifSha256": "8198b616080ee89b923716191c203fcabd1e08f6027b7db92c21ce167bf14119",
+  "receptorInputPdbSha256": "4cfde2047f22094ffa20c384a8f886541e39e9daf96aa0ef209607b781c133b4",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WUY",
+  "ligand": "76N",
+  "sourceCifSha256": "0a215e9fb48a1224048c159080d70b6bfce3ff72e92e718f2f73b3d6e7d34fb3",
+  "receptorInputPdbSha256": "23a319c77c34e2aa13e469ed10139d8a50b4db40db4486343698d42f2f5dec50",
+  "ligandHeavyAtomsInCif": 30,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7WY1",
+  "ligand": "D0L",
+  "sourceCifSha256": "1c32bed02bb15c48f8eb76f26802b96767f71717560f1ce7973f7b04057fe402",
+  "receptorInputPdbSha256": "44da273f138918e1e7a9bd62d1a1bc05297e79b5d8f3346dddeaa5345b448658",
+  "ligandHeavyAtomsInCif": 52,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7X5N",
+  "ligand": "5M5",
+  "sourceCifSha256": "dcb5c8b1d44707bb1348900590d6a98309da2043de094e4c63b1bafdf241c5e3",
+  "receptorInputPdbSha256": "6ea805c75c96f1f55a14f314aed4fb7138d32f4b7ae5b848f4b83f0fc1776c7c",
+  "ligandHeavyAtomsInCif": 60,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7X9K",
+  "ligand": "8OG",
+  "sourceCifSha256": "1cf97a6a89ebf8bfd2089412a25261704542a5a67ced9f20b6158033ef48ff27",
+  "receptorInputPdbSha256": "46ec9b7b3f465a9200c0c97abc1acd0f10a8f5c66a6a4be98bd3c5bd240574c9",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XBV",
+  "ligand": "APC",
+  "sourceCifSha256": "a91849cd262d17b43b8ae6f688bf308e19d357eeeb430ca85501d37f89e1b47c",
+  "receptorInputPdbSha256": "b25e347d9759cde98ac80cc1ceabd85a4835a634a6601b38c12911a0a755965c",
+  "ligandHeavyAtomsInCif": 31,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XFA",
+  "ligand": "D9J",
+  "sourceCifSha256": "049ec38405bbb1e8ff9a94058abc9ba7bd7fcc88154a6879c75b07872f37ac2e",
+  "receptorInputPdbSha256": "76166087c5c865b61d7ab908beef75fc62c6eac00ef6c02a57899e723125ab2c",
+  "ligandHeavyAtomsInCif": 41,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XG5",
+  "ligand": "PLP",
+  "sourceCifSha256": "66716bfd0d388d6a72452bb05c5e1071d5657731f3af2ab0198cda213fc93d68",
+  "receptorInputPdbSha256": "0454e05cabb9d566d88750a4f3ce6a4e37f4177985d4eda53199995cd2821802",
+  "ligandHeavyAtomsInCif": 32,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XI7",
+  "ligand": "4RI",
+  "sourceCifSha256": "df049e1053caa8f3cc7a3108b4b5e219f6d3f173cbba4c505790d2953dc730de",
+  "receptorInputPdbSha256": "0e03a6f5c8a011d0af92e024656875343e3a0217b5f156bb5e402a5d64baf4cc",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XJN",
+  "ligand": "NSD",
+  "sourceCifSha256": "4788e9e61667da4d210cc2b7d28bb13104c06ac639a21aa86c1e96e369f1b972",
+  "receptorInputPdbSha256": "18eac9f1e6f6f3a3bae12a49481acb5771d86a4058f0107a8aee1bbdf1427fd3",
+  "ligandHeavyAtomsInCif": 36,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XPO",
+  "ligand": "UPG",
+  "sourceCifSha256": "03b33a9d951322f01dbd037a4e13ddeda72d62960f6824a05f79b4e5437221a7",
+  "receptorInputPdbSha256": "b76844608b26fd9f7db5dcabe0c6ceadbcf765546a28491eaf0415270d65087d",
+  "ligandHeavyAtomsInCif": 72,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XQZ",
+  "ligand": "FPF",
+  "sourceCifSha256": "eb27145575566260cc1dd44d77c63a8fb5f43f6a7c1312753fdae661829c3307",
+  "receptorInputPdbSha256": "a31599b0d7eb715b079db8cf20b2b3d4ad57137f096935e82bd66b1ec5fdb21d",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7XRL",
+  "ligand": "FWK",
+  "sourceCifSha256": "92c6232e42326cf96047e095cc2075a28e45d0e02d0a883c1812539222cec4ce",
+  "receptorInputPdbSha256": "7133c546cb6d2d35abad9ee59a7ebb13624ad76f205914fd5f10e76435daa86b",
+  "ligandHeavyAtomsInCif": 38,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7YZU",
+  "ligand": "DO7",
+  "sourceCifSha256": "a7e0f79efbf47b824b6e8e511fd0783a559ddc3a08011eea654e6385b4ca3458",
+  "receptorInputPdbSha256": "771374c992c36ed649539ca54ec0e90bc46c8f696b17c34432f9df3346e36c5d",
+  "ligandHeavyAtomsInCif": 16,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Z1Q",
+  "ligand": "NIO",
+  "sourceCifSha256": "8dc8333afc3252c806ba700f46d8d67c1e3e02c5ad28555473a6a8c4f8ade691",
+  "receptorInputPdbSha256": "7ea1fbe0fb96c48a184474c5d575ffe2aa220d4faf18ffe0a85b21647f9e55c2",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Z2O",
+  "ligand": "IAJ",
+  "sourceCifSha256": "767787594cffbf1aa0cd62e4b6396664f01f3fd66fa0b62e8b4461aa42a69289",
+  "receptorInputPdbSha256": "43d04e77ac2f47e155f16cce3f2f561c4e1a827d5b29e8259ad0bb9e14bb8da4",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7Z7F",
+  "ligand": "IF3",
+  "sourceCifSha256": "f5b1dc361fd08367f1de5301e821896d05e72eed9f157bf29eb718d3bd8fbb44",
+  "receptorInputPdbSha256": "0174070bb91434e32d05002d961302d464bb871e03107d93dacd101536fabd0a",
+  "ligandHeavyAtomsInCif": 14,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZCC",
+  "ligand": "OGA",
+  "sourceCifSha256": "bb0ae59aece320b56f2a9f195334f8d1c1bd4504b202f6873ebc0e3311f44a9e",
+  "receptorInputPdbSha256": "282a9b8ad0d8d100ec07375fcacab32cbd6943ce734ed7201bbe50d920cae5f9",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZDY",
+  "ligand": "6MJ",
+  "sourceCifSha256": "5f0c3f6c9a7e6c8c445888ba6f623325abfda4f859722d8920dde1e24c1ebe3c",
+  "receptorInputPdbSha256": "fd1d15cdb224e0d0cdf3546f6197687f13dc3bdfbf68af28ab1347c34bec2b7d",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZF0",
+  "ligand": "DHR",
+  "sourceCifSha256": "58d99d56f0daa0cc204ec4647aa6bc3f3e760413e38ef7cff47980b982dd18af",
+  "receptorInputPdbSha256": "1a71999826e82500b7dda3264a15255c7662684ad4d0e31642182c8a32a320b5",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZHP",
+  "ligand": "IQY",
+  "sourceCifSha256": "a0104b8b3411a6283c5dca26875b1699cc6c1c8271808199ab59455f100c416e",
+  "receptorInputPdbSha256": "8c052d356b7e637cefe93dbe6ba6636c9948047d34bc55d21252461aeed89f00",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZL5",
+  "ligand": "IWE",
+  "sourceCifSha256": "3c7161f9d2ad4c205f1f971fccdd7e52a9627581aad7a39e5000814278475cd7",
+  "receptorInputPdbSha256": "fbe8156fdb5b03b0938adb7afc78b2e01d5d775ada0a289e7c42936488faf6b5",
+  "ligandHeavyAtomsInCif": 46,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZOC",
+  "ligand": "T8E",
+  "sourceCifSha256": "9180b982f877be560be462a831d22e1c9a9c75730a288128d357b127063ea04c",
+  "receptorInputPdbSha256": "d1d3dbb705cf928f61e0a1793b00c1b10af378e86928d74f13e2dbf97111547f",
+  "ligandHeavyAtomsInCif": 15,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZTL",
+  "ligand": "BCN",
+  "sourceCifSha256": "cb225ffdc926f6532693c2f4165306f98db2319aad1af10185ff061158337069",
+  "receptorInputPdbSha256": "96d81eb101b39a8c1fbb5b312e637f684a380859a14ed9eca29be4c1ee36204d",
+  "ligandHeavyAtomsInCif": 11,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZU2",
+  "ligand": "DHT",
+  "sourceCifSha256": "55bbdda3824f446e0b4c51c105f72d808a461a3b75acd10eb7868ae82555136d",
+  "receptorInputPdbSha256": "b19e846a4b7faa76b39b0a1850a26ae14e77b1fcef8616e3a3324420b97d708f",
+  "ligandHeavyAtomsInCif": 21,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZXV",
+  "ligand": "45D",
+  "sourceCifSha256": "8e3bd1f40a852a3e19a88c401c63224ca1dbfe9f90ab3e3cada824a5378ff2e6",
+  "receptorInputPdbSha256": "63beaf8686bdad450e737301418122bb3e4afbbffd2aef4014a6d05e69f44484",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "7ZZW",
+  "ligand": "KKW",
+  "sourceCifSha256": "3052bb532b29efba240781ae908fa559289da21cca70c2bec2d4a885555cf1be",
+  "receptorInputPdbSha256": "e48268a68f8a7882291baa03c3d98f974227ddac4396036724064f13410dfe92",
+  "ligandHeavyAtomsInCif": 87,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8A1H",
+  "ligand": "DLZ",
+  "sourceCifSha256": "d94633d5770de5b8a498274cbe24a0bf8094259e4c4a3328fc9b909ac700f32f",
+  "receptorInputPdbSha256": "6b674283abdd1d4c1d535647dcedea8882d1323d6fdcd46ad51e2d6368ddc7b7",
+  "ligandHeavyAtomsInCif": 23,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8A2D",
+  "ligand": "KXY",
+  "sourceCifSha256": "68ea392983e6af0f202bd4d414e53bb9ce6817b098ddd50dfb2dee606695b3e1",
+  "receptorInputPdbSha256": "0db8ea3409af26265c35c874eee940d4fe91ba4d421aadef25688abe75fc16b5",
+  "ligandHeavyAtomsInCif": 49,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AAU",
+  "ligand": "LH0",
+  "sourceCifSha256": "72804bde988ea7b143f6172a5e72f0c59f06d84ddf51f500369921b122f04a1b",
+  "receptorInputPdbSha256": "b98eb26c30ede0dcdabd8ebe4235e4ffa982c7e337f762ab8c34ef828272e8c4",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AEM",
+  "ligand": "LVF",
+  "sourceCifSha256": "599248e783df67e6bd6cc4032440a52e74b3b0d3ace040be4d0ee8d55324554a",
+  "receptorInputPdbSha256": "e6857ca3afe1753dbd45e66749041dfd705b9eaf225e12f95f2d17d64e514897",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AIE",
+  "ligand": "M7L",
+  "sourceCifSha256": "1747fd17c45013ad6105c7ddf6a6977169db11769b137c8f4c157d6cfcf42486",
+  "receptorInputPdbSha256": "da993dc691fea59d5fff6601a02af4a207794056d0295e4d634da2c92bdb3fb5",
+  "ligandHeavyAtomsInCif": 23,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AP0",
+  "ligand": "PRP",
+  "sourceCifSha256": "4a7ac7278a90d8ce2b58ae41e4a723de527954e8c309681e94d3c84407efad01",
+  "receptorInputPdbSha256": "79cb59467f2f4bebbe0c8e1e33c8bc4d61045dfe7807b5184e1193a8c8e24260",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AQL",
+  "ligand": "PLG",
+  "sourceCifSha256": "a24e303be97f513c207278b5d223fd1d32c152236fe4e1581f106a537268825b",
+  "receptorInputPdbSha256": "f24f98c4d66283dcf829dcaf11900ee9f055605171bcd76fa985debb0762bae1",
+  "ligandHeavyAtomsInCif": 80,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AUH",
+  "ligand": "L9I",
+  "sourceCifSha256": "428e54cea3f9a70f4fec0e05f4f75a3fc93c5cced62a6501c8d84c5b57487798",
+  "receptorInputPdbSha256": "a037d3c8d66304c241d4ebf56b1fe8e8eb985f37513adfac79e0930a29c8456d",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8AY3",
+  "ligand": "OE3",
+  "sourceCifSha256": "5a2cdf0c427bdf975a5122565fc8f707d3c355e9e913a25aa2f3e868b1f13f12",
+  "receptorInputPdbSha256": "e52ec02006d6ce2b03ca303e471d540c3871ff595b1323ab1f5e4b45cdeaf71a",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8B8H",
+  "ligand": "OJQ",
+  "sourceCifSha256": "dd8cdf19da4d3c8878e74c2a7e102a92c56f25aa439a2309cfd0b06b7be649e3",
+  "receptorInputPdbSha256": "09b4fb8a8e12551ad350da0036ba157298b2de65ba2dbf386cbc64f7a64b39a9",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8BOM",
+  "ligand": "QU6",
+  "sourceCifSha256": "e2300d6119f813bba4f45b0cf44e43f5851edc25e0160a854db779c6f0eb9260",
+  "receptorInputPdbSha256": "76fa5b9495793a003b5751b0e5eef92bd966b03f2a8b3d9f4efca163e7f443a1",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8BTI",
+  "ligand": "RFO",
+  "sourceCifSha256": "630b91c55f1060ba35cfde7cd8a4be6fe85cf3dd4bb8bea8df11912a2e02484d",
+  "receptorInputPdbSha256": "ab1ad17b9a8998ec675deafbd7e7228cc5f1050cab7f2f7f8a5ebc9d11ba3705",
+  "ligandHeavyAtomsInCif": 15,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8C3N",
+  "ligand": "ADP",
+  "sourceCifSha256": "6a9815abfbbf1850bc0a9437c114c511a4011cb2eeaee0f87ac43adee8d8db14",
+  "receptorInputPdbSha256": "8da210c65a4fbc3223de7e2eca6daff5455156fbd1e79c4f387fa2187a442144",
+  "ligandHeavyAtomsInCif": 27,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8C5M",
+  "ligand": "MTA",
+  "sourceCifSha256": "403ba60c667b459cce4820921ad111f6d48b3fdda44abe119390b5f0d7491cff",
+  "receptorInputPdbSha256": "433af4981c520cf37d61e0af7a37c5acc48eec4024f1c101098af22c646e8c82",
+  "ligandHeavyAtomsInCif": 20,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8CNH",
+  "ligand": "V6U",
+  "sourceCifSha256": "be1fa442d15872e49f86fa8ee3befaa4baa097794f26d55fa9196692d46e0166",
+  "receptorInputPdbSha256": "88213983ecb5c3c68b242f197cebe840307b8e58be06a92e004b2d4b546afa05",
+  "ligandHeavyAtomsInCif": 25,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8CSD",
+  "ligand": "C5P",
+  "sourceCifSha256": "924427c3b65aca28f10d636ae829adc6aa5bd3ae15b41654981bc356a972d5dd",
+  "receptorInputPdbSha256": "d0f9079d238f52a7d8a07f937eb4ce9899074c9d1a2c990779b8147747cb8021",
+  "ligandHeavyAtomsInCif": 42,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8D19",
+  "ligand": "GSH",
+  "sourceCifSha256": "830b7d95f30067ea54e27f4688b98a4dd59d5e97c774fffb7883c93ccb933247",
+  "receptorInputPdbSha256": "2cae9d15d720fabea48645b91e3210babf41ee8d9111db274bd477d8ab718a60",
+  "ligandHeavyAtomsInCif": 40,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8D39",
+  "ligand": "QDB",
+  "sourceCifSha256": "9b6d986d593a478661ce4859bf76474462f3a0eaf2592bb8a5865334629699ba",
+  "receptorInputPdbSha256": "adc9dc9dcd5d3ad745fafd2a3b67890d9e888a71c060c529ecd77ca80ab3b932",
+  "ligandHeavyAtomsInCif": 17,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8D5D",
+  "ligand": "5DK",
+  "sourceCifSha256": "df5d026fce15687967bc28646813eb31eb67c8ddccd0982a54a84d704f3113c4",
+  "receptorInputPdbSha256": "3483cc247addf1a37db7c15f9f86e7b2aa19ca2938a482a4dc016578a2bd8751",
+  "ligandHeavyAtomsInCif": 54,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8DHG",
+  "ligand": "T78",
+  "sourceCifSha256": "b15550420598987644a3ac67e1d95a2560958a0768a2c6b2c3599e7b9cd9c823",
+  "receptorInputPdbSha256": "4392885f4d5f85ca850dbdbb86ba5e63a26ce5d2e474b4a0cbd4df1909d6388a",
+  "ligandHeavyAtomsInCif": 35,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8DKO",
+  "ligand": "TFB",
+  "sourceCifSha256": "d2f921f2a0d58fd4e01baf95b67780e49181bb0d3ca534d6bb53b7ad65187b99",
+  "receptorInputPdbSha256": "58ad9fa33d8863d2b38537f2486c762a422bf49723c8faf507d9a76e0dde3f49",
+  "ligandHeavyAtomsInCif": 16,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8DP2",
+  "ligand": "UMA",
+  "sourceCifSha256": "52b9eb973d7aa3a79697ffbea5b73797ae4598be663967b13a0fd99e7e501164",
+  "receptorInputPdbSha256": "7824dd772fc30bbb7660938d68965a96a0c84044460381379ce203072aa0341d",
+  "ligandHeavyAtomsInCif": 49,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8DSC",
+  "ligand": "NCA",
+  "sourceCifSha256": "a515bb8083e3a0fad2e62bd6964cf9624e63e05818577f0a7e244e6132605336",
+  "receptorInputPdbSha256": "82df4b77b34df40bbfcb7ce01fbe1f5c7e99ee6265ed6a7052eaea40d17e7889",
+  "ligandHeavyAtomsInCif": 18,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8EAB",
+  "ligand": "VN2",
+  "sourceCifSha256": "a48929d78239d2696f65f03d36360f3499157eca27573d1989ba1d857616ad02",
+  "receptorInputPdbSha256": "09a56d0ebe9037d700d5290620307af73a328d3180ba639a0d3b8f42e3ccd4dc",
+  "ligandHeavyAtomsInCif": 49,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8EX2",
+  "ligand": "Q2Q",
+  "sourceCifSha256": "8f24c9f7835624db96de15046e3f74609f9fc74f9b478595a975175d34a821f6",
+  "receptorInputPdbSha256": "c3b1d5190ecd6e1d7daf28e86a811a5546e5e290b2d3081d9f6202789843a0b9",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8EXL",
+  "ligand": "799",
+  "sourceCifSha256": "d1674802edf4b01a41cec8adea33cb15094d88fc7cc268f76cc42fb877e55c48",
+  "receptorInputPdbSha256": "5e112095a50c1e72eee12d6643f0561ad6e5207c8754226fc5e8134eb56b00b8",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8EYE",
+  "ligand": "X4I",
+  "sourceCifSha256": "3e955abc2365d617c8f19b3f45fcffd4e1227f55d27676c136791f87921ca930",
+  "receptorInputPdbSha256": "f2761dff17fe5ac823e57c7a35252a80bb1e0f393052849f3ec72f162c9fc59f",
+  "ligandHeavyAtomsInCif": 33,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8F4J",
+  "ligand": "PHO",
+  "sourceCifSha256": "58588ce9c8debf4030e60f8a71b53dcca92bb571c56ef99bb121ba74dc15ff65",
+  "receptorInputPdbSha256": "7c01915fd5da3c7b798e15d415cbfd04007dd923e91df14a6bf8d2b5e3cd35bb",
+  "ligandHeavyAtomsInCif": 256,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8F8E",
+  "ligand": "XJI",
+  "sourceCifSha256": "eba81772bab2d8fdc78f0893704a86658d567ea8960acbf6bd56370043fc8188",
+  "receptorInputPdbSha256": "3c58f6eca4cb0c271117eedef5dd660c02165010bbaca06f498da54b890190f7",
+  "ligandHeavyAtomsInCif": 58,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8FAV",
+  "ligand": "4Y5",
+  "sourceCifSha256": "4ad162914e6a7c0174d7419044badda10df1927113c304d7ef92a3282c3c58b1",
+  "receptorInputPdbSha256": "eb544c59f8a91f93c50f758218119bbf166eea7a5940e3881e728598a6f9a8d6",
+  "ligandHeavyAtomsInCif": 66,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8FLV",
+  "ligand": "ZB9",
+  "sourceCifSha256": "ea8991ea478c731810f667bbb17d6a2573180aedb79a4751cf6996a60a5458fc",
+  "receptorInputPdbSha256": "46565b297e0ff4ebb981ae1986bcad64ff4f091ccd87301edeb660e4917944fa",
+  "ligandHeavyAtomsInCif": 29,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8FO5",
+  "ligand": "Y4U",
+  "sourceCifSha256": "d7e75b784caac11967b5e3f6acc0907f6b18e599871ef9d23a2beb96090e0fc5",
+  "receptorInputPdbSha256": "8c6dcca9bbb3ccc2f76c9d3e362a4fabb8d798c0b0d2ad48b50c96bc56f2f0a7",
+  "ligandHeavyAtomsInCif": 34,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8G0V",
+  "ligand": "YHT",
+  "sourceCifSha256": "1dd3f985089390944e4aae5615c897d5de2b13908971d34db1d997b39c235519",
+  "receptorInputPdbSha256": "a5ba10d958ecdce24fc50d8f9813e8ae4f15dfec612abb470fef90b5ff05e16f",
+  "ligandHeavyAtomsInCif": 78,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8G6P",
+  "ligand": "API",
+  "sourceCifSha256": "6531d1b0d241201d3befaba69375d7188b48ffe175e09a97b19f97ffd2b5ce7c",
+  "receptorInputPdbSha256": "fcc6ab93f5a210ea766fa4669c7b39b795228ba9825c678b1b422fb3a75b944a",
+  "ligandHeavyAtomsInCif": 13,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8GFD",
+  "ligand": "ZHR",
+  "sourceCifSha256": "9025de5aad6f4a5b88db0deb9c20fc23b2b7c18b670240711e5dc53c4ae26f68",
+  "receptorInputPdbSha256": "0f328baa703cb57f7fd0d4cac758b4ad72fef1e239ca602ee44741936293c97c",
+  "ligandHeavyAtomsInCif": 26,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8HFN",
+  "ligand": "XGC",
+  "sourceCifSha256": "3f0b0798ab1184d652737bdbb6c7b7aa0b098e488f3b56317b972c6345bdec3c",
+  "receptorInputPdbSha256": "15f73ec531d9249ac5513a58997867047d4924f3c58567f8092a79c613cc2a38",
+  "ligandHeavyAtomsInCif": 24,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8HO0",
+  "ligand": "3ZI",
+  "sourceCifSha256": "80be92290050ddc6f390b0d1780d0ddecbe8da6173a62af5319b6eea2fd6ef8d",
+  "receptorInputPdbSha256": "7397b094dcd80d334973f3e6c1f8fdc58b043d66be49f573461ff0e33bcf8805",
+  "ligandHeavyAtomsInCif": 22,
+  "preparation": "PREPARED"
+ },
+ {
+  "pdbId": "8SLG",
+  "ligand": "G5A",
+  "sourceCifSha256": "ba27787db2dbb6b5c6e36fe8cd3cb6327d943031581237d07044ca54071ab448",
+  "receptorInputPdbSha256": "d25607b36142696e8bbd7748e805409254438f884eb4be98d06f2758c2dfc1a0",
+  "ligandHeavyAtomsInCif": 54,
+  "preparation": "PREPARED"
+ }
+]

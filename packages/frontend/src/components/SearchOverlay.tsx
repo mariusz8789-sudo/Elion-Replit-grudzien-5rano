@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
+import { buildDestinationIndex, buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
 import { track } from '../core/analytics';
 import { useFocusTrap } from '../core/useFocusTrap';
 
@@ -10,7 +10,7 @@ import { useFocusTrap } from '../core/useFocusTrap';
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const index = useMemo(buildSearchIndex, []);
+  const index = useMemo(() => [...buildDestinationIndex(), ...buildSearchIndex()], []);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   useFocusTrap(panelRef, true);
@@ -21,14 +21,15 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
   }, []);
 
   const results = useMemo<SearchEntry[]>(() => {
-    if (!query.trim()) return index.slice(0, 8);
+    // Blank query: one row per destination and per lab, not the first lab's experiments eight times over.
+    if (!query.trim()) return index.filter((e) => e.expId === '__base');
     return filterSearchIndex(index, query).slice(0, 12);
   }, [index, query]);
 
   useEffect(() => setActive(0), [query]);
 
   const go = (e: SearchEntry) => {
-    window.location.hash = `#/lab/${e.labId}`;
+    window.location.hash = e.hash ?? `#/lab/${e.labId}`;
     onClose();
   };
 

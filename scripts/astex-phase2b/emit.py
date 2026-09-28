@@ -33,7 +33,7 @@ CLASSDEF={
 "C5_TRUE_SEARCH_FAILURE":"The locally minimised crystal pose scores MORE THAN 0.5 kcal/mol BETTER than the pose Vina ranked first, yet no pose within 2.0 A appears in the 20 modes. This is the only pattern for which 'the search failed' is the literal explanation.",
 }
 
-def d(key,g): 
+def d(key,g):
     v=[M[p][key] for p in g]
     return {"n":len(v),"min":round(min(v),3),"median":round(statistics.median(v),3),"mean":round(statistics.mean(v),3),"max":round(max(v),3)}
 

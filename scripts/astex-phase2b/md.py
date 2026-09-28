@@ -77,7 +77,7 @@ w("| quantity | 46 successes (min / median / mean / max) | 17 B failures | 20 A 
 w("| --- | --- | --- | --- |")
 LAB={"rotBonds":"rotatable bonds","heavyAtoms":"heavy atoms","rigidFragmentRmsdFloorA":"rigid-fragment RMSD floor (A)","deltaOptMinusRank1":"delta_opt (kcal/mol)","crystalPoseVinaTotal":"crystal-pose Vina (kcal/mol)","ligandEfficiencyXtal":"crystal-pose kcal/mol per heavy atom","worstBoxMarginA":"worst box margin (A)","minLigRecHeavyDistA":"min lig-receptor heavy dist (A)","watersWithin5A":"waters within 5 A","bridgingWaters":"bridging waters","crystalPoseRelaxDriftA":"crystal-pose relaxation drift (A)","mismatchedIonisable":"unionised ionisable groups","polarFraction":"polar heavy-atom fraction"}
 for k,lab in LAB.items():
-    def f(g): 
+    def f(g):
         x=D[k][g]; return "%.3f / %.3f / %.3f / %.3f"%(x["min"],x["median"],x["mean"],x["max"])
     w("| %s | %s | %s | %s |"%(lab,f("successes_run3"),f("B_sampling_failures"),f("A_ranking_failures")))
 w("")

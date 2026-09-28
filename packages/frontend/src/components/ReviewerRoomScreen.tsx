@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type React from 'react';
 import { codeCommitHash } from '../core/build/commitHash';
 import { realClaimCounts, runTamperChallenge, SURPASS2_PINNED_SHA256, type TamperChallengeOutcome, type TamperRun } from '../core/reviewer/tamperChallenge';
@@ -397,6 +397,11 @@ npx vitest run --root packages/frontend reviewer   # this page's engines`}</pre>
 }
 
 export function ReviewerRoomScreen(): React.ReactElement {
+  // `#/reviewer?focus=<section heading id>` (linked from Start) opens the page at that challenge.
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('focus');
+    if (focus) document.getElementById(focus)?.scrollIntoView({ block: 'start' });
+  }, []);
   return (
     <main className="rv-room" id="main-content" tabIndex={-1} lang="en" dir="ltr">
       <header className="rv-hero">

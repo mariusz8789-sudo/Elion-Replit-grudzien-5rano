@@ -199,7 +199,7 @@ export function parseHash(): Route {
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
-  if (h === '#/reviewer') return { kind: 'reviewer' };
+  if (h === '#/reviewer' || h.startsWith('#/reviewer?')) return { kind: 'reviewer' };
   if (h === '#/dome-world') return { kind: 'dome-world' };
   if (h === '#/protection-priority') return { kind: 'protection-priority' };
   if (h === '#/geodesics') return { kind: 'geodesics' };
@@ -283,7 +283,13 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [homeMoreOpen, setHomeMoreOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
+  // Start is itself the introduction: landing there counts as having seen the tour, so it never
+  // pops up later in the middle of a first visit. Other first entries still get the tour.
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    if (hasCompletedOnboarding()) return false;
+    if (parseHash().kind === 'home') { markOnboardingComplete(); return false; }
+    return true;
+  });
   const lastLabId = useRef<string | null>(null);
 
   const contextualGuideSurface: ContextualGuideSurface | null = (() => {

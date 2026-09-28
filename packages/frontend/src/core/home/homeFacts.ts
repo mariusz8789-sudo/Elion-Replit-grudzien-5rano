@@ -45,7 +45,7 @@ export const ASTEX_WORDING = `Vina baseline: ${ASTEX.vinaPreregisteredTop1}/${AS
  */
 export const ASTEX_TRAINING_OVERLAP = { inTrainingLists: 76, of: 85 } as const;
 
-export const ASTEX_CAVEAT = `Development benchmark, not validation. GNINA's published training lists contain ${ASTEX_TRAINING_OVERLAP.inTrainingLists} of these ${ASTEX_TRAINING_OVERLAP.of} complexes (CrossDocked2020 / PDBbind). Independent unseen validation pending: a 308-complex PoseBusters benchmark is pre-registered and not yet run.`;
+export const ASTEX_CAVEAT = `Development benchmark, not validation. GNINA's training data contains ${ASTEX_TRAINING_OVERLAP.inTrainingLists} of these ${ASTEX_TRAINING_OVERLAP.of} complexes. Independent unseen validation pending (PoseBusters, 308 complexes, pre-registered, not yet run).`;
 
 /** Imatinib redocked into ABL1 (PDB 1IEP) with real Vina + Meeko runs, plus its retrosynthesis record. */
 export const IMATINIB = {

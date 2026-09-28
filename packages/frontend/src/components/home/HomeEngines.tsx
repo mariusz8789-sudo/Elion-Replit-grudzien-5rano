@@ -24,14 +24,14 @@ export interface HomeEngine {
 }
 
 export const HOME_ENGINES: readonly HomeEngine[] = [
-  { name: 'RDKit', role: 'Reads molecules, computes descriptors and 3D conformers.', toolId: 'rdkit', record: 'Astex Runs 1–6 (RDKit 2026.03.6)' },
-  { name: 'AutoDock Vina', role: 'Docks a ligand into the protein pocket and scores the pose.', toolId: 'vina', record: 'Imatinib / ABL1 redock, Astex Runs 1–6 (Vina 1.2.7)' },
-  { name: 'Meeko', role: 'Prepares ligands and receptors for Vina.', toolId: null, note: 'Runs inside the Vina worker', record: 'Imatinib / ABL1 redock (Meeko 0.8.0)' },
-  { name: 'GNINA', role: 'CNN rescoring of docked poses.', toolId: null, note: 'Benchmark scorer only · not a product dependency', record: 'Astex Run 7 (development result)' },
+  { name: 'RDKit', role: 'Reads molecules, computes descriptors and 3D conformers.', toolId: 'rdkit', record: 'Astex runs 1–6' },
+  { name: 'AutoDock Vina', role: 'Docks a ligand into the protein pocket and scores the pose.', toolId: 'vina', record: 'imatinib redock, Astex 1–6' },
+  { name: 'Meeko', role: 'Prepares ligands and receptors for Vina.', toolId: null, note: 'in the Vina worker', record: 'imatinib redock' },
+  { name: 'GNINA', role: 'CNN rescoring of docked poses.', toolId: null, note: 'benchmark only · not in product', record: 'Astex run 7' },
   { name: 'ADMET-AI', role: 'Estimates 52 absorption, metabolism and toxicity endpoints.', toolId: 'admet', record: null },
-  { name: 'PySCF', role: 'Quantum chemistry: energies and orbitals.', toolId: 'pyscf', record: 'Natural-product QM run (PySCF 2.14.0)' },
+  { name: 'PySCF', role: 'Quantum chemistry: energies and orbitals.', toolId: 'pyscf', record: 'natural-product QM run' },
   { name: 'OpenMM', role: 'Molecular dynamics of the protein.', toolId: 'openmm', record: null },
-  { name: 'AiZynthFinder', role: 'Retrosynthesis: how a chemist could make it.', toolId: 'aizynthfinder', record: 'Imatinib route (AiZynthFinder 4.4.1), Replay MATCH' },
+  { name: 'AiZynthFinder', role: 'Retrosynthesis: how a chemist could make it.', toolId: 'aizynthfinder', record: 'imatinib route, Replay MATCH' },
   { name: 'Biopython', role: 'Reads protein structures and sequences.', toolId: 'biopython', record: null },
 ];
 
@@ -39,13 +39,13 @@ type Live = { phase: 'checking' } | { phase: 'ready'; byId: ReadonlyMap<string, 
 
 export function liveLabel(engine: HomeEngine, live: Live): { text: string; tone: 'ok' | 'warn' | 'bad' | 'muted' } {
   if (engine.toolId === null) return { text: engine.note ?? 'Not a registered runtime', tone: 'muted' };
-  if (live.phase === 'checking') return { text: 'Live: checking…', tone: 'muted' };
-  if (live.phase === 'unreachable') return { text: 'Live: server unreachable', tone: 'muted' };
+  if (live.phase === 'checking') return { text: 'checking…', tone: 'muted' };
+  if (live.phase === 'unreachable') return { text: 'server unreachable', tone: 'muted' };
   const entry = live.byId.get(engine.toolId);
-  if (!entry) return { text: 'Live: not reported', tone: 'muted' };
-  if (entry.status === 'AVAILABLE') return { text: `Live: AVAILABLE${entry.version ? ` · ${entry.version}` : ''}`, tone: 'ok' };
-  if (entry.status === 'VALIDATION_FAILED') return { text: 'Live: VALIDATION_FAILED', tone: 'bad' };
-  return { text: `Live: ${entry.status}`, tone: 'warn' };
+  if (!entry) return { text: 'not reported', tone: 'muted' };
+  if (entry.status === 'AVAILABLE') return { text: `AVAILABLE${entry.version ? ` · ${entry.version}` : ''}`, tone: 'ok' };
+  if (entry.status === 'VALIDATION_FAILED') return { text: 'VALIDATION_FAILED', tone: 'bad' };
+  return { text: entry.status, tone: 'warn' };
 }
 
 export function HomeEngines(): React.ReactElement {
@@ -62,19 +62,19 @@ export function HomeEngines(): React.ReactElement {
   }, []);
 
   return (
-    <section className="hp-section" aria-labelledby="hp-engines-title" data-testid="home-engines">
-      <p className="hp-kicker">Real engines, not a language model guessing</p>
-      <h2 id="hp-engines-title" className="hp-h2">Scientific engines already connected</h2>
-      <p className="hp-lede">Open-source tools chemists already trust. “Live” is what this server reports right now; the record is the committed run where the engine really ran.</p>
+    <section className="hp-panel hp-span-7" aria-labelledby="hp-engines-title" data-testid="home-engines">
+      <header className="hp-panel-head">
+        <h2 id="hp-engines-title">Scientific engines already connected</h2>
+        <span className="hp-panel-meta">status: live from this server</span>
+      </header>
       <ul className="hp-engines">
         {HOME_ENGINES.map((e) => {
           const s = liveLabel(e, live);
           return (
-            <li key={e.name} className="hp-engine" data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
+            <li key={e.name} className="hp-engine" data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`} title={e.role}>
               <p className="hp-engine-name">{e.name}</p>
-              <p className="hp-engine-role">{e.role}</p>
-              <p className={`hp-chip hp-chip-${s.tone}`}>{s.text}</p>
-              <p className="hp-engine-record">{e.record ? <>Record: {e.record}</> : 'No committed run record yet'}</p>
+              <p className={`hp-pill hp-pill-${s.tone}`}>{s.text}</p>
+              <p className="hp-engine-record">{e.record ? <>Ran: {e.record}</> : 'No committed run yet'}</p>
             </li>
           );
         })}

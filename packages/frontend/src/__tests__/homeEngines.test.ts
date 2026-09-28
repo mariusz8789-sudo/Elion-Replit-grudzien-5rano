@@ -14,18 +14,18 @@ describe('Start engines', () => {
     for (const n of ['RDKit', 'AutoDock Vina', 'Meeko', 'GNINA', 'ADMET-AI', 'PySCF', 'OpenMM', 'AiZynthFinder', 'Biopython']) expect(names).toContain(n);
     const gnina = HOME_ENGINES.find((e) => e.name === 'GNINA')!;
     expect(gnina.toolId).toBeNull();
-    expect(gnina.note).toMatch(/benchmark scorer only.*not a product dependency/i);
+    expect(gnina.note).toMatch(/benchmark only.*not in product/i);
   });
 
   it('reports BLOCKED as blocked, AVAILABLE only when the server says so, and checking before it answers', () => {
     const rdkit = HOME_ENGINES.find((e) => e.toolId === 'rdkit')!;
-    expect(liveLabel(rdkit, { phase: 'checking' })).toEqual({ text: 'Live: checking…', tone: 'muted' });
+    expect(liveLabel(rdkit, { phase: 'checking' })).toEqual({ text: 'checking…', tone: 'muted' });
     expect(liveLabel(rdkit, { phase: 'unreachable' }).tone).toBe('muted');
     const blocked = new Map([['rdkit', entry('rdkit', 'BLOCKED_BY_RUNTIME')]]);
-    expect(liveLabel(rdkit, { phase: 'ready', byId: blocked })).toEqual({ text: 'Live: BLOCKED_BY_RUNTIME', tone: 'warn' });
+    expect(liveLabel(rdkit, { phase: 'ready', byId: blocked })).toEqual({ text: 'BLOCKED_BY_RUNTIME', tone: 'warn' });
     const ok = new Map([['rdkit', entry('rdkit', 'AVAILABLE', '2026.03.6')]]);
-    expect(liveLabel(rdkit, { phase: 'ready', byId: ok })).toEqual({ text: 'Live: AVAILABLE · 2026.03.6', tone: 'ok' });
-    expect(liveLabel(rdkit, { phase: 'ready', byId: new Map() }).text).toBe('Live: not reported');
+    expect(liveLabel(rdkit, { phase: 'ready', byId: ok })).toEqual({ text: 'AVAILABLE · 2026.03.6', tone: 'ok' });
+    expect(liveLabel(rdkit, { phase: 'ready', byId: new Map() }).text).toBe('not reported');
   });
 
   it('every engine with a runtime id matches a tool the backend registry really declares', async () => {

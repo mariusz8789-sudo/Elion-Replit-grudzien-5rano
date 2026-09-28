@@ -47,9 +47,9 @@ describe('StartHero', () => {
     const run7 = json('docs/evidence/astex-run7-gnina-rescore.json') as { topK: { top1: number }; samplingCeilingInPool: { successes: number }; vsVinaBaseline: { baselineTop1: number } };
     expect(html).toContain(`Vina baseline: ${run3.summary.successes}/85. Current Astex development result with GNINA rescoring: ${run7.topK.top1}/85.`);
     expect(html).toContain('Development benchmark, not validation.');
-    expect(html).toContain('contain 76 of these 85 complexes');
+    expect(html).toContain('training data contains 76 of these 85 complexes');
     expect(html).toContain('Independent unseen validation pending');
-    expect(html).toContain('pre-registered and not yet run');
+    expect(html).toContain('pre-registered, not yet run');
     const gninaCard = html.slice(html.indexOf('data-testid="home-astex-gnina"'), html.indexOf('data-testid="home-astex-vina-pooled"'));
     expect(gninaCard).toContain(`${run7.topK.top1}<span> / 85`);
     expect(gninaCard).toContain('data-testid="home-astex-caveat"');
@@ -87,7 +87,8 @@ describe('StartHero', () => {
   it('the wider Scientific OS sits below the drug-discovery story, and hidden modules stay hidden', async () => {
     const html = await render();
     expect(html.indexOf('data-testid="home-broader"')).toBeGreaterThan(html.indexOf('data-testid="home-pipeline"'));
-    for (const label of ['Human Digital Twin', 'CERN / CMS Open Data', 'Quantum', 'Real Lab architecture']) expect(html).toContain(label);
+    for (const label of ['Human Digital Twin', 'CERN / CMS Open Data', 'CERN Complex', 'Chemistry Live Lab', 'Quantum', 'Black holes', 'Research Console', 'Real Lab architecture']) expect(html).toContain(label);
+    for (const href of ['#/human-biology-lab', '#/physics/cms-z', '#/cern-complex', '#/virtual-bio', '#/geodesics', '#/reality', '#/world-director']) expect(html).toContain(`href="${href}"`);
     expect(html).not.toMatch(/Cyber|Mirror|Myth Lab|DICOM|OMNICORE|MoveX/);
   });
 });

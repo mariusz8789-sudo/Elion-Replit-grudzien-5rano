@@ -4,7 +4,7 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
 import { CSRN_KEY } from '../core/home/homeFacts';
 import { AskGenesisMic } from './guide/AskGenesisMic';
-import { HomeProofStrip } from './home/HomeProofStrip';
+import { HomeImatinibPanel, HomeProofStrip } from './home/HomeProofStrip';
 import { HomeEngines } from './home/HomeEngines';
 import { HomePipeline } from './home/HomePipeline';
 
@@ -25,18 +25,24 @@ const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({
 type Health = 'checking' | 'online' | 'no-key' | 'offline';
 
 const CHALLENGES: readonly { id: string; title: string; act: string; result: string }[] = [
-  { id: 'A', title: 'Change the result', act: 'Edit the best Vina score in the committed evidence file.', result: 'Verification fails' },
-  { id: 'B', title: 'Call a model a real measurement', act: 'Relabel MODEL_ESTIMATE as REAL_MEASUREMENT on the certificate.', result: 'Rejected' },
-  { id: 'C', title: 'Sign it with another key', act: 'Rebuild every hash and sign with a valid key that is not Genesis’s.', result: 'SIGNED_UNTRUSTED' },
+  { id: 'A', title: 'Change the result', act: 'edit the Vina score in the file', result: 'Verification fails' },
+  { id: 'B', title: 'Call a model a measurement', act: 'MODEL_ESTIMATE as REAL_MEASUREMENT', result: 'Rejected' },
+  { id: 'C', title: 'Sign with another key', act: 'valid signature, foreign key', result: 'SIGNED_UNTRUSTED' },
 ];
 
 const BROADER: readonly { label: string; hash: string | null; note: string }[] = [
-  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'Organ-to-cell atlas; drug effects not yet calculated' },
-  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: 'Z boson peak from public collision data' },
-  { label: 'Quantum', hash: '#/lab/quantum', note: 'Quantum mechanics laboratory' },
-  { label: 'Physics', hash: '#/scientific-worlds', note: 'Live physics and chemistry models' },
-  { label: 'World / Digital Twin', hash: '#/world-director', note: 'Scenario worlds, labelled SCENARIO' },
-  { label: 'Real Lab architecture', hash: null, note: 'Read-only instrument seam; no hardware connected yet' },
+  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'body → organ → cell · educational model' },
+  { label: 'Virtual Bio Lab', hash: '#/virtual-bio', note: 'in-silico toy models only' },
+  { label: 'Chemistry Live Lab', hash: '#/scientific-worlds?station=st-titration', note: 'titration, 118 elements, Replay' },
+  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: '10,000 real Z→μμ events (2011)' },
+  { label: 'CERN Complex', hash: '#/cern-complex', note: '3D walk-through · no PYTHIA/Geant4' },
+  { label: 'Quantum', hash: '#/lab/quantum', note: 'superposition, Bloch sphere, CHSH' },
+  { label: 'Space-Time', hash: '#/lab/spacetime', note: 'time dilation, light cone' },
+  { label: 'Black holes', hash: '#/geodesics', note: 'photon geodesics, RK4' },
+  { label: 'Reality Navigator', hash: '#/reality', note: 'exact formulas vs cinematic view' },
+  { label: 'World / Digital Twin', hash: '#/world-director', note: 'labelled SCENARIO' },
+  { label: 'Research Console', hash: '#/research-console', note: 'question → hypotheses → falsification' },
+  { label: 'Real Lab architecture', hash: null, note: 'no hardware connected yet' },
 ];
 
 export function StartHero(): React.ReactElement {
@@ -74,9 +80,6 @@ export function StartHero(): React.ReactElement {
           <p className="hp-eyebrow">Genesis · Scientific OS</p>
           <h1 id="hp-title" className="hp-title">Verifiable computational drug discovery.</h1>
           <p className="hp-sub">Real scientific engines. Falsifiable results. Cryptographic evidence. Replay.</p>
-          <p className="hp-chain" aria-label="Molecule, computation, falsification, evidence, replay">
-            <span>Molecule</span><i aria-hidden="true">→</i><span>computation</span><i aria-hidden="true">→</i><span>falsification</span><i aria-hidden="true">→</i><span>evidence</span><i aria-hidden="true">→</i><span>replay</span>
-          </p>
           <div className="hp-cta" data-testid="start-proof">
             <a className="hp-btn hp-btn-primary" href="#/discovery-track" data-testid="door-proof-discovery-track">Explore a verified discovery</a>
             <a className="hp-btn" href="#/reviewer" data-testid="door-proof-reviewer">Open Reviewer Room</a>
@@ -92,78 +95,84 @@ export function StartHero(): React.ReactElement {
         </div>
       </section>
 
-      <HomeProofStrip />
+      <div className="hp-dash">
+        <HomeProofStrip />
 
-      <section className="hp-section" aria-labelledby="hp-verify-title" data-testid="home-verify">
-        <p className="hp-kicker">Try it yourself</p>
-        <h2 id="hp-verify-title" className="hp-h2">Don’t trust the claim. Verify it.</h2>
-        <p className="hp-lede">Three attacks on a real, certified docking record. The checks run in your browser, in the Reviewer Room.</p>
-        <div className="hp-challenges">
-          {CHALLENGES.map((c) => (
-            <a key={c.id} className="hp-challenge" href="#/reviewer?focus=rv-c7" data-testid={`home-challenge-${c.id}`}>
-              <span className="hp-challenge-id">{c.id}</span>
-              <span className="hp-challenge-title">{c.title}</span>
-              <span className="hp-challenge-act">{c.act}</span>
-              <span className="hp-challenge-result">→ {c.result}</span>
-            </a>
-          ))}
-        </div>
-        <p className="hp-replay">Replay re-runs a recorded computation and returns <code>MATCH</code>, <code>DRIFT</code>, <code>ENGINE_VERSION_CHANGED</code> or <code>BLOCKED_BY_RUNTIME</code>. <a href="#/evidence">See Evidence &amp; Replay</a></p>
-        <a className="hp-btn hp-btn-primary" href="#/reviewer">Open Reviewer Room</a>
-      </section>
+        <section className="hp-panel hp-span-7" aria-labelledby="hp-verify-title" data-testid="home-verify">
+          <header className="hp-panel-head">
+            <h2 id="hp-verify-title">Don’t trust the claim. Verify it.</h2>
+            <span className="hp-panel-meta">runs in your browser</span>
+          </header>
+          <div className="hp-checks">
+            {CHALLENGES.map((c) => (
+              <a key={c.id} className="hp-check" href="#/reviewer?focus=rv-c7" data-testid={`home-challenge-${c.id}`}>
+                <span className="hp-check-id">{c.id}</span>
+                <span className="hp-check-text"><strong>{c.title}</strong><small>{c.act}</small></span>
+                <span className="hp-pill hp-pill-ok">{c.result}</span>
+              </a>
+            ))}
+          </div>
+          <p className="hp-replay">Replay verdicts: <code>MATCH</code> <code>DRIFT</code> <code>ENGINE_VERSION_CHANGED</code> <code>BLOCKED_BY_RUNTIME</code> · <a href="#/evidence">Evidence &amp; Replay</a></p>
+          <a className="hp-btn hp-btn-primary hp-btn-block" href="#/reviewer">Open Reviewer Room</a>
+        </section>
 
-      <HomeEngines />
+        <HomeImatinibPanel />
 
-      <HomePipeline />
+        <HomeEngines />
 
-      <section className="hp-section" aria-labelledby="hp-status-title" data-testid="home-status">
-        <p className="hp-kicker">Stated plainly</p>
-        <h2 id="hp-status-title" className="hp-h2">What is signed, and what is still pending</h2>
-        <div className="hp-status-grid">
-          <article className="hp-status-card" data-testid="home-csrn">
-            <p className="hp-stat-label">CSRN evidence signature</p>
+        <section className="hp-panel hp-span-5" aria-labelledby="hp-status-title" data-testid="home-status">
+          <header className="hp-panel-head">
+            <h2 id="hp-status-title">Signed and pending</h2>
+            <span className="hp-panel-meta">from the records</span>
+          </header>
+          <div className="hp-status-item" data-testid="home-csrn">
+            <p className="hp-status-top"><strong>CSRN signature</strong>{CSRN_KEY.generated ? <span className="hp-pill hp-pill-ok">SIGNED</span> : <span className="hp-pill hp-pill-warn">PENDING</span>}</p>
             {CSRN_KEY.generated
-              ? <p className="hp-status-line hp-status-ok">Signed by the published Genesis key<br /><span className="hp-mono">keyId: {CSRN_KEY.keyId}</span></p>
-              : <p className="hp-status-line hp-status-pending">Genesis production signing key not generated yet.</p>}
-            <p className="hp-stat-note">Signature proves integrity/authorship. It does not turn a model estimate into laboratory truth.</p>
-          </article>
-          <article className="hp-status-card" data-testid="home-real-lab">
-            <p className="hp-stat-label">Ready for physical validation</p>
-            <p className="hp-status-line hp-status-pending">Architecture ready for real measurements. First hardware-verified instrument connection pending.</p>
-            <p className="hp-stat-note">Built: real-experiment contract, read-only instrument adapter with calibration and provenance, bridge into the Experiment Fabric, model-versus-measurement labels. No hardware-verified device adapter exists yet.</p>
-          </article>
-        </div>
-      </section>
+              ? <p className="hp-status-line">Signed by the published Genesis key <span className="hp-mono">keyId: {CSRN_KEY.keyId}</span></p>
+              : <p className="hp-status-line">Genesis production signing key not generated yet.</p>}
+            <p className="hp-foot">Signature proves integrity/authorship. It does not turn a model estimate into laboratory truth.</p>
+          </div>
+          <div className="hp-status-item" data-testid="home-real-lab">
+            <p className="hp-status-top"><strong>Ready for physical validation</strong><span className="hp-pill hp-pill-warn">PENDING</span></p>
+            <p className="hp-status-line">Architecture ready for real measurements. First hardware-verified instrument connection pending.</p>
+            <p className="hp-foot">Read-only instrument adapter, calibration and provenance, Experiment Fabric bridge. No hardware-verified device adapter yet.</p>
+          </div>
+        </section>
 
-      <section className="hp-section hp-broader" aria-labelledby="hp-broader-title" data-testid="home-broader">
-        <p className="hp-kicker">Proof of extensibility</p>
-        <h2 id="hp-broader-title" className="hp-h2">Built on a broader Scientific OS</h2>
-        <p className="hp-lede">The same evidence and replay layer runs other sciences. Drug discovery is the focus; these show the platform generalises.</p>
-        <ul className="hp-broader-list">
-          {BROADER.map((b) => (
-            <li key={b.label}>
-              {b.hash ? <a href={b.hash}>{b.label}</a> : <span>{b.label}</span>}
-              <small>{b.note}</small>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <HomePipeline />
 
-      <section className="hp-section hp-ask" aria-labelledby="hp-ask-title">
-        <p className="hp-kicker">Science Chat</p>
-        <h2 id="hp-ask-title" className="hp-h2">Ask in plain language</h2>
-        <p className="hp-lede">The chat below picks a real engine or model, runs it, and saves the result with its evidence.</p>
-        <div className="hp-cta hp-ask-actions">
-          <button type="button" className="hp-btn hp-btn-primary" onClick={focusChat} data-testid="door-ask">Ask Genesis</button>
-          <a className="hp-btn" href="#/scientific-worlds" data-testid="door-laboratory">Enter the laboratory</a>
-          <AskGenesisMic lang="pl" onText={submit} className="hp-btn" />
-          <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">See a ready example</button>
-        </div>
-        <ul className="hp-system" aria-label="System status">
-          <li><strong>{records}</strong> runs saved in Scientific Memory</li>
-          <li><strong className={`hp-health-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</strong> backend {healthLabel}</li>
-        </ul>
-      </section>
+        <section className="hp-panel hp-span-12" aria-labelledby="hp-broader-title" data-testid="home-broader">
+          <header className="hp-panel-head">
+            <h2 id="hp-broader-title">Built on a broader Scientific OS</h2>
+            <span className="hp-panel-meta">same evidence layer, other sciences</span>
+          </header>
+          <ul className="hp-broader-list">
+            {BROADER.map((b) => (
+              <li key={b.label}>
+                {b.hash ? <a href={b.hash}>{b.label}</a> : <span>{b.label}</span>}
+                <small>{b.note}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="hp-panel hp-span-12 hp-ask" aria-labelledby="hp-ask-title">
+          <header className="hp-panel-head">
+            <h2 id="hp-ask-title">Science Chat · ask in plain language</h2>
+            <span className="hp-panel-meta">below</span>
+          </header>
+          <div className="hp-cta hp-ask-actions">
+            <button type="button" className="hp-btn hp-btn-primary" onClick={focusChat} data-testid="door-ask">Ask Genesis</button>
+            <a className="hp-btn" href="#/scientific-worlds" data-testid="door-laboratory">Enter the laboratory</a>
+            <AskGenesisMic lang="pl" onText={submit} className="hp-btn" />
+            <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">See a ready example</button>
+          </div>
+          <ul className="hp-system" aria-label="System status">
+            <li><strong>{records}</strong> runs saved in Scientific Memory</li>
+            <li><strong className={`hp-health-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</strong> backend {healthLabel}</li>
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }

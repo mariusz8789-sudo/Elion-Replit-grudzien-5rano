@@ -26,19 +26,20 @@ export const PIPELINE_STEPS: readonly PipelineStep[] = [
 
 export function HomePipeline(): React.ReactElement {
   return (
-    <section className="hp-section" aria-labelledby="hp-pipeline-title" data-testid="home-pipeline">
-      <p className="hp-kicker">One loop, every step recorded</p>
-      <h2 id="hp-pipeline-title" className="hp-h2">From a question to the next experiment</h2>
+    <section className="hp-panel hp-span-12" aria-labelledby="hp-pipeline-title" data-testid="home-pipeline">
+      <header className="hp-panel-head">
+        <h2 id="hp-pipeline-title">Pipeline · question to next experiment</h2>
+        <span className="hp-panel-meta">tap a step to open its screen</span>
+      </header>
       <ol className="hp-pipeline">
         {PIPELINE_STEPS.map((s, i) => (
           <li key={s.label} className="hp-step">
             {s.hash
-              ? <a href={s.hash}><span className="hp-step-n">{String(i + 1).padStart(2, '0')}</span><span className="hp-step-label">{s.label}</span></a>
-              : <span className="hp-step-static"><span className="hp-step-n">{String(i + 1).padStart(2, '0')}</span><span className="hp-step-label">{s.label}</span></span>}
+              ? <a href={s.hash} title={s.hint}><span className="hp-step-n">{String(i + 1).padStart(2, '0')}</span><span className="hp-step-label">{s.label}</span></a>
+              : <span className="hp-step-static" title={s.hint}><span className="hp-step-n">{String(i + 1).padStart(2, '0')}</span><span className="hp-step-label">{s.label}</span></span>}
           </li>
         ))}
       </ol>
-      <p className="hp-foot">Each step opens the screen that runs or shows it. QM / MD run in backend workers and have no screen of their own yet.</p>
     </section>
   );
 }

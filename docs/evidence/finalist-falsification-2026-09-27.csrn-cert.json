@@ -1,0 +1,43 @@
+{
+  "certId": "genesis:D-150:cb34754a32206efc",
+  "issuedAt": "2026-09-27T17:10:39Z",
+  "issuer": "Genesis",
+  "claim": {
+    "claimId": "D-150-redock-1IEP",
+    "statement": "Imatinib redocked into ABL1 (PDB 1IEP): 5 seeds/settings docked, best AutoDock Vina score -12.81 to -12.601 kcal/mol, median RMSD 0.89 A to the crystal pose.",
+    "domain": "drug-discovery/docking",
+    "epistemicStatus": "MODEL_ESTIMATE"
+  },
+  "evidence": {
+    "evidencePackId": null,
+    "evidenceChainId": null,
+    "evidenceUri": "repo:docs/evidence/finalist-falsification-2026-09-27.json",
+    "replayCapsuleId": null
+  },
+  "provenance": {
+    "provenanceTrail": [
+      {
+        "step": 1,
+        "action": "preregistered-protocol->vina-run",
+        "inputFingerprint": "90238cfa11743e58a35d1e321aace756cad3e325e5d27674011e78576cfe9069",
+        "outputFingerprint": "cb34754a32206efc4bd41d67c36ef794f68a258f62cc34a3322f3478e769b1f2",
+        "timestamp": "2026-09-27T17:10:39Z"
+      },
+      {
+        "step": 2,
+        "action": "vina-run->committed-record",
+        "inputFingerprint": "cb34754a32206efc4bd41d67c36ef794f68a258f62cc34a3322f3478e769b1f2",
+        "outputFingerprint": "e89c6ba8852f1429c8f579474b03bf8f66028b2939878d2bc0a5e9c63578f1cb",
+        "timestamp": "2026-09-27T17:10:39Z"
+      }
+    ]
+  },
+  "integrity": {
+    "hashAlgorithm": "SHA-256",
+    "claimFingerprint": "fd3e06b7645d9c1f0740baaeaf2287b223d0f2430856b77354fb02993db80329",
+    "evidenceFingerprint": "87147cd730f9a8e19963e23ffb7a5845a222f7f81d95f80f8c9a4ca12e2168bb",
+    "provenanceFingerprint": "34a544c7a3d4e45aa485312e400dd908f1b27a41283d6b04a2a85a4ea0cf0033",
+    "signedPayloadFingerprint": "1bac20154a5995a4aaf83eda94da0490d1eba0e0e220aa903b0dec0a61b3785f"
+  },
+  "signature": null
+}

@@ -1,0 +1,487 @@
+{
+ "kind": "GENESIS_ASTEX_REDOCK_TOPN_DIAGNOSTIC",
+ "label": "RUN 4 \u2014 DIAGNOSTIC top-20 pose retention (NOT PREREGISTERED)",
+ "diagnosticProtocol": {
+  "status": "DIAGNOSTIC \u2014 NOT PREREGISTERED",
+  "basedOnProtocolFingerprint": "6a6217aac78edb8ed5e4bb83e0e6c17385871f64e69dc027709de6fd6561c71a",
+  "question": "among the poses Vina generates, does a native-like pose (RMSD < 2.0 A) exist but rank below 1 (ranking failure), or is none generated at all (sampling failure)?",
+  "sharedWithPreregisteredRun3": "ligand definition and CCD chemistry, receptor cleaning, cofactor handling, box, scoring function (vina), exhaustiveness, seed, RMSD metric (symmetry-aware heavy-atom RDKit CalcRMS, no superposition), success threshold (RMSD < 2.0 A), denominator (all 85 cases)",
+  "differencesFromRun3": [
+   "Vina num_modes (n_poses) raised from 1 to the requested number of retained poses",
+   "pose-retention energy window widened from Vina's default 3.0 kcal/mol so it does not truncate the requested modes"
+  ],
+  "caveat": "num_modes and the energy window are applied after the Monte-Carlo runs (redundant-mode removal at min_rmsd, then truncation), so the reported pose set can differ from the single-pose run; rank-1 RMSD is recorded alongside the run-3 top-1 RMSD per case so the perturbation is measurable",
+  "perTargetTuning": "none \u2014 no per-PDB exceptions, no manual boxes, no manual ligand placement, no parameter chosen after inspecting an individual target",
+  "reranking": "none \u2014 no new scoring function and no rescoring model is used; only the RMSD of already-generated Vina poses is measured"
+ },
+ "finishedAt": "2026-09-27T20:50:33+00:00",
+ "dataset": {
+  "name": "Astex Diverse Set, 85 complexes (Hartshorn et al., J. Med. Chem. 2007, 50, 726-741)",
+  "distribution": "github.com/rdk/p2rank-datasets, directory joined/astex",
+  "distributionCommit": "0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
+  "dataDir": "/tmp/claude-0/p2r/joined/astex"
+ },
+ "baselinePreregisteredRun3": {
+  "file": "docs/evidence/astex-redock-benchmark-2026-09-27-run3.json",
+  "sha256": "b07eb0a000f69b8660fd120886735c182c230e39b9a2c3cb547c8b883cdd9ec6",
+  "summary": {
+   "cases": 85,
+   "docked": 85,
+   "successes": 46,
+   "successRate": 0.5412,
+   "successRateAmongDocked": 0.5412,
+   "preparationOrDockingFailures": 0
+  },
+  "protocolFingerprint": "6a6217aac78edb8ed5e4bb83e0e6c17385871f64e69dc027709de6fd6561c71a"
+ },
+ "preregistrationSha256": "923fba66f0d4b22142506c6064b68a09f1bcd70094c76618c7db95762ebe58af",
+ "engine": {
+  "scoringFunction": "vina",
+  "exhaustiveness": 32,
+  "seed": 42,
+  "numModes": 20,
+  "energyRange": 20.0,
+  "successCriterion": "RMSD < 2.0 A",
+  "metric": "symmetry-aware heavy-atom RMSD of each retained pose vs the crystal pose, no superposition (RDKit CalcRMS)"
+ },
+ "versions": {
+  "vina": "1.2.7",
+  "meeko": "0.8.0",
+  "rdkit": "2026.03.6",
+  "biotite": "1.6.0",
+  "python": "3.11.15"
+ },
+ "summary": {
+  "cases": 2,
+  "docked": 2,
+  "coverage": {
+   "top1": {
+    "successes": 1,
+    "cases": 2,
+    "rate": 0.5
+   },
+   "top3": {
+    "successes": 1,
+    "cases": 2,
+    "rate": 0.5
+   },
+   "top5": {
+    "successes": 1,
+    "cases": 2,
+    "rate": 0.5
+   },
+   "top10": {
+    "successes": 1,
+    "cases": 2,
+    "rate": 0.5
+   },
+   "top20": {
+    "successes": 2,
+    "cases": 2,
+    "rate": 1.0
+   }
+  },
+  "maxSuccessWithPerfectRerankingOfTop20": 2,
+  "denominator": 2,
+  "run3Top1Successes": 1,
+  "run3Top1SuccessesFullBenchmark": 46,
+  "gainFromPerfectReranking": 1,
+  "isFullBenchmark": false,
+  "run3Failures": 1,
+  "classificationCounts": {
+   "A_RANKING_FAILURE": 1
+  }
+ },
+ "scoringDiagnostic": {
+  "rankingFailures": 1,
+  "scoreGapsKcalMol": [
+   0.933
+  ],
+  "medianScoreGapKcalMol": 0.933,
+  "within0_5KcalMol": 0,
+  "within1_0KcalMol": 1,
+  "worseThan1_0KcalMol": 0,
+  "note": "gap = (Vina score of the best native-like pose) - (Vina score of the rank-1 pose); positive means Vina scores the native-like pose WORSE (less negative) than the pose it ranks first"
+ },
+ "run3FailureClassification": [
+  {
+   "pdbId": "1G9V",
+   "run3Top1RmsdA": 4.915,
+   "run3Top1VinaScoreKcalMol": -8.123,
+   "diagnosticRank1RmsdA": 10.129,
+   "rank1VinaScoreKcalMol": -8.309,
+   "bestRmsdInTopKA": 1.579,
+   "bestRmsdRank": 18,
+   "bestRmsdVinaScoreKcalMol": -7.376,
+   "bestNativeLikeRank": 18,
+   "bestNativeLikeRmsdA": 1.579,
+   "bestNativeLikeVinaScoreKcalMol": -7.376,
+   "posesGenerated": 20,
+   "classification": "A_RANKING_FAILURE",
+   "reason": "a pose at 1.579 A exists at rank 18 of 20 generated; Vina ranks a 10.129 A pose first (score -8.309 vs -7.376 kcal/mol for the native-like pose)"
+  }
+ ],
+ "cases": [
+  {
+   "pdbId": "1G9V",
+   "listedLigand": "RQ3",
+   "inputSha256": "11a01950a2c1f4f016f3ad53a7b5451e6ca19964928e8119808cd1e154969a7c",
+   "ligandResidue": "RQ3",
+   "ligandHeavyAtoms": 25,
+   "ccdTemplate": "RQ3",
+   "ligandElementsFromCcd": 0,
+   "center": [
+    16.966,
+    16.623,
+    41.744
+   ],
+   "boxSize": [
+    20.0,
+    23.331,
+    20.0
+   ],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "status": "DOCKED",
+   "poses": [
+    {
+     "rank": 1,
+     "affinityKcalMol": -8.309,
+     "rmsdA": 10.129,
+     "poseSha256": "67e8e5cb0c9bb21c4fef10f36780d6e3554ecddbc82654949028768488e33fff"
+    },
+    {
+     "rank": 2,
+     "affinityKcalMol": -8.303,
+     "rmsdA": 10.124,
+     "poseSha256": "32735d0f309caeeb11316e284784173a00e62e8a815d2ae0cd7d3141aed097b5"
+    },
+    {
+     "rank": 3,
+     "affinityKcalMol": -8.225,
+     "rmsdA": 4.873,
+     "poseSha256": "a3c8d453e092ead78488db8d663ce8d37fb21e96b95d7071d2aeacb0d6520d89"
+    },
+    {
+     "rank": 4,
+     "affinityKcalMol": -8.179,
+     "rmsdA": 4.969,
+     "poseSha256": "304d48e1e319b3c1de9066430c502a7c303744649889e67c8419815f3820c673"
+    },
+    {
+     "rank": 5,
+     "affinityKcalMol": -8.127,
+     "rmsdA": 4.941,
+     "poseSha256": "43a5462f472627c6dc17e09277cc821bd5718e49d88eace38a7a53dae4d8ae24"
+    },
+    {
+     "rank": 6,
+     "affinityKcalMol": -8.12,
+     "rmsdA": 4.74,
+     "poseSha256": "64e5f94dac3673359242fe59b1ef4150506d7b064ee7546f00533ff6b1c98cb8"
+    },
+    {
+     "rank": 7,
+     "affinityKcalMol": -7.995,
+     "rmsdA": 4.137,
+     "poseSha256": "27f83d2008532710ab67ccf43e85b42261ee8104a013b30e5c5d18c11f0c8030"
+    },
+    {
+     "rank": 8,
+     "affinityKcalMol": -7.98,
+     "rmsdA": 5.008,
+     "poseSha256": "d828a669da662cf7fb113561d08028af109d1a3e75db4cdf63baab3dac5211ee"
+    },
+    {
+     "rank": 9,
+     "affinityKcalMol": -7.971,
+     "rmsdA": 4.768,
+     "poseSha256": "53ad89f5740562b2341c227943d0f7bb7166b36ea9bfbe279465a0e56a50a292"
+    },
+    {
+     "rank": 10,
+     "affinityKcalMol": -7.852,
+     "rmsdA": 6.382,
+     "poseSha256": "b81e9df11dcfc03372e412781912659067069fda542e21a3ae3e2e28e9ddf211"
+    },
+    {
+     "rank": 11,
+     "affinityKcalMol": -7.783,
+     "rmsdA": 9.718,
+     "poseSha256": "a2db3f5413b8da02abac7f7034c55d9ab06b5059bf83b632f73cc212c245b25e"
+    },
+    {
+     "rank": 12,
+     "affinityKcalMol": -7.757,
+     "rmsdA": 2.633,
+     "poseSha256": "aa2c6a482924a407f18cf8260ca07cec0fad8b1fa99f16ce4378b8acad3bb0d9"
+    },
+    {
+     "rank": 13,
+     "affinityKcalMol": -7.711,
+     "rmsdA": 9.739,
+     "poseSha256": "ef75b7029e761fe1eef6fb08fd3d080dd0733b61e05923c14c421d8083a4c0ef"
+    },
+    {
+     "rank": 14,
+     "affinityKcalMol": -7.674,
+     "rmsdA": 4.088,
+     "poseSha256": "b684cfecbe2dfe98deae0442a75fbd854cb488d74cd8ab2a92cb71723500a3b1"
+    },
+    {
+     "rank": 15,
+     "affinityKcalMol": -7.398,
+     "rmsdA": 4.569,
+     "poseSha256": "f09c9f210c59a1162e8db94fa44250115a2797d6c0a1892ac106ace765e7d35b"
+    },
+    {
+     "rank": 16,
+     "affinityKcalMol": -7.391,
+     "rmsdA": 7.54,
+     "poseSha256": "9501dbccd6ed517f690febeb45c0f6b9b238ae0ff2b2d0c511cd4fb287aecec5"
+    },
+    {
+     "rank": 17,
+     "affinityKcalMol": -7.383,
+     "rmsdA": 3.858,
+     "poseSha256": "b07bcc83cc949ea04c8c23a207e20a8e506af104d710037a0446f58c8aa3713b"
+    },
+    {
+     "rank": 18,
+     "affinityKcalMol": -7.376,
+     "rmsdA": 1.579,
+     "poseSha256": "af24b33cb8dcccbe4f69cccf895c078d21264fa51484ddaf303e72e7e1f8abd7"
+    },
+    {
+     "rank": 19,
+     "affinityKcalMol": -7.335,
+     "rmsdA": 9.064,
+     "poseSha256": "6b14537c3f4f5fd3e9dfcc36963940f26df71312638a95555ec275d502545311"
+    },
+    {
+     "rank": 20,
+     "affinityKcalMol": -7.221,
+     "rmsdA": 3.353,
+     "poseSha256": "0aad4d759b79aca770be55ae2ba7ac6aef568ec99014515d0ef1d624c17a1a93"
+    }
+   ],
+   "nPoses": 20,
+   "rank1RmsdA": 10.129,
+   "rank1VinaScoreKcalMol": -8.309,
+   "bestRmsdA": 1.579,
+   "bestRmsdRank": 18,
+   "ligandSmiles": "Cc1cc(C)cc(NC(=O)Cc2ccc(OC(C)(C)C(=O)O)cc2)c1",
+   "engine": {
+    "scoringFunction": "vina",
+    "vinaVersion": "1.2.7",
+    "meekoVersion": "0.8.0",
+    "rdkitVersion": "2026.03.6",
+    "exhaustiveness": 32,
+    "seed": 42,
+    "numModes": 20,
+    "energyRange": 20.0,
+    "minRmsd": 1.0,
+    "center": [
+     16.966,
+     16.623,
+     41.744
+    ],
+    "boxSize": [
+     20.0,
+     23.331,
+     20.0
+    ]
+   },
+   "receptorPdbqtSha256": "0e6c8feb7726a8b243951a2900ad59381c57935d1a132cedb34ead949c8d2dc7",
+   "ligandPdbqtSha256": "1cc94067e16b800ae878243912aff24918fc10e286d2947bc8d08db6666717d9",
+   "dockedPdbqtSha256": "e87ce0318740220ca0e460099c39995216d61704cbb0f3cf0a7559937135f757",
+   "extraRigidPdbqt": []
+  },
+  {
+   "pdbId": "1HNN",
+   "listedLigand": "SKF",
+   "inputSha256": "be989576472341d6cec10c6e4ea19ccbc0fd3ffaf8a53b1a8f6d332c78eed934",
+   "ligandResidue": "SKF",
+   "ligandHeavyAtoms": 14,
+   "ccdTemplate": "SKF",
+   "ligandElementsFromCcd": 0,
+   "center": [
+    28.265,
+    44.149,
+    16.529
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "cofactorsKept": [
+    {
+     "residue": "SAH2001",
+     "heavyAtoms": 26,
+     "pdbqtAtoms": 33
+    }
+   ],
+   "cofactorsNotKept": [],
+   "status": "DOCKED",
+   "poses": [
+    {
+     "rank": 1,
+     "affinityKcalMol": -8.929,
+     "rmsdA": 1.016,
+     "poseSha256": "f3b44d8a80fad15995f3b3edcfae24ab55e08d0987ce6f4df30b9841ecd0676b"
+    },
+    {
+     "rank": 2,
+     "affinityKcalMol": -7.916,
+     "rmsdA": 2.193,
+     "poseSha256": "4ec40a2ead75c2662b3d7b446c2edc5d6e07d30c0d43e346c4fc02add7481006"
+    },
+    {
+     "rank": 3,
+     "affinityKcalMol": -7.72,
+     "rmsdA": 5.51,
+     "poseSha256": "a57907faeae784e56010aefb71bb0d33ef9a3856c7c6f6c04e54f0f1851e20fe"
+    },
+    {
+     "rank": 4,
+     "affinityKcalMol": -7.389,
+     "rmsdA": 5.492,
+     "poseSha256": "d50476e63ca556e90e9d530183e9fa0ec2ed10adeb95e4792be16a9bde0de281"
+    },
+    {
+     "rank": 5,
+     "affinityKcalMol": -7.321,
+     "rmsdA": 5.093,
+     "poseSha256": "8cb8be12c6f06a5a1b81c1b60c26d40b033cfef7b3c1204eccaf541c2f696f6b"
+    },
+    {
+     "rank": 6,
+     "affinityKcalMol": -6.809,
+     "rmsdA": 5.231,
+     "poseSha256": "542573ff070ee0fba45bca14fa979b1e8f34d1c2a6b9e45cd87c50ffa3919fa0"
+    },
+    {
+     "rank": 7,
+     "affinityKcalMol": -4.965,
+     "rmsdA": 3.152,
+     "poseSha256": "4f90dc4015b9198f5ebaeb1851c77968299d73173b2b6b7abb01606ac6b25f8c"
+    },
+    {
+     "rank": 8,
+     "affinityKcalMol": -4.264,
+     "rmsdA": 2.808,
+     "poseSha256": "7b46dc8aa642175f97ba7e07e96a912d38169aec13a36c0e10f0cf90ac20fc96"
+    },
+    {
+     "rank": 9,
+     "affinityKcalMol": -4.024,
+     "rmsdA": 13.349,
+     "poseSha256": "e3d6abc9414203a8f2365dc78f8e72c46036b8b451ae466f90c35b20c9880ef1"
+    },
+    {
+     "rank": 10,
+     "affinityKcalMol": -3.823,
+     "rmsdA": 13.083,
+     "poseSha256": "c4c78a602c7f53aebdabb3d58023b849794c00e374950e7a9c6c700f7c20612b"
+    },
+    {
+     "rank": 11,
+     "affinityKcalMol": -3.705,
+     "rmsdA": 12.783,
+     "poseSha256": "e355e8e8b37df161483998231752fc47ce3a7b79d8fab1a4759829f6f79e1100"
+    },
+    {
+     "rank": 12,
+     "affinityKcalMol": -3.704,
+     "rmsdA": 2.64,
+     "poseSha256": "b2d53c1e3748497aa68d56cb161e9667c7f4eda692a3d11609997d4a1842dc7f"
+    },
+    {
+     "rank": 13,
+     "affinityKcalMol": -3.457,
+     "rmsdA": 13.621,
+     "poseSha256": "5f84c232d9f06de556f1c60db99ddfe1f1930f57a523f7af3c9749fdbfbf0c5c"
+    },
+    {
+     "rank": 14,
+     "affinityKcalMol": -2.38,
+     "rmsdA": 14.008,
+     "poseSha256": "76423dc385acaaa9e91efe1b18db0b0d50f0a1d0134528d996872374d531c4e3"
+    },
+    {
+     "rank": 15,
+     "affinityKcalMol": -2.145,
+     "rmsdA": 5.181,
+     "poseSha256": "a491b609c4826c6b561bd376cfbf5e9c4af474bc677309436b1663551c623349"
+    },
+    {
+     "rank": 16,
+     "affinityKcalMol": -0.677,
+     "rmsdA": 5.545,
+     "poseSha256": "bafe52b9944926df3e0de653b33a27d70c4b5b29d851bd52dc707a2038879cd5"
+    },
+    {
+     "rank": 17,
+     "affinityKcalMol": -0.276,
+     "rmsdA": 3.045,
+     "poseSha256": "589d8c80da8cdab2652c2e4e3f46dc28d71fded88b198692bd776b504f141e76"
+    },
+    {
+     "rank": 18,
+     "affinityKcalMol": 1.02,
+     "rmsdA": 6.525,
+     "poseSha256": "2396ce78a747c0f414b8c2767c07ebee182123fce721347f4e8d5cd7bdcead74"
+    },
+    {
+     "rank": 19,
+     "affinityKcalMol": 4.222,
+     "rmsdA": 5.605,
+     "poseSha256": "e89e1ea72cf5852000bb4f50ddce050d1773103a544e7cf909c81d3952d364ab"
+    },
+    {
+     "rank": 20,
+     "affinityKcalMol": 4.481,
+     "rmsdA": 11.481,
+     "poseSha256": "2f386367f18a1c4deb6980598026ce9e15f268a81cf7bfd5dca1aa60bad55c52"
+    }
+   ],
+   "nPoses": 20,
+   "rank1RmsdA": 1.016,
+   "rank1VinaScoreKcalMol": -8.929,
+   "bestRmsdA": 1.016,
+   "bestRmsdRank": 1,
+   "ligandSmiles": "NS(=O)(=O)c1ccc2c(c1)CNCC2",
+   "engine": {
+    "scoringFunction": "vina",
+    "vinaVersion": "1.2.7",
+    "meekoVersion": "0.8.0",
+    "rdkitVersion": "2026.03.6",
+    "exhaustiveness": 32,
+    "seed": 42,
+    "numModes": 20,
+    "energyRange": 20.0,
+    "minRmsd": 1.0,
+    "center": [
+     28.265,
+     44.149,
+     16.529
+    ],
+    "boxSize": [
+     20.0,
+     20.0,
+     20.0
+    ]
+   },
+   "receptorPdbqtSha256": "fbbc5c56e48a56eafafefd019541e467c49327d0db7a34b20fc3fc705acab39c",
+   "ligandPdbqtSha256": "f61ee407113491832ac99496ba92c831345831a91466078070e9ce3b213c43e8",
+   "dockedPdbqtSha256": "8524e5fb6c91a07f2db319d740514185ceae4b1126867ff1b4070479aa8bc07e",
+   "extraRigidPdbqt": [
+    {
+     "sha256": "ca67e70d43245940ae8b823b3d5848df629885561c49ad343c19d54a04d79da5",
+     "atoms": 33
+    }
+   ]
+  }
+ ]
+}

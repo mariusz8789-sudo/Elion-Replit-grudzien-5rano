@@ -1,0 +1,1423 @@
+{
+ "kind": "GENESIS_ASTEX_PHASE2B_SAMPLING_DIAGNOSIS",
+ "label": "Astex phase 2B - diagnosis of the 17 B_SAMPLING_FAILURE cases of run 3/run 4",
+ "statusOfThisDocument": "DIAGNOSIS ONLY. No docking was performed. No benchmark number changes. Runs 1-5 and both preregistrations are untouched. The success threshold stays at 2.0 A and the denominator stays 85.",
+ "finishedAt": "2026-09-27T22:05:00+00:00",
+ "inputs": {
+  "poseSetsAndPreparedReceptors": "/tmp/genesis-astex-topn-9wvus3jl/<PDBID>/ (run-4 artefacts, reused, not regenerated)",
+  "crystalStructures": "/tmp/claude-0/p2r/joined/astex (p2rank-datasets 0236ecb38cbb60b89849a1ea36fbd9ee93f3e906)",
+  "classificationSource": "docs/evidence/astex-redock-run4-diagnostic.json field run3FailureClassification, class B_SAMPLING_FAILURE",
+  "vinardoRescoreSource": "docs/evidence/astex-vinardo-rescore.json (run 5)"
+ },
+ "versions": {
+  "vina": "1.2.7",
+  "meeko": "0.8.0",
+  "rdkit": "2026.03.6",
+  "biotite": "1.6.0"
+ },
+ "measurementsPerformed": [
+  {
+   "name": "crystalPoseVina",
+   "what": "Vina score of the CRYSTAL ligand pose at its deposited coordinates against the exact prepared rigid receptor used in run 4 (receptor_with_extra.pdbqt where cofactors were kept), same box. Reported both at fixed coordinates (score()) and after a local minimisation only (optimize()). This is a diagnostic probe, NOT a rescoring run and NOT a benchmark result."
+  },
+  {
+   "name": "deltaOptMinusRank1",
+   "what": "crystalPoseVinaAfterLocalOpt minus the Vina score of the rank-1 pose of the stored run-4 20-pose set. NEGATIVE means the native basin is the better-scoring one and the search missed it; POSITIVE means Vina correctly preferred a non-native pose and more search cannot help."
+  },
+  {
+   "name": "rigidFragmentRmsdFloorA",
+   "what": "Lower bound on the RMSD any Vina pose of this ligand can reach, given that Vina never changes intra-fragment geometry. The torsion tree is read from the actual run-4 ligand.pdbqt (ROOT/BRANCH records, Meeko G0 ring-closure pseudo-atoms excluded); each rigid fragment of the ETKDGv3+MMFF conformer is independently Kabsch-fitted onto the crystal coordinates over all symmetry-equivalent atom mappings, and the pooled RMSD is taken. Because fragment connectivity is ignored, the true floor is >= this number."
+  },
+  {
+   "name": "crystalPoseRelaxationDriftA",
+   "what": "Symmetry-aware RMSD the crystal pose moves under Vina local minimisation in the rigid receptor. A large drift would indicate the rigid receptor cannot accommodate the crystal ligand (clash / wrong side-chain rotamer)."
+  },
+  {
+   "name": "hetatmWithin5A / modifiedResiduesWithin6A / bridgingWaters",
+   "what": "Every HETATM residue whose nearest heavy atom is within 5 A of a crystal-ligand heavy atom, taken from the deposited file (altloc ' ' or 'A', hydrogens excluded), with waters counted separately; modified amino acids detected by the presence of N/CA/C/O backbone atom names in a HETATM residue. A bridging water is a water within 3.5 A of BOTH a ligand N/O/S and a protein N/O/S."
+  },
+  {
+   "name": "worstBoxMargin",
+   "what": "min over crystal-ligand heavy atoms and axes of (half box edge - |coordinate - box centre|), using the exact box written in run 4 (receptor.box.txt)."
+  },
+  {
+   "name": "vinardoCrystalPose",
+   "what": "Same crystal-pose probe with sf_name='vinardo', compared against the BEST Vinardo score among the 20 stored run-4 poses (from run 5). Negative delta means: if the docking scoring function were Vinardo, the native basin would out-score everything the Vina search produced."
+  }
+ ],
+ "factorsRuledOutGlobally": {
+  "boxCoverage": "RULED OUT for all 85. The worst per-case margin over the whole set is 3.167 A (1SJ0, a success); over the 17 it is 4.158 A (1HVY). No crystal ligand comes close to a box wall.",
+  "stericClashWithTheRigidReceptor": "RULED OUT. The smallest ligand-receptor heavy-atom distance over the 17 is 2.286 A and that is a Mn coordination bond (1R58), not a clash; over all 85 the minimum is 1.934 A. Crystal-pose relaxation drift is 0.08-0.65 A over the 17 and 0.18-0.46 A over the 46 successes - the crystal ligand sits comfortably in every prepared rigid receptor. Receptor side-chain flexibility is not the missing ingredient; this is redocking into the ligand's own holo structure, so the side chains are already in the bound rotamer.",
+  "covalentOrCoordinatedLigands": "No ligand among the 17 is covalently bound: the smallest ligand-to-protein-ATOM heavy-atom distance is 2.52 A (1MEH, a hydrogen bond to Ser263 OG). Exactly one, 1R58, is metal-coordinated (two Mn at 2.29 and 2.34 A).",
+  "ligandFlexibility": "RULED OUT as a discriminator. Rotatable bonds: the 17 failures have mean 4.41, median 4, max 9; the 46 successes have mean 4.41, median 4.0, max 11. The distributions are indistinguishable. Heavy atoms: 20.8 mean for the 17 vs 23.6 for the 46 - the failures are if anything SMALLER. 'The ligand is too flexible for exhaustiveness 32' is not supported by the data.",
+  "crystallographicWater": "NOT SUPPORTED as a discriminator. Waters within 5 A of the ligand: median 0 for the 17, median 3.5 for the 46 successes. Bridging waters (within 3.5 A of both ligand and protein polar atoms): mean 1.00 for the 17, mean 1.04 for the 46 successes, medians both 0. Seven of the 17 have NO water at all within 5 A. Keeping conserved waters cannot be the general fix for this class.",
+  "missingCofactors": "NOT the cause for the 17. Every cofactor the rule identifies next to these ligands was kept: UMP (1HVY), IMP (1MEH), HEM + BH4 (1MMV), ADP (1SQ5), FAD (1T9B). The only recorded cofactorsNotKept entry among the 17 is CSO:A319 in 1MEH, which is a modified residue, not a cofactor.",
+  "modifiedResiduesDroppedByTheCleaner": "REAL but RARE. Over the whole 85 only two cases have a modified amino acid deposited as HETATM within 6 A of the ligand: 1MEH (CSO A319, 4.32 A, dropped, class B) and 1XM6 (CME A432, 4.35 A, dropped, class A_RANKING_FAILURE). No MSE, SEP, TPO or PTR lines any of the 85 sites. Fixing the cleaner would touch at most 1 of the 17."
+ },
+ "correlationsNotProvenCausal": {
+  "unionisedIonisableGroups": "The prepared ligand keeps the CCD protonation state: carboxylic acids stay neutral COOH, guanidines and amines stay neutral. 13 of the 17 failures (76%) carry at least one such group against 20 of the 46 successes (43%). This is a real association, but Vina's scoring function is charge-blind (no Coulomb term), so the mechanism can only be a change in donor/acceptor typing and torsion count - it is INFERRED, not measured, that correcting protonation would change these poses. Treat as a hypothesis, not a cause.",
+  "lowLigandEfficiencyOfTheCrystalPose": "The crystal pose of the 17 is scored at a median -0.306 kcal/mol per heavy atom against -0.389 for the 46 successes. Four of the ten worst crystal-pose ligand efficiencies in the whole 85 belong to the 17 (1T9B 2nd, 1HVY 4th, 1GM8 6th, 1GKC 8th). This is the quantitative statement of 'Vina does not see these complexes'."
+ },
+ "threeWayDiagnosisDefinitions": {
+  "1_SEARCH": "The crystal pose scores acceptably on the prepared rigid receptor and does not clash, and its locally minimised score is at least as good as the Vina rank-1 pose, yet no pose within 2.0 A appears in the 20 modes. Vina simply never found it.",
+  "2_SCORING": "The crystal pose scores acceptably and does not clash, but Vina ranks another pose above the locally minimised native basin (delta_opt > 0). The function, not the search, chose wrongly.",
+  "3_PREPARATION_OR_MODEL": "The crystal pose itself is defective on our prepared inputs. Triggered by ANY of: (a) clash - min ligand-receptor heavy-atom distance < 2.2 A or crystal-pose relaxation drift > 0.6 A; (b) the crystal-pose ligand efficiency is worse than the worst of the 46 successes (-0.227 kcal/mol per heavy atom); (c) the prepared ligand's rigid-fragment RMSD floor is >= 1.0 A, so the prepared conformer cannot reproduce the crystal pose; (d) direct inspection shows the docked entity is not the deposited ligand, or a residue lining the site is absent from the prepared receptor.",
+  "note": "This three-way label is a strict mechanical test on the prepared inputs and is reported alongside, not instead of, the C1-C5 class. Where they differ (1HVY, 1MEH, 1T9B are C3 but flagged 3_PREPARATION_OR_MODEL because their crystal pose scores worse than any success; 1Q41 and 1GM8 are C2 and flagged 3 because of the ligand-conformer floor), both labels are true statements about different tests."
+ },
+ "threeWayCounts": {
+  "1_SEARCH": 5,
+  "2_SCORING": 6,
+  "3_PREPARATION_OR_MODEL": 6
+ },
+ "classDefinitions": {
+  "C1_LIGAND_DEFINITION_TRUNCATED": "The deposited ligand spans more than one HETATM residue joined by a covalent bond, and the preregistered ligand rule (chain L, or the single residue carrying the listed code) takes only one of them, so a fragment is docked instead of the inhibitor.",
+  "C2_FIXED_INTERNAL_GEOMETRY_FLOOR": "The rigid-fragment RMSD floor of the single ETKDGv3+MMFF conformer is >= 1.0 A. Vina never changes intra-fragment geometry, so the crystal RMSD cannot go below that floor no matter how the search behaves.",
+  "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE": "The crystal pose, locally minimised in the prepared rigid receptor, scores MORE THAN 0.5 kcal/mol WORSE than the pose Vina ranked first. The search did its job: the native pose is not the optimum of the Vina function in this receptor representation. More search effort cannot recover these.",
+  "C4_NEAR_DEGENERATE_BASINS": "The locally minimised crystal pose and the Vina rank-1 pose are within +/-0.5 kcal/mol of each other. The native basin carries no decisive energetic advantage, so which one the search returns is close to a coin flip.",
+  "C5_TRUE_SEARCH_FAILURE": "The locally minimised crystal pose scores MORE THAN 0.5 kcal/mol BETTER than the pose Vina ranked first, yet no pose within 2.0 A appears in the 20 modes. This is the only pattern for which 'the search failed' is the literal explanation."
+ },
+ "classCounts": {
+  "C1_LIGAND_DEFINITION_TRUNCATED": 1,
+  "C2_FIXED_INTERNAL_GEOMETRY_FLOOR": 2,
+  "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE": 7,
+  "C4_NEAR_DEGENERATE_BASINS": 6,
+  "C5_TRUE_SEARCH_FAILURE": 1
+ },
+ "nearMissCriterion": "best RMSD anywhere in the stored 20-pose set < 2.5 A, i.e. within 0.5 A of the preregistered 2.0 A threshold. Applied uniformly to all 17.",
+ "nearMisses": [
+  "1HVY",
+  "1MEH",
+  "1MMV",
+  "1Q41",
+  "1TT1",
+  "1U4D",
+  "1W1P"
+ ],
+ "casesWithAnIdentifiedCause": 17,
+ "casesWithoutAnIdentifiedCause": 0,
+ "distributions": {
+  "rotBonds": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0,
+    "median": 4.0,
+    "mean": 4.413,
+    "max": 11
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0,
+    "median": 4,
+    "mean": 4.412,
+    "max": 9
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 1,
+    "median": 5.0,
+    "mean": 4.7,
+    "max": 8
+   }
+  },
+  "heavyAtoms": {
+   "successes_run3": {
+    "n": 46,
+    "min": 12,
+    "median": 23.0,
+    "mean": 23.63,
+    "max": 41
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 10,
+    "median": 23,
+    "mean": 20.824,
+    "max": 32
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 10,
+    "median": 23.5,
+    "mean": 23.1,
+    "max": 35
+   }
+  },
+  "rigidFragmentRmsdFloorA": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0.012,
+    "median": 0.354,
+    "mean": 0.395,
+    "max": 1.243
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0.02,
+    "median": 0.437,
+    "mean": 0.473,
+    "max": 1.654
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0.027,
+    "median": 0.363,
+    "mean": 0.336,
+    "max": 0.777
+   }
+  },
+  "deltaOptMinusRank1": {
+   "successes_run3": {
+    "n": 46,
+    "min": -1.746,
+    "median": 0.142,
+    "mean": 0.129,
+    "max": 1.272
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": -0.618,
+    "median": 0.769,
+    "mean": 0.66,
+    "max": 2.334
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": -2.14,
+    "median": 0.468,
+    "mean": 0.252,
+    "max": 1.334
+   }
+  },
+  "deltaXtalMinusRank1": {
+   "successes_run3": {
+    "n": 46,
+    "min": -1.379,
+    "median": 0.641,
+    "mean": 0.656,
+    "max": 1.688
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": -0.352,
+    "median": 1.106,
+    "mean": 1.087,
+    "max": 2.821
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": -1.164,
+    "median": 0.77,
+    "mean": 0.774,
+    "max": 3.594
+   }
+  },
+  "crystalPoseVinaTotal": {
+   "successes_run3": {
+    "n": 46,
+    "min": -13.371,
+    "median": -8.613,
+    "mean": -8.829,
+    "max": -4.826
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": -9.591,
+    "median": -6.545,
+    "mean": -6.538,
+    "max": -2.548
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": -11.725,
+    "median": -7.388,
+    "mean": -7.307,
+    "max": -3.582
+   }
+  },
+  "ligandEfficiencyXtal": {
+   "successes_run3": {
+    "n": 46,
+    "min": -0.607,
+    "median": -0.389,
+    "mean": -0.393,
+    "max": -0.227
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": -0.457,
+    "median": -0.306,
+    "mean": -0.324,
+    "max": -0.198
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": -0.438,
+    "median": -0.34,
+    "mean": -0.334,
+    "max": -0.162
+   }
+  },
+  "worstBoxMarginA": {
+   "successes_run3": {
+    "n": 46,
+    "min": 3.485,
+    "median": 4.944,
+    "mean": 5.209,
+    "max": 7.575
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 4.158,
+    "median": 5.309,
+    "mean": 5.499,
+    "max": 7.416
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 3.167,
+    "median": 4.911,
+    "mean": 5.061,
+    "max": 7.307
+   }
+  },
+  "minLigRecHeavyDistA": {
+   "successes_run3": {
+    "n": 46,
+    "min": 1.938,
+    "median": 2.619,
+    "mean": 2.583,
+    "max": 3.078
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 2.286,
+    "median": 2.63,
+    "mean": 2.657,
+    "max": 2.977
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 1.934,
+    "median": 2.66,
+    "mean": 2.603,
+    "max": 3.224
+   }
+  },
+  "watersWithin5A": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0,
+    "median": 3.5,
+    "mean": 5.087,
+    "max": 15
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0,
+    "median": 0,
+    "mean": 5,
+    "max": 15
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0,
+    "median": 3.0,
+    "mean": 5.5,
+    "max": 20
+   }
+  },
+  "bridgingWaters": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0,
+    "median": 0.0,
+    "mean": 1.043,
+    "max": 5
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0,
+    "median": 0,
+    "mean": 1,
+    "max": 3
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0,
+    "median": 0.0,
+    "mean": 1,
+    "max": 5
+   }
+  },
+  "crystalPoseRelaxDriftA": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0.137,
+    "median": 0.274,
+    "mean": 0.277,
+    "max": 0.46
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0.081,
+    "median": 0.328,
+    "mean": 0.335,
+    "max": 0.65
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0.12,
+    "median": 0.29,
+    "mean": 0.306,
+    "max": 0.489
+   }
+  },
+  "mismatchedIonisable": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0,
+    "median": 0.0,
+    "mean": 0.63,
+    "max": 3
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0,
+    "median": 1,
+    "mean": 1.294,
+    "max": 4
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0,
+    "median": 1.0,
+    "mean": 0.65,
+    "max": 2
+   }
+  },
+  "polarFraction": {
+   "successes_run3": {
+    "n": 46,
+    "min": 0.091,
+    "median": 0.241,
+    "mean": 0.252,
+    "max": 0.5
+   },
+   "B_sampling_failures": {
+    "n": 17,
+    "min": 0.1,
+    "median": 0.3,
+    "mean": 0.292,
+    "max": 0.4
+   },
+   "A_ranking_failures": {
+    "n": 20,
+    "min": 0.1,
+    "median": 0.24,
+    "mean": 0.258,
+    "max": 0.538
+   }
+  }
+ },
+ "perCase": [
+  {
+   "pdbId": "1GKC",
+   "class": "C1_LIGAND_DEFINITION_TRUNCATED",
+   "bestRmsdInTop20A": 3.935,
+   "run3Top1RmsdA": 6.434,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CNC(=O)[C@@H](N)C(C)(C)C",
+   "heavyAtoms": 10,
+   "rotatableBonds": 1,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 1
+   },
+   "polarHeavyAtomFraction": 0.3,
+   "rigidFragmentRmsdFloorA": 0.02,
+   "nRigidFragments": 4,
+   "crystalPoseVinaKcalMol": -2.548,
+   "crystalPoseVinaAfterLocalOptKcalMol": -3.035,
+   "vinaRank1KcalMol": -5.369,
+   "deltaOptMinusRank1KcalMol": 2.334,
+   "crystalPoseLigandEfficiency": -0.255,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 8,
+   "crystalPoseRelaxationDriftA": 0.65,
+   "worstBoxMarginA": 6.882,
+   "minLigandReceptorHeavyDistA": 2.894,
+   "hetatmWithin5A": [
+    {
+     "res": "BUM",
+     "chain": "A",
+     "seq": "1449",
+     "nAtoms": 12,
+     "minDistA": 1.35,
+     "class": "other",
+     "preparedReceptorStatus": "DROPPED (not kept by any rule)"
+    }
+   ],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "BUM",
+     "id": "L1448",
+     "minDistA": 0.0,
+     "heavyAtoms": 10
+    },
+    {
+     "res": "BUM",
+     "id": "A1449",
+     "minDistA": 1.35,
+     "heavyAtoms": 12
+    }
+   ],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -2.672,
+   "vinardoBestOfStoredRun4Poses": -4.213,
+   "vinardoDeltaOptMinusBestStored": 1.541,
+   "cause": "The deposited ligand is TWO HETATM residues joined by a covalent bond: BUM A1449 (12 heavy atoms) -C ... N- BUM L1448 (10 heavy atoms), C-N distance 1.35 A. The preregistered ligand rule ('the HETATM residue in chain L') takes only BUM L1448, so 10 of 22 heavy atoms are docked. The docked SMILES is CNC(=O)[C@@H](N)C(C)(C)C - a tert-leucine N-methylamide fragment, not the hydroxamate inhibitor. Its crystal-pose Vina score is -2.548 kcal/mol, the worst of all 85 cases. A 10-atom fragment in an open MMP groove has no unique energetic minimum; the RMSD is meaningless as a sampling measurement.",
+   "causeConfidence": "HIGH",
+   "causeConfidenceBasis": "Direct structural fact from the deposited file: two BUM residues joined by a 1.35 A C-N bond, only one of them docked. Nothing inferred.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: treat covalently bonded HETATM residues (heavy-atom distance < 1.9 A between residues sharing the ligand's chain/site) as one ligand. General, no PDB named.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "clash/large relaxation drift (drift 0.65 A, min heavy dist 2.89 A); the docked chemical entity is not the deposited ligand (10 of 22 heavy atoms)",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1GM8",
+   "class": "C2_FIXED_INTERNAL_GEOMETRY_FLOOR",
+   "bestRmsdInTop20A": 3.292,
+   "run3Top1RmsdA": 3.523,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CC1(C)[C@H](C(=O)O)N2C(=O)[C@@H](NC(=O)Cc3ccccc3)[C@H]2[S@H]1O",
+   "heavyAtoms": 24,
+   "rotatableBonds": 4,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.292,
+   "rigidFragmentRmsdFloorA": 1.064,
+   "nRigidFragments": 7,
+   "crystalPoseVinaKcalMol": -5.893,
+   "crystalPoseVinaAfterLocalOptKcalMol": -6.3,
+   "vinaRank1KcalMol": -8.143,
+   "deltaOptMinusRank1KcalMol": 1.843,
+   "crystalPoseLigandEfficiency": -0.246,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 6,
+   "crystalPoseRelaxationDriftA": 0.533,
+   "worstBoxMarginA": 4.826,
+   "minLigandReceptorHeavyDistA": 2.526,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 15,
+   "watersWithin3_5A": 5,
+   "bridgingWaters": 3,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -3.875,
+   "vinardoBestOfStoredRun4Poses": -5.61,
+   "vinardoDeltaOptMinusBestStored": 1.735,
+   "cause": "Rigid-fragment RMSD floor 1.064 A (lower bound). SOX is the ring-opened penicilloate with a saturated thiazolidine and a sulfoxide stereocentre; the single ETKDGv3+MMFF conformer's internal geometry cannot be superposed on the crystal geometry to better than 1.064 A even with every torsion set perfectly, and Vina cannot change intra-fragment geometry. The relaxed crystal pose also scores 1.843 kcal/mol WORSE than Vina rank 1, so both barriers are present.",
+   "causeConfidence": "HIGH",
+   "causeConfidenceBasis": "Measured floor 1.064 A AND a measured +1.843 kcal/mol adverse energetic gap. Two independent barriers, both measured.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Same conformer-ensemble rule as 1Q41.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "prepared-ligand rigid-fragment RMSD floor 1.064 A >= 1.0 A",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1HVY",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.009,
+   "run3Top1RmsdA": 3.479,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "Cc1nc(=O)c2cc(CN(C)c3ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)s3)ccc2[nH]1",
+   "heavyAtoms": 32,
+   "rotatableBonds": 9,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 2,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.312,
+   "rigidFragmentRmsdFloorA": 0.632,
+   "nRigidFragments": 12,
+   "crystalPoseVinaKcalMol": -7.222,
+   "crystalPoseVinaAfterLocalOptKcalMol": -7.606,
+   "vinaRank1KcalMol": -9.011,
+   "deltaOptMinusRank1KcalMol": 1.405,
+   "crystalPoseLigandEfficiency": -0.226,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 4,
+   "crystalPoseRelaxationDriftA": 0.33,
+   "worstBoxMarginA": 4.158,
+   "minLigandReceptorHeavyDistA": 2.63,
+   "hetatmWithin5A": [
+    {
+     "res": "UMP",
+     "chain": "A",
+     "seq": "314",
+     "nAtoms": 20,
+     "minDistA": 3.1,
+     "class": "other",
+     "preparedReceptorStatus": "KEPT (rigid cofactor)"
+    }
+   ],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "D16",
+     "id": "L414",
+     "minDistA": 0.0,
+     "heavyAtoms": 32
+    }
+   ],
+   "cofactorsKept": [
+    {
+     "residue": "UMP:A314",
+     "heavyAtoms": 20,
+     "pdbqtAtoms": 24
+    }
+   ],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -4.881,
+   "vinardoBestOfStoredRun4Poses": -6.373,
+   "vinardoDeltaOptMinusBestStored": 1.492,
+   "cause": "Relaxed crystal pose is 1.405 kcal/mol worse than Vina rank 1 (-7.606 vs -9.011). D16 is an antifolate whose glutamate tail (two carboxylic acids, prepared neutral) binds an arginine cluster; crystal-pose ligand efficiency -0.226 kcal/mol per heavy atom is the 4th worst of 85. The UMP cofactor IS kept. No waters within 5 A, no dropped residue, box margin 4.158 A, no clash (min lig-receptor heavy distance 2.63 A). The native pose is simply not the Vina optimum here.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "The +1.405 kcal/mol adverse gap and the -0.226 ligand efficiency are measured, but that marginally crosses the 'worse than any success' line (-0.227) and the attribution to the unionised glutamate tail is inference, not measurement.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "crystal-pose ligand efficiency -0.226 is worse than the worst of the 46 successes (-0.227)",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1KE5",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 2.765,
+   "run3Top1RmsdA": 3.012,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CNS(=O)(=O)c1ccc(NC=C2C(=O)Nc3ccccc32)cc1",
+   "heavyAtoms": 23,
+   "rotatableBonds": 4,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.261,
+   "rigidFragmentRmsdFloorA": 0.169,
+   "nRigidFragments": 5,
+   "crystalPoseVinaKcalMol": -8.378,
+   "crystalPoseVinaAfterLocalOptKcalMol": -9.086,
+   "vinaRank1KcalMol": -8.697,
+   "deltaOptMinusRank1KcalMol": -0.389,
+   "crystalPoseLigandEfficiency": -0.364,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 45,
+   "crystalPoseRelaxationDriftA": 0.246,
+   "worstBoxMarginA": 4.432,
+   "minLigandReceptorHeavyDistA": 2.892,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 7,
+   "watersWithin3_5A": 4,
+   "bridgingWaters": 1,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -6.95,
+   "vinardoBestOfStoredRun4Poses": -5.887,
+   "vinardoDeltaOptMinusBestStored": -1.063,
+   "cause": "Relaxed crystal pose and Vina rank 1 are within scoring noise (-9.086 vs -8.697; delta -0.389 kcal/mol). Geometric floor 0.169 A, box margin 4.432 A, no clash, 4 waters within 3.5 A of the ligand (CDK2 hinge). Nothing structural is missing; the two basins are near-degenerate under the Vina function and the search returned the other one.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Measured -0.389 kcal/mol: the native basin is very slightly better and was not returned. No structural defect found. The cause is the flatness of the landscape, which is measured; the reason the search chose otherwise is not.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "1_SEARCH",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.364), does not clash (drift 0.25 A), and the relaxed native basin is -0.389 kcal/mol BETTER than Vina rank 1 - the search simply never returned it",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1L7F",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 3.653,
+   "run3Top1RmsdA": 4.765,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CCC(CC)[C@H](NC(C)=O)[C@@H]1[C@H](O)[C@@H](C(=O)O)C[C@H]1NC(=N)N",
+   "heavyAtoms": 23,
+   "rotatableBonds": 7,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 3
+   },
+   "polarHeavyAtomFraction": 0.348,
+   "rigidFragmentRmsdFloorA": 0.401,
+   "nRigidFragments": 10,
+   "crystalPoseVinaKcalMol": -7.85,
+   "crystalPoseVinaAfterLocalOptKcalMol": -8.224,
+   "vinaRank1KcalMol": -7.729,
+   "deltaOptMinusRank1KcalMol": -0.495,
+   "crystalPoseLigandEfficiency": -0.341,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 33,
+   "crystalPoseRelaxationDriftA": 0.291,
+   "worstBoxMarginA": 5.809,
+   "minLigandReceptorHeavyDistA": 2.69,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 14,
+   "watersWithin3_5A": 4,
+   "bridgingWaters": 3,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -6.043,
+   "vinardoBestOfStoredRun4Poses": -5.129,
+   "vinardoDeltaOptMinusBestStored": -0.914,
+   "cause": "Relaxed crystal pose 0.495 kcal/mol BETTER than Vina rank 1 but the native basin was not returned in 20 modes. BCZ is a neuraminidase transition-state analogue with a guanidine and a carboxylic acid, both prepared neutral (3 neutral base groups, 1 neutral acid); the real complex is a salt bridge network. 3 bridging waters. Floor 0.401 A.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Measured -0.495 kcal/mol: native basin better, not returned. The salt-bridge network of a neuraminidase transition-state analogue is prepared fully neutral, which is a fact about the input, but its causal role is inference.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "1_SEARCH",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.341), does not clash (drift 0.29 A), and the relaxed native basin is -0.495 kcal/mol BETTER than Vina rank 1 - the search simply never returned it",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1MEH",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.326,
+   "run3Top1RmsdA": 4.175,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "COc1c(C)c2c(c(O)c1CC=C(C)CCC(=O)O)C(=O)OC2",
+   "heavyAtoms": 23,
+   "rotatableBonds": 6,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.261,
+   "rigidFragmentRmsdFloorA": 0.742,
+   "nRigidFragments": 9,
+   "crystalPoseVinaKcalMol": -6.545,
+   "crystalPoseVinaAfterLocalOptKcalMol": -6.882,
+   "vinaRank1KcalMol": -7.651,
+   "deltaOptMinusRank1KcalMol": 0.769,
+   "crystalPoseLigandEfficiency": -0.285,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 20,
+   "crystalPoseRelaxationDriftA": 0.161,
+   "worstBoxMarginA": 5.41,
+   "minLigandReceptorHeavyDistA": 2.52,
+   "hetatmWithin5A": [
+    {
+     "res": "IMP",
+     "chain": " ",
+     "seq": "602",
+     "nAtoms": 23,
+     "minDistA": 3.2,
+     "class": "other",
+     "preparedReceptorStatus": "KEPT (rigid cofactor)"
+    },
+    {
+     "res": "CSO",
+     "chain": "A",
+     "seq": "319",
+     "nAtoms": 7,
+     "minDistA": 4.32,
+     "class": "other",
+     "preparedReceptorStatus": "DROPPED (not kept by any rule)"
+    }
+   ],
+   "watersWithin5A": 9,
+   "watersWithin3_5A": 3,
+   "bridgingWaters": 3,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "CSO",
+     "id": "A319",
+     "minDistA": 4.32,
+     "heavyAtoms": 7
+    }
+   ],
+   "cofactorsKept": [
+    {
+     "residue": "IMP602",
+     "heavyAtoms": 23,
+     "pdbqtAtoms": 28
+    }
+   ],
+   "cofactorsNotKept": [
+    {
+     "residue": "CSO:A319",
+     "reason": "no_ccd_template_with_7_heavy_atoms"
+    }
+   ],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -4.914,
+   "vinardoBestOfStoredRun4Poses": -5.417,
+   "vinardoDeltaOptMinusBestStored": 0.503,
+   "cause": "Relaxed crystal pose 0.769 kcal/mol worse than Vina rank 1. This is the one case of the 17 where the receptor cleaner demonstrably drops a residue lining the site: CSO A319 (S-hydroxy-cysteine) has its nearest heavy atom 4.32 A from the ligand and is recorded in run 3 as cofactorsNotKept with reason no_ccd_template_with_7_heavy_atoms - so neither the ATOM path nor the cofactor path keeps it. The IMP cofactor IS kept. 3 waters within 3.5 A. Geometric floor 0.742 A.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "That CSO A319 is dropped is a recorded fact; that it causes the failure is inferred - the residue is 4.32 A away, in the second shell. The +0.769 kcal/mol gap is measured.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: any HETATM residue carrying N/CA/C/O backbone atoms is a modified amino acid and is kept as rigid receptor atoms (templated from the CCD, or from its heavy atoms with RDKit/Meeko typing). General; it would also pick up 1XM6's CME.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "CSO A319, a modified residue lining the site 4.32 A from the ligand, is absent from the prepared receptor (run 3 cofactorsNotKept: no_ccd_template_with_7_heavy_atoms)",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1MMV",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.093,
+   "run3Top1RmsdA": 7.057,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "CCCNC(=[NH2+])NCCC[C@H](N)C(=O)O",
+   "heavyAtoms": 15,
+   "rotatableBonds": 7,
+   "formalChargeAsPrepared": 1,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 1
+   },
+   "polarHeavyAtomFraction": 0.4,
+   "rigidFragmentRmsdFloorA": 0.062,
+   "nRigidFragments": 10,
+   "crystalPoseVinaKcalMol": -6.081,
+   "crystalPoseVinaAfterLocalOptKcalMol": -6.46,
+   "vinaRank1KcalMol": -7.379,
+   "deltaOptMinusRank1KcalMol": 0.919,
+   "crystalPoseLigandEfficiency": -0.405,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 58,
+   "crystalPoseRelaxationDriftA": 0.215,
+   "worstBoxMarginA": 6.355,
+   "minLigandReceptorHeavyDistA": 2.523,
+   "hetatmWithin5A": [
+    {
+     "res": "HEM",
+     "chain": "A",
+     "seq": "1750",
+     "nAtoms": 43,
+     "minDistA": 2.86,
+     "class": "other",
+     "preparedReceptorStatus": "KEPT (rigid cofactor)"
+    }
+   ],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "3AR",
+     "id": "L1785",
+     "minDistA": 0.0,
+     "heavyAtoms": 15
+    }
+   ],
+   "cofactorsKept": [
+    {
+     "residue": "HEM:A1750",
+     "heavyAtoms": 43,
+     "pdbqtAtoms": 45
+    },
+    {
+     "residue": "BH41760",
+     "heavyAtoms": 17,
+     "pdbqtAtoms": 24
+    }
+   ],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -5.54,
+   "vinardoBestOfStoredRun4Poses": -6.008,
+   "vinardoDeltaOptMinusBestStored": 0.468,
+   "cause": "Relaxed crystal pose 0.919 kcal/mol worse than Vina rank 1. 3AR is N-omega-propyl-L-arginine, the only formally charged (+1) ligand among the 17 as prepared; its guanidinium stacks on the haem. HEM (43 heavy atoms) and BH4 ARE kept as rigid cofactors, so the cofactor is not missing. Floor 0.062 A, no clash, no waters within 5 A. The failure is that Vina's charge-blind function does not reward the cation-haem/Glu592 electrostatics that define the pose.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "The +0.919 kcal/mol adverse gap is measured. The mechanism (charge-blind scoring of a +1 guanidinium over the haem) is inferred; HEM and BH4 are confirmed present, so the obvious alternative is excluded.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.405) and does not clash (drift 0.21 A), but Vina ranks another pose 0.919 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1Q41",
+   "class": "C2_FIXED_INTERNAL_GEOMETRY_FLOOR",
+   "bestRmsdInTop20A": 2.362,
+   "run3Top1RmsdA": 2.742,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "O=C1Nc2ccccc2C1=C1Nc2ccccc2C1=NO",
+   "heavyAtoms": 21,
+   "rotatableBonds": 0,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.238,
+   "rigidFragmentRmsdFloorA": 1.654,
+   "nRigidFragments": 2,
+   "crystalPoseVinaKcalMol": -9.591,
+   "crystalPoseVinaAfterLocalOptKcalMol": -10.172,
+   "vinaRank1KcalMol": -9.831,
+   "deltaOptMinusRank1KcalMol": -0.341,
+   "crystalPoseLigandEfficiency": -0.457,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 73,
+   "crystalPoseRelaxationDriftA": 0.328,
+   "worstBoxMarginA": 5.309,
+   "minLigandReceptorHeavyDistA": 2.619,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -8.066,
+   "vinardoBestOfStoredRun4Poses": -6.321,
+   "vinardoDeltaOptMinusBestStored": -1.745,
+   "cause": "Rigid-fragment RMSD floor 1.654 A - the largest of all 85 cases, and the only one above 1.3 A. IXM (indirubin-3'-monoxime) has ZERO rotatable bonds and just 2 rigid fragments, so the pose is fully determined by the ETKDGv3+MMFF internal geometry of the bis-indolinone/oxime system; that geometry is 1.654 A (lower bound) from the crystal geometry before any docking happens. Delta_opt is only -0.341 kcal/mol, so the energetics are near-degenerate; the barrier is geometric, not energetic, and no amount of search can cross it.",
+   "causeConfidence": "HIGH",
+   "causeConfidenceBasis": "Measured rigid-fragment RMSD floor 1.654 A, the largest of all 85 and the only one above 1.3 A, on a ligand with zero rotatable bonds. The barrier is geometric and cannot be argued away.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: generate an N-conformer ETKDG ensemble (or enumerate ring conformers) and dock each, keep the best-scoring. General.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "prepared-ligand rigid-fragment RMSD floor 1.654 A >= 1.0 A",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1R58",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.748,
+   "run3Top1RmsdA": 3.476,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CC(C)SCC[C@@H](N)[C@H](O)C(=O)NNC(=O)c1cccc(Cl)c1",
+   "heavyAtoms": 23,
+   "rotatableBonds": 7,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 1
+   },
+   "polarHeavyAtomFraction": 0.261,
+   "rigidFragmentRmsdFloorA": 0.053,
+   "nRigidFragments": 11,
+   "crystalPoseVinaKcalMol": -6.508,
+   "crystalPoseVinaAfterLocalOptKcalMol": -6.708,
+   "vinaRank1KcalMol": -8.546,
+   "deltaOptMinusRank1KcalMol": 1.838,
+   "crystalPoseLigandEfficiency": -0.283,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 19,
+   "crystalPoseRelaxationDriftA": 0.081,
+   "worstBoxMarginA": 4.99,
+   "minLigandReceptorHeavyDistA": 2.286,
+   "hetatmWithin5A": [
+    {
+     "res": "MN",
+     "chain": " ",
+     "seq": "480",
+     "nAtoms": 1,
+     "minDistA": 2.29,
+     "class": "metal",
+     "preparedReceptorStatus": "KEPT (metal ion, clean_receptor)"
+    },
+    {
+     "res": "MN",
+     "chain": " ",
+     "seq": "481",
+     "nAtoms": 1,
+     "minDistA": 2.34,
+     "class": "metal",
+     "preparedReceptorStatus": "KEPT (metal ion, clean_receptor)"
+    }
+   ],
+   "watersWithin5A": 12,
+   "watersWithin3_5A": 3,
+   "bridgingWaters": 2,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -4.875,
+   "vinardoBestOfStoredRun4Poses": -6.581,
+   "vinardoDeltaOptMinusBestStored": 1.706,
+   "cause": "Relaxed crystal pose 1.838 kcal/mol worse than Vina rank 1. The ligand's hydroxamate-like group coordinates TWO manganese ions at 2.29 and 2.34 A (the shortest ligand-receptor heavy-atom distances in the whole set after the metals are included). Both Mn are kept, but as bare AD4 metal atoms: Vina's scoring function has no metal-coordination term, so the single interaction that fixes the pose contributes almost nothing. Crystal-pose relaxation drift 0.08 A - the pose fits the rigid receptor perfectly, it just does not score.",
+   "causeConfidence": "HIGH",
+   "causeConfidenceBasis": "Measured +1.838 kcal/mol adverse gap with zero relaxation drift (0.08 A) - the pose fits perfectly and still loses. The ligand coordinates two Mn at 2.29/2.34 A and Vina has no metal-coordination term; that is a documented property of the function, not a guess.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: a scoring function with a metal-coordination term, applied to all 85. NOT satisfied by the proposed Vinardo change, which is also charge- and coordination-blind (measured Vinardo delta +1.706).",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.283) and does not clash (drift 0.08 A), but Vina ranks another pose 1.838 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1SQ5",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.642,
+   "run3Top1RmsdA": 5.768,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)O",
+   "heavyAtoms": 15,
+   "rotatableBonds": 6,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.4,
+   "rigidFragmentRmsdFloorA": 0.144,
+   "nRigidFragments": 10,
+   "crystalPoseVinaKcalMol": -4.583,
+   "crystalPoseVinaAfterLocalOptKcalMol": -4.995,
+   "vinaRank1KcalMol": -6.064,
+   "deltaOptMinusRank1KcalMol": 1.069,
+   "crystalPoseLigandEfficiency": -0.306,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 25,
+   "crystalPoseRelaxationDriftA": 0.361,
+   "worstBoxMarginA": 5.792,
+   "minLigandReceptorHeavyDistA": 2.627,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [
+    {
+     "residue": "ADP5001",
+     "heavyAtoms": 27,
+     "pdbqtAtoms": 34
+    }
+   ],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -3.454,
+   "vinardoBestOfStoredRun4Poses": -4.515,
+   "vinardoDeltaOptMinusBestStored": 1.061,
+   "cause": "Relaxed crystal pose 1.069 kcal/mol worse than Vina rank 1. PAU is pantothenate: 15 heavy atoms, 6 rotatable bonds, 40% polar, one carboxylic acid prepared neutral. The ADP cofactor IS kept. Crystal-pose Vina score -4.583 kcal/mol, 6th worst of 85. A small, very flexible, very polar ligand whose native pose the Vina function does not distinguish.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "+1.069 kcal/mol adverse gap measured; ADP cofactor confirmed present, no waters, no dropped residue, no clash. The residual attribution to a small polar flexible ligand is descriptive.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.306) and does not clash (drift 0.36 A), but Vina ranks another pose 1.069 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1T9B",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 5.799,
+   "run3Top1RmsdA": 8.733,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "COc1nc(C)nc(NC(=O)NS(=O)(=O)c2ccccc2Cl)n1",
+   "heavyAtoms": 23,
+   "rotatableBonds": 4,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.391,
+   "rigidFragmentRmsdFloorA": 0.438,
+   "nRigidFragments": 5,
+   "crystalPoseVinaKcalMol": -4.548,
+   "crystalPoseVinaAfterLocalOptKcalMol": -4.643,
+   "vinaRank1KcalMol": -6.702,
+   "deltaOptMinusRank1KcalMol": 2.059,
+   "crystalPoseLigandEfficiency": -0.198,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 2,
+   "crystalPoseRelaxationDriftA": 0.324,
+   "worstBoxMarginA": 5.046,
+   "minLigandReceptorHeavyDistA": 2.977,
+   "hetatmWithin5A": [
+    {
+     "res": "FAD",
+     "chain": " ",
+     "seq": "701",
+     "nAtoms": 53,
+     "minDistA": 3.52,
+     "class": "other",
+     "preparedReceptorStatus": "KEPT (rigid cofactor)"
+    }
+   ],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [
+    {
+     "residue": "FAD701",
+     "heavyAtoms": 53,
+     "pdbqtAtoms": 63
+    }
+   ],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -3.785,
+   "vinardoBestOfStoredRun4Poses": -4.496,
+   "vinardoDeltaOptMinusBestStored": 0.711,
+   "cause": "Relaxed crystal pose 2.059 kcal/mol worse than Vina rank 1 and the crystal-pose ligand efficiency, -0.198 kcal/mol per heavy atom, is the SECOND WORST of all 85 cases for a 23-heavy-atom ligand. The FAD cofactor (53 heavy atoms) IS kept. 1CS is a chlorsulfuron-type sulfonylurea bound in the long AHAS substrate channel; Vina scores the crystal pose at -4.548 kcal/mol, essentially indistinguishable from a generic channel position, which is why the search ends 5.799 A away - the worst of the 17.",
+   "causeConfidence": "HIGH",
+   "causeConfidenceBasis": "Measured: crystal-pose ligand efficiency -0.198 kcal/mol per heavy atom, worse than any of the 46 successes and 2nd worst of all 85; relaxed crystal pose 2.059 kcal/mol worse than Vina rank 1. The conclusion 'Vina does not see this complex' follows from the numbers.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "3_PREPARATION_OR_MODEL",
+   "threeWayEvidence": "crystal-pose ligand efficiency -0.198 is worse than the worst of the 46 successes (-0.227)",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1TT1",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 2.441,
+   "run3Top1RmsdA": 3.651,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "C=C(C)[C@H]1CN[C@H](C(=O)O)[C@H]1CC(=O)O",
+   "heavyAtoms": 15,
+   "rotatableBonds": 4,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 2,
+    "basic": 1
+   },
+   "polarHeavyAtomFraction": 0.333,
+   "rigidFragmentRmsdFloorA": 0.438,
+   "nRigidFragments": 7,
+   "crystalPoseVinaKcalMol": -6.862,
+   "crystalPoseVinaAfterLocalOptKcalMol": -7.309,
+   "vinaRank1KcalMol": -7.149,
+   "deltaOptMinusRank1KcalMol": -0.16,
+   "crystalPoseLigandEfficiency": -0.457,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 74,
+   "crystalPoseRelaxationDriftA": 0.368,
+   "worstBoxMarginA": 6.28,
+   "minLigandReceptorHeavyDistA": 2.588,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "KAI",
+     "id": "L998",
+     "minDistA": 0.0,
+     "heavyAtoms": 15
+    }
+   ],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -5.888,
+   "vinardoBestOfStoredRun4Poses": -5.628,
+   "vinardoDeltaOptMinusBestStored": -0.26,
+   "cause": "Near-degenerate: delta_opt -0.160 kcal/mol. KAI is kainate, a zwitterion in reality (two carboxylic acids and a secondary amine, all prepared neutral) bound in the GluR2 ligand-binding cleft, where the pose is set entirely by ion pairs. Floor 0.438 A, no waters, no dropped residue, no clash.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Near-degeneracy (-0.160 kcal/mol) is measured. That the missing zwitterion is what flattens the landscape is inference under a charge-blind function.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "1_SEARCH",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.457), does not clash (drift 0.37 A), and the relaxed native basin is -0.160 kcal/mol BETTER than Vina rank 1 - the search simply never returned it",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1TZ8",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 3.103,
+   "run3Top1RmsdA": 3.438,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "CCC(=C(CC)c1ccc(O)cc1)c1ccc(O)cc1",
+   "heavyAtoms": 20,
+   "rotatableBonds": 4,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.1,
+   "rigidFragmentRmsdFloorA": 0.094,
+   "nRigidFragments": 7,
+   "crystalPoseVinaKcalMol": -7.397,
+   "crystalPoseVinaAfterLocalOptKcalMol": -7.816,
+   "vinaRank1KcalMol": -8.029,
+   "deltaOptMinusRank1KcalMol": 0.213,
+   "crystalPoseLigandEfficiency": -0.37,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 46,
+   "crystalPoseRelaxationDriftA": 0.439,
+   "worstBoxMarginA": 4.878,
+   "minLigandReceptorHeavyDistA": 2.641,
+   "hetatmWithin5A": [
+    {
+     "res": "GOL",
+     "chain": " ",
+     "seq": "5",
+     "nAtoms": 6,
+     "minDistA": 4.82,
+     "class": "additive",
+     "preparedReceptorStatus": "DROPPED (crystallisation additive)"
+    }
+   ],
+   "watersWithin5A": 4,
+   "watersWithin3_5A": 2,
+   "bridgingWaters": 2,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -6.06,
+   "vinardoBestOfStoredRun4Poses": -5.63,
+   "vinardoDeltaOptMinusBestStored": -0.43,
+   "cause": "Near-degenerate: delta_opt +0.213 kcal/mol. DES (diethylstilbestrol) is an almost apolar, pseudo-symmetric ligand (polar fraction 0.100) in the oestrogen-receptor pocket; the crystal pose and a flipped pose are within scoring noise. Floor 0.094 A, 2 bridging waters, one glycerol at 4.82 A (dropped as an additive, too far to matter).",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Near-degeneracy (+0.213 kcal/mol) is measured. The pseudo-symmetry explanation for a flipped pose is inference.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.370) and does not clash (drift 0.44 A), but Vina ranks another pose 0.213 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1U4D",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 2.21,
+   "run3Top1RmsdA": 4.219,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "NC1=NC(=C2CCNC(=O)c3[nH]ccc32)C(=O)N1",
+   "heavyAtoms": 18,
+   "rotatableBonds": 0,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 3
+   },
+   "polarHeavyAtomFraction": 0.389,
+   "rigidFragmentRmsdFloorA": 0.437,
+   "nRigidFragments": 5,
+   "crystalPoseVinaKcalMol": -6.314,
+   "crystalPoseVinaAfterLocalOptKcalMol": -6.736,
+   "vinaRank1KcalMol": -6.962,
+   "deltaOptMinusRank1KcalMol": 0.226,
+   "crystalPoseLigandEfficiency": -0.351,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 38,
+   "crystalPoseRelaxationDriftA": 0.308,
+   "worstBoxMarginA": 6.159,
+   "minLigandReceptorHeavyDistA": 2.674,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -4.686,
+   "vinardoBestOfStoredRun4Poses": -3.947,
+   "vinardoDeltaOptMinusBestStored": -0.739,
+   "cause": "Near-degenerate: delta_opt +0.226 kcal/mol. DBQ has ZERO acyclic rotatable bonds but Meeko opens a flexible ring (two G0 ring-closure pseudo-atoms in the ligand PDBQT), so the effective degrees of freedom are not what the rotatable-bond count suggests. Floor 0.437 A. Highly polar (0.389), three neutral basic nitrogens.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Near-degeneracy (+0.226 kcal/mol) is measured, as is the presence of Meeko ring-opening pseudo-atoms. Why the search settles on the other basin is not established.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.351) and does not clash (drift 0.31 A), but Vina ranks another pose 0.226 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "1W1P",
+   "class": "C3_SCORING_FUNCTION_PREFERS_A_NON_NATIVE_POSE",
+   "bestRmsdInTop20A": 2.096,
+   "run3Top1RmsdA": 10.85,
+   "nearMiss": true,
+   "ligandSmilesAsDocked": "O=C1NCC(=O)N2CCC[C@@H]12",
+   "heavyAtoms": 11,
+   "rotatableBonds": 0,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.364,
+   "rigidFragmentRmsdFloorA": 0.146,
+   "nRigidFragments": 1,
+   "crystalPoseVinaKcalMol": -4.425,
+   "crystalPoseVinaAfterLocalOptKcalMol": -4.952,
+   "vinaRank1KcalMol": -5.885,
+   "deltaOptMinusRank1KcalMol": 0.933,
+   "crystalPoseLigandEfficiency": -0.402,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 56,
+   "crystalPoseRelaxationDriftA": 0.425,
+   "worstBoxMarginA": 7.416,
+   "minLigandReceptorHeavyDistA": 2.665,
+   "hetatmWithin5A": [
+    {
+     "res": "GOL",
+     "chain": "A",
+     "seq": "1514",
+     "nAtoms": 6,
+     "minDistA": 2.56,
+     "class": "additive",
+     "preparedReceptorStatus": "DROPPED (crystallisation additive)"
+    },
+    {
+     "res": "GOL",
+     "chain": "A",
+     "seq": "1510",
+     "nAtoms": 6,
+     "minDistA": 3.76,
+     "class": "additive",
+     "preparedReceptorStatus": "DROPPED (crystallisation additive)"
+    }
+   ],
+   "watersWithin5A": 0,
+   "watersWithin3_5A": 0,
+   "bridgingWaters": 0,
+   "modifiedResiduesWithin6A": [
+    {
+     "res": "GIO",
+     "id": "L1518",
+     "minDistA": 0.0,
+     "heavyAtoms": 11
+    }
+   ],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -4.146,
+   "vinardoBestOfStoredRun4Poses": -4.256,
+   "vinardoDeltaOptMinusBestStored": 0.11,
+   "cause": "Relaxed crystal pose 0.933 kcal/mol worse than Vina rank 1. GIO is an 11-heavy-atom rigid bicyclic fragment (0 rotatable bonds); its crystal-pose Vina score is -4.425 kcal/mol, 4th worst of 85 - too weak a signal for the function to locate. Two glycerol molecules sit 2.56 and 3.76 A from the ligand and are dropped as crystallisation additives; they occupy part of the site the docked fragment can wander into. No waters within 5 A.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "+0.933 kcal/mol adverse gap and a crystal-pose score of -4.425 kcal/mol (4th worst of 85) are measured. The role of the two glycerols dropped at 2.56/3.76 A is inferred, not tested.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Global scoring-function change; a second candidate global rule is to keep, rather than drop, crystallisation additives whose heavy atoms come within 4 A of the crystal ligand (here two glycerols at 2.56 and 3.76 A). Both are general rules.",
+   "threeWayDiagnosis": "2_SCORING",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.402) and does not clash (drift 0.42 A), but Vina ranks another pose 0.933 kcal/mol above the relaxed native basin",
+   "recoverableByProposedVinardoDocking": false
+  },
+  {
+   "pdbId": "1YVF",
+   "class": "C5_TRUE_SEARCH_FAILURE",
+   "bestRmsdInTop20A": 3.759,
+   "run3Top1RmsdA": 4.209,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "O=C(O)C(=Cc1ccc(Oc2ccccc2Br)cc1)NC(=O)c1ccccc1",
+   "heavyAtoms": 28,
+   "rotatableBonds": 6,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 1,
+    "basic": 0
+   },
+   "polarHeavyAtomFraction": 0.179,
+   "rigidFragmentRmsdFloorA": 0.877,
+   "nRigidFragments": 8,
+   "crystalPoseVinaKcalMol": -8.35,
+   "crystalPoseVinaAfterLocalOptKcalMol": -8.616,
+   "vinaRank1KcalMol": -7.998,
+   "deltaOptMinusRank1KcalMol": -0.618,
+   "crystalPoseLigandEfficiency": -0.298,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 23,
+   "crystalPoseRelaxationDriftA": 0.286,
+   "worstBoxMarginA": 5.293,
+   "minLigandReceptorHeavyDistA": 2.789,
+   "hetatmWithin5A": [
+    {
+     "res": "GOL",
+     "chain": " ",
+     "seq": "602",
+     "nAtoms": 6,
+     "minDistA": 3.73,
+     "class": "additive",
+     "preparedReceptorStatus": "DROPPED (crystallisation additive)"
+    }
+   ],
+   "watersWithin5A": 12,
+   "watersWithin3_5A": 5,
+   "bridgingWaters": 2,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -6.262,
+   "vinardoBestOfStoredRun4Poses": -5.286,
+   "vinardoDeltaOptMinusBestStored": -0.976,
+   "cause": "The only case of the 17 where the relaxed crystal pose is more than 0.5 kcal/mol BETTER than anything the search returned (-8.616 vs -7.998; delta_opt -0.618) - i.e. a genuinely better-scoring native basin existed and 32-exhaustiveness/20-mode search did not visit it. Floor 0.877 A (high, but below the 1.0 A class threshold), 2 bridging waters, one glycerol at 3.73 A dropped.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Measured -0.618 kcal/mol: the only case where the native basin is clearly better and the search still missed it. The classification is solid; no mechanism for WHY the search missed it was established.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "1_SEARCH",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.298), does not clash (drift 0.29 A), and the relaxed native basin is -0.618 kcal/mol BETTER than Vina rank 1 - the search simply never returned it",
+   "recoverableByProposedVinardoDocking": true
+  },
+  {
+   "pdbId": "2BM2",
+   "class": "C4_NEAR_DEGENERATE_BASINS",
+   "bestRmsdInTop20A": 2.926,
+   "run3Top1RmsdA": 4.196,
+   "nearMiss": false,
+   "ligandSmilesAsDocked": "NCc1cccc(C2CCN(C(=O)c3cncc(CCc4ccccc4)c3)CC2)c1",
+   "heavyAtoms": 30,
+   "rotatableBonds": 6,
+   "formalChargeAsPrepared": 0,
+   "neutralIonisableGroups": {
+    "acidic": 0,
+    "basic": 1
+   },
+   "polarHeavyAtomFraction": 0.133,
+   "rigidFragmentRmsdFloorA": 0.673,
+   "nRigidFragments": 8,
+   "crystalPoseVinaKcalMol": -8.043,
+   "crystalPoseVinaAfterLocalOptKcalMol": -8.843,
+   "vinaRank1KcalMol": -8.466,
+   "deltaOptMinusRank1KcalMol": -0.377,
+   "crystalPoseLigandEfficiency": -0.268,
+   "crystalPoseLigandEfficiencyWorstRankOf85": 14,
+   "crystalPoseRelaxationDriftA": 0.343,
+   "worstBoxMarginA": 4.442,
+   "minLigandReceptorHeavyDistA": 2.629,
+   "hetatmWithin5A": [],
+   "watersWithin5A": 12,
+   "watersWithin3_5A": 3,
+   "bridgingWaters": 1,
+   "modifiedResiduesWithin6A": [],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "vinardoCrystalPoseAfterLocalOptKcalMol": -7.199,
+   "vinardoBestOfStoredRun4Poses": -6.198,
+   "vinardoDeltaOptMinusBestStored": -1.001,
+   "cause": "Near-degenerate: delta_opt -0.377 kcal/mol. PM2 is a 30-heavy-atom, 6-rotatable-bond thrombin/factor-Xa-type ligand with a benzylamine (prepared neutral) that should be an ammonium engaging the S1 aspartate. Floor 0.673 A, 3 waters within 3.5 A, no dropped residue, no clash.",
+   "causeConfidence": "MEDIUM",
+   "causeConfidenceBasis": "Measured -0.377 kcal/mol. No structural defect found. Same caveat as 1KE5.",
+   "globalRulePossible": "YES",
+   "globalRuleNote": "Rule: change the docking scoring function globally (the proposal). Applies to all 85 identically.",
+   "threeWayDiagnosis": "1_SEARCH",
+   "threeWayEvidence": "crystal pose scores acceptably (LE -0.268), does not clash (drift 0.34 A), and the relaxed native basin is -0.377 kcal/mol BETTER than Vina rank 1 - the search simply never returned it",
+   "recoverableByProposedVinardoDocking": true
+  }
+ ],
+ "proposal": {
+  "change": "Dock with the Vinardo scoring function (vina.Vina(sf_name='vinardo')) instead of docking with 'vina' and rescoring afterwards. One global constant in dock_worker; nothing per-target, no new box, no new preparation step.",
+  "whyThisOne": "The diagnosis says the search is not the bottleneck: only 1 of the 17 (1YVF) has a native basin more than 0.5 kcal/mol better than what the search returned, so raising exhaustiveness addresses at most 1 case. 10 of the 17 fail because the native pose is not the optimum of the energy function being searched (7 in C3, plus C1 and the 2 in C2 where the energetics are also adverse). The only way to recover those is to change the energy landscape, and of the changes available, changing the scoring function is the one the existing evidence already quantifies from two independent directions: run 5 showed Vinardo re-ranking alone moves 46 -> 50 on the SAME pose sets, and the crystal-pose probe here shows that for 8 of the 17 (1KE5, 1L7F, 1Q41, 1TT1, 1TZ8, 1U4D, 1YVF, 2BM2) the locally minimised crystal pose out-scores EVERY one of the 20 stored poses under Vinardo, by 0.26 to 1.75 kcal/mol - a native basin that is the Vinardo optimum but not the Vina optimum. Docking with Vinardo makes the search follow that landscape instead of merely re-reading it at the end.",
+  "alternativesRejected": {
+   "raiseExhaustiveness": "Addresses only C5 (1 case). For the 7 C3 cases the search already found something the function likes better than the native pose; more search makes that worse, not better.",
+   "keepConservedWaters": "The water statistics do not separate the 17 from the 46 successes, and 7 of the 17 have no water within 5 A.",
+   "flexibleReceptorSideChains": "Redocking uses the holo receptor; the crystal pose relaxes by at most 0.65 A in every prepared receptor, so there is nothing to relieve.",
+   "keepModifiedResiduesDepositedAsHETATM": "Correct to do, but touches 1 of the 17 (1MEH) and 1 of the 20 A cases (1XM6).",
+   "multipleETKDGconformers": "Addresses C2 (2 cases) and would lower the floor generally, but the floor exceeds 1.0 A in only 2 of the 17 and in 1 of the 46 successes.",
+   "protonateLigandsAtPH7.4": "Best-supported correlation but no measured mechanism under a charge-blind scoring function."
+  },
+  "boundedEstimateOfRecovery": {
+   "labelled": "ESTIMATE, NOT A MEASUREMENT. No docking was run for this document.",
+   "hardUpperBound": 8,
+   "hardUpperBoundReasoning": "Exactly 8 of the 17 have vinardoDeltaOptMinusBestStored < 0, i.e. a native basin that out-scores every pose the Vina search produced under Vinardo: 1KE5, 1L7F, 1Q41, 1TT1, 1TZ8, 1U4D, 1YVF, 2BM2. For the other 9 Vinardo still prefers a non-native pose by +0.11 to +1.74 kcal/mol, so re-docking with Vinardo cannot recover them.",
+   "lowerBound": 0,
+   "lowerBoundReasoning": "A better-scoring basin is necessary, not sufficient: the Vinardo search must also visit it, and it must produce a pose under 2.0 A once there. 1Q41 in particular has a 1.654 A rigid-fragment floor, so even a perfect Vinardo search may land at ~1.7-2.4 A.",
+   "mostLikelyRange": "3 to 6 of the 17",
+   "mostLikelyRangeReasoning": "Of the 8, six have a Vinardo margin >= 0.73 kcal/mol (1KE5 -1.06, 2BM2 -1.00, 1YVF -0.98, 1L7F -0.91, 1U4D -0.74, 1Q41 -1.75) and two are marginal (1TT1 -0.26, 1TZ8 -0.43). Discount 1Q41 for its geometric floor. That leaves ~5 plausible plus 2 marginal, and any global search change converts basins to sub-2.0 A poses imperfectly, so 3 to 6 is the honest interval.",
+   "importantCaveat": "This is a bound on the 17 only. Run 5 also showed Vinardo re-ranking LOSES 5 cases that Vina got right (1L2S, 1OF1, 1OQ5, 1U1C, 1UML). Re-docking with Vinardo re-rolls all 85, so the net effect on the headline 46/85 is NOT bounded by this estimate and could be negative."
+  },
+  "theOneNextExperiment": "Re-run the full 85-case protocol unchanged except sf_name='vinardo' at docking time (same preparation, same boxes, same exhaustiveness 32, same seed 42, same 2.0 A threshold, same denominator 85), preregistered before it is run, and report it as run 6 alongside run 3 rather than replacing it. Prespecify the two numbers that decide it: successes/85, and the count among the 17 diagnosed here. The falsifiable prediction from this diagnosis is that of the 17, between 3 and 6 are recovered and none of the 9 with a positive Vinardo delta is."
+ },
+ "whatCouldNotBeDetermined": [
+  "Whether any of the C3 cases would be recovered by a protonation fix: Vina and Vinardo are both charge-blind, so the prepared protonation state could not be tested with the existing scoring machinery. The association (76% vs 43%) is reported, the causation is not established.",
+  "The true RMSD floor including fragment connectivity. The reported floor is a lower bound obtained by fitting each rigid fragment independently; the achievable floor is higher by an unmeasured amount.",
+  "Whether the Vinardo search would actually visit the better-scoring native basins. Only the scores of the basins were measured, never a Vinardo docking run.",
+  "For 1GKC, what the benchmark result would be with the full 22-heavy-atom two-residue ligand. It was not re-docked, because that requires changing the preregistered ligand rule."
+ ]
+}

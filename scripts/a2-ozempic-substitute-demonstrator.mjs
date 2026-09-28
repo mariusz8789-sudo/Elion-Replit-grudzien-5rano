@@ -16,8 +16,15 @@
  *
  * No drug name was ever the input to candidate DISCOVERY — only ChEMBL
  * binding data and clinical-development phase. The result is
- * CONFLICTING_EVIDENCE, not a forced winner: this demonstrator's checks
+ * NO_SUPERIOR_CANDIDATE, not a forced winner: this demonstrator's checks
  * verify the real reasons why, not that a "best" answer was produced.
+ *
+ * The expected label changed once, on the record: before D-115 it was
+ * CONFLICTING_EVIDENCE. D-115 (docs/DECISIONS.md) applied the single-arm
+ * identity rule to all 20 candidates, which removed native GLP-1's
+ * misattributed dulaglutide observation (NCT05659537); A2's verdict became
+ * NO_SUPERIOR_CANDIDATE and its analysisFingerprint 22e9bdb0 -> 8c99ae95.
+ * The checks below pin the post-D-115 values that table records.
  *
  * Exit code 0 = every mandated property held. Exit code 1 = at least one did
  * not, with the failing property named.
@@ -120,10 +127,10 @@ record('9. two real GCGR-antagonist candidates (mechanistically distinct from se
 
 record('10. the verdict is one of the 6 preregistered labels, and is NOT forced positive',
   ['BEST_SUPPORTED_CANDIDATE', 'PROMISING_BUT_UNCERTAIN', 'NO_SUPERIOR_CANDIDATE', 'NO_SAFE_SUPERIOR_CANDIDATE', 'CONFLICTING_EVIDENCE', 'INSUFFICIENT_EVIDENCE'].includes(report.verdict.label)
-    && report.verdict.label === 'CONFLICTING_EVIDENCE',
-  report.verdict.label);
+    && report.verdict.label === 'NO_SUPERIOR_CANDIDATE',
+  `${report.verdict.label} (expected NO_SUPERIOR_CANDIDATE since D-115)`);
 
-record('11. no PracticalCandidate is gated when the verdict is CONFLICTING_EVIDENCE — nothing is proposed as an actionable winner',
+record('11. no PracticalCandidate is gated when the verdict is NO_SUPERIOR_CANDIDATE — nothing is proposed as an actionable winner',
   report.gatedCandidate === null && report.gateDecision === null && report.surface === 'NONE',
   `gatedCandidate=${report.gatedCandidate} surface=${report.surface}`);
 
@@ -131,8 +138,8 @@ record('12. the underlying evidence remains fully visible regardless of the inco
   report.candidateReports.length === 12 && report.rankedByScore.length === 12,
   'all 12 candidate reports with real trial evidence remain in the report');
 
-record('13. the whole pipeline is deterministic: re-running produces an identical analysis fingerprint',
-  mod.runA2Analysis().analysisFingerprint === report.analysisFingerprint,
+record('13. the whole pipeline is deterministic: re-running produces an identical analysis fingerprint, the one D-115 recorded',
+  mod.runA2Analysis().analysisFingerprint === report.analysisFingerprint && report.analysisFingerprint === '8c99ae95',
   report.analysisFingerprint);
 
 record('14. the analysis fingerprint traces to the preregistration, sealed before any candidate data was pulled',

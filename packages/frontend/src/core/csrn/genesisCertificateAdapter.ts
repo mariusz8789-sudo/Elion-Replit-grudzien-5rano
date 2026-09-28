@@ -23,6 +23,8 @@ import type { SavedExperiment } from '../scienceMemory';
  *     `resolvedFrom` are exactly `discoveryLoop.campaignProvenance`
  *     (`researchCampaign.ts` chaining) — `null` for a campaign's first
  *     cycle, which genuinely has no previous cycle to point at.
+ *   - `claim.epistemicStatus` is `saved.epistemicStatus`, copied, never
+ *     upgraded: a signed MODEL_ESTIMATE stays a MODEL_ESTIMATE.
  *   - `provenance.provenanceTrail` carries ONE step whose fingerprints are
  *     Genesis's own (`hypothesisLoop.preregistrationFingerprint` →
  *     `discoveryLoop.discoveryLoopFingerprint`, or the previous cycle's
@@ -70,6 +72,8 @@ export function buildCertificateInputFromDiscoveryLoop(saved: SavedExperiment, c
       claimId: saved.id,
       statement: discoveryLoop.statement,
       domain: saved.labId,
+      // Bound by the signature as-is; signing never promotes it (see CSRN `Claim.epistemicStatus`).
+      epistemicStatus: saved.epistemicStatus,
     },
     evidence: {
       evidencePackId,

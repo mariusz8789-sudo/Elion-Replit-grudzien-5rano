@@ -34,6 +34,16 @@ export interface Claim {
   readonly domain: string;
   readonly hypothesisId?: string | null;
   readonly predictionSourceExperimentId?: string | null;
+  /**
+   * The claim's epistemic status, in the Genesis vocabulary that produced it
+   * (e.g. `MODEL_ESTIMATE`, `SIMULATION`, `NOT_VALIDATED`) — opaque to CSRN, same
+   * reasoning as `evidenceUri`. It is part of the claim, so `claimFingerprint`
+   * and the signature bind it: relabelling a signed MODEL_ESTIMATE as
+   * REAL_MEASUREMENT makes the certificate INTEGRITY_INVALID. Nothing in CSRN
+   * ever changes it: a verified signature says the claim was not altered, not
+   * that it was measured or validated.
+   */
+  readonly epistemicStatus?: string | null;
 }
 
 export interface Evidence {

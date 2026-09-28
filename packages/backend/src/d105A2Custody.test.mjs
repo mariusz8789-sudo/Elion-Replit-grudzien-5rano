@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const custody = await import(pathToFileURL(path.join(HERE, '../../../scripts/d105-a2-custody.mjs')).href);
@@ -76,7 +77,7 @@ test('the frozen D-076/077 pin agrees with 6 of 7 overlapping structures', () =>
   assert.equal(p.disagree.length, 1);
 });
 
-test('the one disagreement is a deleted run that still parses — corruption here is SILENT', () => {
+test('the one disagreement is a deleted run that still parses — corruption here is SILENT', { skip: RDKIT_SKIP }, () => {
   const [d] = custody.pinCrossCheck().disagree;
   assert.equal(d.id, 'CHEMBL414357');
   assert.equal(d.chunk, 2);
@@ -88,14 +89,14 @@ test('the one disagreement is a deleted run that still parses — corruption her
   assert.equal(d.deliveredStillParses, true);
 });
 
-test('every RDKit-unparseable structure sits in a chunk that already failed on hash', () => {
+test('every RDKit-unparseable structure sits in a chunk that already failed on hash', { skip: RDKIT_SKIP }, () => {
   const r = custody.rdkitParseReport();
   const failed = new Set(custody.coverage().chunksFailed);
   for (const u of r.unparseable) assert.ok(failed.has(u.chunk), `${u.id} is in chunk ${u.chunk}`);
   assert.equal(r.empty, 2);
 });
 
-test('parse success does not confer custody: failed chunks are excluded in full', () => {
+test('parse success does not confer custody: failed chunks are excluded in full', { skip: RDKIT_SKIP }, () => {
   const verified = custody.verifiedSmiles();
   const all = custody.allDeliveredSmiles();
   // Nearly every structure parses; only the byte-verified chunks may be used.

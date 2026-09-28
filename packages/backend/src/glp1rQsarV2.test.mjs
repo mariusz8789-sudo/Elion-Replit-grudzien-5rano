@@ -26,6 +26,7 @@ import {
 } from './campaign/glp1rQsarV2.mjs';
 import { trainRidge, loadGlp1rValidationGate } from './campaign/glp1rQsar.mjs';
 import { descriptors as rdkitDescriptors, detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const GATE_PATH = join(SRC, 'campaign/glp1r-validation-gate.json');
@@ -78,7 +79,7 @@ describe('the dense ridge exists because the sparse binary one cannot do this', 
 
 // =========================================================================
 describe('features are refused rather than guessed', () => {
-  test('descriptor names match the LIVE engine — a wrong name is a hard failure, not a zero', () => {
+  test('descriptor names match the LIVE engine — a wrong name is a hard failure, not a zero', { skip: RDKIT_SKIP }, () => {
     const d = rdkitDetect();
     assert.equal(d.available, true);
     const real = Object.keys(rdkitDescriptors('CCO').data);

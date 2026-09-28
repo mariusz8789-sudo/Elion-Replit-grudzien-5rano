@@ -20,6 +20,7 @@ import { loadGiprValidationGate, loadGiprPin, trainGiprModel, probeGiprCapabilit
 import { loadGlp1rValidationGate } from './campaign/glp1rQsar.mjs';
 import { assessDualTargetAxes, rankDualTarget, dualTargetVerdict, DUAL_TARGET_OBJECTIVES, VALUE_KIND } from './campaign/dualTargetDiscovery.mjs';
 import { runExperimentDag, compareDagRuns, EXPERIMENT_NODES, NODE_STATUS } from './campaign/experimentDag.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const withTempDir = (fn) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'mounjaro-test-'));
@@ -109,7 +110,7 @@ describe('D-081 GIPR track — fail-closed, gate frozen before data', () => {
     assert.equal(censored.dropped.missingValue, 1);
   });
 
-  it('the GIPR capability is COMPUTED from a real training attempt — and with real data it now fails on SIZE, not absence', () => {
+  it('the GIPR capability is COMPUTED from a real training attempt — and with real data it now fails on SIZE, not absence', { skip: RDKIT_SKIP }, () => {
     const cap = probeGiprCapability();
     assert.equal(cap.available, false);
     // The code moved from PIN_MISSING to INSUFFICIENT_DATA when 233 real rows

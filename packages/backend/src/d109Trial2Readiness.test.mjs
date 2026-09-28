@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const readiness = await import(pathToFileURL(path.join(HERE, '../../../scripts/d109-trial2-readiness.mjs')).href);
@@ -33,7 +34,7 @@ test('this module never proposes, drafts, or seals a new preregistration', () =>
   assert.equal(Object.keys(readiness).includes('proposeArm'), false);
 });
 
-test('GIPR is currently BLOCKED on data volume alone, with the exact real counts', () => {
+test('GIPR is currently BLOCKED on data volume alone, with the exact real counts', { skip: RDKIT_SKIP }, () => {
   const r = gipr.trainGiprModel();
   assert.equal(r.ok, false);
   assert.equal(r.code, 'INSUFFICIENT_DATA');
@@ -42,7 +43,7 @@ test('GIPR is currently BLOCKED on data volume alone, with the exact real counts
   assert.match(r.reasons[0], /nTest=24/);
 });
 
-test('the GIPR split is a deterministic hash function, not a tunable ratio — the gap is a data problem, not a knob problem', () => {
+test('the GIPR split is a deterministic hash function, not a tunable ratio — the gap is a data problem, not a knob problem', { skip: RDKIT_SKIP }, () => {
   // 146 + 63 (implied calib) + 24 = 233 exactly: no row is lost to
   // featurisation failure, so the shortfall is entirely about how many
   // real rows exist, not about rows being dropped for a fixable reason.

@@ -1,0 +1,4447 @@
+{
+ "1G9V": {
+  "pdbId": "1G9V",
+  "smiles": "Cc1cc(C)cc(NC(=O)Cc2ccc(OC(C)(C)C(=O)O)cc2)c1",
+  "heavyAtoms": 25,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 341.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.966,
+    16.623,
+    41.744
+   ],
+   "size": [
+    20.0,
+    23.331,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.918,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 3.224,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 4384,
+  "hetWithin5A": [],
+  "watersWithin5A": 9,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.915,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.579
+ },
+ "1GKC": {
+  "pdbId": "1GKC",
+  "smiles": "CNC(=O)[C@@H](N)C(C)(C)C",
+  "heavyAtoms": 10,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 144.2,
+  "nRings": 0,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 2,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    67.317,
+    32.356,
+    119.878
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.882,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.894,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1278,
+  "hetWithin5A": [
+   {
+    "res": "BUM",
+    "chain": "A",
+    "seq": "1449",
+    "nAtoms": 12,
+    "minDistA": 1.35,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 6.434,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 3.935
+ },
+ "1GM8": {
+  "pdbId": "1GM8",
+  "smiles": "CC1(C)[C@H](C(=O)O)N2C(=O)[C@@H](NC(=O)Cc3ccccc3)[C@H]2[S@H]1O",
+  "heavyAtoms": 24,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 5,
+  "formalCharge": 0,
+  "mw": 352.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    14.458,
+    -2.042,
+    3.683
+   ],
+   "size": [
+    20.0,
+    20.598,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.826,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.526,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 6066,
+  "hetWithin5A": [],
+  "watersWithin5A": 15,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.523,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 3.292
+ },
+ "1GPK": {
+  "pdbId": "1GPK",
+  "smiles": "CC=C1[C@@H]2C=C(C)C[C@@]1(N)c1ccc(=O)[nH]c1C2",
+  "heavyAtoms": 18,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 242.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    2.842,
+    67.452,
+    63.054
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.101,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.622,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3995,
+  "hetWithin5A": [],
+  "watersWithin5A": 7,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.52,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1HNN": {
+  "pdbId": "1HNN",
+  "smiles": "NS(=O)(=O)c1ccc2c(c1)CNCC2",
+  "heavyAtoms": 14,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 1,
+  "formalCharge": 0,
+  "mw": 212.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    28.265,
+    44.149,
+    16.529
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.241,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.568,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1998,
+  "hetWithin5A": [
+   {
+    "res": "SAH",
+    "chain": " ",
+    "seq": "2001",
+    "nAtoms": 26,
+    "minDistA": 4.4,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.026,
+  "cofactorsKept": [
+   {
+    "residue": "SAH2001",
+    "heavyAtoms": 26,
+    "pdbqtAtoms": 33
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1HP0": {
+  "pdbId": "1HP0",
+  "smiles": "Nc1nccc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O",
+  "heavyAtoms": 19,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 266.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.686,
+    25.497,
+    12.944
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.801,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.543,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 5,
+  "nRecHeavyAtoms": 2440,
+  "hetWithin5A": [
+   {
+    "res": "CA",
+    "chain": "A",
+    "seq": "328",
+    "nAtoms": 1,
+    "minDistA": 2.55,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.054,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1HQ2": {
+  "pdbId": "1HQ2",
+  "smiles": "Nc1nc2c(c(=O)[nH]1)N=C(CO)CN2",
+  "heavyAtoms": 14,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 1,
+  "formalCharge": 0,
+  "mw": 195.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -8.503,
+    7.946,
+    17.463
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 7.253,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.142,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1294,
+  "hetWithin5A": [
+   {
+    "res": "MG",
+    "chain": "A",
+    "seq": "162",
+    "nAtoms": 1,
+    "minDistA": 2.14,
+    "class": "metal"
+   },
+   {
+    "res": "APC",
+    "chain": " ",
+    "seq": "171",
+    "nAtoms": 31,
+    "minDistA": 2.95,
+    "class": "other"
+   },
+   {
+    "res": "MG",
+    "chain": "A",
+    "seq": "161",
+    "nAtoms": 1,
+    "minDistA": 4.69,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 9,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.42,
+  "cofactorsKept": [
+   {
+    "residue": "APC171",
+    "heavyAtoms": 31,
+    "pdbqtAtoms": 39
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1HVY": {
+  "pdbId": "1HVY",
+  "smiles": "Cc1nc(=O)c2cc(CN(C)c3ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)s3)ccc2[nH]1",
+  "heavyAtoms": 32,
+  "rotBonds": 9,
+  "rotBondsNonStrict": 10,
+  "formalCharge": 0,
+  "mw": 458.5,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 2,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    0.401,
+    12.392,
+    17.766
+   ],
+   "size": [
+    20.0,
+    24.773,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.158,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.63,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2339,
+  "hetWithin5A": [
+   {
+    "res": "UMP",
+    "chain": "A",
+    "seq": "314",
+    "nAtoms": 20,
+    "minDistA": 3.1,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.479,
+  "cofactorsKept": [
+   {
+    "residue": "UMP:A314",
+    "heavyAtoms": 20,
+    "pdbqtAtoms": 24
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.009
+ },
+ "1HWI": {
+  "pdbId": "1HWI",
+  "smiles": "CC(C)n1c(C=C[C@@H](O)C[C@@H](O)CC(=O)O)c(-c2ccc(F)cc2)c2ccccc21",
+  "heavyAtoms": 30,
+  "rotBonds": 8,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 411.5,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    33.197,
+    -6.634,
+    -10.597
+   ],
+   "size": [
+    20.0,
+    20.085,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.351,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.804,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2913,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.087,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.014
+ },
+ "1HWW": {
+  "pdbId": "1HWW",
+  "smiles": "O[C@H]1[C@H]2[C@H](O)CCCN2C[C@H]1O",
+  "heavyAtoms": 12,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 173.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    31.377,
+    66.383,
+    7.718
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 7.575,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.3,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 4,
+  "nRecHeavyAtoms": 8182,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "1102",
+    "nAtoms": 1,
+    "minDistA": 2.3,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 6,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.281,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1IA1": {
+  "pdbId": "1IA1",
+  "smiles": "Nc1nc(N)c2c(Sc3ccccc3)cccc2n1",
+  "heavyAtoms": 19,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 268.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    30.54,
+    -3.375,
+    1.901
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.078,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.6,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1586,
+  "hetWithin5A": [
+   {
+    "res": "TQ3",
+    "chain": " ",
+    "seq": "194",
+    "nAtoms": 19,
+    "minDistA": 0.0,
+    "class": "other"
+   },
+   {
+    "res": "NDP",
+    "chain": " ",
+    "seq": "193",
+    "nAtoms": 48,
+    "minDistA": 3.59,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.394,
+  "cofactorsKept": [
+   {
+    "residue": "NDP193",
+    "heavyAtoms": 48,
+    "pdbqtAtoms": 59
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1IG3": {
+  "pdbId": "1IG3",
+  "smiles": "Cc1ncc(C[n+]2csc(CCO)c2C)c(N)n1",
+  "heavyAtoms": 18,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 1,
+  "mw": 265.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    6.32,
+    70.358,
+    19.332
+   ],
+   "size": [
+    20.0,
+    20.0,
+    22.354
+   ]
+  },
+  "worstBoxMarginA": 4.671,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.571,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 3887,
+  "hetWithin5A": [
+   {
+    "res": "SO4",
+    "chain": " ",
+    "seq": "609",
+    "nAtoms": 5,
+    "minDistA": 3.19,
+    "class": "additive"
+   },
+   {
+    "res": "SO4",
+    "chain": " ",
+    "seq": "607",
+    "nAtoms": 5,
+    "minDistA": 4.65,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 9.385,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.729
+ },
+ "1J3J": {
+  "pdbId": "1J3J",
+  "smiles": "CCc1nc(N)nc(N)c1-c1ccc(Cl)cc1",
+  "heavyAtoms": 17,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 248.7,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    28.165,
+    5.311,
+    58.672
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.772,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.639,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 4598,
+  "hetWithin5A": [
+   {
+    "res": "NDP",
+    "chain": " ",
+    "seq": "610",
+    "nAtoms": 48,
+    "minDistA": 3.5,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.52,
+  "cofactorsKept": [
+   {
+    "residue": "NDP610",
+    "heavyAtoms": 48,
+    "pdbqtAtoms": 59
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1JD0": {
+  "pdbId": "1JD0",
+  "smiles": "CC(=O)Nc1nnc(S(N)(=O)=O)s1",
+  "heavyAtoms": 13,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 222.3,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    18.481,
+    6.524,
+    25.564
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.942,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 1.96,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2089,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "901",
+    "nAtoms": 1,
+    "minDistA": 1.96,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 5.546,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.873
+ },
+ "1JJE": {
+  "pdbId": "1JJE",
+  "smiles": "O=C(O)[C@@H](Cc1ccccc1)[C@H](Cc1ccc2c(c1)OCO2)C(=O)O",
+  "heavyAtoms": 25,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 342.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 2,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    57.657,
+    24.777,
+    34.576
+   ],
+   "size": [
+    20.0,
+    20.0,
+    23.029
+   ]
+  },
+  "worstBoxMarginA": 4.904,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 1.998,
+  "nContactsBelow2_2A": 2,
+  "nContactsBelow2_6A": 3,
+  "nRecHeavyAtoms": 1716,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "251",
+    "nAtoms": 1,
+    "minDistA": 2.0,
+    "class": "metal"
+   },
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "252",
+    "nAtoms": 1,
+    "minDistA": 2.14,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.979,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.377
+ },
+ "1JLA": {
+  "pdbId": "1JLA",
+  "smiles": "CC(C)c1c(Cc2ccccc2)n(COCc2ccccc2)c(=O)[nH]c1=O",
+  "heavyAtoms": 27,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 364.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -3.08,
+    -35.284,
+    24.86
+   ],
+   "size": [
+    20.248,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.015,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.702,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 7813,
+  "hetWithin5A": [],
+  "watersWithin5A": 1,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.601,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1K3U": {
+  "pdbId": "1K3U",
+  "smiles": "O=C(O)C[C@H](NC(=O)Cc1c[nH]c2ccccc12)C(=O)O",
+  "heavyAtoms": 21,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 290.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 2,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    48.894,
+    27.243,
+    13.062
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.178,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.462,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 3,
+  "nRecHeavyAtoms": 4989,
+  "hetWithin5A": [],
+  "watersWithin5A": 3,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.64,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1KE5": {
+  "pdbId": "1KE5",
+  "smiles": "CNS(=O)(=O)c1ccc(NC=C2C(=O)Nc3ccccc32)cc1",
+  "heavyAtoms": 23,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 329.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -9.51,
+    48.704,
+    38.092
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.548
+   ]
+  },
+  "worstBoxMarginA": 4.432,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.892,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2226,
+  "hetWithin5A": [],
+  "watersWithin5A": 7,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.012,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.765
+ },
+ "1KZK": {
+  "pdbId": "1KZK",
+  "smiles": "Cc1ccccc1CNC(=O)[C@H]1N(C(=O)[C@@H](O)[C@H](Cc2ccccc2)NC(=O)c2cccc(O)c2C)CSC1(C)C",
+  "heavyAtoms": 41,
+  "rotBonds": 9,
+  "rotBondsNonStrict": 12,
+  "formalCharge": 0,
+  "mw": 575.7,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 2,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    19.859,
+    -1.74,
+    16.894
+   ],
+   "size": [
+    22.12,
+    20.521,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.928,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.616,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1498,
+  "hetWithin5A": [],
+  "watersWithin5A": 15,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.152,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1L2S": {
+  "pdbId": "1L2S",
+  "smiles": "O=C(O)c1sccc1S(=O)(=O)Nc1ccc(Cl)cc1",
+  "heavyAtoms": 19,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 317.8,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    51.489,
+    -2.268,
+    22.3
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.62,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.635,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 5398,
+  "hetWithin5A": [],
+  "watersWithin5A": 5,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 5.319,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "D_UNCERTAIN",
+  "bestRmsdInTopKA": 0.492
+ },
+ "1L7F": {
+  "pdbId": "1L7F",
+  "smiles": "CCC(CC)[C@H](NC(C)=O)[C@@H]1[C@H](O)[C@@H](C(=O)O)C[C@H]1NC(=N)N",
+  "heavyAtoms": 23,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 9,
+  "formalCharge": 0,
+  "mw": 328.4,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 3,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 2,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    25.917,
+    17.175,
+    62.803
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.809,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.69,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3069,
+  "hetWithin5A": [],
+  "watersWithin5A": 14,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.765,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 3.653
+ },
+ "1LPZ": {
+  "pdbId": "1LPZ",
+  "smiles": "Cc1cccc2c1cc(C(=O)NCc1cc(Cl)cc(Cl)c1)n2Cc1cccc(C(=N)N)c1",
+  "heavyAtoms": 32,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 465.4,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 2,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    7.335,
+    6.815,
+    22.976
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.487
+   ]
+  },
+  "worstBoxMarginA": 4.93,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.566,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2248,
+  "hetWithin5A": [],
+  "watersWithin5A": 13,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.661,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1LRH": {
+  "pdbId": "1LRH",
+  "smiles": "O=C(O)Cc1cccc2ccccc12",
+  "heavyAtoms": 14,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 186.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    10.066,
+    56.969,
+    63.22
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.591,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.405,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 3,
+  "nRecHeavyAtoms": 1270,
+  "hetWithin5A": [
+   {
+    "res": "NLA",
+    "chain": " ",
+    "seq": "5190",
+    "nAtoms": 14,
+    "minDistA": 0.0,
+    "class": "other"
+   },
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "180",
+    "nAtoms": 1,
+    "minDistA": 2.4,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.764,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1M2Z": {
+  "pdbId": "1M2Z",
+  "smiles": "C[C@@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
+  "heavyAtoms": 28,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 392.5,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    30.453,
+    7.022,
+    13.256
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.241
+   ]
+  },
+  "worstBoxMarginA": 4.407,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.978,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2246,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.597,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1MEH": {
+  "pdbId": "1MEH",
+  "smiles": "COc1c(C)c2c(c(O)c1CC=C(C)CCC(=O)O)C(=O)OC2",
+  "heavyAtoms": 23,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 320.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    56.294,
+    55.996,
+    18.24
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.41,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.52,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2725,
+  "hetWithin5A": [
+   {
+    "res": "IMP",
+    "chain": " ",
+    "seq": "602",
+    "nAtoms": 23,
+    "minDistA": 3.2,
+    "class": "other"
+   },
+   {
+    "res": "CSO",
+    "chain": "A",
+    "seq": "319",
+    "nAtoms": 7,
+    "minDistA": 4.32,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 9,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [
+   {
+    "res": "CSO",
+    "chain": "A",
+    "seq": "319",
+    "nAtoms": 7,
+    "minDistA": 4.32,
+    "class": "other"
+   }
+  ],
+  "success_run3": false,
+  "rmsd_run3": 4.175,
+  "cofactorsKept": [
+   {
+    "residue": "IMP602",
+    "heavyAtoms": 23,
+    "pdbqtAtoms": 28
+   }
+  ],
+  "cofactorsNotKept": [
+   {
+    "residue": "CSO:A319",
+    "reason": "no_ccd_template_with_7_heavy_atoms"
+   }
+  ],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.326
+ },
+ "1MMV": {
+  "pdbId": "1MMV",
+  "smiles": "CCCNC(=[NH2+])NCCC[C@H](N)C(=O)O",
+  "heavyAtoms": 15,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 9,
+  "formalCharge": 1,
+  "mw": 217.3,
+  "nRings": 0,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 3,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    11.491,
+    -0.225,
+    23.58
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.355,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.523,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 3373,
+  "hetWithin5A": [
+   {
+    "res": "HEM",
+    "chain": "A",
+    "seq": "1750",
+    "nAtoms": 43,
+    "minDistA": 2.86,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.057,
+  "cofactorsKept": [
+   {
+    "residue": "HEM:A1750",
+    "heavyAtoms": 43,
+    "pdbqtAtoms": 45
+   },
+   {
+    "residue": "BH41760",
+    "heavyAtoms": 17,
+    "pdbqtAtoms": 24
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.093
+ },
+ "1MZC": {
+  "pdbId": "1MZC",
+  "smiles": "CC[C@@]1(c2cccc(Oc3cc([C@](C)(N)c4cncn4C)ccc3C#N)c2)CCCCN(C)C1=O",
+  "heavyAtoms": 35,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 471.6,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    17.14,
+    133.836,
+    -2.639
+   ],
+   "size": [
+    20.0,
+    20.0,
+    21.442
+   ]
+  },
+  "worstBoxMarginA": 4.439,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 1.934,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 5902,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "B",
+    "seq": "1001",
+    "nAtoms": 1,
+    "minDistA": 1.93,
+    "class": "metal"
+   },
+   {
+    "res": "FPP",
+    "chain": " ",
+    "seq": "902",
+    "nAtoms": 24,
+    "minDistA": 3.35,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 20,
+  "watersWithin3_5A": 6,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.707,
+  "cofactorsKept": [
+   {
+    "residue": "FPP902",
+    "heavyAtoms": 24,
+    "pdbqtAtoms": 27
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.496
+ },
+ "1N1M": {
+  "pdbId": "1N1M",
+  "smiles": "CC(C)[C@H](N)C(=O)N1CCCC1",
+  "heavyAtoms": 12,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 170.3,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    81.621,
+    75.002,
+    97.963
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.184,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.797,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 5948,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.89,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1N2J": {
+  "pdbId": "1N2J",
+  "smiles": "CC(C)(CO)[C@@H](O)C(=O)[O-]",
+  "heavyAtoms": 10,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": -1,
+  "mw": 147.1,
+  "nRings": 0,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 1,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    32.685,
+    33.843,
+    47.379
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 7.279,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.779,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2114,
+  "hetWithin5A": [
+   {
+    "res": "SO4",
+    "chain": " ",
+    "seq": "603",
+    "nAtoms": 5,
+    "minDistA": 4.42,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 6.904,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.463
+ },
+ "1N2V": {
+  "pdbId": "1N2V",
+  "smiles": "CCCCc1nc2c(=O)[nH][nH]c(=O)c2[nH]1",
+  "heavyAtoms": 15,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 208.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.229,
+    17.404,
+    20.877
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.361,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.678,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2903,
+  "hetWithin5A": [],
+  "watersWithin5A": 9,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 2.744,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.554
+ },
+ "1N46": {
+  "pdbId": "1N46",
+  "smiles": "Cc1cc(-n2ncc(=O)[nH]c2=O)cc(C)c1Oc1ccc(O)c(C(C)C)c1",
+  "heavyAtoms": 27,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 367.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    20.784,
+    6.68,
+    2.904
+   ],
+   "size": [
+    20.0,
+    20.4,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.857,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.612,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1968,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.517,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1NAV": {
+  "pdbId": "1NAV",
+  "smiles": "CC(C)c1cc(Oc2c(Cl)cc(CC(=O)O)cc2Cl)ccc1O",
+  "heavyAtoms": 23,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 5,
+  "formalCharge": 0,
+  "mw": 355.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    48.32,
+    18.236,
+    19.534
+   ],
+   "size": [
+    20.455,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.672,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.553,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1934,
+  "hetWithin5A": [],
+  "watersWithin5A": 2,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.751,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1OF1": {
+  "pdbId": "1OF1",
+  "smiles": "Cc1cn([C@@]23C[C@H](O)[C@@H](CO)[C@@H]2C3)c(=O)[nH]c1=O",
+  "heavyAtoms": 18,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 252.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    47.288,
+    33.765,
+    0.087
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.827,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.688,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2349,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.774,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1OF6": {
+  "pdbId": "1OF6",
+  "smiles": "N[C@@H](Cc1ccc(O)cc1)C(=O)O",
+  "heavyAtoms": 13,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 181.2,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    31.64,
+    -1.272,
+    49.771
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.749,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.515,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2621,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.807,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1OPK": {
+  "pdbId": "1OPK",
+  "smiles": "Cn1c(=O)c(-c2c(Cl)cccc2Cl)cc2cnc(Nc3cccc(CO)c3)nc21",
+  "heavyAtoms": 29,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 427.3,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    46.447,
+    18.007,
+    17.919
+   ],
+   "size": [
+    20.0,
+    22.326,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.249,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.839,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3612,
+  "hetWithin5A": [],
+  "watersWithin5A": 4,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.763,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1OQ5": {
+  "pdbId": "1OQ5",
+  "smiles": "Cc1ccc(-c2cc(C(F)(F)F)nn2-c2ccc(S(N)(=O)=O)cc2)cc1",
+  "heavyAtoms": 26,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 381.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    17.014,
+    6.827,
+    13.637
+   ],
+   "size": [
+    20.0,
+    20.005,
+    20.004
+   ]
+  },
+  "worstBoxMarginA": 4.346,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 1.968,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2031,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "600",
+    "nAtoms": 1,
+    "minDistA": 1.97,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 7,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.883,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1OWE": {
+  "pdbId": "1OWE",
+  "smiles": "N=C(N)c1ccc2cc(C(=O)Nc3ccccc3)ccc2c1",
+  "heavyAtoms": 22,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 289.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    22.64,
+    15.905,
+    32.533
+   ],
+   "size": [
+    20.355,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.447,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.771,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1929,
+  "hetWithin5A": [
+   {
+    "res": "SO4",
+    "chain": " ",
+    "seq": "302",
+    "nAtoms": 5,
+    "minDistA": 2.86,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 8,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 2.334,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.04
+ },
+ "1OYT": {
+  "pdbId": "1OYT",
+  "smiles": "NC(=[NH2+])c1ccc([C@H]2[C@H]3C(=O)N(Cc4ccc(F)cc4)C(=O)[C@H]3[C@@H]3CCCN32)cc1",
+  "heavyAtoms": 30,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 1,
+  "mw": 407.5,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.793,
+    -12.378,
+    21.829
+   ],
+   "size": [
+    21.695,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.607,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.778,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2265,
+  "hetWithin5A": [],
+  "watersWithin5A": 15,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.466,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1P2Y": {
+  "pdbId": "1P2Y",
+  "smiles": "CN1CCC[C@H]1c1cccnc1",
+  "heavyAtoms": 12,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 1,
+  "formalCharge": 0,
+  "mw": 162.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.332,
+    12.716,
+    41.045
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 7.307,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.198,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 3270,
+  "hetWithin5A": [
+   {
+    "res": "HEM",
+    "chain": "A",
+    "seq": "430",
+    "nAtoms": 43,
+    "minDistA": 2.2,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 3,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.326,
+  "cofactorsKept": [
+   {
+    "residue": "HEM:A430",
+    "heavyAtoms": 43,
+    "pdbqtAtoms": 45
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.458
+ },
+ "1P62": {
+  "pdbId": "1P62",
+  "smiles": "Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)C2(F)F)c(=O)n1",
+  "heavyAtoms": 18,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 263.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    68.707,
+    34.922,
+    19.397
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.518,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.478,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1894,
+  "hetWithin5A": [
+   {
+    "res": "MO3",
+    "chain": " ",
+    "seq": "401",
+    "nAtoms": 4,
+    "minDistA": 3.93,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 4,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.967,
+  "cofactorsKept": [
+   {
+    "residue": "ADP301",
+    "heavyAtoms": 27,
+    "pdbqtAtoms": 34
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1PMN": {
+  "pdbId": "1PMN",
+  "smiles": "CCCn1c(C2CCN(C)CC2)nc(-c2ccc(Cl)c(Cl)c2)c1-c1ccnc(NC2CC2)n1",
+  "heavyAtoms": 33,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 485.5,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    22.145,
+    10.709,
+    31.938
+   ],
+   "size": [
+    20.0,
+    21.61,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.772,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.828,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2749,
+  "hetWithin5A": [],
+  "watersWithin5A": 10,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.786,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1Q1G": {
+  "pdbId": "1Q1G",
+  "smiles": "CSC[C@H]1[NH2+][C@@H](c2c[nH]c3c(=O)[nH]cnc23)[C@H](O)[C@@H]1O",
+  "heavyAtoms": 20,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 1,
+  "mw": 297.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 1,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    8.685,
+    4.806,
+    92.751
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.704,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.597,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1861,
+  "hetWithin5A": [
+   {
+    "res": "SO4",
+    "chain": " ",
+    "seq": "401",
+    "nAtoms": 5,
+    "minDistA": 2.84,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 6.281,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.827
+ },
+ "1Q41": {
+  "pdbId": "1Q41",
+  "smiles": "O=C1Nc2ccccc2C1=C1Nc2ccccc2C1=NO",
+  "heavyAtoms": 21,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 277.3,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    39.632,
+    6.297,
+    36.269
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.309,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.619,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2680,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 2.742,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.362
+ },
+ "1Q4G": {
+  "pdbId": "1Q4G",
+  "smiles": "C[C@H](C(=O)O)c1ccc(-c2ccccc2)cc1",
+  "heavyAtoms": 17,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 226.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    26.617,
+    33.7,
+    201.931
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.518,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.513,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 4492,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.316,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1R1H": {
+  "pdbId": "1R1H",
+  "smiles": "C[C@H](NC(=O)[C@H](Cc1ccc(-c2ccccc2)cc1)C[P@](=O)(O)[C@H](C)N)C(=O)O",
+  "heavyAtoms": 29,
+  "rotBonds": 9,
+  "rotBondsNonStrict": 10,
+  "formalCharge": 0,
+  "mw": 418.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 2,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 1
+  },
+  "box": {
+   "center": [
+    31.251,
+    44.543,
+    34.611
+   ],
+   "size": [
+    20.965,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.368,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 1.945,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 2,
+  "nRecHeavyAtoms": 5596,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "1001",
+    "nAtoms": 1,
+    "minDistA": 1.94,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 13,
+  "watersWithin3_5A": 8,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.134,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1R55": {
+  "pdbId": "1R55",
+  "smiles": "CNC(=O)[C@@H](NC(=O)[C@H](CC(C)C)[C@H](O)C(=O)NO)C(C)(C)C",
+  "heavyAtoms": 23,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 11,
+  "formalCharge": 0,
+  "mw": 331.4,
+  "nRings": 0,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 2,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    9.381,
+    13.944,
+    25.293
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.742,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 1.938,
+  "nContactsBelow2_2A": 2,
+  "nContactsBelow2_6A": 2,
+  "nRecHeavyAtoms": 1515,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": "A",
+    "seq": "201",
+    "nAtoms": 1,
+    "minDistA": 1.94,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 11,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.138,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1R58": {
+  "pdbId": "1R58",
+  "smiles": "CC(C)SCC[C@@H](N)[C@H](O)C(=O)NNC(=O)c1cccc(Cl)c1",
+  "heavyAtoms": 23,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 10,
+  "formalCharge": 0,
+  "mw": 359.9,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    17.636,
+    30.943,
+    17.197
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.99,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.286,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 4,
+  "nRecHeavyAtoms": 2897,
+  "hetWithin5A": [
+   {
+    "res": "MN",
+    "chain": " ",
+    "seq": "480",
+    "nAtoms": 1,
+    "minDistA": 2.29,
+    "class": "metal"
+   },
+   {
+    "res": "MN",
+    "chain": " ",
+    "seq": "481",
+    "nAtoms": 1,
+    "minDistA": 2.34,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.476,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.748
+ },
+ "1R9O": {
+  "pdbId": "1R9O",
+  "smiles": "C[C@H](C(=O)O)c1ccc(-c2ccccc2)c(F)c1",
+  "heavyAtoms": 18,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 244.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    8.636,
+    33.142,
+    -1.903
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.402,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.693,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3693,
+  "hetWithin5A": [
+   {
+    "res": "GOL",
+    "chain": " ",
+    "seq": "502",
+    "nAtoms": 6,
+    "minDistA": 3.76,
+    "class": "additive"
+   },
+   {
+    "res": "HEM",
+    "chain": " ",
+    "seq": "500",
+    "nAtoms": 43,
+    "minDistA": 3.86,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 3,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.773,
+  "cofactorsKept": [
+   {
+    "residue": "HEM500",
+    "heavyAtoms": 43,
+    "pdbqtAtoms": 45
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.33
+ },
+ "1S19": {
+  "pdbId": "1S19",
+  "smiles": "C=C1C(=CC=C2CCC[C@]3(C)[C@@H]([C@H](C)C=C[C@@H](O)C4CC4)CC[C@@H]23)C[C@@H](O)C[C@@H]1O",
+  "heavyAtoms": 30,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 5,
+  "formalCharge": 0,
+  "mw": 412.6,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    11.597,
+    23.037,
+    34.284
+   ],
+   "size": [
+    22.802,
+    21.289,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.098,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.738,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2012,
+  "hetWithin5A": [],
+  "watersWithin5A": 2,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 9.347,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.612
+ },
+ "1S3V": {
+  "pdbId": "1S3V",
+  "smiles": "COc1cc(N(C)C[C@@H]2CCC3=C(C2)C(N)=N[C@@H](N)N3)cc(OC)c1OC",
+  "heavyAtoms": 27,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 375.5,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 3,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -2.707,
+    27.832,
+    3.43
+   ],
+   "size": [
+    20.0,
+    21.37,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.945,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.719,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1502,
+  "hetWithin5A": [],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 6.414,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.459
+ },
+ "1SG0": {
+  "pdbId": "1SG0",
+  "smiles": "Oc1ccc(C=Cc2cc(O)cc(O)c2)cc1",
+  "heavyAtoms": 17,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 228.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    26.201,
+    13.578,
+    5.275
+   ],
+   "size": [
+    20.163,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.885,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.759,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1878,
+  "hetWithin5A": [
+   {
+    "res": "FAD",
+    "chain": " ",
+    "seq": "433",
+    "nAtoms": 53,
+    "minDistA": 3.48,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 5.398,
+  "cofactorsKept": [
+   {
+    "residue": "FAD433",
+    "heavyAtoms": 53,
+    "pdbqtAtoms": 63
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "D_UNCERTAIN",
+  "bestRmsdInTopKA": 0.913
+ },
+ "1SJ0": {
+  "pdbId": "1SJ0",
+  "smiles": "Oc1ccc([C@H]2Sc3cc(O)ccc3O[C@H]2c2ccc(OCCN3CCCCC3)cc2)cc1",
+  "heavyAtoms": 33,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 463.6,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    31.406,
+    -1.491,
+    25.297
+   ],
+   "size": [
+    21.063,
+    20.0,
+    21.694
+   ]
+  },
+  "worstBoxMarginA": 3.167,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.583,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1929,
+  "hetWithin5A": [],
+  "watersWithin5A": 3,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.806,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.814
+ },
+ "1SQ5": {
+  "pdbId": "1SQ5",
+  "smiles": "CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)O",
+  "heavyAtoms": 15,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 219.2,
+  "nRings": 0,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    52.214,
+    5.557,
+    7.472
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.792,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.627,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2381,
+  "hetWithin5A": [
+   {
+    "res": "PAU",
+    "chain": " ",
+    "seq": "6001",
+    "nAtoms": 15,
+    "minDistA": 0.0,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 5.768,
+  "cofactorsKept": [
+   {
+    "residue": "ADP5001",
+    "heavyAtoms": 27,
+    "pdbqtAtoms": 34
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.642
+ },
+ "1SQN": {
+  "pdbId": "1SQN",
+  "smiles": "C#C[C@]1(O)CC[C@H]2[C@@H]3CCC4=CC(=O)CC[C@@H]4[C@H]3CC[C@@]21C",
+  "heavyAtoms": 22,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 298.4,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -2.454,
+    1.531,
+    25.555
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.787,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.761,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1936,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.406,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1T40": {
+  "pdbId": "1T40",
+  "smiles": "O=C(O)COc1cc(F)ccc1C(=O)NCc1nc2c(F)c(F)cc(F)c2s1",
+  "heavyAtoms": 28,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 414.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.632,
+    -6.701,
+    14.475
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.349
+   ]
+  },
+  "worstBoxMarginA": 4.625,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.711,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2573,
+  "hetWithin5A": [
+   {
+    "res": "NAP",
+    "chain": " ",
+    "seq": "318",
+    "nAtoms": 48,
+    "minDistA": 3.13,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 9,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.198,
+  "cofactorsKept": [
+   {
+    "residue": "NAP318",
+    "heavyAtoms": 48,
+    "pdbqtAtoms": 58
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1T46": {
+  "pdbId": "1T46",
+  "smiles": "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+  "heavyAtoms": 37,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 493.6,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    26.181,
+    26.061,
+    40.364
+   ],
+   "size": [
+    20.0,
+    20.0,
+    27.226
+   ]
+  },
+  "worstBoxMarginA": 3.485,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.848,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2359,
+  "hetWithin5A": [],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.734,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1T9B": {
+  "pdbId": "1T9B",
+  "smiles": "COc1nc(C)nc(NC(=O)NS(=O)(=O)c2ccccc2Cl)n1",
+  "heavyAtoms": 23,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 357.8,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    22.963,
+    25.212,
+    136.166
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.046,
+  "receptorPdbqt": "receptor_with_extra.pdbqt",
+  "minLigRecHeavyDistA": 2.977,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 4405,
+  "hetWithin5A": [
+   {
+    "res": "FAD",
+    "chain": " ",
+    "seq": "701",
+    "nAtoms": 53,
+    "minDistA": 3.52,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 8.733,
+  "cofactorsKept": [
+   {
+    "residue": "FAD701",
+    "heavyAtoms": 53,
+    "pdbqtAtoms": 63
+   }
+  ],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 5.799
+ },
+ "1TOW": {
+  "pdbId": "1TOW",
+  "smiles": "O=C(O)CCCn1c2ccccc2c2ccccc21",
+  "heavyAtoms": 19,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 253.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    21.012,
+    4.954,
+    1.532
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.829,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.651,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1022,
+  "hetWithin5A": [],
+  "watersWithin5A": 11,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.607,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1TT1": {
+  "pdbId": "1TT1",
+  "smiles": "C=C(C)[C@H]1CN[C@H](C(=O)O)[C@H]1CC(=O)O",
+  "heavyAtoms": 15,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 213.2,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 2,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    2.312,
+    0.839,
+    26.37
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.28,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.588,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2012,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.651,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.441
+ },
+ "1TZ8": {
+  "pdbId": "1TZ8",
+  "smiles": "CCC(=C(CC)c1ccc(O)cc1)c1ccc(O)cc1",
+  "heavyAtoms": 20,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 4,
+  "formalCharge": 0,
+  "mw": 268.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    16.61,
+    61.718,
+    34.948
+   ],
+   "size": [
+    20.74,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.878,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.641,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3058,
+  "hetWithin5A": [
+   {
+    "res": "GOL",
+    "chain": " ",
+    "seq": "5",
+    "nAtoms": 6,
+    "minDistA": 4.82,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 4,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.438,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 3.103
+ },
+ "1U1C": {
+  "pdbId": "1U1C",
+  "smiles": "O=c1[nH]c(=O)n(COCCO)cc1Cc1ccccc1",
+  "heavyAtoms": 20,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 276.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    14.081,
+    99.949,
+    72.855
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.669,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.642,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1885,
+  "hetWithin5A": [
+   {
+    "res": "PO4",
+    "chain": " ",
+    "seq": "3030",
+    "nAtoms": 5,
+    "minDistA": 3.38,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.647,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1U4D": {
+  "pdbId": "1U4D",
+  "smiles": "NC1=NC(=C2CCNC(=O)c3[nH]ccc32)C(=O)N1",
+  "heavyAtoms": 18,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 245.2,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 3,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 2,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    22.887,
+    14.856,
+    56.335
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.159,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.674,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2065,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.219,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.21
+ },
+ "1UML": {
+  "pdbId": "1UML",
+  "smiles": "NC(=O)c1cn([C@@H](CO)CCn2ccc3ccc(NC(=O)CCc4ccccc4)cc32)cn1",
+  "heavyAtoms": 33,
+  "rotBonds": 10,
+  "rotBondsNonStrict": 11,
+  "formalCharge": 0,
+  "mw": 445.5,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    49.622,
+    53.586,
+    19.018
+   ],
+   "size": [
+    20.0,
+    20.359,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.67,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.65,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2790,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": " ",
+    "seq": "400",
+    "nAtoms": 1,
+    "minDistA": 3.99,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 7,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.469,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1UNL": {
+  "pdbId": "1UNL",
+  "smiles": "CC[C@H](CO)Nc1nc(NCc2ccccc2)c2ncn(C(C)C)c2n1",
+  "heavyAtoms": 26,
+  "rotBonds": 8,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 354.5,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    59.626,
+    28.97,
+    26.836
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.54,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.807,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3542,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.634,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1UOU": {
+  "pdbId": "1UOU",
+  "smiles": "N=C1CCCN1Cc1[nH]c(=O)[nH]c(=O)c1Cl",
+  "heavyAtoms": 16,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 242.7,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -3.483,
+    2.004,
+    29.185
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 6.265,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.642,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3163,
+  "hetWithin5A": [],
+  "watersWithin5A": 5,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.087,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.739
+ },
+ "1V0P": {
+  "pdbId": "1V0P",
+  "smiles": "CC(C)[C@H](CO)Nc1nc(Nc2ccc(C(=O)O)c(Cl)c2)c2ncn(C(C)C)c2n1",
+  "heavyAtoms": 30,
+  "rotBonds": 8,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 432.9,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    25.721,
+    -1.521,
+    34.9
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.206,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.588,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2232,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 3.176,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.143
+ },
+ "1V48": {
+  "pdbId": "1V48",
+  "smiles": "Nc1nc2c(ncn2CCCCC(F)(F)P(=O)(O)O)c(=O)[nH]1",
+  "heavyAtoms": 22,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 337.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 1
+  },
+  "box": {
+   "center": [
+    73.579,
+    45.084,
+    50.055
+   ],
+   "size": [
+    20.0,
+    22.33,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.767,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.622,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2003,
+  "hetWithin5A": [],
+  "watersWithin5A": 10,
+  "watersWithin3_5A": 6,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.002,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1V4S": {
+  "pdbId": "1V4S",
+  "smiles": "Cn1ccnc1Sc1cc(C(=O)Nc2nccs2)c(N)cc1F",
+  "heavyAtoms": 23,
+  "rotBonds": 4,
+  "rotBondsNonStrict": 5,
+  "formalCharge": 0,
+  "mw": 349.4,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    40.21,
+    15.085,
+    61.973
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.091,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.454,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 3505,
+  "hetWithin5A": [],
+  "watersWithin5A": 3,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.763,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1VCJ": {
+  "pdbId": "1VCJ",
+  "smiles": "CCC(CC)Nc1cc(C(=O)O)ccc1N1C(=O)CC[C@@]1(CN)CO",
+  "heavyAtoms": 25,
+  "rotBonds": 8,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 349.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    31.77,
+    -9.362,
+    64.056
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.648,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.527,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 3031,
+  "hetWithin5A": [],
+  "watersWithin5A": 2,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.234,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1W1P": {
+  "pdbId": "1W1P",
+  "smiles": "O=C1NCC(=O)N2CCC[C@@H]12",
+  "heavyAtoms": 11,
+  "rotBonds": 0,
+  "rotBondsNonStrict": 0,
+  "formalCharge": 0,
+  "mw": 154.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    18.181,
+    44.287,
+    102.679
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 7.416,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.665,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 3899,
+  "hetWithin5A": [
+   {
+    "res": "GOL",
+    "chain": "A",
+    "seq": "1514",
+    "nAtoms": 6,
+    "minDistA": 2.56,
+    "class": "additive"
+   },
+   {
+    "res": "GOL",
+    "chain": "A",
+    "seq": "1510",
+    "nAtoms": 6,
+    "minDistA": 3.76,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 10.85,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.096
+ },
+ "1W2G": {
+  "pdbId": "1W2G",
+  "smiles": "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O",
+  "heavyAtoms": 17,
+  "rotBonds": 2,
+  "rotBondsNonStrict": 2,
+  "formalCharge": 0,
+  "mw": 242.2,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    32.749,
+    23.974,
+    86.281
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.854,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.72,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1323,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.814,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1X8X": {
+  "pdbId": "1X8X",
+  "smiles": "N[C@@H](Cc1ccc(O)cc1)C(=O)O",
+  "heavyAtoms": 13,
+  "rotBonds": 3,
+  "rotBondsNonStrict": 3,
+  "formalCharge": 0,
+  "mw": 181.2,
+  "nRings": 1,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    8.685,
+    29.029,
+    16.283
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.428,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.676,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2544,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.721,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1XM6": {
+  "pdbId": "1XM6",
+  "smiles": "CCCOc1cc([C@]2(C)CNC(=O)O2)ccc1OC",
+  "heavyAtoms": 19,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 5,
+  "formalCharge": 0,
+  "mw": 265.3,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    46.371,
+    1.647,
+    -9.878
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.213,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 3.026,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2719,
+  "hetWithin5A": [
+   {
+    "res": "CME",
+    "chain": "A",
+    "seq": "432",
+    "nAtoms": 10,
+    "minDistA": 4.35,
+    "class": "other"
+   }
+  ],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [
+   {
+    "res": "CME",
+    "chain": "A",
+    "seq": "432",
+    "nAtoms": 10,
+    "minDistA": 4.35,
+    "class": "other"
+   }
+  ],
+  "success_run3": false,
+  "rmsd_run3": 2.222,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [
+   {
+    "residue": "CME:A432",
+    "reason": "no_ccd_template_with_10_heavy_atoms"
+   }
+  ],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 0.963
+ },
+ "1XOQ": {
+  "pdbId": "1XOQ",
+  "smiles": "O=C(Nc1c(Cl)cncc1Cl)c1ccc(OC(F)F)c(OCC2CC2)c1",
+  "heavyAtoms": 26,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 8,
+  "formalCharge": 0,
+  "mw": 403.2,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    14.117,
+    28.703,
+    53.487
+   ],
+   "size": [
+    20.0,
+    20.0,
+    21.33
+   ]
+  },
+  "worstBoxMarginA": 3.927,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 3.078,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2638,
+  "hetWithin5A": [],
+  "watersWithin5A": 0,
+  "watersWithin3_5A": 0,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.596,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1XOZ": {
+  "pdbId": "1XOZ",
+  "smiles": "CN1CC(=O)N2[C@H](c3ccc4c(c3)OCO4)c3[nH]c4ccccc4c3C[C@@H]2C1=O",
+  "heavyAtoms": 29,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 1,
+  "formalCharge": 0,
+  "mw": 389.4,
+  "nRings": 6,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    47.315,
+    35.038,
+    12.047
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.892,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.771,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2639,
+  "hetWithin5A": [],
+  "watersWithin5A": 13,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.358,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1Y6B": {
+  "pdbId": "1Y6B",
+  "smiles": "COc1ccc(S(=O)(=O)NCC2CC2)cc1Nc1ncc(-c2cccc(-c3cccnc3)c2)o1",
+  "heavyAtoms": 34,
+  "rotBonds": 9,
+  "rotBondsNonStrict": 9,
+  "formalCharge": 0,
+  "mw": 476.6,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    0.389,
+    30.704,
+    17.317
+   ],
+   "size": [
+    20.0,
+    22.086,
+    22.169
+   ]
+  },
+  "worstBoxMarginA": 4.503,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.543,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2135,
+  "hetWithin5A": [],
+  "watersWithin5A": 10,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.167,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1YGC": {
+  "pdbId": "1YGC",
+  "smiles": "CCOc1cc(OCC)c(F)c([C@@H](Nc2ccc(C(=N)N)c(O)c2)C(=O)NS(=O)(=O)c2cccc(N)c2)c1",
+  "heavyAtoms": 38,
+  "rotBonds": 11,
+  "rotBondsNonStrict": 12,
+  "formalCharge": 0,
+  "mw": 545.6,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    10.57,
+    41.478,
+    32.491
+   ],
+   "size": [
+    20.0,
+    20.0,
+    21.15
+   ]
+  },
+  "worstBoxMarginA": 4.958,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.798,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2370,
+  "hetWithin5A": [],
+  "watersWithin5A": 14,
+  "watersWithin3_5A": 7,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 1.713,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1YQY": {
+  "pdbId": "1YQY",
+  "smiles": "Cc1cc(S(=O)(=O)N[C@@H](C(=O)NO)C2CCOCC2)ccc1F",
+  "heavyAtoms": 23,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 346.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    11.035,
+    18.68,
+    27.493
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.984,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.169,
+  "nContactsBelow2_2A": 1,
+  "nContactsBelow2_6A": 3,
+  "nRecHeavyAtoms": 4064,
+  "hetWithin5A": [
+   {
+    "res": "ZN",
+    "chain": " ",
+    "seq": "601",
+    "nAtoms": 1,
+    "minDistA": 2.17,
+    "class": "metal"
+   }
+  ],
+  "watersWithin5A": 6,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.409,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1YV3": {
+  "pdbId": "1YV3",
+  "smiles": "Cc1ccc2c(c1)C(=O)[C@]1(O)CCN(c3ccccc3)C1=N2",
+  "heavyAtoms": 22,
+  "rotBonds": 1,
+  "rotBondsNonStrict": 1,
+  "formalCharge": 0,
+  "mw": 292.3,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 1,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    22.322,
+    38.353,
+    37.231
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.262,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.476,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 5007,
+  "hetWithin5A": [],
+  "watersWithin5A": 4,
+  "watersWithin3_5A": 1,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.519,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "1YVF": {
+  "pdbId": "1YVF",
+  "smiles": "O=C(O)C(=Cc1ccc(Oc2ccccc2Br)cc1)NC(=O)c1ccccc1",
+  "heavyAtoms": 28,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 438.3,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 1,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    -10.913,
+    56.213,
+    49.762
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 5.293,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.789,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 4390,
+  "hetWithin5A": [
+   {
+    "res": "GOL",
+    "chain": " ",
+    "seq": "602",
+    "nAtoms": 6,
+    "minDistA": 3.73,
+    "class": "additive"
+   }
+  ],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 5,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.209,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 3.759
+ },
+ "1YWR": {
+  "pdbId": "1YWR",
+  "smiles": "C[C@H](Nc1nccc(-c2c(-c3ccc(F)cc3)c(=O)n(C3CCNCC3)n2C)n1)c1ccccc1",
+  "heavyAtoms": 35,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 472.6,
+  "nRings": 5,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    2.724,
+    -0.956,
+    21.338
+   ],
+   "size": [
+    20.0,
+    20.0,
+    21.11
+   ]
+  },
+  "worstBoxMarginA": 4.249,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.559,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 2723,
+  "hetWithin5A": [],
+  "watersWithin5A": 7,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.434,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.76
+ },
+ "1Z95": {
+  "pdbId": "1Z95",
+  "smiles": "C[C@](O)(CS(=O)(=O)c1ccc(F)cc1)C(=O)Nc1ccc(C#N)c(C(F)(F)F)c1",
+  "heavyAtoms": 29,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 430.4,
+  "nRings": 2,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    27.977,
+    2.357,
+    6.252
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 3.736,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.539,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 1,
+  "nRecHeavyAtoms": 1946,
+  "hetWithin5A": [],
+  "watersWithin5A": 2,
+  "watersWithin3_5A": 2,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.745,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ },
+ "2BM2": {
+  "pdbId": "2BM2",
+  "smiles": "NCc1cccc(C2CCN(C(=O)c3cncc(CCc4ccccc4)c3)CC2)c1",
+  "heavyAtoms": 30,
+  "rotBonds": 6,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 399.5,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    26.401,
+    75.883,
+    83.364
+   ],
+   "size": [
+    23.39,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.442,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.629,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 7644,
+  "hetWithin5A": [],
+  "watersWithin5A": 12,
+  "watersWithin3_5A": 3,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 4.196,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "B_SAMPLING_FAILURE",
+  "bestRmsdInTopKA": 2.926
+ },
+ "2BR1": {
+  "pdbId": "2BR1",
+  "smiles": "COc1ccc(-c2oc3ncnc(NCCO)c3c2-c2ccc(OC)cc2)cc1",
+  "heavyAtoms": 29,
+  "rotBonds": 7,
+  "rotBondsNonStrict": 7,
+  "formalCharge": 0,
+  "mw": 391.4,
+  "nRings": 4,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 0,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    17.671,
+    -2.981,
+    10.242
+   ],
+   "size": [
+    22.425,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.354,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 3.0,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 2191,
+  "hetWithin5A": [],
+  "watersWithin5A": 17,
+  "watersWithin3_5A": 8,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": false,
+  "rmsd_run3": 7.348,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": "A_RANKING_FAILURE",
+  "bestRmsdInTopKA": 1.356
+ },
+ "2BSM": {
+  "pdbId": "2BSM",
+  "smiles": "CCNC(=O)c1n[nH]c(-c2cc(Cl)c(O)cc2O)c1-c1ccc(OC)cc1",
+  "heavyAtoms": 27,
+  "rotBonds": 5,
+  "rotBondsNonStrict": 6,
+  "formalCharge": 0,
+  "mw": 387.8,
+  "nRings": 3,
+  "groups": {
+   "neutralCOOH": 0,
+   "carboxylate": 0,
+   "neutralAliphAmine": 1,
+   "protonatedAmine": 0,
+   "amidine_guanidine_neutral": 0,
+   "phosphateP": 0
+  },
+  "box": {
+   "center": [
+    32.07,
+    8.752,
+    25.23
+   ],
+   "size": [
+    20.0,
+    20.0,
+    20.0
+   ]
+  },
+  "worstBoxMarginA": 4.664,
+  "receptorPdbqt": "receptor.pdbqt",
+  "minLigRecHeavyDistA": 2.778,
+  "nContactsBelow2_2A": 0,
+  "nContactsBelow2_6A": 0,
+  "nRecHeavyAtoms": 1617,
+  "hetWithin5A": [],
+  "watersWithin5A": 11,
+  "watersWithin3_5A": 4,
+  "modifiedResiduesWithin5A": [],
+  "success_run3": true,
+  "rmsd_run3": 0.464,
+  "cofactorsKept": [],
+  "cofactorsNotKept": [],
+  "classification": null,
+  "bestRmsdInTopKA": null
+ }
+}

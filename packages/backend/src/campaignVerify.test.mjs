@@ -13,6 +13,7 @@ import { runMultiFidelityStage } from './campaign/multiFidelity.mjs';
 import { replayScienceRun, verifyScienceRun, verifyScienceRunDispatched, getVerificationHistory, VERDICT } from './campaign/verify.mjs';
 import { resolveWorkerConfig } from './compute/remoteScientificWorkerClient.mjs';
 import { sha256Hex16 } from './provenance.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 /**
  * Scientific Reproducibility (Priority B) — replay-verification on REAL
@@ -121,7 +122,7 @@ describe('replay verification of real Scientific Runs', () => {
     assert.equal(r.verdict, VERDICT.REPLAY_UNSUPPORTED);
   });
 
-  test('a remote PySCF ScienceRun replays through the existing worker client and persists MATCH', async () => {
+  test('a remote PySCF ScienceRun replays through the existing worker client and persists MATCH', { skip: RDKIT_SKIP }, async () => {
     const db = openDatabase(':memory:');
     const output = { energyHartree: -74.95, homoLumoGapEv: 12.1, dipoleDebye: 1.8 };
     const run = saveScienceRun(db, {

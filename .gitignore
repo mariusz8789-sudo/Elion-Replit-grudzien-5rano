@@ -61,3 +61,7 @@ artifacts/human-biology-lab-*.png
 # Molecule World Smart UI e2e (packages/e2e/src/molecule-world.e2e.spec.ts)
 artifacts/molecule-world.png
 artifacts/molecule-world-mobile.png
+
+# Genesis CSRN private signing key: generated and kept outside the repository (scripts/csrn-keygen.mjs refuses paths inside it).
+*private*.jwk
+*.private.json

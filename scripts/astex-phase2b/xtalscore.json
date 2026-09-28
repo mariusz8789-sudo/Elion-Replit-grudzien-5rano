@@ -1,0 +1,512 @@
+{
+ "1G9V": {
+  "crystalPoseVinaTotal": -6.686,
+  "crystalPoseInter": -9.227,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.975
+ },
+ "1GKC": {
+  "crystalPoseVinaTotal": -2.548,
+  "crystalPoseInter": -2.921,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -3.035
+ },
+ "1GM8": {
+  "crystalPoseVinaTotal": -5.893,
+  "crystalPoseInter": -7.616,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.3
+ },
+ "1GPK": {
+  "crystalPoseVinaTotal": -10.129,
+  "crystalPoseInter": -10.425,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.411
+ },
+ "1HNN": {
+  "crystalPoseVinaTotal": -7.581,
+  "crystalPoseInter": -8.246,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.351
+ },
+ "1HP0": {
+  "crystalPoseVinaTotal": -8.276,
+  "crystalPoseInter": -10.211,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.383
+ },
+ "1HQ2": {
+  "crystalPoseVinaTotal": -8.501,
+  "crystalPoseInter": -9.495,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.973
+ },
+ "1HVY": {
+  "crystalPoseVinaTotal": -7.222,
+  "crystalPoseInter": -11.444,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.606
+ },
+ "1HWI": {
+  "crystalPoseVinaTotal": -4.87,
+  "crystalPoseInter": -7.575,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -5.228
+ },
+ "1HWW": {
+  "crystalPoseVinaTotal": -6.184,
+  "crystalPoseInter": -6.727,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.01
+ },
+ "1IA1": {
+  "crystalPoseVinaTotal": -7.933,
+  "crystalPoseInter": -9.324,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.581
+ },
+ "1IG3": {
+  "crystalPoseVinaTotal": -6.244,
+  "crystalPoseInter": -8.069,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.328
+ },
+ "1J3J": {
+  "crystalPoseVinaTotal": -8.291,
+  "crystalPoseInter": -9.745,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.818
+ },
+ "1JD0": {
+  "crystalPoseVinaTotal": -4.908,
+  "crystalPoseInter": -5.625,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -5.264
+ },
+ "1JJE": {
+  "crystalPoseVinaTotal": -8.185,
+  "crystalPoseInter": -12.014,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.171
+ },
+ "1JLA": {
+  "crystalPoseVinaTotal": -10.84,
+  "crystalPoseInter": -15.277,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.394
+ },
+ "1K3U": {
+  "crystalPoseVinaTotal": -8.975,
+  "crystalPoseInter": -12.648,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.637
+ },
+ "1KE5": {
+  "crystalPoseVinaTotal": -8.378,
+  "crystalPoseInter": -10.337,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.086
+ },
+ "1KZK": {
+  "crystalPoseVinaTotal": -11.224,
+  "crystalPoseInter": -18.442,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.665
+ },
+ "1L2S": {
+  "crystalPoseVinaTotal": -6.692,
+  "crystalPoseInter": -8.452,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.393
+ },
+ "1L7F": {
+  "crystalPoseVinaTotal": -7.85,
+  "crystalPoseInter": -11.521,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.224
+ },
+ "1LPZ": {
+  "crystalPoseVinaTotal": -9.87,
+  "crystalPoseInter": -13.332,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.682
+ },
+ "1LRH": {
+  "crystalPoseVinaTotal": -7.442,
+  "crystalPoseInter": -8.529,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.026
+ },
+ "1M2Z": {
+  "crystalPoseVinaTotal": -11.936,
+  "crystalPoseInter": -14.379,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -12.14
+ },
+ "1MEH": {
+  "crystalPoseVinaTotal": -6.545,
+  "crystalPoseInter": -9.224,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.882
+ },
+ "1MMV": {
+  "crystalPoseVinaTotal": -6.081,
+  "crystalPoseInter": -8.925,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.46
+ },
+ "1MZC": {
+  "crystalPoseVinaTotal": -7.183,
+  "crystalPoseInter": -12.432,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.672
+ },
+ "1N1M": {
+  "crystalPoseVinaTotal": -5.004,
+  "crystalPoseInter": -5.735,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -5.487
+ },
+ "1N2J": {
+  "crystalPoseVinaTotal": -4.291,
+  "crystalPoseInter": -5.294,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -4.352
+ },
+ "1N2V": {
+  "crystalPoseVinaTotal": -6.564,
+  "crystalPoseInter": -7.715,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.835
+ },
+ "1N46": {
+  "crystalPoseVinaTotal": -11.054,
+  "crystalPoseInter": -13.962,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.799
+ },
+ "1NAV": {
+  "crystalPoseVinaTotal": -9.111,
+  "crystalPoseInter": -12.307,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.805
+ },
+ "1OF1": {
+  "crystalPoseVinaTotal": -8.848,
+  "crystalPoseInter": -10.4,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.223
+ },
+ "1OF6": {
+  "crystalPoseVinaTotal": -4.826,
+  "crystalPoseInter": -6.096,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -5.35
+ },
+ "1OPK": {
+  "crystalPoseVinaTotal": -11.119,
+  "crystalPoseInter": -14.044,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.449
+ },
+ "1OQ5": {
+  "crystalPoseVinaTotal": -7.817,
+  "crystalPoseInter": -9.874,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.674
+ },
+ "1OWE": {
+  "crystalPoseVinaTotal": -7.714,
+  "crystalPoseInter": -9.067,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.806
+ },
+ "1OYT": {
+  "crystalPoseVinaTotal": -10.851,
+  "crystalPoseInter": -13.389,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.131
+ },
+ "1P2Y": {
+  "crystalPoseVinaTotal": -3.582,
+  "crystalPoseInter": -3.791,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.111
+ },
+ "1P62": {
+  "crystalPoseVinaTotal": -7.65,
+  "crystalPoseInter": -9.215,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.797
+ },
+ "1PMN": {
+  "crystalPoseVinaTotal": -9.221,
+  "crystalPoseInter": -12.994,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.589
+ },
+ "1Q1G": {
+  "crystalPoseVinaTotal": -7.269,
+  "crystalPoseInter": -8.968,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.124
+ },
+ "1Q41": {
+  "crystalPoseVinaTotal": -9.591,
+  "crystalPoseInter": -9.871,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.172
+ },
+ "1Q4G": {
+  "crystalPoseVinaTotal": -8.596,
+  "crystalPoseInter": -10.355,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.087
+ },
+ "1R1H": {
+  "crystalPoseVinaTotal": -8.348,
+  "crystalPoseInter": -13.473,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.281
+ },
+ "1R55": {
+  "crystalPoseVinaTotal": -6.103,
+  "crystalPoseInter": -9.314,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.32
+ },
+ "1R58": {
+  "crystalPoseVinaTotal": -6.508,
+  "crystalPoseInter": -9.933,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.708
+ },
+ "1R9O": {
+  "crystalPoseVinaTotal": -7.725,
+  "crystalPoseInter": -9.306,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.369
+ },
+ "1S19": {
+  "crystalPoseVinaTotal": -11.725,
+  "crystalPoseInter": -16.181,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -12.288
+ },
+ "1S3V": {
+  "crystalPoseVinaTotal": -8.966,
+  "crystalPoseInter": -12.373,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.489
+ },
+ "1SG0": {
+  "crystalPoseVinaTotal": -7.235,
+  "crystalPoseInter": -8.715,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.464
+ },
+ "1SJ0": {
+  "crystalPoseVinaTotal": -10.435,
+  "crystalPoseInter": -14.706,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.702
+ },
+ "1SQ5": {
+  "crystalPoseVinaTotal": -4.583,
+  "crystalPoseInter": -6.592,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -4.995
+ },
+ "1SQN": {
+  "crystalPoseVinaTotal": -11.035,
+  "crystalPoseInter": -11.358,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.381
+ },
+ "1T40": {
+  "crystalPoseVinaTotal": -10.832,
+  "crystalPoseInter": -14.948,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -11.213
+ },
+ "1T46": {
+  "crystalPoseVinaTotal": -13.371,
+  "crystalPoseInter": -18.842,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -13.965
+ },
+ "1T9B": {
+  "crystalPoseVinaTotal": -4.548,
+  "crystalPoseInter": -5.611,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -4.643
+ },
+ "1TOW": {
+  "crystalPoseVinaTotal": -7.35,
+  "crystalPoseInter": -9.284,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.675
+ },
+ "1TT1": {
+  "crystalPoseVinaTotal": -6.862,
+  "crystalPoseInter": -8.868,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.309
+ },
+ "1TZ8": {
+  "crystalPoseVinaTotal": -7.397,
+  "crystalPoseInter": -9.559,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.816
+ },
+ "1U1C": {
+  "crystalPoseVinaTotal": -6.947,
+  "crystalPoseInter": -9.587,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.278
+ },
+ "1U4D": {
+  "crystalPoseVinaTotal": -6.314,
+  "crystalPoseInter": -7.79,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.736
+ },
+ "1UML": {
+  "crystalPoseVinaTotal": -8.942,
+  "crystalPoseInter": -14.431,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.475
+ },
+ "1UNL": {
+  "crystalPoseVinaTotal": -7.997,
+  "crystalPoseInter": -11.97,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.366
+ },
+ "1UOU": {
+  "crystalPoseVinaTotal": -6.944,
+  "crystalPoseInter": -7.756,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.641
+ },
+ "1V0P": {
+  "crystalPoseVinaTotal": -7.829,
+  "crystalPoseInter": -11.948,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.169
+ },
+ "1V48": {
+  "crystalPoseVinaTotal": -7.208,
+  "crystalPoseInter": -10.368,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.036
+ },
+ "1V4S": {
+  "crystalPoseVinaTotal": -8.1,
+  "crystalPoseInter": -10.23,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.0
+ },
+ "1VCJ": {
+  "crystalPoseVinaTotal": -6.672,
+  "crystalPoseInter": -10.378,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.556
+ },
+ "1W1P": {
+  "crystalPoseVinaTotal": -4.425,
+  "crystalPoseInter": -4.425,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -4.952
+ },
+ "1W2G": {
+  "crystalPoseVinaTotal": -6.936,
+  "crystalPoseInter": -8.152,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.539
+ },
+ "1X8X": {
+  "crystalPoseVinaTotal": -5.97,
+  "crystalPoseInter": -7.54,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -6.417
+ },
+ "1XM6": {
+  "crystalPoseVinaTotal": -7.638,
+  "crystalPoseInter": -9.871,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.07
+ },
+ "1XOQ": {
+  "crystalPoseVinaTotal": -9.096,
+  "crystalPoseInter": -12.818,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -9.392
+ },
+ "1XOZ": {
+  "crystalPoseVinaTotal": -12.393,
+  "crystalPoseInter": -13.118,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -12.657
+ },
+ "1Y6B": {
+  "crystalPoseVinaTotal": -8.598,
+  "crystalPoseInter": -13.122,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.916
+ },
+ "1YGC": {
+  "crystalPoseVinaTotal": -8.627,
+  "crystalPoseInter": -14.678,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.992
+ },
+ "1YQY": {
+  "crystalPoseVinaTotal": -8.975,
+  "crystalPoseInter": -11.86,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.155
+ },
+ "1YV3": {
+  "crystalPoseVinaTotal": -12.074,
+  "crystalPoseInter": -13.133,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -12.475
+ },
+ "1YVF": {
+  "crystalPoseVinaTotal": -8.35,
+  "crystalPoseInter": -11.524,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.616
+ },
+ "1YWR": {
+  "crystalPoseVinaTotal": -9.885,
+  "crystalPoseInter": -13.352,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.614
+ },
+ "1Z95": {
+  "crystalPoseVinaTotal": -10.313,
+  "crystalPoseInter": -14.232,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -10.885
+ },
+ "2BM2": {
+  "crystalPoseVinaTotal": -8.043,
+  "crystalPoseInter": -11.1,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.843
+ },
+ "2BR1": {
+  "crystalPoseVinaTotal": -7.506,
+  "crystalPoseInter": -10.798,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -7.391
+ },
+ "2BSM": {
+  "crystalPoseVinaTotal": -8.987,
+  "crystalPoseInter": -12.14,
+  "crystalPoseIntra": 0.0,
+  "afterLocalOptTotal": -8.952
+ }
+}

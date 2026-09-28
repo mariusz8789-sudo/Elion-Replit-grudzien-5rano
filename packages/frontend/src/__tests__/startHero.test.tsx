@@ -47,9 +47,9 @@ describe('StartHero', () => {
     const run7 = json('docs/evidence/astex-run7-gnina-rescore.json') as { topK: { top1: number }; samplingCeilingInPool: { successes: number }; vsVinaBaseline: { baselineTop1: number } };
     expect(html).toContain(`Vina baseline: ${run3.summary.successes}/85. Current Astex development result with GNINA rescoring: ${run7.topK.top1}/85.`);
     expect(html).toContain('Development benchmark, not validation.');
-    expect(html).toContain('contain 76 of these 85 complexes');
+    expect(html).toContain('training data contains 76 of these 85 complexes');
     expect(html).toContain('Independent unseen validation pending');
-    expect(html).toContain('pre-registered and not yet run');
+    expect(html).toContain('pre-registered, not yet run');
     const gninaCard = html.slice(html.indexOf('data-testid="home-astex-gnina"'), html.indexOf('data-testid="home-astex-vina-pooled"'));
     expect(gninaCard).toContain(`${run7.topK.top1}<span> / 85`);
     expect(gninaCard).toContain('data-testid="home-astex-caveat"');

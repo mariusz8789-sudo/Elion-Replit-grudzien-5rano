@@ -1,0 +1,12 @@
+{
+  "kind": "GENESIS_CSRN_PUBLIC_KEY",
+  "version": 1,
+  "status": "NOT_YET_GENERATED",
+  "algorithm": "ECDSA-P256-SHA256",
+  "keyId": null,
+  "publicKeyJwk": null,
+  "validFrom": null,
+  "validUntil": null,
+  "keyIdMethod": "SHA-256 (hex) of the canonical JSON (sorted keys) of {crv, kty, x, y}; packages/csrn computePublicKeyId",
+  "notice": "The Genesis CSRN evidence-signing key has not been generated yet. The owner generates it on their own machine with scripts/csrn-keygen.mjs; until then no certificate is signed by a Genesis key. A future signature is not a qualified or legal electronic signature, and it is not laboratory validation."
+}

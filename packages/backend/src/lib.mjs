@@ -118,8 +118,13 @@ export function mimeFor(filePath) {
   return MIME[path.extname(filePath)] ?? 'application/octet-stream';
 }
 
-/** Hashowane assety Vite (np. index-A1b2C3d4.js) — bezpieczne do cache'owania na rok. */
+/**
+ * Hashowane assety Vite (np. index-A1b2C3d4.js) — bezpieczne do cache'owania na rok.
+ * Nigdy pliki z /.well-known/: ich nazwy są stałe, a treść się zmienia (np. publiczny
+ * klucz CSRN w genesis-csrn-key.json przechodzi z NOT_YET_GENERATED na ACTIVE).
+ */
 export function isHashedAsset(filePath) {
+  if (filePath.split(/[\\/]/).includes('.well-known')) return false;
   return /-[A-Za-z0-9_-]{8,}\./.test(path.basename(filePath));
 }
 

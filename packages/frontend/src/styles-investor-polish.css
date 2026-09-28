@@ -237,35 +237,48 @@
   .gdd-table tbody tr { transition: none !important; }
 }
 
-/* Mobile home is one composed screen: a short visual identity above the one
-   conversation. The full desktop hero must never turn into a second page of
-   controls competing with Chat. */
+/* Mobile home is one scrolling page: a compact hero (title + the "check it
+   yourself" proof with its three buttons) and, below it, the one conversation.
+   The hero used to be clipped into a fixed 17rem strip with the head pinned to
+   its bottom edge; once the proof block landed on Start, that strip pushed the
+   proof up under the top bar and the page read as a single cut-off panel. */
 @media (max-width: 900px) {
   .shell-main-split {
     height: 100%;
     min-height: 0;
-    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
   .shell-main-split .shell-route {
-    flex: 0 0 min(32dvh, 17rem) !important;
-    min-height: 12rem;
-    overflow: hidden !important;
+    flex: 0 0 auto !important;
+    min-height: 0;
+    overflow: visible !important;
   }
   .shell-main-split .shell-chat {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    min-height: 72dvh !important;
     border-top-color: rgba(119, 232, 242, 0.18);
   }
   .shell-main-split .home-dashboard,
-  .shell-main-split .start { height: 100%; min-height: 0; overflow: hidden; }
-  .shell-main-split .start { display: block; padding: 0; }
+  .shell-main-split .start { height: auto; min-height: 0; overflow: hidden; }
+  .shell-main-split .start { display: block; padding: 1.1rem 1rem 1.2rem; }
   .shell-main-split .start-head {
-    position: absolute;
-    inset: auto 1rem 1rem;
+    position: relative;
+    inset: auto;
     z-index: 2;
-    max-width: min(21rem, calc(100% - 2rem));
-    padding: 0;
+    max-width: none;
+    padding: 0.9rem;
   }
+  /* The page now scrolls under the sticky top bar, so the bar needs its own backdrop. */
+  .shell-main-split .topbar {
+    top: 0 !important;
+    margin: 0 !important;
+    z-index: 30 !important;
+    background: #03080c !important;
+    box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.9) !important;
+  }
+  /* Keep the chat input clear of the fixed bottom navigation bar. */
+  .shell-main-split .shell-chat { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important; }
   .shell-main-split .start-title {
     margin: 0;
     font-size: clamp(1.35rem, 7vw, 1.9rem);

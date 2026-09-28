@@ -1,0 +1,58 @@
+{
+ "kind": "astex-vinardo-rescoring-preregistration",
+ "frozenAt": "2026-09-27T21:03:50+00:00",
+ "protocolFingerprintSha256": "0c9c5f92799e187aa18674b248762ab3e5de1ea9d66d78142966908723f9e5c7",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+ "protocol": {
+  "id": "astex-vinardo-rescoring-prereg",
+  "label": "Astex \u2014 Vinardo rescoring of the run-4 stored top-20 pose sets (run 5, diagnostic)",
+  "status": "PREREGISTERED BEFORE ANY RESULT WAS COMPUTED \u2014 frozen protocol, amendments only by append",
+  "question": "Does the Vinardo scoring function, applied to exactly the pose sets AutoDock Vina already generated in run 4, rank a native-like pose (RMSD < 2.0 A) first in cases where the Vina function did not?",
+  "inputs": {
+   "poseSets": "the run-4 diagnostic pose sets ONLY \u2014 the docked.pdbqt written by run 4 for each of the 85 Astex cases",
+   "integrityGate": "for every case, sha256(docked.pdbqt) MUST equal the dockedPdbqtSha256 recorded in docs/evidence/astex-redock-run4-diagnostic.json and sha256(receptor.pdbqt) MUST equal receptorPdbqtSha256; a case whose files do not match, or are missing, is reported as UNAVAILABLE and is NOT re-docked and NOT dropped from the denominator",
+   "dataset": "Astex Diverse Set, github.com/rdk/p2rank-datasets, joined/astex, commit 0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
+   "denominator": "all 85 cases, always"
+  },
+  "forbidden": [
+   "any new docking or re-docking",
+   "any change to sampling (exhaustiveness, seed, num_modes, energy_range, min_rmsd)",
+   "any change to the receptor, the ligand, the structures or the box",
+   "any change to the success threshold (RMSD < 2.0 A) or the denominator (85)",
+   "any local optimisation, minimisation or relaxation of a pose (Vina optimize() is NOT called)",
+   "any per-target or per-PDB tuning, exception or manual intervention",
+   "any modification of runs 1, 2, 3 or 4, their evidence files, or the run-1 preregistration"
+  ],
+  "method": {
+   "engine": "AutoDock Vina 1.2.7 python API with sf_name='vinardo'",
+   "receptor": "the run-4 receptor.pdbqt for that case, plus the same extraRigidPdbqt list run 4 recorded for that case",
+   "maps": "compute_vina_maps(center, box_size) with the center and boxSize recorded by run 4 for that case \u2014 unchanged",
+   "scoring": "each retained pose is loaded as a single-model PDBQT at its stored coordinates and scored with Vina.score(); the returned total score is the Vinardo score. Coordinates are never altered.",
+   "ranking": "poses sorted by Vinardo total score ascending (more negative is better); ties broken by the original Vina rank ascending",
+   "rmsd": "NOT recomputed by a new metric \u2014 the per-pose symmetry-aware heavy-atom RMSD is recomputed with the identical RDKit CalcRMS code path used in run 4 and MUST equal the run-4 recorded value for that pose to 3 decimals; a mismatch is reported as a failed check, not silently accepted",
+   "poseIdentity": "the run-4 coordinate-derived pose SHA-256 is recomputed and must match, binding this run to run 4's exact poses"
+  },
+  "prespecifiedMetrics": [
+   "vinardoTop1Successes / 85 (rank-1 Vinardo pose has RMSD < 2.0 A)",
+   "of the 20 cases run 4 classified A_RANKING_FAILURE: how many Vinardo now ranks a native-like pose first (RECOVERED)",
+   "of the cases where the Vina rank-1 pose in the run-4 pose set was already native-like: how many Vinardo now ranks a non-native pose first (LOST)",
+   "net gain = vinardoTop1Successes minus the run-4 diagnostic Vina top-1 successes (46), on the same pose sets",
+   "per case: Vina rank, Vinardo rank, RMSD and both scores for the Vinardo rank-1 pose and for the best-RMSD pose"
+  ],
+  "prespecifiedInterpretation": {
+   "scoringIsTheBottleneck": "net gain >= +5 AND at least 8 of the 20 A_RANKING_FAILURE cases recovered",
+   "scoringIsNotTheBottleneck": "net gain <= +2 OR fewer than 4 of the 20 recovered",
+   "inconclusive": "anything between the two \u2014 reported as inconclusive, not spun either way",
+   "consequence": "only if scoringIsTheBottleneck is met is a next SAMPLING experiment proposed for the 17 B_SAMPLING_FAILURE cases; otherwise the proposal is stated to be premature"
+  },
+  "baseline": {
+   "preregisteredRun3Top1": "46 / 85",
+   "run4DiagnosticVinaTop1OnTheseSamePoseSets": "46 / 85",
+   "run4Top20Ceiling": "68 / 85",
+   "run4RankingFailures": 20,
+   "run4SamplingFailures": 17
+  },
+  "reproducibility": "the script records per case: input sha256, receptor pdbqt sha256, docked pdbqt sha256; per pose: rank, Vina affinity, Vinardo score, RMSD, pose sha256. A deterministic replay on 2 cases is executed and reported.",
+  "amendments": []
+ }
+}

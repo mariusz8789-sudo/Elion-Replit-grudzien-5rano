@@ -1,0 +1,151 @@
+{
+ "kind": "GENESIS_ASTEX_RANKING_RULE_PREREG",
+ "label": "Astex phase 4 - preregistration of the ranking-rule selection (MODEL SELECTION, NOT A VALIDATION)",
+ "frozenAt": "2026-09-28T04:22:53+00:00",
+ "frozenBeforeAnyResultWasComputed": true,
+ "notAValidation": "MODEL SELECTION ON THE TEST SET. Astex has been inspected repeatedly in this project, and this step chooses one ranking rule by its score on those same 85 cases. The number the winning rule attains here is therefore a POST-HOC DEVELOPMENT NUMBER and is NOT a validation result, NOT a measurement of generalisation, and NOT a headline. It may not be quoted as the method's performance. Any claim about how this rule generalises requires a separate, separately frozen, prospective run whose protocol is written after this result is in.",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True).encode()).hexdigest()",
+ "protocolFingerprintSha256": "fc7b3177851faa12a487af3c69e3e0e16cab4068f492c39b13cef04a77d5c0f5",
+ "protocol": {
+  "dataset": "Astex Diverse Set, 85 cases",
+  "denominator": 85,
+  "denominatorPolicy": "always 85; no case is ever excluded, filtered or replaced, for any reason",
+  "successThresholdRmsdA": 2.0,
+  "thresholdPolicy": "RMSD < 2.0 A, symmetry-aware heavy-atom, unchanged from runs 1-6; may not be altered",
+  "question": "Of a small, closed, preregistered set of candidate ranking rules over the frozen run-6 pooled pose set, which one puts a native-like pose first on the most of the 85 Astex cases?",
+  "whatThisIs": "MODEL SELECTION ON THE TEST SET. Astex has been inspected repeatedly in this project, and this step chooses one ranking rule by its score on those same 85 cases. The number the winning rule attains here is therefore a POST-HOC DEVELOPMENT NUMBER and is NOT a validation result, NOT a measurement of generalisation, and NOT a headline. It may not be quoted as the method's performance. Any claim about how this rule generalises requires a separate, separately frozen, prospective run whose protocol is written after this result is in.",
+  "poseSource": {
+   "run": "run 6 multi-seed Vina ensemble",
+   "evidence": "docs/evidence/astex-run6-multiseed-ensemble.json",
+   "evidenceSha256": "bae66aa9af480ac7887507dc11e284b05fb460994c0c5c215c523248c304657d",
+   "run6PreregSha256": "84a907029cab34af74f0d47b0acc9cca54966cbf1c377e26936b3f6df9be1ca5",
+   "run6ProtocolFingerprintSha256": "e183a4f7255d50c0d85832c240d815637ea6b871d99fe6506adc878d46446651",
+   "dockedPdbqtGlob": "/tmp/claude-0/run6/work/<PDBID>/seed<SEED>/dock/docked.pdbqt",
+   "perCaseJsonGlob": "/tmp/claude-0/run6/cases/<PDBID>.json",
+   "seeds": [
+    42,
+    1042,
+    2042,
+    3042,
+    4042
+   ],
+   "noRedocking": "NO DOCKING, NO MINIMISATION, NO POSE MOVEMENT OF ANY KIND. Vina.dock() and Vina.optimize() are never called. Poses are scored at their stored coordinates only.",
+   "poolingRuleInheritedFrozen": {
+    "source": "run 6 preregistration, unchanged",
+    "dedupCutoffA": 1.0,
+    "dedup": "symmetry-aware heavy-atom RMSD below 1.0 A collapses to the better-scoring pose; ties by (seedIndex, rank) ascending",
+    "poolOrderingForDedupVisits": "Vina score ascending, ties by (seedIndex, rank) ascending",
+    "note": "the deduplicated pool per case is read verbatim from the run-6 per-case JSON 'pool' array; it is not recomputed and not altered"
+   }
+  },
+  "integrityGate": {
+   "perSeedChecks": [
+    "sha256 of /tmp/claude-0/run6/work/<PDBID>/seed<SEED>/dock/docked.pdbqt equals seedRuns[].dockedPdbqtSha256 in the run-6 evidence",
+    "sha256 of the effective receptor pdbqt (receptor_with_extra.pdbqt when run 6 recorded extra rigid atoms, receptor.pdbqt otherwise) equals seedRuns[].receptorPdbqtSha256",
+    "sha256 of every individual pose model equals the run-6 recorded poseSha256",
+    "recomputed symmetry-aware RMSD of every pose equals the run-6 recorded rmsdA to 3 decimals"
+   ],
+   "onFailure": "the case is reported UNAVAILABLE. It is NOT re-docked, NOT repaired and NOT removed from the denominator. An UNAVAILABLE case counts as a top-1 failure for every candidate rule alike.",
+   "rmsdToleranceA": 0.0005
+  },
+  "vinardoScoring": {
+   "engine": "AutoDock Vina 1.2.7 python bindings, Vina(sf_name='vinardo')",
+   "procedure": "set_receptor(effective receptor pdbqt), compute_vina_maps(center, boxSize from the run-6 per-case record), then set_ligand_from_file(single pose pdbqt) and score() for each pose at its stored coordinates",
+   "value": "total score, element 0 of score(), in kcal/mol, rounded to 3 decimals for reporting and used at full precision for ordering",
+   "sameMapsForAllSeeds": "the run-6 receptor pdbqt is bit-identical across the five seeds of a case, so one map set per case is used and this identity is verified by sha256 before it is relied on"
+  },
+  "candidateRules": {
+   "closed": true,
+   "count": 4,
+   "note": "this list is complete and closed. No rule outside it may be evaluated, and no rule inside it may be modified, after this protocol is fingerprinted.",
+   "symbols": {
+    "V": "Vina score of the pose in kcal/mol, as recorded by run 6",
+    "D": "Vinardo score of the pose in kcal/mol, recomputed at the stored coordinates",
+    "N": "size of the case's deduplicated pool",
+    "t": "the deterministic tie-break key (seedIndex, rank) ascending"
+   },
+   "rules": [
+    {
+     "id": "vina",
+     "complexityOrder": 0,
+     "description": "Vina score alone - the incumbent baseline",
+     "sortKey": "(V, seedIndex, rank) ascending",
+     "justification": "the method's current ranking; the baseline every other candidate must beat. Its pooled top-1 is 50/85 in the run-6 evidence."
+    },
+    {
+     "id": "vinardo",
+     "complexityOrder": 1,
+     "description": "Vinardo score alone",
+     "sortKey": "(D, V, seedIndex, rank) ascending",
+     "justification": "the only alternative scoring function already measured in this project (run 5), where it gained +4 net on the smaller run-4 pose sets. Testing it on the larger pooled set is the direct follow-up."
+    },
+    {
+     "id": "linear_equal_weight",
+     "complexityOrder": 2,
+     "description": "fixed-weight linear combination of the two scores, weight declared here in advance",
+     "weight": 0.5,
+     "formula": "S = 0.5 * V + 0.5 * D",
+     "sortKey": "(S, V, seedIndex, rank) ascending",
+     "justification": "both scores are in kcal/mol on comparable scales, so an unweighted average is the one linear combination that introduces no fitted parameter. The weight 0.5 is fixed here and may not be changed after results are seen."
+    },
+    {
+     "id": "normalised_rank_sum",
+     "complexityOrder": 3,
+     "description": "normalised rank-sum consensus of the two scorers",
+     "formula": "rv = 0-based index of the pose when the pool is sorted by (V, seedIndex, rank); rd = 0-based index when sorted by (D, seedIndex, rank); nv = rv/(N-1) and nd = rd/(N-1), both defined as 0 when N == 1; S = 0.5 * (nv + nd)",
+     "sortKey": "(S, V, seedIndex, rank) ascending",
+     "justification": "rank consensus is scale-free and so is insensitive to the fact that Vinardo totals are systematically smaller in magnitude than Vina totals; it is the standard non-parametric alternative to the linear combination."
+    }
+   ]
+  },
+  "prohibitions": [
+   "no per-target or per-PDB weights, exceptions or overrides",
+   "no rule that selects a scoring function per case",
+   "no free parameter tuned, chosen or adjusted after any result is seen",
+   "no change to the 2.0 A threshold",
+   "no change to the denominator of 85",
+   "no re-docking, no minimisation, no pose movement",
+   "no candidate added to or removed from the closed list after fingerprinting",
+   "no zip or tar archive of any kind"
+  ],
+  "selectionCriterion": {
+   "primary": "TOP1(rule) = number of the 85 cases whose rank-1 pose under that rule has RMSD < 2.0 A",
+   "winner": "argmax over the closed candidate list of TOP1(rule)",
+   "tieBreak1": "if two or more candidates share the maximum TOP1, prefer the one with fewer LOST cases against the Vina baseline, where LOST(rule) = cases the Vina baseline ranks native-like first and the rule does not",
+   "tieBreak2": "if still tied, prefer the rule with the smaller complexityOrder (vina < vinardo < linear_equal_weight < normalised_rank_sum)",
+   "withinOneCaseRule": "if the best and second-best candidates differ by at most 1 case in TOP1, the result is declared 'within one case', the SIMPLER of the two (smaller complexityOrder) is selected, and the fact that simplicity rather than the raw count decided it is stated explicitly in the report.",
+   "reportingRequirement": "TOP1, RECOVERED, LOST and NET against the Vina baseline of 50 must be reported for EVERY candidate, including candidates that do worse than the baseline. Reporting only the winner is a protocol violation.",
+   "baselineTop1": 50,
+   "baselineSource": "run-6 evidence summary.coverageOverPooledPoses.top1.successes over the pooled deduplicated poses"
+  },
+  "secondaryDiagnostics": {
+   "perSeedRobustness": {
+    "what": "every candidate rule is additionally applied to each seed's own 20-pose set alone, with no pooling, giving 5 numbers per rule comparable to the run-6 per-seed Vina figures 46, 49, 50, 47, 49",
+    "reported": "min, max, mean, sample standard deviation and the per-seed counts, for every candidate",
+    "affectsSelection": false,
+    "purpose": "to measure how much of the winner's pooled margin over Vina survives on individual seeds. A rule whose advantage vanishes on single seeds is noise, and this must be said plainly."
+   },
+   "finalRunEstimate": {
+    "what": "a bounded, explicitly labelled ESTIMATE of what a future frozen 85-case run would produce under the winning rule, together with the reasons it could come out lower",
+    "isNotAResult": true,
+    "noFinalRunHere": "this protocol does NOT authorise or perform that run"
+   }
+  },
+  "immutability": [
+   "runs 1-6, all their evidence files and all three existing preregistrations are immutable and are not written by this protocol",
+   "only NEW files are written: docs/evidence/astex-ranking-rule-prereg.json, docs/evidence/astex-ranking-rule-selection.json, docs/evidence/astex-ranking-rule-selection.md, scripts/astex-ranking-rule-select.py, scripts/test-astex-ranking.py"
+  ],
+  "runnerObligation": "the runner recomputes sha256(json.dumps(protocol, sort_keys=True)) from the protocol object in this file and REFUSES TO RUN, with a non-zero exit, if it differs from protocolFingerprintSha256.",
+  "pinnedCodeSha256": {
+   "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e",
+   "scripts/astex-multiseed-ensemble.py": "9fa303b0dd252ae2ed92a0455068e9223b312dfcdf5d5b1ae65db53bda911137",
+   "scripts/astex-vinardo-rescore.py": "5279d41c8e7626c75042ac2c95ac1ae76c37081d25b8fb6985c6f57201d02e21"
+  },
+  "versions": {
+   "vina": "1.2.7",
+   "meeko": "0.8.0",
+   "rdkit": "2026.03.6",
+   "python": "3.11.15"
+  }
+ }
+}

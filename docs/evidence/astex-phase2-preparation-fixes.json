@@ -1,0 +1,1272 @@
+{
+ "kind": "GENESIS_ASTEX_PHASE2_PREPARATION_FIXES",
+ "generatedAt": "2026-09-27T22:28:05+00:00",
+ "baselines": {
+  "run3": "docs/evidence/astex-redock-benchmark-2026-09-27-run3.json (46/85, top-1 path, num_modes 1)",
+  "run4diagnostic": "docs/evidence/astex-redock-run4-diagnostic.json (same preparation, redock_poses, numModes 20) \u2014 THIS is the like-for-like baseline for the new numbers",
+  "phase2b": "docs/evidence/astex-phase2b-sampling-diagnosis.json"
+ },
+ "immutability": "runs 1-5, both preregistrations, docs/evidence/astex-posesets/ and the three preregistered astex scripts are byte-identical to HEAD 5e18ce62; verified with git show",
+ "newCode": [
+  "scripts/astex_phase2_prep.py",
+  "scripts/astex-phase2-redock.py",
+  "scripts/test-astex-phase2-preparation.py"
+ ],
+ "protocol": {
+  "unchangedFromRun3": [
+   "box rule",
+   "exhaustiveness 32",
+   "seed 42",
+   "vina scoring function",
+   "cofactor rule",
+   "receptor cleaning",
+   "ligand CCD chemistry",
+   "RMSD < 2.0 A",
+   "denominator 85"
+  ],
+  "changed": [
+   "RULE 1 covalently linked ligand residues",
+   "RULE 2 modified amino-acid residues",
+   "reporting via redock_poses with numModes 20"
+  ],
+  "rule3": "AUDITED, NOT CHANGED \u2014 no machinery added"
+ },
+ "rule1": {
+  "statement": "After the preregistered ligand residue is selected, absorb transitively every other HETATM residue (excluding water, single-atom metal ions, the crystallisation-additive list, and any residue the cofactor rule already keeps) that has a heavy atom within d <= r_cov(A) + r_cov(B) + 0.40 A of a ligand heavy atom, with Cordero (2008) covalent radii.",
+  "toleranceA": 0.4,
+  "radiiSource": "Cordero et al., Dalton Trans. 2008, 2832",
+  "casesChanged": [
+   "1GKC"
+  ],
+  "acceptedBonds": [
+   {
+    "pdbId": "1GKC",
+    "residue": "BUM:A1449",
+    "heavyAtoms": 12,
+    "bondLengthA": 1.35,
+    "bondAtoms": "N...C",
+    "covalentCutoffA": 1.87,
+    "marginA": 0.52
+   }
+  ],
+  "nearestRejectedContactOverAll85": [
+   {
+    "closestContactA": 4.325,
+    "pdbId": "1MEH",
+    "residue": "CSO:A319"
+   },
+   {
+    "closestContactA": 4.352,
+    "pdbId": "1XM6",
+    "residue": "CME:A432"
+   },
+   {
+    "closestContactA": 6.799,
+    "pdbId": "2BM2",
+    "residue": "PM23211"
+   },
+   {
+    "closestContactA": 8.024,
+    "pdbId": "1OYT",
+    "residue": "NA601"
+   },
+   {
+    "closestContactA": 8.184,
+    "pdbId": "1KZK",
+    "residue": "EGL801"
+   },
+   {
+    "closestContactA": 8.574,
+    "pdbId": "1G9V",
+    "residue": "RQ3802"
+   },
+   {
+    "closestContactA": 8.6,
+    "pdbId": "1Q4G",
+    "residue": "HEM:A801"
+   },
+   {
+    "closestContactA": 8.91,
+    "pdbId": "1N1M",
+    "residue": "HG950"
+   }
+  ],
+  "marginStatement": "the only accepted bond is 1.350 A against a 1.870 A C-N cutoff (margin 0.520 A); the nearest rejected contact anywhere in the 85 is 4.325 A, i.e. 2.975 A further out than the accepted bond and 2.455 A outside its own cutoff",
+  "perCase": {
+   "1G9V": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "RQ3802",
+      "heavyAtoms": 25,
+      "closestContactA": 8.574,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 6.654
+     }
+    ]
+   },
+   "1GKC": {
+    "absorbed": [
+     {
+      "residue": "BUM:A1449",
+      "heavyAtoms": 12,
+      "bondLengthA": 1.35,
+      "bondAtoms": "N...C",
+      "covalentCutoffA": 1.87,
+      "marginA": 0.52
+     }
+    ],
+    "nearestRejected": []
+   },
+   "1GM8": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1GPK": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:A1539",
+      "heavyAtoms": 14,
+      "closestContactA": 16.4,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 14.48
+     }
+    ]
+   },
+   "1HNN": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1HP0": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1HQ2": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1HVY": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "CME:A43",
+      "heavyAtoms": 10,
+      "closestContactA": 19.485,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 17.565
+     }
+    ]
+   },
+   "1HWI": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "ADP101",
+      "heavyAtoms": 27,
+      "closestContactA": 9.465,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 7.645
+     }
+    ]
+   },
+   "1HWW": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:A1101",
+      "heavyAtoms": 14,
+      "closestContactA": 31.991,
+      "covalentCutoffA": 1.72,
+      "shortfallA": 30.271
+     }
+    ]
+   },
+   "1IA1": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1IG3": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1J3J": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "UMP611",
+      "heavyAtoms": 20,
+      "closestContactA": 38.44,
+      "covalentCutoffA": 1.77,
+      "shortfallA": 36.67
+     }
+    ]
+   },
+   "1JD0": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1JJE": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1JLA": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "CSD:A280",
+      "heavyAtoms": 8,
+      "closestContactA": 32.78,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 30.96
+     }
+    ]
+   },
+   "1K3U": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NA:B803",
+      "heavyAtoms": 1,
+      "closestContactA": 26.397,
+      "covalentCutoffA": 2.82,
+      "shortfallA": 23.577
+     }
+    ]
+   },
+   "1KE5": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1KZK": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "EGL801",
+      "heavyAtoms": 4,
+      "closestContactA": 8.184,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 6.364
+     }
+    ]
+   },
+   "1L2S": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "STC1115",
+      "heavyAtoms": 19,
+      "closestContactA": 24.535,
+      "covalentCutoffA": 1.72,
+      "shortfallA": 22.815
+     }
+    ]
+   },
+   "1L7F": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:B1200",
+      "heavyAtoms": 14,
+      "closestContactA": 17.787,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 15.867
+     }
+    ]
+   },
+   "1LPZ": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1LRH": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:E181",
+      "heavyAtoms": 14,
+      "closestContactA": 19.799,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 17.879
+     }
+    ]
+   },
+   "1M2Z": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1MEH": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "CSO:A319",
+      "heavyAtoms": 7,
+      "closestContactA": 4.325,
+      "covalentCutoffA": 1.72,
+      "shortfallA": 2.605
+     }
+    ]
+   },
+   "1MMV": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1MZC": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "SUC901",
+      "heavyAtoms": 23,
+      "closestContactA": 20.736,
+      "covalentCutoffA": 1.77,
+      "shortfallA": 18.966
+     }
+    ]
+   },
+   "1N1M": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "HG950",
+      "heavyAtoms": 1,
+      "closestContactA": 8.91,
+      "covalentCutoffA": 2.48,
+      "shortfallA": 6.43
+     }
+    ]
+   },
+   "1N2J": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "BAL802",
+      "heavyAtoms": 6,
+      "closestContactA": 16.572,
+      "covalentCutoffA": 1.77,
+      "shortfallA": 14.802
+     }
+    ]
+   },
+   "1N2V": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1N46": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1NAV": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1OF1": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1OF6": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1OPK": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "MYR1",
+      "heavyAtoms": 16,
+      "closestContactA": 22.083,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 20.163
+     }
+    ]
+   },
+   "1OQ5": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1OWE": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1OYT": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NA601",
+      "heavyAtoms": 1,
+      "closestContactA": 8.024,
+      "covalentCutoffA": 2.77,
+      "shortfallA": 5.254
+     }
+    ]
+   },
+   "1P2Y": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1P62": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1PMN": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1Q1G": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "IOH501",
+      "heavyAtoms": 4,
+      "closestContactA": 15.393,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 13.573
+     }
+    ]
+   },
+   "1Q41": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1Q4G": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "HEM:A801",
+      "heavyAtoms": 43,
+      "closestContactA": 8.6,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 6.68
+     }
+    ]
+   },
+   "1R1H": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:A754",
+      "heavyAtoms": 14,
+      "closestContactA": 20.865,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 19.045
+     }
+    ]
+   },
+   "1R55": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NAG:B510",
+      "heavyAtoms": 14,
+      "closestContactA": 11.883,
+      "covalentCutoffA": 1.77,
+      "shortfallA": 10.113
+     }
+    ]
+   },
+   "1R58": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1R9O": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1S19": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1S3V": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "SUL188",
+      "heavyAtoms": 5,
+      "closestContactA": 9.329,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 7.509
+     }
+    ]
+   },
+   "1SG0": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1SJ0": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1SQ5": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1SQN": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1T40": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1T46": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1T9B": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "K1696",
+      "heavyAtoms": 1,
+      "closestContactA": 18.023,
+      "covalentCutoffA": 3.19,
+      "shortfallA": 14.833
+     }
+    ]
+   },
+   "1TOW": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1TT1": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1TZ8": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "DES3",
+      "heavyAtoms": 20,
+      "closestContactA": 37.642,
+      "covalentCutoffA": 1.92,
+      "shortfallA": 35.722
+     }
+    ]
+   },
+   "1U1C": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1U4D": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1UML": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1UNL": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1UOU": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1V0P": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1V48": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1V4S": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "NA600",
+      "heavyAtoms": 1,
+      "closestContactA": 14.354,
+      "covalentCutoffA": 2.77,
+      "shortfallA": 11.584
+     }
+    ]
+   },
+   "1VCJ": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1W1P": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1W2G": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1X8X": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1XM6": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "CME:A432",
+      "heavyAtoms": 10,
+      "closestContactA": 4.352,
+      "covalentCutoffA": 1.72,
+      "shortfallA": 2.632
+     }
+    ]
+   },
+   "1XOQ": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1XOZ": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1Y6B": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1YGC": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1YQY": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1YV3": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "ADP999",
+      "heavyAtoms": 27,
+      "closestContactA": 10.275,
+      "covalentCutoffA": 1.72,
+      "shortfallA": 8.555
+     }
+    ]
+   },
+   "1YVF": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1YWR": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "1Z95": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "2BM2": {
+    "absorbed": [],
+    "nearestRejected": [
+     {
+      "residue": "PM23211",
+      "heavyAtoms": 90,
+      "closestContactA": 6.799,
+      "covalentCutoffA": 1.82,
+      "shortfallA": 4.979
+     }
+    ]
+   },
+   "2BR1": {
+    "absorbed": [],
+    "nearestRejected": []
+   },
+   "2BSM": {
+    "absorbed": [],
+    "nearestRejected": []
+   }
+  }
+ },
+ "rule2": {
+  "statement": "A HETATM residue carrying a complete amino-acid backbone by atom name (N, CA, C, O), not water/metal/additive/the ligand/an already-kept cofactor, whose backbone N or C is within covalent bonding distance of a backbone N or C of an ATOM record, is a modified residue OF the protein chain and is kept as rigid receptor atoms: CCD template restricted to the deposited atom names (polymer leaving atoms such as OXT removed, open valences capped with implicit H), RDKit AssignBondOrdersFromTemplate + AddHs, Meeko AD4 typing, appended via extraRigidPdbqtPaths.",
+  "casesChanged": [
+   "1HVY",
+   "1JLA",
+   "1MEH",
+   "1XM6"
+  ],
+  "residuesKept": {
+   "1HVY": [
+    {
+     "residue": "CME:A43",
+     "resname": "CME",
+     "heavyAtoms": 10,
+     "pdbqtAtoms": 13,
+     "peptideBondA": 1.327,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    }
+   ],
+   "1JLA": [
+    {
+     "residue": "CSD:A280",
+     "resname": "CSD",
+     "heavyAtoms": 8,
+     "pdbqtAtoms": 11,
+     "peptideBondA": 1.333,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    }
+   ],
+   "1MEH": [
+    {
+     "residue": "CSO:A319",
+     "resname": "CSO",
+     "heavyAtoms": 7,
+     "pdbqtAtoms": 10,
+     "peptideBondA": 1.329,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    }
+   ],
+   "1XM6": [
+    {
+     "residue": "CME:A194",
+     "resname": "CME",
+     "heavyAtoms": 10,
+     "pdbqtAtoms": 13,
+     "peptideBondA": 1.316,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    },
+    {
+     "residue": "CME:A320",
+     "resname": "CME",
+     "heavyAtoms": 10,
+     "pdbqtAtoms": 13,
+     "peptideBondA": 1.327,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    },
+    {
+     "residue": "CME:A432",
+     "resname": "CME",
+     "heavyAtoms": 10,
+     "pdbqtAtoms": 13,
+     "peptideBondA": 1.327,
+     "ccdLeavingAtomsRemoved": [
+      "OXT"
+     ]
+    }
+   ]
+  },
+  "residuesNotTyped": {},
+  "determinismOfUntypableResidues": "a residue that cannot be typed is recorded under rule2ModifiedResiduesNotTyped with the exception text and left out; over the 85 this list is empty",
+  "residuesRejectedByThePolymerBondRequirement": {
+   "1N2J": "BAL802 (beta-alanine, 6 heavy atoms) has an amino-acid backbone but its nearest backbone-to-protein-backbone contact is 3.500 A, far outside the 1.87 A cutoff, so it is a free molecule, not a chain residue",
+   "1GKC": "BUM:A1449 has an amino-acid backbone but is 4.039 A from the chain; it is absorbed by rule 1 instead",
+   "1HNN": "SAH2001 has an amino-acid backbone but is already kept by the run-3 cofactor rule"
+  }
+ },
+ "rule3": {
+  "verdict": "NO RULE IMPLEMENTED",
+  "whatThePipelineDoes": [
+   "every deposited receptor hydrogen is dropped (astex-redock-benchmark.clean_receptor)",
+   "meeko mk_prepare_receptor adds hydrogens from its residue templates; 55168 polar hydrogens (AD4 type HD) over 307569 receptor atoms across the 85",
+   "no pH model, no hydrogen-bond-network optimisation, no Asn/Gln/His flip, no titration"
+  ],
+  "histidineMeasurement": {
+   "receptorsAudited": 85,
+   "histidineResiduesAudited": 895,
+   "states": {
+    "HIE": 895
+   },
+   "statement": "every histidine in every one of the 85 prepared receptors is the same tautomer (NE2-H, ND1 acceptor). The choice is a fixed Meeko template, so it is fully deterministic and identical across all 85; it is not chosen per PDB."
+  },
+  "evidenceAgainstAProblem": {
+   "hisRingNitrogenWithin4_5AOfLigand": {
+    "46 run-3 successes": "18 of 46 (39%)",
+    "22 A_RANKING_FAILURE": "11 of 22 (50%)",
+    "17 B_SAMPLING_FAILURE": "2 of 17 (12%)"
+   },
+   "rotatableSerThrTyrHydroxylHydrogenWithin4AOfLigand": {
+    "46 run-3 successes": "38 of 46 (83%)",
+    "22 A_RANKING_FAILURE": "14 of 22 (64%)",
+    "17 B_SAMPLING_FAILURE": "12 of 17 (71%)"
+   },
+   "reading": "the failure classes are not enriched in either exposure \u2014 the B_SAMPLING class is the LEAST exposed to histidine of the three groups. No failure class points at receptor protonation."
+  },
+  "whatWasNotRuledOut": "that a hydrogen-bond-network optimiser (Reduce / PDB2PQR) would change some poses. That was not measured. It is new machinery with no failure class behind it, so it was not added."
+ },
+ "validation": {
+  "scope": "5 cases any rule changes + 8 control cases no rule changes. The full 85-case benchmark was NOT run.",
+  "controlSelectionCriterion": "the run-3 successes that no rule changes, sorted by PDB id ascending (45 of them), taking indices 0, 6, 12, 18, 24, 30, 36, 42 \u2014 every sixth \u2014 giving 8 cases. No hand-picking.",
+  "controlsThatMoved": [],
+  "controlVerdict": "NONE \u2014 all 8 controls reproduce the run-4 diagnostic rank-1 RMSD, rank-1 score and best-in-20 RMSD exactly",
+  "cases": [
+   {
+    "pdbId": "1GKC",
+    "group": "RULE_CHANGED",
+    "rulesApplied": [
+     "RULE1 +12 heavy atoms (BUM:A1449)"
+    ],
+    "run3Outcome": "B_SAMPLING_FAILURE",
+    "ligandHeavyAtomsBefore": 10,
+    "ligandHeavyAtomsAfter": 22,
+    "receptorHeavyAtomsBefore": 1278,
+    "receptorHeavyAtomsAfter": 1278,
+    "crystalPoseVinaBefore": -2.548,
+    "crystalPoseVinaAfter": -5.29,
+    "crystalPoseAfterLocalOptBefore": -3.035,
+    "crystalPoseAfterLocalOptAfter": -6.229,
+    "minLigandReceptorHeavyDistBeforeA": 2.894,
+    "minLigandReceptorHeavyDistAfterA": 2.074,
+    "crystalPoseRelaxationDriftBeforeA": 0.65,
+    "crystalPoseRelaxationDriftAfterA": 0.461,
+    "run3Top1RmsdA": 6.434,
+    "run3Top1ScoreKcalMol": -5.375,
+    "oldRank1RmsdA": 6.421,
+    "oldRank1ScoreKcalMol": -5.369,
+    "oldBestRmsdInTop20A": 3.935,
+    "oldBestRmsdRank": 17,
+    "newRank1RmsdA": 6.65,
+    "newRank1ScoreKcalMol": -6.796,
+    "newBestRmsdInTop20A": 1.447,
+    "newBestRmsdRank": 3,
+    "run3Success": false,
+    "newSuccess": false,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": false
+   },
+   {
+    "pdbId": "1HVY",
+    "group": "RULE_CHANGED",
+    "rulesApplied": [
+     "RULE2 keep CME:A43 (10 heavy -> 13 pdbqt atoms)"
+    ],
+    "run3Outcome": "B_SAMPLING_FAILURE",
+    "ligandHeavyAtomsBefore": 32,
+    "ligandHeavyAtomsAfter": 32,
+    "receptorHeavyAtomsBefore": 2339,
+    "receptorHeavyAtomsAfter": 2349,
+    "crystalPoseVinaBefore": -7.222,
+    "crystalPoseVinaAfter": -7.222,
+    "crystalPoseAfterLocalOptBefore": -7.606,
+    "crystalPoseAfterLocalOptAfter": -7.606,
+    "minLigandReceptorHeavyDistBeforeA": 2.63,
+    "minLigandReceptorHeavyDistAfterA": 2.63,
+    "crystalPoseRelaxationDriftBeforeA": 0.33,
+    "crystalPoseRelaxationDriftAfterA": 0.33,
+    "run3Top1RmsdA": 3.479,
+    "run3Top1ScoreKcalMol": -8.709,
+    "oldRank1RmsdA": 9.357,
+    "oldRank1ScoreKcalMol": -9.011,
+    "oldBestRmsdInTop20A": 2.009,
+    "oldBestRmsdRank": 15,
+    "newRank1RmsdA": 9.357,
+    "newRank1ScoreKcalMol": -9.011,
+    "newBestRmsdInTop20A": 2.009,
+    "newBestRmsdRank": 15,
+    "run3Success": false,
+    "newSuccess": false,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1JLA",
+    "group": "RULE_CHANGED",
+    "rulesApplied": [
+     "RULE2 keep CSD:A280 (8 heavy -> 11 pdbqt atoms)"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 27,
+    "ligandHeavyAtomsAfter": 27,
+    "receptorHeavyAtomsBefore": 7813,
+    "receptorHeavyAtomsAfter": 7821,
+    "crystalPoseVinaBefore": -10.84,
+    "crystalPoseVinaAfter": -10.84,
+    "crystalPoseAfterLocalOptBefore": -11.394,
+    "crystalPoseAfterLocalOptAfter": -11.394,
+    "minLigandReceptorHeavyDistBeforeA": 2.702,
+    "minLigandReceptorHeavyDistAfterA": 2.702,
+    "crystalPoseRelaxationDriftBeforeA": 0.291,
+    "crystalPoseRelaxationDriftAfterA": 0.291,
+    "run3Top1RmsdA": 0.601,
+    "run3Top1ScoreKcalMol": -11.789,
+    "oldRank1RmsdA": 0.594,
+    "oldRank1ScoreKcalMol": -11.766,
+    "oldBestRmsdInTop20A": 0.594,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 0.594,
+    "newRank1ScoreKcalMol": -11.766,
+    "newBestRmsdInTop20A": 0.594,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1MEH",
+    "group": "RULE_CHANGED",
+    "rulesApplied": [
+     "RULE2 keep CSO:A319 (7 heavy -> 10 pdbqt atoms)"
+    ],
+    "run3Outcome": "B_SAMPLING_FAILURE",
+    "ligandHeavyAtomsBefore": 23,
+    "ligandHeavyAtomsAfter": 23,
+    "receptorHeavyAtomsBefore": 2725,
+    "receptorHeavyAtomsAfter": 2732,
+    "crystalPoseVinaBefore": -6.545,
+    "crystalPoseVinaAfter": -6.628,
+    "crystalPoseAfterLocalOptBefore": -6.882,
+    "crystalPoseAfterLocalOptAfter": -6.955,
+    "minLigandReceptorHeavyDistBeforeA": 2.52,
+    "minLigandReceptorHeavyDistAfterA": 2.52,
+    "crystalPoseRelaxationDriftBeforeA": 0.161,
+    "crystalPoseRelaxationDriftAfterA": 0.225,
+    "run3Top1RmsdA": 4.175,
+    "run3Top1ScoreKcalMol": -7.632,
+    "oldRank1RmsdA": 4.177,
+    "oldRank1ScoreKcalMol": -7.651,
+    "oldBestRmsdInTop20A": 2.326,
+    "oldBestRmsdRank": 10,
+    "newRank1RmsdA": 4.66,
+    "newRank1ScoreKcalMol": -7.447,
+    "newBestRmsdInTop20A": 2.455,
+    "newBestRmsdRank": 4,
+    "run3Success": false,
+    "newSuccess": false,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": false
+   },
+   {
+    "pdbId": "1XM6",
+    "group": "RULE_CHANGED",
+    "rulesApplied": [
+     "RULE2 keep CME:A194 (10 heavy -> 13 pdbqt atoms), CME:A320 (10 heavy -> 13 pdbqt atoms), CME:A432 (10 heavy -> 13 pdbqt atoms)"
+    ],
+    "run3Outcome": "A_RANKING_FAILURE",
+    "ligandHeavyAtomsBefore": 19,
+    "ligandHeavyAtomsAfter": 19,
+    "receptorHeavyAtomsBefore": 2719,
+    "receptorHeavyAtomsAfter": 2749,
+    "crystalPoseVinaBefore": -7.638,
+    "crystalPoseVinaAfter": -7.711,
+    "crystalPoseAfterLocalOptBefore": -8.07,
+    "crystalPoseAfterLocalOptAfter": -8.141,
+    "minLigandReceptorHeavyDistBeforeA": 3.026,
+    "minLigandReceptorHeavyDistAfterA": 3.026,
+    "crystalPoseRelaxationDriftBeforeA": 0.236,
+    "crystalPoseRelaxationDriftAfterA": 0.224,
+    "run3Top1RmsdA": 2.222,
+    "run3Top1ScoreKcalMol": -8.993,
+    "oldRank1RmsdA": 2.224,
+    "oldRank1ScoreKcalMol": -8.995,
+    "oldBestRmsdInTop20A": 0.963,
+    "oldBestRmsdRank": 2,
+    "newRank1RmsdA": 2.235,
+    "newRank1ScoreKcalMol": -9.049,
+    "newBestRmsdInTop20A": 0.956,
+    "newBestRmsdRank": 2,
+    "run3Success": false,
+    "newSuccess": false,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": false
+   },
+   {
+    "pdbId": "1GPK",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 18,
+    "ligandHeavyAtomsAfter": 18,
+    "receptorHeavyAtomsBefore": 3995,
+    "receptorHeavyAtomsAfter": 3995,
+    "crystalPoseVinaBefore": -10.129,
+    "crystalPoseVinaAfter": -10.129,
+    "crystalPoseAfterLocalOptBefore": -10.411,
+    "crystalPoseAfterLocalOptAfter": -10.411,
+    "minLigandReceptorHeavyDistBeforeA": 2.622,
+    "minLigandReceptorHeavyDistAfterA": 2.622,
+    "crystalPoseRelaxationDriftBeforeA": 0.21,
+    "crystalPoseRelaxationDriftAfterA": 0.21,
+    "run3Top1RmsdA": 0.52,
+    "run3Top1ScoreKcalMol": -10.482,
+    "oldRank1RmsdA": 0.517,
+    "oldRank1ScoreKcalMol": -10.51,
+    "oldBestRmsdInTop20A": 0.517,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 0.517,
+    "newRank1ScoreKcalMol": -10.51,
+    "newBestRmsdInTop20A": 0.517,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1J3J",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 17,
+    "ligandHeavyAtomsAfter": 17,
+    "receptorHeavyAtomsBefore": 4598,
+    "receptorHeavyAtomsAfter": 4598,
+    "crystalPoseVinaBefore": -8.291,
+    "crystalPoseVinaAfter": -8.291,
+    "crystalPoseAfterLocalOptBefore": -8.818,
+    "crystalPoseAfterLocalOptAfter": -8.818,
+    "minLigandReceptorHeavyDistBeforeA": 2.639,
+    "minLigandReceptorHeavyDistAfterA": 2.639,
+    "crystalPoseRelaxationDriftBeforeA": 0.328,
+    "crystalPoseRelaxationDriftAfterA": 0.328,
+    "run3Top1RmsdA": 0.52,
+    "run3Top1ScoreKcalMol": -8.774,
+    "oldRank1RmsdA": 0.516,
+    "oldRank1ScoreKcalMol": -8.764,
+    "oldBestRmsdInTop20A": 0.516,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 0.516,
+    "newRank1ScoreKcalMol": -8.764,
+    "newBestRmsdInTop20A": 0.516,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1N1M",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 12,
+    "ligandHeavyAtomsAfter": 12,
+    "receptorHeavyAtomsBefore": 5948,
+    "receptorHeavyAtomsAfter": 5948,
+    "crystalPoseVinaBefore": -5.004,
+    "crystalPoseVinaAfter": -5.004,
+    "crystalPoseAfterLocalOptBefore": -5.487,
+    "crystalPoseAfterLocalOptAfter": -5.487,
+    "minLigandReceptorHeavyDistBeforeA": 2.797,
+    "minLigandReceptorHeavyDistAfterA": 2.797,
+    "crystalPoseRelaxationDriftBeforeA": 0.311,
+    "crystalPoseRelaxationDriftAfterA": 0.311,
+    "run3Top1RmsdA": 0.89,
+    "run3Top1ScoreKcalMol": -5.796,
+    "oldRank1RmsdA": 1.967,
+    "oldRank1ScoreKcalMol": -5.872,
+    "oldBestRmsdInTop20A": 0.871,
+    "oldBestRmsdRank": 2,
+    "newRank1RmsdA": 1.967,
+    "newRank1ScoreKcalMol": -5.872,
+    "newBestRmsdInTop20A": 0.871,
+    "newBestRmsdRank": 2,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1OQ5",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 26,
+    "ligandHeavyAtomsAfter": 26,
+    "receptorHeavyAtomsBefore": 2031,
+    "receptorHeavyAtomsAfter": 2031,
+    "crystalPoseVinaBefore": -7.817,
+    "crystalPoseVinaAfter": -7.817,
+    "crystalPoseAfterLocalOptBefore": -8.674,
+    "crystalPoseAfterLocalOptAfter": -8.674,
+    "minLigandReceptorHeavyDistBeforeA": 1.968,
+    "minLigandReceptorHeavyDistAfterA": 1.968,
+    "crystalPoseRelaxationDriftBeforeA": 0.46,
+    "crystalPoseRelaxationDriftAfterA": 0.46,
+    "run3Top1RmsdA": 0.883,
+    "run3Top1ScoreKcalMol": -8.72,
+    "oldRank1RmsdA": 0.877,
+    "oldRank1ScoreKcalMol": -8.731,
+    "oldBestRmsdInTop20A": 0.877,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 0.877,
+    "newRank1ScoreKcalMol": -8.731,
+    "newBestRmsdInTop20A": 0.877,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1R55",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 23,
+    "ligandHeavyAtomsAfter": 23,
+    "receptorHeavyAtomsBefore": 1515,
+    "receptorHeavyAtomsAfter": 1515,
+    "crystalPoseVinaBefore": -6.103,
+    "crystalPoseVinaAfter": -6.103,
+    "crystalPoseAfterLocalOptBefore": -6.32,
+    "crystalPoseAfterLocalOptAfter": -6.32,
+    "minLigandReceptorHeavyDistBeforeA": 1.938,
+    "minLigandReceptorHeavyDistAfterA": 1.938,
+    "crystalPoseRelaxationDriftBeforeA": 0.159,
+    "crystalPoseRelaxationDriftAfterA": 0.159,
+    "run3Top1RmsdA": 1.138,
+    "run3Top1ScoreKcalMol": -7.576,
+    "oldRank1RmsdA": 1.138,
+    "oldRank1ScoreKcalMol": -7.592,
+    "oldBestRmsdInTop20A": 1.138,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 1.138,
+    "newRank1ScoreKcalMol": -7.592,
+    "newBestRmsdInTop20A": 1.138,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1UML",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 33,
+    "ligandHeavyAtomsAfter": 33,
+    "receptorHeavyAtomsBefore": 2790,
+    "receptorHeavyAtomsAfter": 2790,
+    "crystalPoseVinaBefore": -8.942,
+    "crystalPoseVinaAfter": -8.942,
+    "crystalPoseAfterLocalOptBefore": -9.475,
+    "crystalPoseAfterLocalOptAfter": -9.475,
+    "minLigandReceptorHeavyDistBeforeA": 2.65,
+    "minLigandReceptorHeavyDistAfterA": 2.65,
+    "crystalPoseRelaxationDriftBeforeA": 0.246,
+    "crystalPoseRelaxationDriftAfterA": 0.246,
+    "run3Top1RmsdA": 1.469,
+    "run3Top1ScoreKcalMol": -9.804,
+    "oldRank1RmsdA": 1.42,
+    "oldRank1ScoreKcalMol": -9.828,
+    "oldBestRmsdInTop20A": 1.42,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 1.42,
+    "newRank1ScoreKcalMol": -9.828,
+    "newBestRmsdInTop20A": 1.42,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1X8X",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 13,
+    "ligandHeavyAtomsAfter": 13,
+    "receptorHeavyAtomsBefore": 2544,
+    "receptorHeavyAtomsAfter": 2544,
+    "crystalPoseVinaBefore": -5.97,
+    "crystalPoseVinaAfter": -5.97,
+    "crystalPoseAfterLocalOptBefore": -6.417,
+    "crystalPoseAfterLocalOptAfter": -6.417,
+    "minLigandReceptorHeavyDistBeforeA": 2.676,
+    "minLigandReceptorHeavyDistAfterA": 2.676,
+    "crystalPoseRelaxationDriftBeforeA": 0.207,
+    "crystalPoseRelaxationDriftAfterA": 0.207,
+    "run3Top1RmsdA": 0.721,
+    "run3Top1ScoreKcalMol": -6.877,
+    "oldRank1RmsdA": 0.794,
+    "oldRank1ScoreKcalMol": -6.901,
+    "oldBestRmsdInTop20A": 0.741,
+    "oldBestRmsdRank": 2,
+    "newRank1RmsdA": 0.794,
+    "newRank1ScoreKcalMol": -6.901,
+    "newBestRmsdInTop20A": 0.741,
+    "newBestRmsdRank": 2,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   },
+   {
+    "pdbId": "1YV3",
+    "group": "CONTROL",
+    "rulesApplied": [
+     "none"
+    ],
+    "run3Outcome": "SUCCESS",
+    "ligandHeavyAtomsBefore": 22,
+    "ligandHeavyAtomsAfter": 22,
+    "receptorHeavyAtomsBefore": 5007,
+    "receptorHeavyAtomsAfter": 5007,
+    "crystalPoseVinaBefore": -12.074,
+    "crystalPoseVinaAfter": -12.074,
+    "crystalPoseAfterLocalOptBefore": -12.475,
+    "crystalPoseAfterLocalOptAfter": -12.475,
+    "minLigandReceptorHeavyDistBeforeA": 2.476,
+    "minLigandReceptorHeavyDistAfterA": 2.476,
+    "crystalPoseRelaxationDriftBeforeA": 0.255,
+    "crystalPoseRelaxationDriftAfterA": 0.255,
+    "run3Top1RmsdA": 0.519,
+    "run3Top1ScoreKcalMol": -12.694,
+    "oldRank1RmsdA": 0.492,
+    "oldRank1ScoreKcalMol": -12.709,
+    "oldBestRmsdInTop20A": 0.492,
+    "oldBestRmsdRank": 1,
+    "newRank1RmsdA": 0.492,
+    "newRank1ScoreKcalMol": -12.709,
+    "newBestRmsdInTop20A": 0.492,
+    "newBestRmsdRank": 1,
+    "run3Success": true,
+    "newSuccess": true,
+    "crosses2A": "no",
+    "identicalToRun4Diagnostic": true
+   }
+  ]
+ },
+ "estimate": {
+  "measured": {
+   "top1SuccessesUnchanged": "46/85 \u2014 none of the 5 changed cases crosses 2.0 A",
+   "top20SamplingCeiling": "68/85 -> 69/85 (1GKC best-in-20 3.935 A -> 1.447 A)",
+   "top3Coverage": "59/85 -> 60/85 (1GKC at rank 3)",
+   "casesWithByteIdenticalInputsToRun4": 80,
+   "controlsThatMoved": 0
+  },
+  "estimateLabelledAsSuch": {
+   "label": "ESTIMATE, NOT A MEASUREMENT",
+   "recoveredNow": 0,
+   "upperBound": 1,
+   "statement": "0 recovered at top-1 now; 0 to 1 in combination with a later ranking or scoring change, that 1 being 1GKC (1.447 A pose at rank 3). The 85-case audits for both rules are exhaustive, so no further preparation defect of either class remains in the set.",
+   "notMeasured": "whether Vinardo docking or a multi-seed consensus would rank 1GKC's 1.447 A pose first with the corrected 22-atom ligand"
+  },
+  "ruleWorth": {
+   "rule1": "unambiguously worth having \u2014 the benchmark was docking a different molecule from the one deposited",
+   "rule2": "near-null on the Astex 85: crystal-pose score improves by 0.083 (1MEH) and 0.073 (1XM6) kcal/mol, 1MEH best-in-20 gets 0.129 A WORSE, nothing recovered. Keep for correctness, not for benchmark gain.",
+   "rule3": "not implemented"
+  }
+ },
+ "tests": {
+  "file": "scripts/test-astex-phase2-preparation.py",
+  "passed": 27,
+  "failed": 0,
+  "skipped": 0
+ }
+}

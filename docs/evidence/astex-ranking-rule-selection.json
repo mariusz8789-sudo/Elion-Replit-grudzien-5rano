@@ -1,0 +1,4067 @@
+{
+ "kind": "GENESIS_ASTEX_RANKING_RULE_SELECTION",
+ "label": "Astex phase 4 - ranking-rule selection over the frozen run-6 pooled poses",
+ "notAValidation": "MODEL SELECTION ON THE TEST SET. Astex has been inspected repeatedly in this project, and this step chooses one ranking rule by its score on those same 85 cases. The number the winning rule attains here is therefore a POST-HOC DEVELOPMENT NUMBER and is NOT a validation result, NOT a measurement of generalisation, and NOT a headline. It may not be quoted as the method's performance. Any claim about how this rule generalises requires a separate, separately frozen, prospective run whose protocol is written after this result is in.",
+ "finishedAt": "2026-09-28T04:39:15+00:00",
+ "preregistration": {
+  "file": "docs/evidence/astex-ranking-rule-prereg.json",
+  "sha256": "8ddc6496e7bdbd642e8b8a4649be25733acaaaf760ba9ea7cdaae9f0f91c0dd9",
+  "protocolFingerprintSha256": "fc7b3177851faa12a487af3c69e3e0e16cab4068f492c39b13cef04a77d5c0f5",
+  "fingerprintRecomputedAndMatched": true,
+  "frozenAt": "2026-09-28T04:22:53+00:00",
+  "pinnedInputsVerified": {
+   "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e",
+   "scripts/astex-multiseed-ensemble.py": "9fa303b0dd252ae2ed92a0455068e9223b312dfcdf5d5b1ae65db53bda911137",
+   "scripts/astex-vinardo-rescore.py": "5279d41c8e7626c75042ac2c95ac1ae76c37081d25b8fb6985c6f57201d02e21",
+   "docs/evidence/astex-run6-multiseed-ensemble.json": "bae66aa9af480ac7887507dc11e284b05fb460994c0c5c215c523248c304657d"
+  }
+ },
+ "dataset": {
+  "name": "Astex Diverse Set",
+  "cases": 85,
+  "denominator": 85,
+  "thresholdRmsdA": 2.0
+ },
+ "poseSource": {
+  "run": "run 6 multi-seed Vina ensemble",
+  "workDir": "/tmp/claude-0/run6/work",
+  "casesDir": "/tmp/claude-0/run6/cases",
+  "redocked": false,
+  "minimised": false,
+  "posesMoved": false
+ },
+ "integrity": {
+  "unavailable": [
+   "1GM8"
+  ],
+  "unavailableCount": 1,
+  "detail": [
+   {
+    "pdbId": "1GM8",
+    "failedChecks": [
+     {
+      "check": "scoring",
+      "ok": false,
+      "error": "\n\nVina runtime error: The ligand is outside the grid box. Increase the size of the grid box or center it accordingly around the ligand.\n"
+     }
+    ]
+   }
+  ],
+  "policy": "UNAVAILABLE cases stay in the denominator and count as a top-1 failure for every rule alike; nothing is re-docked",
+  "casesScored": 84
+ },
+ "samplingCeilingInPool": {
+  "successes": 80,
+  "denominator": 85,
+  "definition": "cases with any pose under 2.0 A in the frozen pool"
+ },
+ "candidates": [
+  {
+   "rule": "vina",
+   "top1Successes": 50,
+   "denominator": 85,
+   "rate": 0.5882,
+   "recoveredVsBaseline": [],
+   "recovered": 0,
+   "lostVsBaseline": [],
+   "lost": 0,
+   "net": 0,
+   "baselineTop1": 50,
+   "top1Cases": [
+    "1GKC",
+    "1GPK",
+    "1HNN",
+    "1HQ2",
+    "1HWI",
+    "1HWW",
+    "1IA1",
+    "1IG3",
+    "1J3J",
+    "1JLA",
+    "1K3U",
+    "1KE5",
+    "1KZK",
+    "1L2S",
+    "1LPZ",
+    "1LRH",
+    "1M2Z",
+    "1N46",
+    "1NAV",
+    "1OF1",
+    "1OF6",
+    "1OPK",
+    "1OQ5",
+    "1OYT",
+    "1P62",
+    "1PMN",
+    "1Q4G",
+    "1R1H",
+    "1R55",
+    "1R9O",
+    "1SG0",
+    "1SQN",
+    "1T40",
+    "1T46",
+    "1TT1",
+    "1U1C",
+    "1UML",
+    "1UNL",
+    "1V48",
+    "1V4S",
+    "1VCJ",
+    "1W2G",
+    "1X8X",
+    "1XOQ",
+    "1XOZ",
+    "1Y6B",
+    "1YQY",
+    "1YV3",
+    "1Z95",
+    "2BSM"
+   ]
+  },
+  {
+   "rule": "vinardo",
+   "top1Successes": 53,
+   "denominator": 85,
+   "rate": 0.6235,
+   "recoveredVsBaseline": [
+    "1HP0",
+    "1MZC",
+    "1OWE",
+    "1S3V",
+    "1SJ0",
+    "1TOW",
+    "1U4D",
+    "1V0P",
+    "1YWR"
+   ],
+   "recovered": 9,
+   "lostVsBaseline": [
+    "1GPK",
+    "1L2S",
+    "1OQ5",
+    "1P62",
+    "1TT1",
+    "1U1C"
+   ],
+   "lost": 6,
+   "net": 3,
+   "baselineTop1": 50,
+   "top1Cases": [
+    "1GKC",
+    "1HNN",
+    "1HP0",
+    "1HQ2",
+    "1HWI",
+    "1HWW",
+    "1IA1",
+    "1IG3",
+    "1J3J",
+    "1JLA",
+    "1K3U",
+    "1KE5",
+    "1KZK",
+    "1LPZ",
+    "1LRH",
+    "1M2Z",
+    "1MZC",
+    "1N46",
+    "1NAV",
+    "1OF1",
+    "1OF6",
+    "1OPK",
+    "1OWE",
+    "1OYT",
+    "1PMN",
+    "1Q4G",
+    "1R1H",
+    "1R55",
+    "1R9O",
+    "1S3V",
+    "1SG0",
+    "1SJ0",
+    "1SQN",
+    "1T40",
+    "1T46",
+    "1TOW",
+    "1U4D",
+    "1UML",
+    "1UNL",
+    "1V0P",
+    "1V48",
+    "1V4S",
+    "1VCJ",
+    "1W2G",
+    "1X8X",
+    "1XOQ",
+    "1XOZ",
+    "1Y6B",
+    "1YQY",
+    "1YV3",
+    "1YWR",
+    "1Z95",
+    "2BSM"
+   ]
+  },
+  {
+   "rule": "linear_equal_weight",
+   "top1Successes": 53,
+   "denominator": 85,
+   "rate": 0.6235,
+   "recoveredVsBaseline": [
+    "1HP0",
+    "1S3V",
+    "1TOW",
+    "1U4D",
+    "1V0P",
+    "1YWR"
+   ],
+   "recovered": 6,
+   "lostVsBaseline": [
+    "1GPK",
+    "1L2S",
+    "1TT1"
+   ],
+   "lost": 3,
+   "net": 3,
+   "baselineTop1": 50,
+   "top1Cases": [
+    "1GKC",
+    "1HNN",
+    "1HP0",
+    "1HQ2",
+    "1HWI",
+    "1HWW",
+    "1IA1",
+    "1IG3",
+    "1J3J",
+    "1JLA",
+    "1K3U",
+    "1KE5",
+    "1KZK",
+    "1LPZ",
+    "1LRH",
+    "1M2Z",
+    "1N46",
+    "1NAV",
+    "1OF1",
+    "1OF6",
+    "1OPK",
+    "1OQ5",
+    "1OYT",
+    "1P62",
+    "1PMN",
+    "1Q4G",
+    "1R1H",
+    "1R55",
+    "1R9O",
+    "1S3V",
+    "1SG0",
+    "1SQN",
+    "1T40",
+    "1T46",
+    "1TOW",
+    "1U1C",
+    "1U4D",
+    "1UML",
+    "1UNL",
+    "1V0P",
+    "1V48",
+    "1V4S",
+    "1VCJ",
+    "1W2G",
+    "1X8X",
+    "1XOQ",
+    "1XOZ",
+    "1Y6B",
+    "1YQY",
+    "1YV3",
+    "1YWR",
+    "1Z95",
+    "2BSM"
+   ]
+  },
+  {
+   "rule": "normalised_rank_sum",
+   "top1Successes": 54,
+   "denominator": 85,
+   "rate": 0.6353,
+   "recoveredVsBaseline": [
+    "1JD0",
+    "1SJ0",
+    "1TOW",
+    "1V0P",
+    "1YVF"
+   ],
+   "recovered": 5,
+   "lostVsBaseline": [
+    "1U1C"
+   ],
+   "lost": 1,
+   "net": 4,
+   "baselineTop1": 50,
+   "top1Cases": [
+    "1GKC",
+    "1GPK",
+    "1HNN",
+    "1HQ2",
+    "1HWI",
+    "1HWW",
+    "1IA1",
+    "1IG3",
+    "1J3J",
+    "1JD0",
+    "1JLA",
+    "1K3U",
+    "1KE5",
+    "1KZK",
+    "1L2S",
+    "1LPZ",
+    "1LRH",
+    "1M2Z",
+    "1N46",
+    "1NAV",
+    "1OF1",
+    "1OF6",
+    "1OPK",
+    "1OQ5",
+    "1OYT",
+    "1P62",
+    "1PMN",
+    "1Q4G",
+    "1R1H",
+    "1R55",
+    "1R9O",
+    "1SG0",
+    "1SJ0",
+    "1SQN",
+    "1T40",
+    "1T46",
+    "1TOW",
+    "1TT1",
+    "1UML",
+    "1UNL",
+    "1V0P",
+    "1V48",
+    "1V4S",
+    "1VCJ",
+    "1W2G",
+    "1X8X",
+    "1XOQ",
+    "1XOZ",
+    "1Y6B",
+    "1YQY",
+    "1YV3",
+    "1YVF",
+    "1Z95",
+    "2BSM"
+   ]
+  }
+ ],
+ "selection": {
+  "winner": "linear_equal_weight",
+  "decidedBy": "withinOneCaseRule_simplerRulePreferred",
+  "withinOneCaseOfRunnerUp": true,
+  "bestByTop1": "normalised_rank_sum",
+  "bestByTop1Count": 54,
+  "secondByTop1": "linear_equal_weight",
+  "secondByTop1Count": 53,
+  "runnerUp": "normalised_rank_sum",
+  "marginCases": 1,
+  "orderApplied": [
+   "normalised_rank_sum",
+   "linear_equal_weight",
+   "vinardo",
+   "vina"
+  ],
+  "criterion": "argmax top1Successes over 85; ties by fewer LOST vs the Vina baseline; then by smaller complexityOrder; if the best two are within 1 case, the simpler of the two is selected and that is stated"
+ },
+ "winnerSummary": {
+  "rule": "linear_equal_weight",
+  "top1": 53,
+  "denominator": 85,
+  "vsBaseline50": 3,
+  "recovered": 6,
+  "lost": 3,
+  "net": 3,
+  "perSeedCounts": [
+   50,
+   54,
+   52,
+   48,
+   50
+  ],
+  "perSeedNetVsVina": [
+   4,
+   5,
+   2,
+   1,
+   1
+  ],
+  "perSeedMeanNet": 2.6
+ },
+ "residualRankingGapUnderWinner": {
+  "count": 27,
+  "cases": [
+   "1G9V",
+   "1GPK",
+   "1JD0",
+   "1JJE",
+   "1L2S",
+   "1L7F",
+   "1MEH",
+   "1MMV",
+   "1MZC",
+   "1N1M",
+   "1N2J",
+   "1N2V",
+   "1OWE",
+   "1P2Y",
+   "1Q1G",
+   "1R58",
+   "1S19",
+   "1SJ0",
+   "1SQ5",
+   "1TT1",
+   "1TZ8",
+   "1UOU",
+   "1XM6",
+   "1YGC",
+   "1YVF",
+   "2BM2",
+   "2BR1"
+  ],
+  "definition": "a native-like pose exists in the frozen pool and the winning rule does not put it first"
+ },
+ "unitTests": {
+  "command": "python3 scripts/test-astex-ranking.py",
+  "passed": 52,
+  "failed": 0
+ },
+ "immutability": {
+  "filesChecked": 43,
+  "changed": [],
+  "allUnchanged": true,
+  "method": "sha256 of `git show HEAD:<path>` compared with the worktree file"
+ },
+ "perSeedRobustness": {
+  "vina": {
+   "counts": [
+    46,
+    49,
+    50,
+    47,
+    49
+   ],
+   "min": 46,
+   "max": 50,
+   "mean": 48.2,
+   "sampleStdDev": 1.64,
+   "netVsVinaPerSeed": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "meanNetVsVina": 0.0,
+   "seedsWhereNetIsPositive": 0,
+   "seedsWhereNetIsNegative": 0,
+   "perSeed": [
+    {
+     "seedIndex": 0,
+     "seed": 42,
+     "top1Successes": 46,
+     "denominator": 85,
+     "rate": 0.5412,
+     "netVsVinaSameSeed": 0,
+     "recovered": 0,
+     "lost": 0
+    },
+    {
+     "seedIndex": 1,
+     "seed": 1042,
+     "top1Successes": 49,
+     "denominator": 85,
+     "rate": 0.5765,
+     "netVsVinaSameSeed": 0,
+     "recovered": 0,
+     "lost": 0
+    },
+    {
+     "seedIndex": 2,
+     "seed": 2042,
+     "top1Successes": 50,
+     "denominator": 85,
+     "rate": 0.5882,
+     "netVsVinaSameSeed": 0,
+     "recovered": 0,
+     "lost": 0
+    },
+    {
+     "seedIndex": 3,
+     "seed": 3042,
+     "top1Successes": 47,
+     "denominator": 85,
+     "rate": 0.5529,
+     "netVsVinaSameSeed": 0,
+     "recovered": 0,
+     "lost": 0
+    },
+    {
+     "seedIndex": 4,
+     "seed": 4042,
+     "top1Successes": 49,
+     "denominator": 85,
+     "rate": 0.5765,
+     "netVsVinaSameSeed": 0,
+     "recovered": 0,
+     "lost": 0
+    }
+   ]
+  },
+  "vinardo": {
+   "counts": [
+    51,
+    52,
+    50,
+    47,
+    48
+   ],
+   "min": 47,
+   "max": 52,
+   "mean": 49.6,
+   "sampleStdDev": 2.07,
+   "netVsVinaPerSeed": [
+    5,
+    3,
+    0,
+    0,
+    -1
+   ],
+   "meanNetVsVina": 1.4,
+   "seedsWhereNetIsPositive": 2,
+   "seedsWhereNetIsNegative": 1,
+   "perSeed": [
+    {
+     "seedIndex": 0,
+     "seed": 42,
+     "top1Successes": 51,
+     "denominator": 85,
+     "rate": 0.6,
+     "netVsVinaSameSeed": 5,
+     "recovered": 10,
+     "lost": 5
+    },
+    {
+     "seedIndex": 1,
+     "seed": 1042,
+     "top1Successes": 52,
+     "denominator": 85,
+     "rate": 0.6118,
+     "netVsVinaSameSeed": 3,
+     "recovered": 9,
+     "lost": 6
+    },
+    {
+     "seedIndex": 2,
+     "seed": 2042,
+     "top1Successes": 50,
+     "denominator": 85,
+     "rate": 0.5882,
+     "netVsVinaSameSeed": 0,
+     "recovered": 6,
+     "lost": 6
+    },
+    {
+     "seedIndex": 3,
+     "seed": 3042,
+     "top1Successes": 47,
+     "denominator": 85,
+     "rate": 0.5529,
+     "netVsVinaSameSeed": 0,
+     "recovered": 6,
+     "lost": 6
+    },
+    {
+     "seedIndex": 4,
+     "seed": 4042,
+     "top1Successes": 48,
+     "denominator": 85,
+     "rate": 0.5647,
+     "netVsVinaSameSeed": -1,
+     "recovered": 5,
+     "lost": 6
+    }
+   ]
+  },
+  "linear_equal_weight": {
+   "counts": [
+    50,
+    54,
+    52,
+    48,
+    50
+   ],
+   "min": 48,
+   "max": 54,
+   "mean": 50.8,
+   "sampleStdDev": 2.28,
+   "netVsVinaPerSeed": [
+    4,
+    5,
+    2,
+    1,
+    1
+   ],
+   "meanNetVsVina": 2.6,
+   "seedsWhereNetIsPositive": 5,
+   "seedsWhereNetIsNegative": 0,
+   "perSeed": [
+    {
+     "seedIndex": 0,
+     "seed": 42,
+     "top1Successes": 50,
+     "denominator": 85,
+     "rate": 0.5882,
+     "netVsVinaSameSeed": 4,
+     "recovered": 7,
+     "lost": 3
+    },
+    {
+     "seedIndex": 1,
+     "seed": 1042,
+     "top1Successes": 54,
+     "denominator": 85,
+     "rate": 0.6353,
+     "netVsVinaSameSeed": 5,
+     "recovered": 8,
+     "lost": 3
+    },
+    {
+     "seedIndex": 2,
+     "seed": 2042,
+     "top1Successes": 52,
+     "denominator": 85,
+     "rate": 0.6118,
+     "netVsVinaSameSeed": 2,
+     "recovered": 4,
+     "lost": 2
+    },
+    {
+     "seedIndex": 3,
+     "seed": 3042,
+     "top1Successes": 48,
+     "denominator": 85,
+     "rate": 0.5647,
+     "netVsVinaSameSeed": 1,
+     "recovered": 3,
+     "lost": 2
+    },
+    {
+     "seedIndex": 4,
+     "seed": 4042,
+     "top1Successes": 50,
+     "denominator": 85,
+     "rate": 0.5882,
+     "netVsVinaSameSeed": 1,
+     "recovered": 5,
+     "lost": 4
+    }
+   ]
+  },
+  "normalised_rank_sum": {
+   "counts": [
+    49,
+    54,
+    51,
+    49,
+    50
+   ],
+   "min": 49,
+   "max": 54,
+   "mean": 50.6,
+   "sampleStdDev": 2.07,
+   "netVsVinaPerSeed": [
+    3,
+    5,
+    1,
+    2,
+    1
+   ],
+   "meanNetVsVina": 2.4,
+   "seedsWhereNetIsPositive": 5,
+   "seedsWhereNetIsNegative": 0,
+   "perSeed": [
+    {
+     "seedIndex": 0,
+     "seed": 42,
+     "top1Successes": 49,
+     "denominator": 85,
+     "rate": 0.5765,
+     "netVsVinaSameSeed": 3,
+     "recovered": 6,
+     "lost": 3
+    },
+    {
+     "seedIndex": 1,
+     "seed": 1042,
+     "top1Successes": 54,
+     "denominator": 85,
+     "rate": 0.6353,
+     "netVsVinaSameSeed": 5,
+     "recovered": 6,
+     "lost": 1
+    },
+    {
+     "seedIndex": 2,
+     "seed": 2042,
+     "top1Successes": 51,
+     "denominator": 85,
+     "rate": 0.6,
+     "netVsVinaSameSeed": 1,
+     "recovered": 3,
+     "lost": 2
+    },
+    {
+     "seedIndex": 3,
+     "seed": 3042,
+     "top1Successes": 49,
+     "denominator": 85,
+     "rate": 0.5765,
+     "netVsVinaSameSeed": 2,
+     "recovered": 2,
+     "lost": 0
+    },
+    {
+     "seedIndex": 4,
+     "seed": 4042,
+     "top1Successes": 50,
+     "denominator": 85,
+     "rate": 0.5882,
+     "netVsVinaSameSeed": 1,
+     "recovered": 3,
+     "lost": 2
+    }
+   ]
+  }
+ },
+ "perCase": [
+  {
+   "pdbId": "1G9V",
+   "status": "SCORED",
+   "poolSize": 42,
+   "bestRmsdInPoolA": 1.707,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.915,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.339,
+    "rank1VinardoScore": -6.303,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.915,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.339,
+    "rank1VinardoScore": -6.303,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.915,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.339,
+    "rank1VinardoScore": -6.303,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.915,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.339,
+    "rank1VinardoScore": -6.303,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1GKC",
+   "status": "SCORED",
+   "poolSize": 58,
+   "bestRmsdInPoolA": 1.075,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.075,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.247,
+    "rank1VinardoScore": -5.594,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.075,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.247,
+    "rank1VinardoScore": -5.594,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.075,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.247,
+    "rank1VinardoScore": -5.594,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.075,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.247,
+    "rank1VinardoScore": -5.594,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1GM8",
+   "status": "UNAVAILABLE",
+   "poolSize": 0,
+   "bestRmsdInPoolA": null,
+   "nativeLikeAvailable": false,
+   "vina": {
+    "rank1RmsdA": null,
+    "rank1Seed": null,
+    "rank1OriginalRank": null,
+    "rank1VinaScore": null,
+    "rank1VinardoScore": null,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": null,
+    "rank1Seed": null,
+    "rank1OriginalRank": null,
+    "rank1VinaScore": null,
+    "rank1VinardoScore": null,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": null,
+    "rank1Seed": null,
+    "rank1OriginalRank": null,
+    "rank1VinaScore": null,
+    "rank1VinardoScore": null,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": null,
+    "rank1Seed": null,
+    "rank1OriginalRank": null,
+    "rank1VinaScore": null,
+    "rank1VinardoScore": null,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1GPK",
+   "status": "SCORED",
+   "poolSize": 35,
+   "bestRmsdInPoolA": 0.517,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.517,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.51,
+    "rank1VinardoScore": -8.161,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 3.664,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.489,
+    "rank1VinardoScore": -8.37,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 3.664,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.489,
+    "rank1VinardoScore": -8.37,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.517,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.51,
+    "rank1VinardoScore": -8.161,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1HNN",
+   "status": "SCORED",
+   "poolSize": 53,
+   "bestRmsdInPoolA": 0.449,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.016,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.929,
+    "rank1VinardoScore": -7.31,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.016,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.929,
+    "rank1VinardoScore": -7.31,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.016,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.929,
+    "rank1VinardoScore": -7.31,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.016,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.929,
+    "rank1VinardoScore": -7.31,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1HP0",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 0.421,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.104,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.154,
+    "rank1VinardoScore": -6.167,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.421,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -9.023,
+    "rank1VinardoScore": -6.412,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.421,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -9.023,
+    "rank1VinardoScore": -6.412,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.104,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.154,
+    "rank1VinardoScore": -6.167,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1HQ2",
+   "status": "SCORED",
+   "poolSize": 32,
+   "bestRmsdInPoolA": 0.404,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.404,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.433,
+    "rank1VinardoScore": -6.411,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.404,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.433,
+    "rank1VinardoScore": -6.411,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.404,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.433,
+    "rank1VinardoScore": -6.411,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.404,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.433,
+    "rank1VinardoScore": -6.411,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1HVY",
+   "status": "SCORED",
+   "poolSize": 50,
+   "bestRmsdInPoolA": 2.041,
+   "nativeLikeAvailable": false,
+   "vina": {
+    "rank1RmsdA": 3.27,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.479,
+    "rank1VinardoScore": -6.461,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 9.674,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 13,
+    "rank1VinaScore": -8.486,
+    "rank1VinardoScore": -6.562,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 3.27,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.479,
+    "rank1VinardoScore": -6.461,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 3.27,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.479,
+    "rank1VinardoScore": -6.461,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1HWI",
+   "status": "SCORED",
+   "poolSize": 57,
+   "bestRmsdInPoolA": 1.324,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.324,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.434,
+    "rank1VinardoScore": -4.787,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.324,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.434,
+    "rank1VinardoScore": -4.787,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.324,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.434,
+    "rank1VinardoScore": -4.787,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.324,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.434,
+    "rank1VinardoScore": -4.787,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1HWW",
+   "status": "SCORED",
+   "poolSize": 39,
+   "bestRmsdInPoolA": 0.29,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.29,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.957,
+    "rank1VinardoScore": -5.431,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.29,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.957,
+    "rank1VinardoScore": -5.431,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.29,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.957,
+    "rank1VinardoScore": -5.431,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.29,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.957,
+    "rank1VinardoScore": -5.431,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1IA1",
+   "status": "SCORED",
+   "poolSize": 35,
+   "bestRmsdInPoolA": 0.345,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.345,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.647,
+    "rank1VinardoScore": -6.845,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.345,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.647,
+    "rank1VinardoScore": -6.845,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.345,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.647,
+    "rank1VinardoScore": -6.845,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.345,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.647,
+    "rank1VinardoScore": -6.845,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1IG3",
+   "status": "SCORED",
+   "poolSize": 47,
+   "bestRmsdInPoolA": 0.749,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.886,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.218,
+    "rank1VinardoScore": -6.102,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.971,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.21,
+    "rank1VinardoScore": -6.272,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.971,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.21,
+    "rank1VinardoScore": -6.272,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.886,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.218,
+    "rank1VinardoScore": -6.102,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1J3J",
+   "status": "SCORED",
+   "poolSize": 26,
+   "bestRmsdInPoolA": 0.516,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.516,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.764,
+    "rank1VinardoScore": -7.184,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.516,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.764,
+    "rank1VinardoScore": -7.184,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.516,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.764,
+    "rank1VinardoScore": -7.184,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.516,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.764,
+    "rank1VinardoScore": -7.184,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1JD0",
+   "status": "SCORED",
+   "poolSize": 48,
+   "bestRmsdInPoolA": 1.293,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 5.231,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.417,
+    "rank1VinardoScore": -3.614,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.825,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -6.098,
+    "rank1VinardoScore": -4.589,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 5.825,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -6.098,
+    "rank1VinardoScore": -4.589,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.939,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.301,
+    "rank1VinardoScore": -4.226,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1JJE",
+   "status": "SCORED",
+   "poolSize": 42,
+   "bestRmsdInPoolA": 0.808,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 8.036,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.26,
+    "rank1VinardoScore": -8.448,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 8.036,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.26,
+    "rank1VinardoScore": -8.448,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 8.036,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.26,
+    "rank1VinardoScore": -8.448,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 8.036,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.26,
+    "rank1VinardoScore": -8.448,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1JLA",
+   "status": "SCORED",
+   "poolSize": 37,
+   "bestRmsdInPoolA": 0.582,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.582,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.88,
+    "rank1VinardoScore": -9.924,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.582,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.88,
+    "rank1VinardoScore": -9.924,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.582,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.88,
+    "rank1VinardoScore": -9.924,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.582,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.88,
+    "rank1VinardoScore": -9.924,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1K3U",
+   "status": "SCORED",
+   "poolSize": 45,
+   "bestRmsdInPoolA": 0.637,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.637,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.626,
+    "rank1VinardoScore": -8.543,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.637,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.626,
+    "rank1VinardoScore": -8.543,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.637,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.626,
+    "rank1VinardoScore": -8.543,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.637,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.626,
+    "rank1VinardoScore": -8.543,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1KE5",
+   "status": "SCORED",
+   "poolSize": 54,
+   "bestRmsdInPoolA": 0.37,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.319,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.434,
+    "rank1VinardoScore": -6.89,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.319,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.434,
+    "rank1VinardoScore": -6.89,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.319,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.434,
+    "rank1VinardoScore": -6.89,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.319,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.434,
+    "rank1VinardoScore": -6.89,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1KZK",
+   "status": "SCORED",
+   "poolSize": 74,
+   "bestRmsdInPoolA": 0.315,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.315,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.617,
+    "rank1VinardoScore": -9.234,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.315,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.617,
+    "rank1VinardoScore": -9.234,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.315,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.617,
+    "rank1VinardoScore": -9.234,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.315,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.617,
+    "rank1VinardoScore": -9.234,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1L2S",
+   "status": "SCORED",
+   "poolSize": 37,
+   "bestRmsdInPoolA": 0.492,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.492,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.742,
+    "rank1VinardoScore": -4.747,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.333,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.716,
+    "rank1VinardoScore": -5.122,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 5.333,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.716,
+    "rank1VinardoScore": -5.122,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.492,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.742,
+    "rank1VinardoScore": -4.747,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1L7F",
+   "status": "SCORED",
+   "poolSize": 76,
+   "bestRmsdInPoolA": 1.556,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.471,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.779,
+    "rank1VinardoScore": -5.381,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.746,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.406,
+    "rank1VinardoScore": -5.428,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.471,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.779,
+    "rank1VinardoScore": -5.381,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.471,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.779,
+    "rank1VinardoScore": -5.381,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1LPZ",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 0.684,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.684,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.582,
+    "rank1VinardoScore": -8.427,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.684,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.582,
+    "rank1VinardoScore": -8.427,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.684,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.582,
+    "rank1VinardoScore": -8.427,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.684,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.582,
+    "rank1VinardoScore": -8.427,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1LRH",
+   "status": "SCORED",
+   "poolSize": 30,
+   "bestRmsdInPoolA": 0.395,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.615,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.942,
+    "rank1VinardoScore": -6.394,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.615,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.942,
+    "rank1VinardoScore": -6.394,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.615,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.942,
+    "rank1VinardoScore": -6.394,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.615,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.942,
+    "rank1VinardoScore": -6.394,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1M2Z",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 0.321,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.321,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.329,
+    "rank1VinardoScore": -9.16,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.321,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.329,
+    "rank1VinardoScore": -9.16,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.321,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.329,
+    "rank1VinardoScore": -9.16,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.321,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.329,
+    "rank1VinardoScore": -9.16,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1MEH",
+   "status": "SCORED",
+   "poolSize": 58,
+   "bestRmsdInPoolA": 0.954,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.207,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.734,
+    "rank1VinardoScore": -5.665,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.207,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.734,
+    "rank1VinardoScore": -5.665,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.207,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.734,
+    "rank1VinardoScore": -5.665,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.207,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.734,
+    "rank1VinardoScore": -5.665,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1MMV",
+   "status": "SCORED",
+   "poolSize": 61,
+   "bestRmsdInPoolA": 1.992,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 7.095,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.399,
+    "rank1VinardoScore": -6.124,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 7.095,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.399,
+    "rank1VinardoScore": -6.124,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 7.095,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.399,
+    "rank1VinardoScore": -6.124,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 7.095,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.399,
+    "rank1VinardoScore": -6.124,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1MZC",
+   "status": "SCORED",
+   "poolSize": 63,
+   "bestRmsdInPoolA": 0.496,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 7.755,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.232,
+    "rank1VinardoScore": -5.814,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.311,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 6,
+    "rank1VinaScore": -7.741,
+    "rank1VinardoScore": -6.255,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 7.755,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.232,
+    "rank1VinardoScore": -5.814,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 7.755,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.232,
+    "rank1VinardoScore": -5.814,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1N1M",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 0.834,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.009,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.083,
+    "rank1VinardoScore": -4.213,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.723,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -5.833,
+    "rank1VinardoScore": -4.611,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.723,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -5.833,
+    "rank1VinardoScore": -4.611,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.009,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.083,
+    "rank1VinardoScore": -4.213,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1N2J",
+   "status": "SCORED",
+   "poolSize": 58,
+   "bestRmsdInPoolA": 1.452,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 6.933,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -4.675,
+    "rank1VinardoScore": -3.472,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 7.564,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 5,
+    "rank1VinaScore": -4.437,
+    "rank1VinardoScore": -3.607,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 6.933,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -4.675,
+    "rank1VinardoScore": -3.472,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 6.933,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -4.675,
+    "rank1VinardoScore": -3.472,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1N2V",
+   "status": "SCORED",
+   "poolSize": 30,
+   "bestRmsdInPoolA": 0.569,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.743,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.294,
+    "rank1VinardoScore": -5.074,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 2.743,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.294,
+    "rank1VinardoScore": -5.074,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 2.743,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.294,
+    "rank1VinardoScore": -5.074,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.743,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.294,
+    "rank1VinardoScore": -5.074,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1N46",
+   "status": "SCORED",
+   "poolSize": 24,
+   "bestRmsdInPoolA": 0.559,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.559,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.949,
+    "rank1VinardoScore": -9.157,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.559,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.949,
+    "rank1VinardoScore": -9.157,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.559,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.949,
+    "rank1VinardoScore": -9.157,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.559,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.949,
+    "rank1VinardoScore": -9.157,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1NAV",
+   "status": "SCORED",
+   "poolSize": 23,
+   "bestRmsdInPoolA": 0.759,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.759,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.299,
+    "rank1VinardoScore": -7.93,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.759,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.299,
+    "rank1VinardoScore": -7.93,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.759,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.299,
+    "rank1VinardoScore": -7.93,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.759,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.299,
+    "rank1VinardoScore": -7.93,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1OF1",
+   "status": "SCORED",
+   "poolSize": 34,
+   "bestRmsdInPoolA": 0.496,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.496,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.57,
+    "rank1VinardoScore": -6.49,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.496,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.57,
+    "rank1VinardoScore": -6.49,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.496,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.57,
+    "rank1VinardoScore": -6.49,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.496,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.57,
+    "rank1VinardoScore": -6.49,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1OF6",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 0.811,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.811,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.401,
+    "rank1VinardoScore": -5.387,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.811,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.401,
+    "rank1VinardoScore": -5.387,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.811,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.401,
+    "rank1VinardoScore": -5.387,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.811,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.401,
+    "rank1VinardoScore": -5.387,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1OPK",
+   "status": "SCORED",
+   "poolSize": 22,
+   "bestRmsdInPoolA": 0.536,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.788,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.21,
+    "rank1VinardoScore": -8.715,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.536,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -12.008,
+    "rank1VinardoScore": -8.921,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.536,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -12.008,
+    "rank1VinardoScore": -8.921,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.788,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.21,
+    "rank1VinardoScore": -8.715,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1OQ5",
+   "status": "SCORED",
+   "poolSize": 26,
+   "bestRmsdInPoolA": 0.882,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.882,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.738,
+    "rank1VinardoScore": -6.064,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.428,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -8.233,
+    "rank1VinardoScore": -6.484,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.882,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.738,
+    "rank1VinardoScore": -6.064,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.882,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.738,
+    "rank1VinardoScore": -6.064,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1OWE",
+   "status": "SCORED",
+   "poolSize": 40,
+   "bestRmsdInPoolA": 0.846,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.518,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.68,
+    "rank1VinardoScore": -6.399,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.66,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -8.455,
+    "rank1VinardoScore": -6.615,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 2.518,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.68,
+    "rank1VinardoScore": -6.399,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.518,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.68,
+    "rank1VinardoScore": -6.399,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1OYT",
+   "status": "SCORED",
+   "poolSize": 60,
+   "bestRmsdInPoolA": 0.595,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.595,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.214,
+    "rank1VinardoScore": -8.583,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.595,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.214,
+    "rank1VinardoScore": -8.583,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.595,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.214,
+    "rank1VinardoScore": -8.583,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.595,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.214,
+    "rank1VinardoScore": -8.583,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1P2Y",
+   "status": "SCORED",
+   "poolSize": 47,
+   "bestRmsdInPoolA": 1.472,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.344,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.176,
+    "rank1VinardoScore": -4.74,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.394,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.974,
+    "rank1VinardoScore": -4.891,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.344,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.176,
+    "rank1VinardoScore": -4.74,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.394,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.974,
+    "rank1VinardoScore": -4.891,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1P62",
+   "status": "SCORED",
+   "poolSize": 51,
+   "bestRmsdInPoolA": 0.432,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.432,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.168,
+    "rank1VinardoScore": -5.878,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.653,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.116,
+    "rank1VinardoScore": -5.898,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.432,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.168,
+    "rank1VinardoScore": -5.878,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.432,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.168,
+    "rank1VinardoScore": -5.878,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1PMN",
+   "status": "SCORED",
+   "poolSize": 61,
+   "bestRmsdInPoolA": 0.835,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.835,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.901,
+    "rank1VinardoScore": -6.864,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.835,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.901,
+    "rank1VinardoScore": -6.864,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.835,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.901,
+    "rank1VinardoScore": -6.864,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.835,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.901,
+    "rank1VinardoScore": -6.864,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1Q1G",
+   "status": "SCORED",
+   "poolSize": 56,
+   "bestRmsdInPoolA": 0.819,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 6.393,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.775,
+    "rank1VinardoScore": -5.266,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 2.96,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.591,
+    "rank1VinardoScore": -5.409,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 6.393,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.775,
+    "rank1VinardoScore": -5.266,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 6.393,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.775,
+    "rank1VinardoScore": -5.266,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1Q41",
+   "status": "SCORED",
+   "poolSize": 38,
+   "bestRmsdInPoolA": 2.362,
+   "nativeLikeAvailable": false,
+   "vina": {
+    "rank1RmsdA": 6.667,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.107,
+    "rank1VinardoScore": -7.047,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 6.667,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.107,
+    "rank1VinardoScore": -7.047,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 6.667,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.107,
+    "rank1VinardoScore": -7.047,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 6.667,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.107,
+    "rank1VinardoScore": -7.047,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1Q4G",
+   "status": "SCORED",
+   "poolSize": 27,
+   "bestRmsdInPoolA": 0.296,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.296,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.179,
+    "rank1VinardoScore": -7.307,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.296,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.179,
+    "rank1VinardoScore": -7.307,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.296,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.179,
+    "rank1VinardoScore": -7.307,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.296,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.179,
+    "rank1VinardoScore": -7.307,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1R1H",
+   "status": "SCORED",
+   "poolSize": 43,
+   "bestRmsdInPoolA": 1.143,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.143,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.103,
+    "rank1VinardoScore": -8.126,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.143,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.103,
+    "rank1VinardoScore": -8.126,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.143,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.103,
+    "rank1VinardoScore": -8.126,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.143,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.103,
+    "rank1VinardoScore": -8.126,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1R55",
+   "status": "SCORED",
+   "poolSize": 49,
+   "bestRmsdInPoolA": 1.029,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.138,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.592,
+    "rank1VinardoScore": -6.254,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.138,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.592,
+    "rank1VinardoScore": -6.254,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.138,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.592,
+    "rank1VinardoScore": -6.254,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.138,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.592,
+    "rank1VinardoScore": -6.254,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1R58",
+   "status": "SCORED",
+   "poolSize": 75,
+   "bestRmsdInPoolA": 1.906,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 3.478,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.546,
+    "rank1VinardoScore": -6.581,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 3.478,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.546,
+    "rank1VinardoScore": -6.581,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 3.478,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.546,
+    "rank1VinardoScore": -6.581,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 3.478,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.546,
+    "rank1VinardoScore": -6.581,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1R9O",
+   "status": "SCORED",
+   "poolSize": 39,
+   "bestRmsdInPoolA": 0.418,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.656,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.486,
+    "rank1VinardoScore": -6.822,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.656,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.486,
+    "rank1VinardoScore": -6.822,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.656,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.486,
+    "rank1VinardoScore": -6.822,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.656,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.486,
+    "rank1VinardoScore": -6.822,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1S19",
+   "status": "SCORED",
+   "poolSize": 97,
+   "bestRmsdInPoolA": 1.534,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.193,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.818,
+    "rank1VinardoScore": -8.811,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 2.193,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.818,
+    "rank1VinardoScore": -8.811,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 2.193,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.818,
+    "rank1VinardoScore": -8.811,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.193,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.818,
+    "rank1VinardoScore": -8.811,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1S3V",
+   "status": "SCORED",
+   "poolSize": 26,
+   "bestRmsdInPoolA": 0.459,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 6.397,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.42,
+    "rank1VinardoScore": -6.21,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.459,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -9.331,
+    "rank1VinardoScore": -6.83,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.459,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -9.331,
+    "rank1VinardoScore": -6.83,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 6.397,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.42,
+    "rank1VinardoScore": -6.21,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1SG0",
+   "status": "SCORED",
+   "poolSize": 21,
+   "bestRmsdInPoolA": 0.913,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.723,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.462,
+    "rank1VinardoScore": -6.493,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.723,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.462,
+    "rank1VinardoScore": -6.493,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.723,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.462,
+    "rank1VinardoScore": -6.493,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.723,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.462,
+    "rank1VinardoScore": -6.493,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1SJ0",
+   "status": "SCORED",
+   "poolSize": 64,
+   "bestRmsdInPoolA": 0.715,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 5.372,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.694,
+    "rank1VinardoScore": -8.829,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.661,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.281,
+    "rank1VinardoScore": -9.053,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 5.372,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.694,
+    "rank1VinardoScore": -8.829,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.661,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.281,
+    "rank1VinardoScore": -9.053,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1SQ5",
+   "status": "SCORED",
+   "poolSize": 62,
+   "bestRmsdInPoolA": 1.331,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 5.805,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.104,
+    "rank1VinardoScore": -4.374,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.984,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.011,
+    "rank1VinardoScore": -4.515,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 5.984,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.011,
+    "rank1VinardoScore": -4.515,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 5.984,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.011,
+    "rank1VinardoScore": -4.515,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1SQN",
+   "status": "SCORED",
+   "poolSize": 29,
+   "bestRmsdInPoolA": 0.426,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.426,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.532,
+    "rank1VinardoScore": -9.22,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.426,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.532,
+    "rank1VinardoScore": -9.22,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.426,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.532,
+    "rank1VinardoScore": -9.22,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.426,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.532,
+    "rank1VinardoScore": -9.22,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1T40",
+   "status": "SCORED",
+   "poolSize": 44,
+   "bestRmsdInPoolA": 1.344,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.344,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.005,
+    "rank1VinardoScore": -7.953,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.344,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.005,
+    "rank1VinardoScore": -7.953,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.344,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.005,
+    "rank1VinardoScore": -7.953,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.344,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -11.005,
+    "rank1VinardoScore": -7.953,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1T46",
+   "status": "SCORED",
+   "poolSize": 63,
+   "bestRmsdInPoolA": 0.727,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.727,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -13.145,
+    "rank1VinardoScore": -8.073,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.727,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -13.145,
+    "rank1VinardoScore": -8.073,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.727,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -13.145,
+    "rank1VinardoScore": -8.073,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.727,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -13.145,
+    "rank1VinardoScore": -8.073,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1T9B",
+   "status": "SCORED",
+   "poolSize": 37,
+   "bestRmsdInPoolA": 5.799,
+   "nativeLikeAvailable": false,
+   "vina": {
+    "rank1RmsdA": 7.587,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.916,
+    "rank1VinardoScore": -5.268,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 7.861,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -6.786,
+    "rank1VinardoScore": -5.275,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 7.587,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.916,
+    "rank1VinardoScore": -5.268,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 7.587,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.916,
+    "rank1VinardoScore": -5.268,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1TOW",
+   "status": "SCORED",
+   "poolSize": 29,
+   "bestRmsdInPoolA": 0.596,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.62,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.861,
+    "rank1VinardoScore": -5.184,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.596,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.799,
+    "rank1VinardoScore": -5.842,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.596,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.799,
+    "rank1VinardoScore": -5.842,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.596,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -7.799,
+    "rank1VinardoScore": -5.842,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1TT1",
+   "status": "SCORED",
+   "poolSize": 77,
+   "bestRmsdInPoolA": 0.361,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.361,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.4,
+    "rank1VinardoScore": -5.578,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 3.76,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -7.272,
+    "rank1VinardoScore": -5.713,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 3.76,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -7.272,
+    "rank1VinardoScore": -5.713,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.361,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.4,
+    "rank1VinardoScore": -5.578,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1TZ8",
+   "status": "SCORED",
+   "poolSize": 25,
+   "bestRmsdInPoolA": 0.407,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 3.416,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.046,
+    "rank1VinardoScore": -5.464,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 2.288,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -7.709,
+    "rank1VinardoScore": -6.157,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 2.288,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -7.709,
+    "rank1VinardoScore": -6.157,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 3.416,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.046,
+    "rank1VinardoScore": -5.464,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1U1C",
+   "status": "SCORED",
+   "poolSize": 45,
+   "bestRmsdInPoolA": 0.776,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.688,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.355,
+    "rank1VinardoScore": -6.425,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 6.307,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -7.977,
+    "rank1VinardoScore": -6.738,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.688,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.355,
+    "rank1VinardoScore": -6.425,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 6.307,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 3,
+    "rank1VinaScore": -7.977,
+    "rank1VinardoScore": -6.738,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1U4D",
+   "status": "SCORED",
+   "poolSize": 73,
+   "bestRmsdInPoolA": 0.989,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.274,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.105,
+    "rank1VinardoScore": -4.371,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.989,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.093,
+    "rank1VinardoScore": -4.518,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.989,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.093,
+    "rank1VinardoScore": -4.518,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.274,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -7.105,
+    "rank1VinardoScore": -4.371,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1UML",
+   "status": "SCORED",
+   "poolSize": 57,
+   "bestRmsdInPoolA": 1.196,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.86,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.167,
+    "rank1VinardoScore": -7.486,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.86,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.167,
+    "rank1VinardoScore": -7.486,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.86,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.167,
+    "rank1VinardoScore": -7.486,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.86,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.167,
+    "rank1VinardoScore": -7.486,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1UNL",
+   "status": "SCORED",
+   "poolSize": 52,
+   "bestRmsdInPoolA": 0.446,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.636,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.492,
+    "rank1VinardoScore": -5.436,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.446,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.392,
+    "rank1VinardoScore": -5.781,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.446,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.392,
+    "rank1VinardoScore": -5.781,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.446,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.392,
+    "rank1VinardoScore": -5.781,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1UOU",
+   "status": "SCORED",
+   "poolSize": 46,
+   "bestRmsdInPoolA": 0.545,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.933,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.248,
+    "rank1VinardoScore": -5.619,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.523,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -7.851,
+    "rank1VinardoScore": -5.936,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.933,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.248,
+    "rank1VinardoScore": -5.619,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.933,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.248,
+    "rank1VinardoScore": -5.619,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1V0P",
+   "status": "SCORED",
+   "poolSize": 45,
+   "bestRmsdInPoolA": 0.744,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 3.194,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.93,
+    "rank1VinardoScore": -5.208,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.744,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.687,
+    "rank1VinardoScore": -5.461,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.744,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.687,
+    "rank1VinardoScore": -5.461,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.744,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.687,
+    "rank1VinardoScore": -5.461,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1V48",
+   "status": "SCORED",
+   "poolSize": 65,
+   "bestRmsdInPoolA": 0.852,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.852,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.583,
+    "rank1VinardoScore": -6.692,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.852,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.583,
+    "rank1VinardoScore": -6.692,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.852,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.583,
+    "rank1VinardoScore": -6.692,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.852,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.583,
+    "rank1VinardoScore": -6.692,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1V4S",
+   "status": "SCORED",
+   "poolSize": 40,
+   "bestRmsdInPoolA": 0.723,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.723,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.623,
+    "rank1VinardoScore": -6.295,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.723,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.623,
+    "rank1VinardoScore": -6.295,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.723,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.623,
+    "rank1VinardoScore": -6.295,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.723,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.623,
+    "rank1VinardoScore": -6.295,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1VCJ",
+   "status": "SCORED",
+   "poolSize": 59,
+   "bestRmsdInPoolA": 0.859,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 1.246,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.059,
+    "rank1VinardoScore": -5.982,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.246,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.059,
+    "rank1VinardoScore": -5.982,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.246,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.059,
+    "rank1VinardoScore": -5.982,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 1.246,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.059,
+    "rank1VinardoScore": -5.982,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1W1P",
+   "status": "SCORED",
+   "poolSize": 33,
+   "bestRmsdInPoolA": 2.106,
+   "nativeLikeAvailable": false,
+   "vina": {
+    "rank1RmsdA": 9.437,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -5.91,
+    "rank1VinardoScore": -3.783,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 10.852,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -5.9,
+    "rank1VinardoScore": -4.292,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 10.852,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -5.9,
+    "rank1VinardoScore": -4.292,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 10.852,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -5.9,
+    "rank1VinardoScore": -4.292,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1W2G",
+   "status": "SCORED",
+   "poolSize": 47,
+   "bestRmsdInPoolA": 0.879,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.879,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.716,
+    "rank1VinardoScore": -6.195,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.879,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.716,
+    "rank1VinardoScore": -6.195,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.879,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.716,
+    "rank1VinardoScore": -6.195,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.879,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.716,
+    "rank1VinardoScore": -6.195,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1X8X",
+   "status": "SCORED",
+   "poolSize": 37,
+   "bestRmsdInPoolA": 0.67,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.67,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.904,
+    "rank1VinardoScore": -5.194,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.67,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.904,
+    "rank1VinardoScore": -5.194,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.67,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.904,
+    "rank1VinardoScore": -5.194,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.67,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -6.904,
+    "rank1VinardoScore": -5.194,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1XM6",
+   "status": "SCORED",
+   "poolSize": 46,
+   "bestRmsdInPoolA": 1.024,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 2.235,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.049,
+    "rank1VinardoScore": -6.871,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 2.235,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.049,
+    "rank1VinardoScore": -6.871,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 2.235,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.049,
+    "rank1VinardoScore": -6.871,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 2.235,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.049,
+    "rank1VinardoScore": -6.871,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1XOQ",
+   "status": "SCORED",
+   "poolSize": 33,
+   "bestRmsdInPoolA": 0.538,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.538,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.458,
+    "rank1VinardoScore": -6.87,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.538,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.458,
+    "rank1VinardoScore": -6.87,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.538,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.458,
+    "rank1VinardoScore": -6.87,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.538,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.458,
+    "rank1VinardoScore": -6.87,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1XOZ",
+   "status": "SCORED",
+   "poolSize": 58,
+   "bestRmsdInPoolA": 0.353,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.353,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.558,
+    "rank1VinardoScore": -9.339,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.353,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.558,
+    "rank1VinardoScore": -9.339,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.353,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.558,
+    "rank1VinardoScore": -9.339,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.353,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.558,
+    "rank1VinardoScore": -9.339,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1Y6B",
+   "status": "SCORED",
+   "poolSize": 53,
+   "bestRmsdInPoolA": 0.922,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.922,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.618,
+    "rank1VinardoScore": -6.949,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.922,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.618,
+    "rank1VinardoScore": -6.949,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.922,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.618,
+    "rank1VinardoScore": -6.949,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.922,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.618,
+    "rank1VinardoScore": -6.949,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1YGC",
+   "status": "SCORED",
+   "poolSize": 61,
+   "bestRmsdInPoolA": 1.372,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 3.825,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.634,
+    "rank1VinardoScore": -8.098,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 3.825,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.634,
+    "rank1VinardoScore": -8.098,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 3.825,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.634,
+    "rank1VinardoScore": -8.098,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 3.825,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.634,
+    "rank1VinardoScore": -8.098,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1YQY",
+   "status": "SCORED",
+   "poolSize": 41,
+   "bestRmsdInPoolA": 0.409,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.409,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.186,
+    "rank1VinardoScore": -8.354,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.409,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.186,
+    "rank1VinardoScore": -8.354,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.409,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.186,
+    "rank1VinardoScore": -8.354,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.409,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.186,
+    "rank1VinardoScore": -8.354,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1YV3",
+   "status": "SCORED",
+   "poolSize": 38,
+   "bestRmsdInPoolA": 0.494,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.494,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.776,
+    "rank1VinardoScore": -9.26,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.494,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.776,
+    "rank1VinardoScore": -9.26,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.494,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.776,
+    "rank1VinardoScore": -9.26,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.494,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -12.776,
+    "rank1VinardoScore": -9.26,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1YVF",
+   "status": "SCORED",
+   "poolSize": 64,
+   "bestRmsdInPoolA": 0.818,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 8.905,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.348,
+    "rank1VinardoScore": -5.089,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 5.931,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.121,
+    "rank1VinardoScore": -5.749,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 5.931,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 2,
+    "rank1VinaScore": -8.121,
+    "rank1VinardoScore": -5.749,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.818,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.339,
+    "rank1VinardoScore": -5.445,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "1YWR",
+   "status": "SCORED",
+   "poolSize": 58,
+   "bestRmsdInPoolA": 1.396,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 7.107,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.08,
+    "rank1VinardoScore": -6.047,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 1.738,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 5,
+    "rank1VinaScore": -9.53,
+    "rank1VinardoScore": -7.077,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 1.738,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 5,
+    "rank1VinaScore": -9.53,
+    "rank1VinardoScore": -7.077,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 7.107,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.08,
+    "rank1VinardoScore": -6.047,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "1Z95",
+   "status": "SCORED",
+   "poolSize": 42,
+   "bestRmsdInPoolA": 0.41,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.41,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.751,
+    "rank1VinardoScore": -7.545,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.41,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.751,
+    "rank1VinardoScore": -7.545,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.41,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.751,
+    "rank1VinardoScore": -7.545,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.41,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -10.751,
+    "rank1VinardoScore": -7.545,
+    "success": true
+   }
+  },
+  {
+   "pdbId": "2BM2",
+   "status": "SCORED",
+   "poolSize": 79,
+   "bestRmsdInPoolA": 1.317,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 4.213,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.466,
+    "rank1VinardoScore": -6.198,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 4.225,
+    "rank1Seed": 3042,
+    "rank1OriginalRank": 7,
+    "rank1VinaScore": -7.71,
+    "rank1VinardoScore": -6.676,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 4.213,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.466,
+    "rank1VinardoScore": -6.198,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.213,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.466,
+    "rank1VinardoScore": -6.198,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "2BR1",
+   "status": "SCORED",
+   "poolSize": 34,
+   "bestRmsdInPoolA": 1.304,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 7.426,
+    "rank1Seed": 1042,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -8.261,
+    "rank1VinardoScore": -4.082,
+    "success": false
+   },
+   "vinardo": {
+    "rank1RmsdA": 8.306,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 8,
+    "rank1VinaScore": -7.602,
+    "rank1VinardoScore": -5.43,
+    "success": false
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 6.347,
+    "rank1Seed": 2042,
+    "rank1OriginalRank": 4,
+    "rank1VinaScore": -7.777,
+    "rank1VinardoScore": -5.414,
+    "success": false
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 4.432,
+    "rank1Seed": 4042,
+    "rank1OriginalRank": 5,
+    "rank1VinaScore": -7.781,
+    "rank1VinardoScore": -5.083,
+    "success": false
+   }
+  },
+  {
+   "pdbId": "2BSM",
+   "status": "SCORED",
+   "poolSize": 36,
+   "bestRmsdInPoolA": 0.457,
+   "nativeLikeAvailable": true,
+   "vina": {
+    "rank1RmsdA": 0.457,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.243,
+    "rank1VinardoScore": -6.372,
+    "success": true
+   },
+   "vinardo": {
+    "rank1RmsdA": 0.457,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.243,
+    "rank1VinardoScore": -6.372,
+    "success": true
+   },
+   "linear_equal_weight": {
+    "rank1RmsdA": 0.457,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.243,
+    "rank1VinardoScore": -6.372,
+    "success": true
+   },
+   "normalised_rank_sum": {
+    "rank1RmsdA": 0.457,
+    "rank1Seed": 42,
+    "rank1OriginalRank": 1,
+    "rank1VinaScore": -9.243,
+    "rank1VinardoScore": -6.372,
+    "success": true
+   }
+  }
+ ]
+}

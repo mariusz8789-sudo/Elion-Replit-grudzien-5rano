@@ -22,6 +22,9 @@ Commands:
           extraRigidPdbqtPaths?}
                               -> re-docks the co-crystallised ligand and reports the heavy-atom
                                  RMSD of the top pose against the crystal pose
+  redock_poses {... same as redock ..., numModes?, energyRange?, minRmsd?}
+                              -> DIAGNOSTIC: same preparation, Vina keeps numModes poses and the
+                                 per-pose RMSD vs the crystal pose is reported for all of them
 
 IMPORTANT SCIENTIFIC HONESTY:
 - Docking scores are MODEL_ESTIMATE (Vina empirical scoring function, kcal/mol),
@@ -303,6 +306,28 @@ def _prepare_receptor(req, out_dir):
     }
 
 
+def _with_extra_rigid(rec, req, out_dir):
+    """Opt-in: extra rigid receptor atoms (e.g. a haem or NADPH cofactor typed separately as rigid PDBQT)
+    appended to the Meeko receptor. Off by default; when on, the record lists every file and its hash."""
+    extra_paths = [str(p) for p in (req.get("extraRigidPdbqtPaths") or [])]
+    if not extra_paths:
+        return rec
+    text = open(rec["receptorPdbqtPath"]).read()
+    extras = []
+    for p in extra_paths:
+        body = open(p).read()
+        atoms = [l for l in body.splitlines() if l.startswith(("ATOM", "HETATM"))]
+        if not atoms:
+            raise ValueError("extra_rigid_pdbqt_empty: %s" % os.path.basename(p))
+        extras.append({"path": p, "sha256": _sha(body), "atoms": len(atoms)})
+        text = text.rstrip("\n") + "\n" + "\n".join(atoms) + "\n"
+    combined = os.path.join(out_dir, "receptor", "receptor_with_extra.pdbqt")
+    with open(combined, "w") as f:
+        f.write(text)
+    return {**rec, "receptorPdbqtPath": combined, "meekoReceptorPdbqtSha256": rec["receptorPdbqtSha256"],
+            "receptorPdbqtSha256": _sha(text), "extraRigidPdbqt": extras}
+
+
 def _redock(req, out_dir):
     """Crystal-ligand redocking: dock the co-crystallised ligand from its SMILES, RMSD vs crystal pose."""
     from rdkit import Chem
@@ -313,24 +338,7 @@ def _redock(req, out_dir):
     ref = Chem.RemoveHs(xtal)
     smiles = Chem.MolToSmiles(ref)
     rec = _prepare_receptor(req, os.path.join(out_dir, "receptor"))
-    # Opt-in: extra rigid receptor atoms (e.g. a haem or NADPH cofactor typed separately as rigid PDBQT)
-    # appended to the Meeko receptor. Off by default; when on, the record lists every file and its hash.
-    extra_paths = [str(p) for p in (req.get("extraRigidPdbqtPaths") or [])]
-    if extra_paths:
-        text = open(rec["receptorPdbqtPath"]).read()
-        extras = []
-        for p in extra_paths:
-            body = open(p).read()
-            atoms = [l for l in body.splitlines() if l.startswith(("ATOM", "HETATM"))]
-            if not atoms:
-                raise ValueError("extra_rigid_pdbqt_empty: %s" % os.path.basename(p))
-            extras.append({"path": p, "sha256": _sha(body), "atoms": len(atoms)})
-            text = text.rstrip("\n") + "\n" + "\n".join(atoms) + "\n"
-        combined = os.path.join(out_dir, "receptor", "receptor_with_extra.pdbqt")
-        with open(combined, "w") as f:
-            f.write(text)
-        rec = {**rec, "receptorPdbqtPath": combined, "meekoReceptorPdbqtSha256": rec["receptorPdbqtSha256"],
-               "receptorPdbqtSha256": _sha(text), "extraRigidPdbqt": extras}
+    rec = _with_extra_rigid(rec, req, out_dir)
     r = _run_dock({"ligandSmiles": smiles, "receptorPdbqtPath": rec["receptorPdbqtPath"], "center": rec["center"],
                    "boxSize": rec["boxSize"], "exhaustiveness": req.get("exhaustiveness", 8), "nPoses": 1,
                    "seed": req.get("seed", 42)}, os.path.join(out_dir, "dock"))
@@ -345,6 +353,132 @@ def _redock(req, out_dir):
     return {"ligandSmiles": smiles, "rmsdA": round(float(rmsd), 3), "bestAffinityKcalMol": r["bestAffinityKcalMol"],
             "receptor": rec, "vinaVersion": r["vinaVersion"], "meekoVersion": r["meekoVersion"],
             "poseSha256": r["poseSha256"], "seed": r["seed"], "exhaustiveness": r["exhaustiveness"]}
+
+
+def pose_models(docked_text):
+    """Split a multi-model Vina output PDBQT into one text block per MODEL, in Vina's rank order."""
+    models, cur = [], None
+    for line in docked_text.splitlines():
+        if line.startswith("MODEL"):
+            cur = []
+            continue
+        if line.startswith("ENDMDL"):
+            if cur is not None:
+                models.append("\n".join(cur) + "\n")
+            cur = None
+            continue
+        if cur is not None:
+            cur.append(line)
+    if not models:  # single-model file without MODEL/ENDMDL tags
+        body = [l for l in docked_text.splitlines() if l.strip()]
+        if body:
+            models.append("\n".join(body) + "\n")
+    return models
+
+
+def pose_identity(model_text):
+    """Deterministic pose identity: SHA-256 over (element, x, y, z) of the pose's atom records, 3 decimals.
+
+    Independent of atom serial numbers, Vina's REMARK lines and line padding, so the same coordinates
+    always hash the same way regardless of which run wrote them."""
+    rows = []
+    for l in model_text.splitlines():
+        if not l.startswith(("ATOM", "HETATM")):
+            continue
+        el = (l[77:79].strip() or l[12:16].strip()[:2]).upper()
+        rows.append("%s %.3f %.3f %.3f" % (el, float(l[30:38]), float(l[38:46]), float(l[46:54])))
+    return _sha("\n".join(rows))
+
+
+def _redock_poses(req, out_dir):
+    """DIAGNOSTIC top-N redocking: identical preparation to `redock`, but Vina keeps N modes and the
+    RMSD vs the crystal pose is reported for EVERY retained pose, not only the top-ranked one.
+
+    Identical to `redock` in receptor prep, ligand prep, box, scoring function, exhaustiveness and seed;
+    the only differences are Vina's num_modes (n_poses) and the energy window used to retain poses.
+    Raising num_modes/widening energy_range can perturb the reported pose set (Vina removes redundant
+    modes with min_rmsd and truncates to num_modes AFTER the Monte-Carlo runs), so rank 1 here is not
+    guaranteed bit-identical to the single-pose `redock` path; both are reported so it can be checked.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import rdMolAlign
+    from vina import Vina
+    from meeko import PDBQTMolecule, RDKitMolCreate
+    xtal = Chem.MolFromMolFile(str(req["ligandSdfPath"]), removeHs=False)
+    if xtal is None:
+        raise ValueError("ligand_sdf_unreadable")
+    ref = Chem.RemoveHs(xtal)
+    smiles = Chem.MolToSmiles(ref)
+    rec = _prepare_receptor(req, os.path.join(out_dir, "receptor"))
+    rec = _with_extra_rigid(rec, req, out_dir)
+
+    seed = int(req.get("seed", 42))
+    exhaustiveness = max(1, int(req.get("exhaustiveness", 8)))
+    num_modes = max(1, int(req.get("numModes", 20)))
+    energy_range = float(req.get("energyRange", 20.0))
+    min_rmsd = float(req.get("minRmsd", 1.0))
+    center = rec["center"]
+    box = rec["boxSize"]
+
+    dock_dir = os.path.join(out_dir, "dock")
+    os.makedirs(dock_dir, exist_ok=True)
+    lig_pdbqt, lig_xyz = _prep(smiles, seed)
+    lig_path = os.path.join(dock_dir, "ligand.pdbqt")
+    with open(lig_path, "w") as f:
+        f.write(lig_pdbqt)
+    out_path = os.path.join(dock_dir, "docked.pdbqt")
+
+    v = Vina(sf_name="vina", seed=seed, verbosity=0)
+    v.set_receptor(rec["receptorPdbqtPath"])
+    v.set_ligand_from_file(lig_path)
+    v.compute_vina_maps(center=center, box_size=box)
+    v.dock(exhaustiveness=exhaustiveness, n_poses=num_modes, min_rmsd=min_rmsd)
+    v.write_poses(out_path, n_poses=num_modes, energy_range=energy_range, overwrite=True)
+    energies = v.energies(n_poses=num_modes, energy_range=energy_range)
+
+    docked_text = open(out_path).read()
+    models = pose_models(docked_text)
+    pm = PDBQTMolecule(docked_text, skip_typing=True)
+    mol = Chem.RemoveHs(RDKitMolCreate.from_pdbqt_mol(pm)[0])
+    confs = list(mol.GetConformers())
+    if len(confs) != len(models):
+        raise ValueError("pose_count_mismatch: %d conformers vs %d models" % (len(confs), len(models)))
+
+    poses = []
+    for i, conf in enumerate(confs):
+        single = Chem.Mol(mol)
+        single.RemoveAllConformers()
+        single.AddConformer(Chem.Conformer(conf), assignId=True)
+        # Symmetry-aware heavy-atom RMSD, in place (no superposition) — same metric as `redock`.
+        rmsd = rdMolAlign.CalcRMS(single, ref)
+        aff = float(energies[i][0]) if i < len(energies) else None
+        poses.append({"rank": i + 1, "affinityKcalMol": round(aff, 3) if aff is not None else None,
+                      "rmsdA": round(float(rmsd), 3), "poseSha256": pose_identity(models[i])})
+
+    import vina as vina_mod
+    import meeko as meeko_mod
+    from rdkit import rdBase
+    best = min(poses, key=lambda p: p["rmsdA"]) if poses else None
+    return {
+        "mode": "DIAGNOSTIC_TOP_N",
+        "ligandSmiles": smiles, "ligandHeavyAtoms": ref.GetNumAtoms(),
+        "poses": poses, "nPoses": len(poses),
+        "rmsdA": poses[0]["rmsdA"] if poses else None,
+        "bestAffinityKcalMol": poses[0]["affinityKcalMol"] if poses else None,
+        "bestRmsdA": best["rmsdA"] if best else None,
+        "bestRmsdRank": best["rank"] if best else None,
+        "receptor": rec,
+        "engine": {"scoringFunction": "vina", "vinaVersion": getattr(vina_mod, "__version__", "?"),
+                   "meekoVersion": getattr(meeko_mod, "__version__", "?"), "rdkitVersion": rdBase.rdkitVersion,
+                   "exhaustiveness": exhaustiveness, "seed": seed, "numModes": num_modes,
+                   "energyRange": energy_range, "minRmsd": min_rmsd,
+                   "center": center, "boxSize": box},
+        "vinaVersion": getattr(vina_mod, "__version__", "?"),
+        "meekoVersion": getattr(meeko_mod, "__version__", "?"),
+        "seed": seed, "exhaustiveness": exhaustiveness,
+        "ligandPdbqtSha256": _sha(lig_pdbqt), "dockedPdbqtSha256": _sha(docked_text),
+        "ligandAtoms": int(len(lig_xyz)),
+    }
 
 
 def main():
@@ -389,13 +523,15 @@ def main():
             print(json.dumps({"ok": False, "error": "dock_reference_failed: %s" % str(e)[:180]}))
         return
 
-    if cmd in ("prepare_receptor", "prepare_ligand", "redock"):
+    if cmd in ("prepare_receptor", "prepare_ligand", "redock", "redock_poses"):
         try:
             out_dir = req.get("outDir") or os.path.join(os.getcwd(), "_" + cmd)
             if cmd == "prepare_receptor":
                 r = _prepare_receptor(req, out_dir)
             elif cmd == "redock":
                 r = _redock(req, out_dir)
+            elif cmd == "redock_poses":
+                r = _redock_poses(req, out_dir)
             else:
                 seed = int(req.get("seed", 42))
                 pdbqt, xyz = _prep(str(req["ligandSmiles"]), seed)

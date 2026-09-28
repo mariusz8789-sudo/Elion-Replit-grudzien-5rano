@@ -1,0 +1,74 @@
+{
+ "kind": "astex-multiseed-ensemble-preregistration",
+ "frozenAt": "2026-09-27T23:42:09+00:00",
+ "protocolFingerprintSha256": "e183a4f7255d50c0d85832c240d815637ea6b871d99fe6506adc878d46446651",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+ "protocol": {
+  "id": "astex-multiseed-ensemble-prereg",
+  "label": "Astex \u2014 multi-seed Vina ensemble sampling diagnostic (run 6, diagnostic)",
+  "status": "PREREGISTERED BEFORE ANY RESULT WAS COMPUTED \u2014 frozen protocol, amendments only by append",
+  "purpose": "measure whether pooling poses from a fixed set of independent Vina seeds raises the native-like pose availability ceiling above run 4's 68/85, and quantify the stochastic error bar on the single-seed result",
+  "notAHeadline": "DIAGNOSTIC. This run does NOT produce a new headline. The preregistered headline stays run 3's 46/85 top-1 until a separately frozen full run replaces it. No ranking change is made here.",
+  "preparation": {
+   "base": "the preregistered run-3 preparation, imported unchanged",
+   "phase2Rule1": "covalently linked multi-residue ligands are absorbed into the ligand using element covalent radii plus 0.40 A, excluding water, single-atom metal ions, the additive list and residues the cofactor rule already keeps; over the 85 this changes 1GKC only (10 -> 22 heavy atoms)",
+   "phase2Rule2": "chemically modified amino-acid residues that are peptide-bonded into the chain are typed from the wwPDB CCD with polymer leaving atoms removed and kept as part of the rigid receptor; over the 85 this changes 1HVY, 1JLA, 1MEH, 1XM6",
+   "phase2Rule3": "none \u2014 the protonation and histidine audit found no defect and nothing was implemented"
+  },
+  "seeds": {
+   "list": [
+    42,
+    1042,
+    2042,
+    3042,
+    4042
+   ],
+   "rule": "seed_i = 42 + 1000*i for i in 0..4; 42 is the preregistered run-3 seed. Fixed before the run, identical for all 85 cases.",
+   "forbidden": "no per-PDB seed choice, no searching seeds until a case succeeds, no adding or dropping a seed after seeing any result"
+  },
+  "search": {
+   "scoringFunction": "vina",
+   "exhaustiveness": 32,
+   "numModes": 20,
+   "energyRange": 20.0,
+   "minRmsd": 1.0,
+   "box": "unchanged from run 3, per case",
+   "identicalForAll85": true
+  },
+  "pooling": {
+   "method": "pool all poses from all 5 seeds per case, then deduplicate deterministically",
+   "dedup": "two poses are the same if their symmetry-aware heavy-atom RMSD to each other is below 1.0 A, matching Vina's own min_rmsd; the survivor is the one with the better Vina score, ties broken by (seed index, rank) ascending",
+   "ordering": "the pooled pose list is ordered by Vina score ascending, ties broken by (seed index, rank) ascending",
+   "retained": "the top 20 pooled poses define the top-K windows, so the ceiling is comparable to run 4's top-20; the full deduplicated pool is also reported separately as bestAvailable"
+  },
+  "metrics": [
+   "top-1 / 3 / 5 / 10 / 20 coverage over the pooled poses, denominator 85",
+   "sampling ceiling: cases with any pose under 2.0 A anywhere in the deduplicated pool, denominator 85",
+   "comparison against run 4: ceiling 68/85, top-1 46, top-3 59, top-5 63, top-10 66, top-20 68",
+   "per-seed single-seed top-1, to quantify the stochastic error bar on the 46/85 result",
+   "cases newly reaching a native-like pose, and cases that lose one",
+   "the list of cases still with no pose under 2.0 A"
+  ],
+  "successCriterion": "RMSD < 2.0 A, symmetry-aware heavy-atom RDKit CalcRMS, no superposition",
+  "denominator": "all 85 cases, always; no case excluded, no threshold change, no per-target tuning",
+  "immutability": "runs 1-5, their evidence and both earlier preregistrations are untouched",
+  "codeIdentity": {
+   "gitHead": "5e18ce620a353fc0b4e1b83d267998bf640c754b",
+   "uncommittedFileSha256": {
+    "scripts/astex_phase2_prep.py": "8cf5e3dc2ce92d0ff05808896782efc527e89678548a5873f0c036e5203b8d67",
+    "scripts/astex-phase2-redock.py": "1c9c76b516f8b57e42bdedcd7b4e577a84d5f3e8866bc501c90dbc30a333a416",
+    "scripts/astex-redock-benchmark.py": "81aa6e9bdb9724ccc637b9ba9fb3d638613339f4d4ebf81fad6f7db761fc6dd0",
+    "scripts/astex-redock-topn-diagnostic.py": "b1e9651b889eeaa56d9ca34fb7761d859e1124c7b1e65e6560e1d1b5cc0342d6",
+    "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e"
+   }
+  },
+  "dataset": "github.com/rdk/p2rank-datasets, joined/astex, commit 0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
+  "versions": {
+   "vina": "1.2.7",
+   "meeko": "0.8.0",
+   "rdkit": "2026.03.6",
+   "biotite": "1.6.0"
+  },
+  "amendments": []
+ }
+}

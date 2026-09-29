@@ -41,11 +41,11 @@ describe('EngineCoreHolo', () => {
     expect(canUseWebGL()).toBe(false);
   });
 
-  it('StartHero keeps the holo well in the markup but mounts the WebGL scene only after effects run', async () => {
+  it('the Start dashboard no longer mounts the decorative holo (owner decision 2026-09-29)', async () => {
     vi.stubGlobal('window', { localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {}, key: () => null, length: 0 }, location: { hash: '' } });
     const { StartHero } = await import('../components/StartHero');
     const html = renderToStaticMarkup(<StartHero />);
-    expect(html).toContain('class="start-holo"');
-    expect(html).not.toContain('engine-core-holo'); // effects do not run statically: no canvas, no three.js
+    expect(html).not.toContain('start-holo');
+    expect(html).not.toContain('engine-core-holo');
   });
 });

@@ -155,6 +155,22 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // entry ("wkrótce") by an explicit product decision recorded in
   // MASTER_PRIORITY_GENESIS.md ("Cyber/GOV pozostaje OFF main"). Wiring it
   // would ship a capability the menu says does not exist yet.
+  'components/GenesisCapabilityShowcase.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/GenesisCommandCenterHero.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/GenesisDashboard.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure (reached only through it); kept for reuse.',
+  'components/ScaleJourney.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/TimeTransport.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure (reached only through it); kept for reuse.',
+  'components/WorkspaceStage.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'core/workspaceStage.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting WorkspaceStage, its only consumer.',
+  'core/agent/crossDomainSynthesis.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'core/three/genesisPulseScene.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'core/three/sceneRegistry.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'components/guide/AskGenesisMic.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the inline Ask panel that held the microphone button; Ask is now the one ScienceChat.',
+  'components/holo/EngineCoreHolo.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the decorative engine hologram ("decoration, not information").',
+  'components/liveMatrix/LiveMatrixBackground.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background (owner: remove the Matrix background, keep a subtle identity).',
+  'components/liveMatrix/genesisVisualState.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
+  'components/liveMatrix/matrixController.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
+  'components/liveMatrix/matrixEngine.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
   'core/governance/index.ts': 'Sovereign staged OFF by product decision; menu badges it "wkrótce".',
   'core/governance/approval.ts': 'Same Sovereign staging decision.',
   'core/governance/audit.ts': 'Same Sovereign staging decision.',

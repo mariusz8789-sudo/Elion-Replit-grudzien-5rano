@@ -312,7 +312,7 @@ export function AppShell({ children, chat, chatInline = false }: {
             onClick={() => go(item)}
           >
             <span aria-hidden="true">{item.icon}</span>
-            <span>{item.label.split(' ')[0]}</span>
+            <span>{item.shortLabel ?? item.label.split(' ')[0]}</span>
           </button>
         ))}
         <button

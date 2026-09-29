@@ -1,178 +1,223 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { listExperiments } from '../core/scienceMemory';
-import { CSRN_KEY } from '../core/home/homeFacts';
-import { AskGenesisMic } from './guide/AskGenesisMic';
-import { HomeImatinibPanel, HomeProofStrip } from './home/HomeProofStrip';
-import { HomeEngines } from './home/HomeEngines';
-import { HomePipeline } from './home/HomePipeline';
-
-/** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
-const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({ default: m.EngineCoreHolo })));
+import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { getGenesisCapability } from '../core/capabilities/genesisCapabilityRegistry';
+import { ASTEX, ASTEX_TRAINING_OVERLAP, CSRN_KEY, IMATINIB } from '../core/home/homeFacts';
+import { HomeEnginesRow } from './home/HomeEngines';
 
 /**
- * START — the first 30–60 seconds for a grant reviewer, investor or scientist.
+ * START — the dashboard. It is an OVERVIEW only: what Genesis is, the four
+ * areas with one plain sentence and one honest status each, recent research,
+ * evidence status and the engines. Navigation lives in the menu (AppShell),
+ * the conversation lives in Ask (the one ScienceChat). Neither is repeated here.
  *
- * Order: what Genesis is → the numbers → try to break it (Reviewer Room) →
- * the engines → the pipeline → honest status (CSRN key, real lab) → the wider
- * Scientific OS → the Science Chat, which the shell mounts right below this.
- * Nothing here computes or certifies anything: numbers come from committed
- * evidence (`core/home/homeFacts`), engine status from the backend toolchain,
- * and every check links to the screen that really runs it.
+ * STATUS RULE (owner's): no number or status is typed in by hand. Each one is
+ * read from a real source, and a source that has nothing shows an honest empty
+ * state:
+ *   - Drug Discovery  → committed Astex records (`homeFacts`)
+ *   - Human Biology   → a description of the path, no count
+ *   - Evidence        → committed imatinib Replay record (`homeFacts`)
+ *   - Physics & CERN  → capability registry entry `cern-cms-open-data`
+ *   - Recent research → `listExperiments()` (Scientific Memory in this browser)
+ *   - CSRN signature  → published key file (`CSRN_KEY`)
+ *   - Engines         → `GET /api/compute/toolchain`, live
+ *   - Backend         → `GET /api/health`, live
  */
 
-type Health = 'checking' | 'online' | 'no-key' | 'offline';
+type Health = 'checking' | 'online' | 'offline';
 
-const CHALLENGES: readonly { id: string; title: string; act: string; result: string }[] = [
-  { id: 'A', title: 'Change the result', act: 'edit the Vina score in the file', result: 'Verification fails' },
-  { id: 'B', title: 'Call a model a measurement', act: 'MODEL_ESTIMATE as REAL_MEASUREMENT', result: 'Rejected' },
-  { id: 'C', title: 'Sign with another key', act: 'valid signature, foreign key', result: 'SIGNED_UNTRUSTED' },
+const CMS = getGenesisCapability('cern-cms-open-data');
+
+interface Area {
+  readonly id: string;
+  readonly title: string;
+  readonly line: string;
+  readonly status: string;
+  readonly tone: 'ok' | 'warn' | 'muted';
+  readonly note?: string;
+  readonly cta: string;
+  readonly hash: string;
+  readonly extra?: { label: string; hash: string };
+}
+
+const AREAS: readonly Area[] = [
+  {
+    id: 'drug',
+    title: 'Drug Discovery',
+    line: 'Design, test and falsify computational drug candidates.',
+    status: `Vina baseline ${ASTEX.vinaPreregisteredTop1}/${ASTEX.denominator} · GNINA dev ${ASTEX.gninaTop1}/${ASTEX.denominator}`,
+    tone: 'ok',
+    note: `Astex development benchmark, not validation: ${ASTEX_TRAINING_OVERLAP.inTrainingLists} of ${ASTEX_TRAINING_OVERLAP.of} complexes are in GNINA's training data.`,
+    cta: 'Open Drug Discovery',
+    hash: '#/drug',
+    extra: { label: 'Verified example: imatinib', hash: '#/discovery-track' },
+  },
+  {
+    id: 'biology',
+    title: 'Human Biology',
+    line: 'Explore anatomy from body to organ, tissue and cell.',
+    status: 'Body → organ → tissue → cell',
+    tone: 'muted',
+    cta: 'Open Human Explorer',
+    hash: '#/human-biology-lab',
+  },
+  {
+    id: 'evidence',
+    title: 'Evidence & Replay',
+    line: 'Verify where a result came from and reproduce it.',
+    status: `Imatinib route · Replay ${IMATINIB.replay}`,
+    tone: IMATINIB.replay === 'MATCH' ? 'ok' : 'warn',
+    cta: 'Open Reviewer Room',
+    hash: '#/reviewer',
+  },
+  {
+    id: 'physics',
+    title: 'Physics & CERN',
+    line: 'Run physical models and inspect real CMS Open Data.',
+    status: CMS ? `CMS Open Data · ${CMS.readiness === 'AVAILABLE' ? 'available' : CMS.readiness.toLowerCase().replace(/_/g, ' ')}` : 'CMS Open Data · not registered',
+    tone: CMS?.readiness === 'AVAILABLE' ? 'ok' : 'warn',
+    note: CMS?.epistemicLabel === 'EXTERNAL_REAL_OBSERVATION' ? 'Published historical data, analysed offline. Not a live detector feed.' : undefined,
+    cta: 'Open CMS data',
+    hash: '#/physics/cms-z',
+    extra: { label: 'Physics laboratory', hash: '#/scientific-worlds' },
+  },
 ];
 
-const BROADER: readonly { label: string; hash: string | null; note: string }[] = [
-  { label: 'Human Digital Twin', hash: '#/human-biology-lab', note: 'body → organ → cell · educational model' },
-  { label: 'Virtual Bio Lab', hash: '#/virtual-bio', note: 'in-silico toy models only' },
-  { label: 'Chemistry Live Lab', hash: '#/scientific-worlds?station=st-titration', note: 'titration, 118 elements, Replay' },
-  { label: 'CERN / CMS Open Data', hash: '#/physics/cms-z', note: '10,000 real Z→μμ events (2011)' },
-  { label: 'CERN Complex', hash: '#/cern-complex', note: '3D walk-through · no PYTHIA/Geant4' },
-  { label: 'Quantum', hash: '#/lab/quantum', note: 'superposition, Bloch sphere, CHSH' },
-  { label: 'Space-Time', hash: '#/lab/spacetime', note: 'time dilation, light cone' },
-  { label: 'Black holes', hash: '#/geodesics', note: 'photon geodesics, RK4' },
-  { label: 'Reality Navigator', hash: '#/reality', note: 'exact formulas vs cinematic view' },
-  { label: 'World / Digital Twin', hash: '#/world-director', note: 'labelled SCENARIO' },
-  { label: 'Research Console', hash: '#/research-console', note: 'question → hypotheses → falsification' },
-  { label: 'Real Lab architecture', hash: null, note: 'no hardware connected yet' },
+/** One compact row of the wider Scientific OS: links only, no counts. */
+const BROADER: readonly { label: string; hash: string }[] = [
+  { label: 'Chemistry', hash: '#/scientific-worlds?station=st-titration' },
+  { label: 'Quantum', hash: '#/lab/quantum' },
+  { label: 'Space-time', hash: '#/lab/spacetime' },
+  { label: 'Black holes', hash: '#/geodesics' },
+  { label: 'CERN Complex', hash: '#/cern-complex' },
+  { label: 'Virtual Bio Lab', hash: '#/virtual-bio' },
+  { label: 'World Director', hash: '#/world-director' },
 ];
+
+/** "3 min ago", from the record's own timestamp. Never a made-up time. */
+export function relativeTime(iso: string, now: number = Date.now()): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return 'unknown time';
+  const s = Math.max(0, Math.round((now - t) / 1000));
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const d = Math.floor(s / 86400);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
+function readRecent(): { rows: readonly SavedExperiment[]; total: number } {
+  try {
+    const all = listExperiments();
+    return { rows: all.slice(0, 4), total: all.length };
+  } catch {
+    return { rows: [], total: 0 };
+  }
+}
 
 export function StartHero(): React.ReactElement {
   const [health, setHealth] = useState<Health>('checking');
-  // Static render (tests, SSR) never mounts the WebGL hero; the browser turns it on after mount.
-  const [holo, setHolo] = useState(false);
-  useEffect(() => { setHolo(true); }, []);
-  const records = useMemo(() => { try { return listExperiments().length; } catch { return 0; } }, []);
+  const [query, setQuery] = useState('');
+  const recent = useMemo(readRecent, []);
 
   useEffect(() => {
     let cancelled = false;
     fetch('/api/health')
-      .then((r) => r.json())
-      .then((d: { ai?: string }) => { if (!cancelled) setHealth(d.ai === 'ready' ? 'online' : 'no-key'); })
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(() => { if (!cancelled) setHealth('online'); })
       .catch(() => { if (!cancelled) setHealth('offline'); });
     return () => { cancelled = true; };
   }, []);
 
-  const submit = (text: string): void => {
-    const t = text.trim();
-    if (t) requestOpenScienceChat(t);
+  const submit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    const t = query.trim();
+    requestOpenScienceChat(t || undefined);
+    setQuery('');
   };
-  const focusChat = (): void => {
-    const input = document.querySelector<HTMLElement>('.science-chat-inline [aria-label="Wiadomość do Science Chat"]');
-    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    input?.focus({ preventScroll: true });
-  };
-
-  const healthLabel = health === 'checking' ? 'checking…' : health === 'online' ? 'online · AI ready' : health === 'no-key' ? 'online · AI without key' : 'offline · local mode';
 
   return (
-    <div className="hp" data-testid="start-hero" lang="en" dir="ltr">
-      <section className="hp-hero" aria-labelledby="hp-title">
-        <div className="hp-hero-text">
-          <p className="hp-eyebrow">Genesis · Scientific OS</p>
-          <h1 id="hp-title" className="hp-title">Verifiable computational drug discovery.</h1>
-          <p className="hp-sub">Real scientific engines. Falsifiable results. Cryptographic evidence. Replay.</p>
-          <div className="hp-cta" data-testid="start-proof">
-            <a className="hp-btn hp-btn-primary" href="#/discovery-track" data-testid="door-proof-discovery-track">Explore a verified discovery</a>
-            <a className="hp-btn" href="#/reviewer" data-testid="door-proof-reviewer">Open Reviewer Room</a>
-            <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Znajdź kandydatów dla BCR-ABL (cel imatynibu).')} data-testid="door-proof-drug">Run the imatinib experiment</button>
-          </div>
-          <p className="hp-honest">Every result is computational and labelled so. No Genesis prediction has been tested in a laboratory yet.</p>
-        </div>
-        <div className="start-holo" aria-hidden="true">
-          <span className="start-holo-base" />
-          <span className="start-holo-ring start-holo-ring-a" />
-          <span className="start-holo-ring start-holo-ring-b" />
-          {holo && <Suspense fallback={null}><EngineCoreHolo /></Suspense>}
-        </div>
+    <div className="hp hp-v2" data-testid="start-hero" lang="en" dir="ltr">
+      <header className="hp-head">
+        <p className="hp-eyebrow">
+          <span>Genesis · Scientific OS</span>
+          <span className={`hp-health hp-health-${health}`} data-testid="home-backend">
+            <i aria-hidden="true" />{health === 'checking' ? 'checking backend…' : health === 'online' ? 'backend online' : 'backend offline'}
+          </span>
+        </p>
+        <h1 className="hp-title">Verifiable computational drug discovery.</h1>
+        <p className="hp-sub">One scientific OS: drug discovery first, with human biology and physics on the same evidence layer.</p>
+        <form className="hp-command" onSubmit={submit} role="search" data-testid="home-command">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="What do you want to investigate?"
+            aria-label="What do you want to investigate?"
+          />
+          <button type="submit" aria-label="Ask Genesis">→</button>
+        </form>
+      </header>
+
+      <section className="hp-areas" aria-label="Areas">
+        {AREAS.map((a) => (
+          <article key={a.id} className="hp-area" data-testid={`home-area-${a.id}`}>
+            <h2>{a.title}</h2>
+            <p className="hp-area-line">{a.line}</p>
+            <p className={`hp-area-status hp-tone-${a.tone}`}><i aria-hidden="true" />{a.status}</p>
+            {a.note && <p className="hp-area-note">{a.note}</p>}
+            <div className="hp-area-actions">
+              <a className="hp-btn hp-btn-primary" href={a.hash}>{a.cta}</a>
+              {a.extra && <a className="hp-link" href={a.extra.hash}>{a.extra.label}</a>}
+            </div>
+          </article>
+        ))}
       </section>
 
-      <div className="hp-dash">
-        <HomeProofStrip />
-
-        <section className="hp-panel hp-span-7" aria-labelledby="hp-verify-title" data-testid="home-verify">
-          <header className="hp-panel-head">
-            <h2 id="hp-verify-title">Don’t trust the claim. Verify it.</h2>
-            <span className="hp-panel-meta">runs in your browser</span>
+      <div className="hp-duo">
+        <section className="hp-card" aria-labelledby="hp-recent-title" data-testid="home-recent">
+          <header className="hp-card-head">
+            <h2 id="hp-recent-title">Recent research</h2>
+            <span>Scientific Memory · this browser</span>
           </header>
-          <div className="hp-checks">
-            {CHALLENGES.map((c) => (
-              <a key={c.id} className="hp-check" href="#/reviewer?focus=rv-c7" data-testid={`home-challenge-${c.id}`}>
-                <span className="hp-check-id">{c.id}</span>
-                <span className="hp-check-text"><strong>{c.title}</strong><small>{c.act}</small></span>
-                <span className="hp-pill hp-pill-ok">{c.result}</span>
-              </a>
-            ))}
-          </div>
-          <p className="hp-replay">Replay verdicts: <code>MATCH</code> <code>DRIFT</code> <code>ENGINE_VERSION_CHANGED</code> <code>BLOCKED_BY_RUNTIME</code> · <a href="#/evidence">Evidence &amp; Replay</a></p>
-          <a className="hp-btn hp-btn-primary hp-btn-block" href="#/reviewer">Open Reviewer Room</a>
+          {recent.rows.length === 0 ? (
+            <p className="hp-empty" data-testid="home-recent-empty">No runs saved yet. Ask a question or open an area above to start one.</p>
+          ) : (
+            <ul className="hp-recent">
+              {recent.rows.map((r) => (
+                <li key={r.id}>
+                  <a href="#/memory">
+                    <strong>{r.experimentName}</strong>
+                    <small>{relativeTime(r.createdAt)} · {r.epistemicStatus}</small>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {recent.total > 0 && <a className="hp-link" href="#/memory">All {recent.total} saved runs</a>}
         </section>
 
-        <HomeImatinibPanel />
-
-        <HomeEngines />
-
-        <section className="hp-panel hp-span-5" aria-labelledby="hp-status-title" data-testid="home-status">
-          <header className="hp-panel-head">
-            <h2 id="hp-status-title">Signed and pending</h2>
-            <span className="hp-panel-meta">from the records</span>
+        <section className="hp-card" aria-labelledby="hp-evidence-title" data-testid="home-evidence">
+          <header className="hp-card-head">
+            <h2 id="hp-evidence-title">Evidence status</h2>
+            <span>from the committed records</span>
           </header>
-          <div className="hp-status-item" data-testid="home-csrn">
-            <p className="hp-status-top"><strong>CSRN signature</strong>{CSRN_KEY.generated ? <span className="hp-pill hp-pill-ok">SIGNED</span> : <span className="hp-pill hp-pill-warn">PENDING</span>}</p>
-            {CSRN_KEY.generated
-              ? <p className="hp-status-line">Signed by the published Genesis key <span className="hp-mono">keyId: {CSRN_KEY.keyId}</span></p>
-              : <p className="hp-status-line">Genesis production signing key not generated yet.</p>}
-            <p className="hp-foot">Signature proves integrity/authorship. It does not turn a model estimate into laboratory truth.</p>
-          </div>
-          <div className="hp-status-item" data-testid="home-real-lab">
-            <p className="hp-status-top"><strong>Ready for physical validation</strong><span className="hp-pill hp-pill-warn">PENDING</span></p>
-            <p className="hp-status-line">Architecture ready for real measurements. First hardware-verified instrument connection pending.</p>
-            <p className="hp-foot">Read-only instrument adapter, calibration and provenance, Experiment Fabric bridge. No hardware-verified device adapter yet.</p>
-          </div>
-        </section>
-
-        <HomePipeline />
-
-        <section className="hp-panel hp-span-12" aria-labelledby="hp-broader-title" data-testid="home-broader">
-          <header className="hp-panel-head">
-            <h2 id="hp-broader-title">Built on a broader Scientific OS</h2>
-            <span className="hp-panel-meta">same evidence layer, other sciences</span>
-          </header>
-          <ul className="hp-broader-list">
-            {BROADER.map((b) => (
-              <li key={b.label}>
-                {b.hash ? <a href={b.hash}>{b.label}</a> : <span>{b.label}</span>}
-                <small>{b.note}</small>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="hp-panel hp-span-12 hp-ask" aria-labelledby="hp-ask-title">
-          <header className="hp-panel-head">
-            <h2 id="hp-ask-title">Science Chat · ask in plain language</h2>
-            <span className="hp-panel-meta">below</span>
-          </header>
-          <div className="hp-cta hp-ask-actions">
-            <button type="button" className="hp-btn hp-btn-primary" onClick={focusChat} data-testid="door-ask">Ask Genesis</button>
-            <a className="hp-btn" href="#/scientific-worlds" data-testid="door-laboratory">Enter the laboratory</a>
-            <AskGenesisMic lang="pl" onText={submit} className="hp-btn" />
-            <button type="button" className="hp-btn hp-btn-quiet" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">See a ready example</button>
-          </div>
-          <ul className="hp-system" aria-label="System status">
-            <li><strong>{records}</strong> runs saved in Scientific Memory</li>
-            <li><strong className={`hp-health-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</strong> backend {healthLabel}</li>
-          </ul>
+          <p className="hp-kv"><span>Imatinib retrosynthesis</span><b className={IMATINIB.replay === 'MATCH' ? 'hp-tone-ok' : 'hp-tone-warn'}>Replay {IMATINIB.replay}</b></p>
+          <p className="hp-kv" data-testid="home-csrn">
+            <span>CSRN signature</span>
+            {CSRN_KEY.generated ? <b className="hp-tone-ok">SIGNED · {CSRN_KEY.keyId}</b> : <b className="hp-tone-warn">PENDING · key not generated yet</b>}
+          </p>
+          <p className="hp-area-note">Every result is computational and labelled so. No Genesis prediction has been tested in a laboratory yet.</p>
+          <a className="hp-link" href="#/reviewer">Try to break a result in the Reviewer Room</a>
         </section>
       </div>
+
+      <HomeEnginesRow />
+
+      <nav className="hp-broader" aria-label="Broader Scientific OS" data-testid="home-broader">
+        <span>Broader Scientific OS</span>
+        {BROADER.map((b) => <a key={b.hash} href={b.hash}>{b.label}</a>)}
+      </nav>
     </div>
   );
 }

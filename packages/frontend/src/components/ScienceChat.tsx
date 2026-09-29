@@ -343,10 +343,16 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
   );
 }
 
-const QUICK_STARTS = [
-  { label: 'Lek', prompt: 'Porównaj właściwości aspiryny w laboratorium.' },
-  { label: 'Chemia', prompt: 'Uruchom miareczkowanie kwasowo-zasadowe NaOH.' },
-  { label: 'Fizyka', prompt: 'Pokaż czarną dziurę 3D i trajektorię światła.' },
+/**
+ * Ask examples. Each prompt is sent exactly as if typed, through the same
+ * router as any other message; each was checked in the browser to land on the
+ * screen its label names.
+ */
+const ASK_EXAMPLES = [
+  { label: 'Open a molecule in 3D', prompt: 'Show molecule lab' },
+  { label: 'Explore a human organ', prompt: 'Show brain' },
+  { label: 'Inspect CMS data', prompt: 'Open real CMS data' },
+  { label: 'Run a physics experiment', prompt: 'Run a three-body simulation' },
 ] as const;
 
 function TurnText({ turn }: { turn: ChatTurn }) {
@@ -1017,11 +1023,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <div className="science-chat-log" ref={scrollRef}>
         {turns.length === 0 && (
-          <section className="science-chat-empty" aria-label="Rozpocznij badanie">
-            <span>ONE CHAT · ONE LAB</span>
-            <h2>Co chcesz zbadać?</h2>
-            <p>Opisz cel. Genesis wybierze właściwe laboratorium i pokaże wynik.</p>
-            <div>{QUICK_STARTS.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+          <section className="science-chat-empty" aria-label="Ask Genesis" lang="en">
+            <span>ASK</span>
+            <h2>What do you want to investigate?</h2>
+            <p>Describe the research task. Genesis routes it to an available model, engine or verified workflow.</p>
+            <div data-testid="ask-examples">{ASK_EXAMPLES.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
           </section>
         )}
         {turns.map((t, i) => (
@@ -1080,7 +1086,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
-          placeholder="Co chcesz zbadać?"
+          placeholder="Describe the research task…"
           aria-label="Wiadomość do Science Chat"
         />
         <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>

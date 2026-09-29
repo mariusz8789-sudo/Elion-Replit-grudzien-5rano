@@ -49,17 +49,7 @@ export function liveLabel(engine: HomeEngine, live: Live): { text: string; tone:
 }
 
 export function HomeEngines(): React.ReactElement {
-  const [live, setLive] = useState<Live>({ phase: 'checking' });
-  useEffect(() => {
-    let cancelled = false;
-    void listToolchain()
-      .then((r) => {
-        if (cancelled) return;
-        setLive(r.ok ? { phase: 'ready', byId: new Map(r.data.map((t) => [t.toolId, t])) } : { phase: 'unreachable' });
-      })
-      .catch(() => { if (!cancelled) setLive({ phase: 'unreachable' }); });
-    return () => { cancelled = true; };
-  }, []);
+  const live = useLiveToolchain();
 
   return (
     <section className="hp-panel hp-span-7" aria-labelledby="hp-engines-title" data-testid="home-engines">
@@ -79,6 +69,53 @@ export function HomeEngines(): React.ReactElement {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/** The live toolchain answer, shared by the full panel and the dashboard row. */
+function useLiveToolchain(): Live {
+  const [live, setLive] = useState<Live>({ phase: 'checking' });
+  useEffect(() => {
+    let cancelled = false;
+    void listToolchain()
+      .then((r) => {
+        if (cancelled) return;
+        setLive(r.ok ? { phase: 'ready', byId: new Map(r.data.map((t) => [t.toolId, t])) } : { phase: 'unreachable' });
+      })
+      .catch(() => { if (!cancelled) setLive({ phase: 'unreachable' }); });
+    return () => { cancelled = true; };
+  }, []);
+  return live;
+}
+
+/**
+ * Dashboard row: one chip per registered runtime engine, status live from the
+ * server. Engines outside the runtime registry (Meeko, GNINA) are named in the
+ * footnote instead of getting a status they do not have.
+ */
+export function HomeEnginesRow(): React.ReactElement {
+  const live = useLiveToolchain();
+  const runtimes = HOME_ENGINES.filter((e) => e.toolId !== null);
+  const outside = HOME_ENGINES.filter((e) => e.toolId === null);
+  const meta = live.phase === 'checking' ? 'checking this server…' : live.phase === 'unreachable' ? 'server unreachable · status unknown' : 'live from this server';
+  return (
+    <section className="hp-card hp-engines-row" aria-labelledby="hp-engines-title" data-testid="home-engines">
+      <header className="hp-card-head">
+        <h2 id="hp-engines-title">Engines</h2>
+        <span>{meta}</span>
+      </header>
+      <ul>
+        {runtimes.map((e) => {
+          const s = liveLabel(e, live);
+          return (
+            <li key={e.name} className={`hp-tone-${s.tone}`} title={`${e.role} ${s.text}`} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
+              <i aria-hidden="true" />{e.name}<span className="hp-sr"> · {s.text}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="hp-area-note">{outside.map((e) => `${e.name}: ${e.note ?? 'not a registered runtime'}`).join(' · ')}</p>
     </section>
   );
 }

@@ -2,6 +2,7 @@ import type * as THREE_NS from 'three';
 import { FULL_ATLAS_HIDDEN_BY_DEFAULT, FULL_ATLAS_SYSTEM_COLOR, type FullAtlasOrganMesh, type FullAtlasPartRange, type FullAtlasSystemMesh } from './bodyParts3dFullAtlas';
 import { AtlasPartPicker, type AtlasPickSystem } from './atlasPartPicker';
 import { brainRegionOf } from './brainParts';
+import { anatomySideOf } from './anatomyNamesPl';
 import { EXPLORE_ORGANS, organsInRegion, regionOfAtlasPoint, REGION_LABEL, structureLabel, type BodyRegionId, type ExploreHitData, type ExploreState } from './anatomyExplore';
 
 /**
@@ -116,13 +117,14 @@ export class AnatomyFocusLayer {
     // Never dispose: the highlight shares its system's vertex buffers, and disposing would free them.
     this.highlight?.removeFromParent(); this.highlight = null;
     const range = this.partRange(state);
-    if (range && state.system) {
+    if (range && state.system && !this.hiddenSystems.has(state.system)) {
       this.highlight = this.picker.highlightMesh(state.system, range, this.picked);
       if (this.highlight) this.atlasGroup.add(this.highlight);
     }
     const region = new Set(organsInRegion(state.regionId).map((o) => o.id));
     for (const [id, group] of this.groups) {
-      group.visible = state.level !== 'BODY' && region.has(id) && !this.hiddenSystems.has(ORGAN_SYSTEM[id] ?? 'digestive');
+      // The chosen organ stays in view when its system is filtered out: its vessels or nerves are shown around it.
+      group.visible = state.level !== 'BODY' && region.has(id) && (state.organId === id || !this.hiddenSystems.has(ORGAN_SYSTEM[id] ?? 'digestive'));
       if (!group.visible) continue;
       const selected = state.organId === id;
       const others = state.organId !== null && !selected;
@@ -185,12 +187,13 @@ export class AnatomyFocusLayer {
     const out: { name: string; label: string; system: string; regionId: BodyRegionId; score: number }[] = [];
     const seen = new Set<string>();
     for (const { system, range } of this.picker.all()) {
-      const label = structureLabel(null, range.name, system).label;
-      const key = `${label}|${system}`;
+      const base = structureLabel(null, range.name, system).label;
+      const side = anatomySideOf(range.name);
+      const label = side ? `${base} (${side} strona)` : base;
       const hay = norm(`${label} ${range.name}`);
       const at = hay.indexOf(q);
       if (at < 0 || seen.has(range.name)) continue;
-      seen.add(range.name); void key;
+      seen.add(range.name);
       const [min, max] = range.bounds;
       const regionId = regionOfAtlasPoint((min[0]! + max[0]!) / 2 - cx, (min[1]! + max[1]!) / 2, this.heightMeters);
       out.push({ name: range.name, label, system, regionId, score: (norm(label).startsWith(q) ? 0 : 1) + at / 100 });
@@ -256,6 +259,7 @@ export class AnatomyFocusLayer {
     }
     const range = this.partRange(state);
     if (range && state.structure) {
+      if (this.hiddenSystems.has(state.system!)) return [];
       const c = this.rangeBox(range, new this.THREE.Box3()).getCenter(new this.THREE.Vector3()).applyMatrix4(this.atlasGroup.matrixWorld);
       return [{ key: state.structure, text: structureLabel(null, state.structure, state.system).label, hit: { kind: 'part', name: state.structure, system: state.system! }, world: c }];
     }

@@ -1132,6 +1132,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           onBack={exploreBack} onAction={exploreAction}
           onlySystem={onlySystem} onSystem={(id) => applyLayers(id, peeled)} peeled={peeled}
           onPeel={(id) => applyLayers(onlySystem, peeled.includes(id) ? peeled.filter((p) => p !== id) : [...peeled, id])}
+          onPhoto={() => sim.capturePng()} onRestore={(v) => { applyLayers(v.onlySystem, v.peeled); sim.exploreRestore(v.explore); }}
           search={(q) => sim.searchStructures(q)} onFind={(r: StructureResult) => sim.exploreFind(r.name, r.regionId)}
           onLadder={exploreLadder} onMagnify={exploreMagnify} />
       </>}

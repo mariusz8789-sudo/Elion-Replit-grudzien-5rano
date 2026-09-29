@@ -96,6 +96,23 @@ export interface ExploreOrgan {
   readonly role: string;
 }
 
+/** The body system each organ belongs to, and a few sentences about how it works (textbook level, for a layperson). */
+export const ORGAN_ABOUT: Readonly<Record<string, { readonly system: string; readonly about: string }>> = {
+  brain: { system: 'Układ nerwowy', about: 'Mózg odbiera sygnały ze zmysłów i wysyła polecenia do mięśni. Kora mózgu odpowiada za myślenie, mowę i ruch, móżdżek za równowagę, a pień mózgu za oddech i bicie serca.' },
+  eyes: { system: 'Narządy zmysłów', about: 'Rogówka i soczewka skupiają światło na siatkówce. Komórki siatkówki zamieniają je w sygnał, który nerw wzrokowy przekazuje do mózgu.' },
+  heart: { system: 'Układ krążenia', about: 'Serce to mięsień z czterema jamami: dwoma przedsionkami i dwiema komorami. Prawa strona tłoczy krew do płuc, lewa do całego ciała. Zastawki pilnują, żeby krew płynęła w jedną stronę.' },
+  airways: { system: 'Układ oddechowy', about: 'Tchawica dzieli się na dwa oskrzela główne, a te na coraz drobniejsze gałązki. Na ich końcach, w pęcherzykach płucnych, tlen przechodzi do krwi, a dwutlenek węgla z krwi do powietrza.' },
+  aorta: { system: 'Układ krążenia', about: 'Aorta wychodzi z lewej komory serca, zakręca łukiem i biegnie w dół wzdłuż kręgosłupa. Odchodzą od niej tętnice do głowy, rąk, narządów brzucha i nóg.' },
+  stomach: { system: 'Układ pokarmowy', about: 'Żołądek przyjmuje pokarm z przełyku, miesza go z kwasem solnym i enzymami, a potem porcjami przesuwa do dwunastnicy.' },
+  liver: { system: 'Układ pokarmowy', about: 'Wątroba to największy gruczoł ciała. Rozkłada leki i toksyny, magazynuje cukier jako glikogen i wytwarza żółć, która przez drogi żółciowe trafia do jelita i pomaga trawić tłuszcze.' },
+  pancreas: { system: 'Układ pokarmowy i dokrewny', about: 'Trzustka ma dwie role: wydziela do dwunastnicy enzymy trawienne, a jej wyspy wydzielają do krwi insulinę i glukagon, które regulują poziom cukru.' },
+  intestine: { system: 'Układ pokarmowy', about: 'Jelito cienkie (dwunastnica, jelito czcze i kręte) wchłania składniki pokarmu. Jelito grube odzyskuje wodę i formuje stolec.' },
+  spleen: { system: 'Układ chłonny', about: 'Śledziona usuwa z krwi stare czerwone krwinki i magazynuje część białych krwinek, które pomagają zwalczać zakażenia.' },
+  kidneys: { system: 'Układ moczowy', about: 'Nerki filtrują krew i usuwają nadmiar wody, soli i produkty przemiany materii jako mocz. Pomagają też regulować ciśnienie krwi. Na ich szczytach leżą nadnercza.' },
+  bladder: { system: 'Układ moczowy', about: 'Moczowody prowadzą mocz z nerek do pęcherza, który go gromadzi, a cewka moczowa wyprowadza go na zewnątrz.' },
+  rectum: { system: 'Układ pokarmowy', about: 'Odbytnica to ostatni odcinek jelita grubego. Gromadzi stolec przed jego wydaleniem.' },
+};
+
 const named = (re: RegExp, system?: string) => (p: FullAtlasPart) => (system === undefined || p.system === system) && re.test(p.name);
 const inSkull = (p: FullAtlasPart) => p.bounds[0]![1]! > 1.35;
 

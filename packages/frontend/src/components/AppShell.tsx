@@ -323,7 +323,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           aria-controls="genesis-mobile-menu"
         >
           <span aria-hidden="true">☰</span>
-          <span>Menu</span>
+          <span>Więcej</span>
         </button>
       </nav>
 
@@ -332,7 +332,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu" tabIndex={-1} />
           <div id="genesis-mobile-menu" className="shell-sheet" role="dialog" aria-modal="true" aria-label="Pełne menu Genesis">
             <div className="shell-sheet-head">
-              <span><strong>Menu</strong><small>Wybierz obszar Genesis</small></span>
+              <span><strong>Więcej</strong><small>Wszystkie obszary Genesis</small></span>
               <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
             </div>
             <div className="shell-sheet-body">{sections}</div>

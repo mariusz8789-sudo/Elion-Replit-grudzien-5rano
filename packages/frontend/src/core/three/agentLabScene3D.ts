@@ -221,12 +221,26 @@ export class AgentLabScene3D implements Sim3D {
     this.exploreHidden = [...systems]; this.exploreForceShow = [...forceShow];
     this.focusLayer?.setHiddenSystems(this.exploreHidden, this.exploreForceShow);
   }
+  /** A PNG of what the camera sees right now (drawn once more so the image is never an empty buffer). */
+  capturePng(): string | null {
+    if (!this.renderer || !this.scene || !this.pickCamera) return null;
+    this.renderer.render(this.scene, this.pickCamera);
+    try { return this.renderer.domElement.toDataURL('image/png'); } catch { return null; }
+  }
   searchStructures(query: string): { name: string; label: string; system: string; regionId: BodyRegionId }[] { return this.focusLayer?.search(query) ?? []; }
   /** Search: fly straight to a structure by its atlas name (in its body region). */
   exploreFind(name: string, regionId: BodyRegionId): boolean {
     const found = this.focusLayer?.findPart(name);
     if (!found) return false;
     this.applyExplore({ level: 'STRUCTURE', regionId, organId: null, structure: found.name, system: found.system });
+    return true;
+  }
+  /** A saved view: back to the same place, as long as the atlas still has it. */
+  exploreRestore(state: ExploreState): boolean {
+    if (!this.focusLayer) return false;
+    if (state.organId && !this.focusLayer.hasOrgan(state.organId)) return false;
+    if (state.level === 'STRUCTURE' && !state.organId && (!state.structure || !this.focusLayer.findPart(state.structure))) return false;
+    this.applyExplore(state);
     return true;
   }
   /** Pinch / wheel: closer (< 1) or further (> 1) than the fitted framing, within sane bounds. */

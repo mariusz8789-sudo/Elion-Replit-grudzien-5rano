@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { BODY_SYSTEMS, EXPLORE_LAYERS, SYSTEM_PL, exploreCrumbs, exploreOrgan, REGION_LABEL, structureLabel, type BodyRegionId, type ExploreState } from '../core/three/anatomyExplore';
+import { BODY_SYSTEMS, EXPLORE_LAYERS, ORGAN_ABOUT, SYSTEM_PL, exploreCrumbs, exploreOrgan, REGION_LABEL, structureLabel, type BodyRegionId, type ExploreState } from '../core/three/anatomyExplore';
 import type { ExploreHit } from '../core/three/anatomyFocusLayer';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
+import { deleteView, notePlace, readNote, readViews, saveView, writeNote, type SavedView } from '../core/three/anatomyNotebook';
 
 /**
  * ANATOMY SELECTION HUD — the small layer over the body while it is explored: a breadcrumb with Back at
@@ -10,7 +11,7 @@ import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
  * Nothing here covers the human; the names of the organs sit next to the organs themselves.
  */
 
-export type ExploreAction = 'section' | 'microscope' | 'cell' | 'blood' | 'isolate';
+export type ExploreAction = 'section' | 'microscope' | 'cell' | 'blood' | 'isolate' | 'vessels' | 'nerves' | 'function';
 /** The macro → micro ladder of the reference (Ciało 1 m … DNA 0,1 nm); each rung runs the existing instrument. */
 export type LadderLevel = 'body' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule' | 'dna';
 export const LADDER: readonly (readonly [LadderLevel, string, string])[] = [
@@ -41,6 +42,9 @@ export interface AnatomySelectionHUDProps {
   readonly onFind: (result: StructureResult) => void;
   readonly onLadder: (level: LadderLevel) => void;
   readonly onMagnify: (magnification: number) => void;
+  /** "Zrób zdjęcie": a PNG of the current view, or null when the view cannot be captured. */
+  readonly onPhoto: () => string | null;
+  readonly onRestore: (view: SavedView) => void;
 }
 
 const SURFACES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['XRAY', 'RTG'], ['GHOST', 'Duch']];
@@ -64,9 +68,16 @@ export function microCaption(artifact: BiologyArtifact): { title: string; detail
   return null;
 }
 
-export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify }: AnatomySelectionHUDProps): JSX.Element | null {
-  const [panel, setPanel] = useState<'systems' | 'layers' | 'search' | null>(null);
+export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify, onPhoto, onRestore }: AnatomySelectionHUDProps): JSX.Element | null {
+  const [panel, setPanel] = useState<'systems' | 'layers' | 'search' | 'save' | null>(null);
   const [query, setQuery] = useState('');
+  const [showAbout, setShowAbout] = useState(false);
+  const place = notePlace(explore);
+  const [note, setNote] = useState(() => readNote(place));
+  const [views, setViews] = useState<SavedView[]>(() => readViews());
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [saved, setSaved] = useState('');
+  useEffect(() => { setNote(readNote(place)); setSaved(''); setShowAbout(false); }, [place]);
   const organ = exploreOrgan(explore.organId);
   const caption = micro ? microCaption(micro) : null;
   const blood = micro?.kind === 'histology' ? micro.slide.tissueType === 'BLOOD' : micro?.kind === 'hyperscope' && micro.cell?.tissueType === 'BLOOD';
@@ -76,7 +87,9 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   const atBody = explore.level === 'BODY';
   const system = BODY_SYSTEMS.find((s) => s.id === onlySystem);
   const title = caption?.title ?? structure?.label ?? organ?.label ?? (explore.regionId ? REGION_LABEL[explore.regionId] : system ? `Układ ${system.label.toLowerCase()}` : 'Ciało człowieka');
-  const detail = caption?.detail ?? structure?.detail ?? organ?.role
+  const about = organ ? ORGAN_ABOUT[organ.id] : undefined;
+  const subtitle = caption ? null : structure && organ ? organ.label : about?.system ?? (structure && explore.system ? SYSTEM_PL[explore.system] : null);
+  const detail = caption?.detail ?? (showAbout && about && !structure ? about.about : null) ?? structure?.detail ?? organ?.role
     ?? (explore.level === 'REGION' ? 'Dotknij narządu, mięśnia, kości albo nazwy. Warstwy zdejmują to, co leży na wierzchu.' : 'Dotknij części ciała albo wybierz układ. Każdą strukturę można też wyszukać.');
   const microscopeOk = Boolean(organ?.explorerOrganId);
   const ladderOn = microscopeOk && (explore.level === 'ORGAN' || explore.level === 'STRUCTURE') && !blood;
@@ -86,9 +99,27 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
     : atBody ? []
       : explore.level === 'REGION'
         ? [['section', sectionOn ? 'Zamknij przekrój' : 'Przekrój', true], ['blood', 'Krew', true]]
-        : [['microscope', 'Mikroskop', microscopeOk], ['section', sectionOn ? 'Zamknij przekrój' : 'Przekrój', true], ['isolate', isolated ? 'W ciele' : 'Osobno', microscopeOk], ['blood', 'Krew', true]];
+        : [['microscope', 'Histologia', microscopeOk], ['isolate', isolated ? 'W ciele' : 'Widok 3D', microscopeOk], ['section', sectionOn ? 'Zamknij przekrój' : 'Przekrój', true],
+          ['vessels', 'Unaczynienie', true], ['nerves', 'Nerwy', true], ['function', 'Funkcja', Boolean(about) && !structure], ['blood', 'Krew', true]];
+  const isOn = (id: ExploreAction): boolean => (id === 'section' && sectionOn) || (id === 'isolate' && isolated)
+    || (id === 'vessels' && onlySystem === 'circulatory') || (id === 'nerves' && onlySystem === 'nervous') || (id === 'function' && showAbout);
+  const act = (id: ExploreAction): void => {
+    if (id === 'vessels') { onSystem(onlySystem === 'circulatory' ? null : 'circulatory'); return; }
+    if (id === 'nerves') { onSystem(onlySystem === 'nervous' ? null : 'nervous'); return; }
+    if (id === 'function') { setShowAbout(!showAbout); return; }
+    onAction(id);
+  };
+  const takePhoto = (): void => {
+    const png = onPhoto();
+    setPhoto(png);
+    setSaved(png ? 'Zdjęcie gotowe: zapisz je poniżej.' : 'Nie udało się zrobić zdjęcia tego widoku.');
+  };
+  const keepView = (): void => {
+    setViews(saveView({ title: crumbs.join(' › '), explore, onlySystem, peeled }));
+    setSaved('Widok zapisany w tej przeglądarce.');
+  };
   const results = panel === 'search' ? search(query) : [];
-  const toggle = (id: 'systems' | 'layers' | 'search'): void => setPanel(panel === id ? null : id);
+  const toggle = (id: 'systems' | 'layers' | 'search' | 'save'): void => setPanel(panel === id ? null : id);
   return (
     <div className="ax-hud" data-testid="anatomy-hud" data-level={explore.level} data-micro={micro?.kind ?? ''}>
       {!atBody && <nav className="ax-crumbs" aria-label="Gdzie jesteś">
@@ -100,6 +131,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
           <button type="button" className={`ax-tab${panel === 'systems' ? ' is-on' : ''}`} aria-expanded={panel === 'systems'} onClick={() => toggle('systems')} data-testid="anatomy-tab-systems">Układy{system ? `: ${system.label}` : ''}</button>
           <button type="button" className={`ax-tab${panel === 'layers' ? ' is-on' : ''}`} aria-expanded={panel === 'layers'} onClick={() => toggle('layers')} data-testid="anatomy-tab-layers">Warstwy{peeled.length ? ` (−${peeled.length})` : ''}</button>
           <button type="button" className={`ax-tab${panel === 'search' ? ' is-on' : ''}`} aria-expanded={panel === 'search'} onClick={() => toggle('search')} data-testid="anatomy-tab-search">Szukaj</button>
+          <button type="button" className={`ax-tab${panel === 'save' ? ' is-on' : ''}`} aria-expanded={panel === 'save'} onClick={() => toggle('save')} data-testid="anatomy-tab-save">Notatki</button>
         </div>
         <section className={`ax-pop${panel === 'systems' ? ' is-open' : ''}`} aria-label="Układy ciała" data-panel="systems">
           <h3>Układy ciała</h3>
@@ -121,6 +153,22 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
           <ul className="ax-results">{results.map((r) => <li key={r.name}><button type="button" className="ax-item" onClick={() => { onFind(r); setPanel(null); setQuery(''); }} data-testid="anatomy-result">{r.label}<small>{SYSTEM_PL[r.system] ?? r.system} · {REGION_LABEL[r.regionId]}</small></button></li>)}</ul>
           {panel === 'search' && query.trim().length >= 2 && results.length === 0 && <p className="ax-note">Nic nie znaleziono.</p>}
         </section>
+        <section className={`ax-pop${panel === 'save' ? ' is-open' : ''}`} aria-label="Notatki i widoki" data-panel="save">
+          <h3>Dodaj notatkę</h3>
+          <textarea className="ax-note-input" rows={3} placeholder={`Notatka: ${title}`} value={note} onChange={(e) => setNote(e.target.value)} aria-label="Notatka do tego miejsca" data-testid="anatomy-note" />
+          <span className="ax-surfaces">
+            <button type="button" className="ax-surf" onClick={() => setSaved(writeNote(place, note) ? 'Notatka zapisana w tej przeglądarce.' : 'Ta przeglądarka nie pozwala zapisywać.')} data-testid="anatomy-note-save">Zapisz notatkę</button>
+            <button type="button" className="ax-surf" onClick={keepView} data-testid="anatomy-view-save">Zapisz widok</button>
+            <button type="button" className="ax-surf" onClick={takePhoto} data-testid="anatomy-photo">Zrób zdjęcie</button>
+          </span>
+          {saved && <p className="ax-note" role="status" data-testid="anatomy-saved">{saved}</p>}
+          {photo && <a className="ax-photo" href={photo} download={`genesis-${title.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.png`} data-testid="anatomy-photo-link"><img src={photo} alt={`Zdjęcie widoku: ${title}`} />Pobierz zdjęcie</a>}
+          {views.length > 0 && <><h3>Zapisane widoki</h3>
+            <ul className="ax-results">{views.map((v) => <li key={v.id} className="ax-view">
+              <button type="button" className="ax-item" onClick={() => { onRestore(v); setPanel(null); }} data-testid="anatomy-view">{v.title}<small>{new Date(v.savedAt).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</small></button>
+              <button type="button" className="ax-x" aria-label={`Usuń widok ${v.title}`} onClick={() => setViews(deleteView(v.id))}>×</button>
+            </li>)}</ul></>}
+        </section>
       </aside>
       {ladderOn && <nav className="ax-ladder" aria-label="Od makro do mikro" data-testid="anatomy-ladder">
         {LADDER.map(([level, label, scale]) => <button key={level} type="button" className={`ax-rung${currentRung === level ? ' is-on' : ''}`} aria-current={currentRung === level ? 'step' : undefined} disabled={busy} onClick={() => onLadder(level)} data-testid={`anatomy-rung-${level}`}><strong>{label}</strong><small>{scale}</small></button>)}
@@ -128,12 +176,13 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
       <section className="ax-sheet" aria-live="polite" data-testid="anatomy-sheet">
         <div className="ax-name">
           <strong data-testid="anatomy-name">{title}</strong>
+          {subtitle && <em data-testid="anatomy-system">{subtitle}</em>}
           {detail && <span data-testid="anatomy-detail">{detail}</span>}
         </div>
         {(actions.length > 0 || micro?.kind === 'hyperscope') && <div className="ax-row">
           {micro?.kind === 'hyperscope' && MAGNIFICATIONS.map((m) => <button key={m} type="button" className={`ax-act${micro.capture.request.magnification === m ? ' is-on' : ''}`} disabled={busy} onClick={() => onMagnify(m)} data-testid={`anatomy-mag-${m}`}>{m}×</button>)}
           {actions.filter(([, , ok]) => ok).map(([id, label]) => (
-            <button key={id} type="button" className={`ax-act${id === 'microscope' ? ' is-primary' : ''}${(id === 'section' && sectionOn) || (id === 'isolate' && isolated) ? ' is-on' : ''}`} disabled={busy && id !== 'section'} onClick={() => onAction(id)} data-testid={`anatomy-${id}`}>{busy && id === 'microscope' ? 'Trwa…' : label}</button>
+            <button key={id} type="button" className={`ax-act${id === 'microscope' ? ' is-primary' : ''}${isOn(id) ? ' is-on' : ''}`} aria-pressed={isOn(id)} disabled={busy && (id === 'microscope' || id === 'blood' || id === 'isolate')} onClick={() => act(id)} data-testid={`anatomy-${id}`}>{busy && id === 'microscope' ? 'Trwa…' : label}</button>
           ))}
         </div>}
       </section>

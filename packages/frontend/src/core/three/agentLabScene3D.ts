@@ -181,7 +181,13 @@ export class AgentLabScene3D implements Sim3D {
   private onOrganPicked: ((nodeId: string) => void) | null = null;
   private lastPickedNode: string | null = null;
   setOrganPickListener(listener: ((nodeId: string) => void) | null): void { this.onOrganPicked = listener; }
+  private onPartPicked: ((selection: { part: string | null; region: string | null }) => void) | null = null;
+  private dragFrom: { x: number; y: number; moved: boolean } | null = null;
+  setPartPickListener(listener: ((selection: { part: string | null; region: string | null }) => void) | null): void { this.onPartPicked = listener; }
+  /** The close-up region chips: light one region (null shows the whole organ again). */
+  selectCloseUpRegion(regionId: string | null): void { this.macroMicro?.selectRegion(regionId); this.onPartPicked?.(this.macroMicro?.getSelection() ?? { part: null, region: null }); }
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+    if (this.pointerCloseUp(x, y, type)) return;
     if (type !== 'up' || !this.THREE || !this.pickCamera || !this.renderer || this.cameraMode !== 'TWIN') return;
     const canvas = this.renderer.domElement;
     const ray = new this.THREE.Raycaster();
@@ -194,6 +200,32 @@ export class AgentLabScene3D implements Sim3D {
     });
     const id = hit?.object.userData.nodeId;
     if (typeof id === 'string') { this.lastPickedNode = id; this.onOrganPicked?.(id); }
+  }
+
+  /** Organ close-up: drag turns it, a tap names the structure under the finger. True when handled. */
+  private pointerCloseUp(x: number, y: number, type: 'down' | 'move' | 'up'): boolean {
+    const layer = this.macroMicro;
+    if (!layer?.group.visible || !this.THREE || !this.pickCamera || !this.renderer) return false;
+    const parts = layer.partMeshes();
+    if (parts.length === 0) return false;
+    if (type === 'down') { this.dragFrom = { x, y, moved: false }; return true; }
+    if (type === 'move') {
+      if (!this.dragFrom) return false;
+      const dx = x - this.dragFrom.x;
+      if (Math.abs(dx) > 4 || this.dragFrom.moved) { layer.rotateBy(dx * 0.012); this.dragFrom = { x, y, moved: true }; }
+      return true;
+    }
+    const drag = this.dragFrom; this.dragFrom = null;
+    if (drag?.moved) return true;
+    const canvas = this.renderer.domElement;
+    const ray = new this.THREE.Raycaster();
+    ray.setFromCamera(new this.THREE.Vector2(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2), this.pickCamera);
+    const hit = ray.intersectObjects(parts, false).find((c) => ((c.object as THREE_NS.Mesh).material as THREE_NS.Material).opacity > 0.5);
+    const name = hit?.object.userData.partName;
+    if (typeof name !== 'string') return false;
+    layer.selectPart(layer.getSelection().part === name ? null : name);
+    this.onPartPicked?.(layer.getSelection());
+    return true;
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void { this.renderMetrics = metrics; }
@@ -291,7 +323,7 @@ export class AgentLabScene3D implements Sim3D {
     const abort = new AbortController(); this.fullAtlasAbort = abort;
     this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'LOADING' });
     loadFullAtlas(THREE, abort.signal).then((atlas) => {
-      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); for (const o of atlas.organs?.values() ?? []) o.geometry.dispose(); return; }
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); for (const o of atlas.organs?.values() ?? []) for (const part of o.parts) part.geometry.dispose(); return; }
       this.fullAtlasAbort = null; this.fullAtlas = atlas;
       for (const t of this.twins) t.applyFullAtlas(atlas);
       this.macroMicro?.setAtlasOrgans(atlas.organs ?? null);
@@ -1010,14 +1042,15 @@ export class AgentLabScene3D implements Sim3D {
       // the view narrows — one isolated organ, or an active section — and eases back out when it widens.
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
-      if (this.chamberGlass) this.chamberGlass.visible = false;
+      if (this.chamberGlass) this.chamberGlass.visible = this.macroMicro?.group.visible !== true;
       if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
       // Portrait leaves room for the lower dock; an isolate/section moves closer to the torso.
       const portrait = camera.aspect < 1;
       const macroVisible = this.macroMicro?.group.visible === true;
-      const dist = portrait ? (macroVisible ? 3.1 : tight ? 3.0 : 4.0) : (macroVisible ? 1.7 : tight ? 2.3 : 2.5);
+      // The close-up is the subject: close enough that the organ fills the free middle of the screen.
+      const dist = portrait ? (macroVisible ? 2.05 : tight ? 3.0 : 3.45) : (macroVisible ? 1.35 : tight ? 2.3 : 2.5);
       // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
       const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
       const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : macroVisible ? 1.58 : tight ? 1.45 : 1.4;
@@ -1028,7 +1061,7 @@ export class AgentLabScene3D implements Sim3D {
       this.twinCamPos.lerp(this.scratchA, cameraEase(5));
       const panelOffset = subjectOffset + (this.researchLayoutOpen && !portrait ? 0.35 : 0);
       // Portrait keeps the subject in the upper half, above the lower research dock.
-      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : macroVisible ? 1.42 : portrait ? 1.03 : 1.08;
+      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : macroVisible ? (portrait ? 1.22 : 1.42) : portrait ? 1.03 : 1.08;
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, lookY, TWIN_CHAMBER.position.z);
       this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
@@ -1133,7 +1166,7 @@ export class AgentLabScene3D implements Sim3D {
     this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
     this.fullAtlasAbort?.abort(); this.fullAtlasAbort = null; this.fullAtlasState = FULL_ATLAS_IDLE;
     for (const sys of this.fullAtlas?.systems ?? []) sys.geometry.dispose();
-    for (const organ of this.fullAtlas?.organs?.values() ?? []) organ.geometry.dispose();
+    for (const organ of this.fullAtlas?.organs?.values() ?? []) for (const part of organ.parts) part.geometry.dispose();
     this.fullAtlas = null;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;

@@ -56,8 +56,14 @@ export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPar
   brain: (p) => p.system === 'nervous' && p.bounds[0]![1]! > 1.35 && !/nerve|ganglion|branch|spinal/i.test(p.name),
 };
 
-export interface FullAtlasOrganMesh {
+export interface FullAtlasOrganPart {
+  readonly name: string;
   readonly geometry: THREE_NS.BufferGeometry;
+}
+
+/** One organ's structures, each its own geometry so a tap in the close-up can name it. */
+export interface FullAtlasOrganMesh {
+  readonly parts: readonly FullAtlasOrganPart[];
   readonly partCount: number;
 }
 
@@ -70,7 +76,7 @@ export interface FullAtlasSystemMesh {
 
 export interface LoadedFullAtlas {
   readonly systems: readonly FullAtlasSystemMesh[];
-  /** Organ id → that organ's own atlas structures merged (see FULL_ATLAS_ORGAN_PARTS). */
+  /** Organ id → that organ's own atlas structures (see FULL_ATLAS_ORGAN_PARTS). */
   readonly organs?: ReadonlyMap<string, FullAtlasOrganMesh>;
   readonly structures: number;
   readonly concepts: number;
@@ -163,7 +169,7 @@ export async function loadFullAtlas(
   const organs = new Map<string, FullAtlasOrganMesh>();
   for (const [organId, selects] of Object.entries(FULL_ATLAS_ORGAN_PARTS)) {
     const parts = manifest.parts.filter(selects);
-    if (parts.length) organs.set(organId, { geometry: mergeSystemParts(THREE, parts, buffers), partCount: parts.length });
+    if (parts.length) organs.set(organId, { parts: parts.map((p) => ({ name: p.name, geometry: mergeSystemParts(THREE, [p], buffers) })), partCount: parts.length });
   }
   return {
     systems,

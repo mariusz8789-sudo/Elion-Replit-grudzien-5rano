@@ -495,6 +495,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     });
     return () => sim.setOrganPickListener(null);
   }, [sim, controller, nextLogicalTime, submitCommands]);
+  const [closeUp, setCloseUp] = useState<{ part: string | null; region: string | null }>({ part: null, region: null });
+  useEffect(() => { sim.setPartPickListener(setCloseUp); return () => sim.setPartPickListener(null); }, [sim]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
   const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
@@ -1038,6 +1040,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
           twinContext={twinContext}
+          closeUp={closeUp} onCloseUpRegion={(id) => sim.selectCloseUpRegion(id)}
           surface={surface} onSurface={applySurface}
           subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
           researchControls={<>{commandControls}{researchControls}</>}

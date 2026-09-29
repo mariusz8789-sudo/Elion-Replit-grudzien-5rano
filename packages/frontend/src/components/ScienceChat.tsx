@@ -39,6 +39,7 @@ import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
 import { UnifiedResearchJourney } from './UnifiedResearchJourney';
+import { CHAT_ENGINES, type ChatEngine } from '../core/scienceChat/engines';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -348,12 +349,6 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
  * router as any other message; each was checked in the browser to land on the
  * screen its label names.
  */
-const ASK_EXAMPLES = [
-  { label: 'Open a molecule in 3D', prompt: 'Show molecule lab' },
-  { label: 'Explore a human organ', prompt: 'Show brain' },
-  { label: 'Inspect CMS data', prompt: 'Open real CMS data' },
-  { label: 'Run a physics experiment', prompt: 'Run a three-body simulation' },
-] as const;
 
 function TurnText({ turn }: { turn: ChatTurn }) {
   if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
@@ -377,6 +372,9 @@ function TurnText({ turn }: { turn: ChatTurn }) {
 export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [engineId, setEngineId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickEngine = (engine: ChatEngine): void => { setEngineId(engine.id); setInput(engine.prompt); inputRef.current?.focus(); };
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
@@ -1025,9 +1023,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         {turns.length === 0 && (
           <section className="science-chat-empty" aria-label="Ask Genesis" lang="en">
             <span>ASK</span>
-            <h2>What do you want to investigate?</h2>
-            <p>Describe the research task. Genesis routes it to an available model, engine or verified workflow.</p>
-            <div data-testid="ask-examples">{ASK_EXAMPLES.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+            <h2>Choose an engine</h2>
+            <p>It fills in a task Genesis can run. Nothing starts until you send it.</p>
+            <div className="sc-engine-grid" data-testid="chat-engines">{CHAT_ENGINES.map((e) => (
+              <button key={e.id} type="button" data-testid={`chat-engine-${e.id}`} onClick={() => pickEngine(e)}><b>{e.task}</b><small>{e.engine}</small></button>
+            ))}</div>
           </section>
         )}
         {turns.map((t, i) => (
@@ -1080,12 +1080,20 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
+      {turns.length > 0 && (
+        <div className="sc-engine-row" data-testid="chat-engine-row" aria-label="Engine">
+          {CHAT_ENGINES.map((e) => (
+            <button key={e.id} type="button" className={engineId === e.id ? 'on' : undefined} aria-pressed={engineId === e.id} onClick={() => pickEngine(e)}>{e.engine}</button>
+          ))}
+        </div>
+      )}
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
+          ref={inputRef}
           placeholder="Describe the research task…"
           aria-label="Wiadomość do Science Chat"
         />

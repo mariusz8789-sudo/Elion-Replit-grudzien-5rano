@@ -1,0 +1,27 @@
+{
+ "pdbId": "7CNQ",
+ "ligand": "G8X",
+ "seeds": [
+  42,
+  1042,
+  2042,
+  3042,
+  4042
+ ],
+ "inputs": {
+  "ok": true,
+  "cif": "/tmp/claude-0/pb-bench/structures/raw_from_pdb/7cnq.cif",
+  "pdb": "/tmp/claude-0/run8/data/7cnq.pdb",
+  "sourceCifSha256": "2930eaec84ca566844e0724ef1abc4a50127b1fb21ff8be6febe9746fc2ef598",
+  "receptorInputPdbSha256": "5bbdf49b9d01c6769654e98866d50ff7bcece65e71b08a33fb00954ec3a54b9a"
+ },
+ "status": "PREPARATION_FAILED",
+ "error": "no_ccd_template_with_13_heavy_atoms",
+ "seedRuns": [],
+ "pool": [],
+ "poolSize": 0,
+ "gninaOrdered": [],
+ "anyNativeLike": false,
+ "top1Success": false,
+ "wallClockSeconds": 0.3
+}

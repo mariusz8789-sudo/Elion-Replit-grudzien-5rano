@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MORE_ITEMS, MORE_SECTIONS, NAV_ITEMS, NAV_SECTIONS, activeNavId, navVariants } from '../core/navigation';
+import { MORE_ITEMS, MORE_SECTIONS, NAV_ITEMS, NAV_SECTIONS, RESEARCH_TOPICS, activeNavId, navVariants } from '../core/navigation';
+import { resolveLaunch, resolvedResearchTopics } from '../core/researchLauncher';
+import { getGenesisCapability } from '../core/capabilities/genesisCapabilityRegistry';
+import { buildDestinationIndex, filterSearchIndex } from '../core/search';
 
 /**
  * NAVIGATION ↔ ROUTER CONSISTENCY.
@@ -127,5 +130,44 @@ describe('the main menu is the owner\'s list, in his order', () => {
     ]);
     const main = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.hash)));
     expect(MORE_ITEMS.filter((item) => item.hash !== undefined && main.has(item.hash))).toEqual([]);
+  });
+});
+
+describe('Research Launcher: five topics, only runnable actions, every one routed', () => {
+  const routes = routerHashes();
+  const routable = (hash: string): boolean =>
+    /^#\/lab\/[\w-]+$/.test(hash) || [...routes].some((r) => r === hash || hash.startsWith(r));
+
+  it('shows the five topics in order, each with at least two runnable actions', () => {
+    expect(resolvedResearchTopics().map((t) => t.topic.label)).toEqual(['Drug Discovery', 'Molecules', 'Human Biology', 'CERN', 'Physics']);
+    for (const { topic, actions } of resolvedResearchTopics()) {
+      expect(actions.length, topic.id).toBeGreaterThanOrEqual(2);
+      expect(actions.length, topic.id).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('every configured action resolves: a real route, or an existing chat command on a FABRIC/CUSTOM_FLOW capability', () => {
+    for (const topic of RESEARCH_TOPICS) {
+      for (const action of topic.actions) {
+        const resolved = resolveLaunch(action);
+        expect(resolved, `${topic.id}: ${action.label}`).not.toBeNull();
+        if (resolved!.hash) expect(routable(resolved!.hash), resolved!.hash).toBe(true);
+        else expect(resolved!.chatCommand).toBeTruthy();
+      }
+    }
+  });
+
+  it('readiness comes from the registry: a capability that is not AVAILABLE/PARTIAL is never shown', () => {
+    expect(getGenesisCapability('virtual-animals')?.readiness).toBe('NOT_IMPLEMENTED');
+    expect(resolveLaunch({ label: 'x', target: { kind: 'capability', capabilityId: 'virtual-animals' } })).toBeNull();
+    expect(resolveLaunch({ label: 'x', target: { kind: 'capability', capabilityId: 'genesis-9d' } })).toBeNull();
+    expect(resolveLaunch({ label: 'x', target: { kind: 'chat', capabilityId: 'cern-cms-open-data', command: 'x' } })).toBeNull();
+  });
+
+  it('search lists the same capabilities as the menu and the launcher', () => {
+    const index = buildDestinationIndex();
+    for (const item of NAV_SECTIONS[0]!.items) if (item.hash && item.hash !== '#/') expect(index.some((e) => e.hash === item.hash), item.id).toBe(true);
+    expect(filterSearchIndex(index, 'imatinib').some((e) => e.hash === '#/discovery-track' || e.hash === '#/drug')).toBe(true);
+    expect(filterSearchIndex(index, 'kompleks').some((e) => e.hash === '#/cern-complex')).toBe(true);
   });
 });

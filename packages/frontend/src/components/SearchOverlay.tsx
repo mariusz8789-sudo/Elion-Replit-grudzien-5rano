@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildDestinationIndex, buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
 import { track } from '../core/analytics';
+import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { useFocusTrap } from '../core/useFocusTrap';
 
 /**
@@ -29,7 +30,8 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => setActive(0), [query]);
 
   const go = (e: SearchEntry) => {
-    window.location.hash = e.hash ?? `#/lab/${e.labId}`;
+    if (e.command) requestOpenScienceChat(e.command);
+    else window.location.hash = e.hash ?? `#/lab/${e.labId}`;
     onClose();
   };
 

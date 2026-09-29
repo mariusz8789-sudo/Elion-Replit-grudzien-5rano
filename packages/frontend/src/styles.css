@@ -4761,6 +4761,22 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .science-chat-empty > div { display: flex; justify-content: center; flex-wrap: wrap; gap: .45rem; }
 .science-chat-empty button { padding: .48rem .8rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); background: rgba(92, 214, 232, .06); cursor: pointer; }
 .science-chat-empty button:hover { border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
+/* Research Launcher: the chat's empty state. Five topics, each opening 2–3 real actions. */
+.research-launcher { width: min(100%, 40rem); margin: 0 auto; padding: .9rem .75rem; }
+.research-launcher h2 { margin: 0 0 .3rem; font-size: clamp(1.2rem, 4vw, 1.6rem); }
+.research-launcher p { margin: 0 0 .8rem; color: var(--text-dim); font-size: .82rem; line-height: 1.45; }
+.rl-topics { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; grid-template-columns: 1fr; }
+@media (min-width: 400px) { .rl-topics { grid-template-columns: 1fr 1fr; } .rl-topic.is-open { grid-column: 1 / -1; } }
+.rl-topic { border: 1px solid var(--border-strong); border-radius: .7rem; background: rgba(92, 214, 232, .04); overflow: hidden; }
+.rl-topic.is-open { border-color: var(--cyan); }
+.rl-topic-head { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 3rem; padding: .5rem .75rem; text-align: left; color: var(--text); background: none; border: 0; cursor: pointer; font-size: .9rem; }
+.rl-topic-head strong { flex: 1; font-weight: 600; }
+.rl-chevron { color: var(--text-faint); font-family: var(--font-mono); }
+.rl-actions { display: grid; gap: .3rem; padding: 0 .5rem .55rem; }
+.rl-action { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .45rem .65rem; border: 1px solid var(--border); border-radius: .55rem; background: rgba(0, 0, 0, .25); color: var(--text); text-align: left; cursor: pointer; font-size: .84rem; }
+.rl-action:hover { border-color: var(--cyan); }
+.rl-action > span:first-child { flex: 1; min-width: 0; }
+.rl-action small { flex: none; color: var(--text-faint); font: 600 .58rem/1.2 var(--font-mono); letter-spacing: .06em; }
 .sc-long-answer > summary { cursor: pointer; list-style: none; display: grid; gap: .55rem; }
 .sc-long-answer > summary::-webkit-details-marker { display: none; }
 .sc-long-answer > summary b { color: var(--cyan); font: 650 .68rem/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }

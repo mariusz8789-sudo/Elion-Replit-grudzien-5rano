@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ResearchLauncher } from './ResearchLauncher';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
@@ -342,12 +343,6 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
     </section>
   );
 }
-
-const QUICK_STARTS = [
-  { label: 'Lek', prompt: 'Porównaj właściwości aspiryny w laboratorium.' },
-  { label: 'Chemia', prompt: 'Uruchom miareczkowanie kwasowo-zasadowe NaOH.' },
-  { label: 'Fizyka', prompt: 'Pokaż czarną dziurę 3D i trajektorię światła.' },
-] as const;
 
 function TurnText({ turn }: { turn: ChatTurn }) {
   if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
@@ -968,8 +963,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
   // Lets another screen (the Matrix dashboard) surface THIS SAME chat instance —
   // reusing every real state/handler above — instead of a second chat surface.
+  // On Home the chat is inline at the bottom of the page, so "open" means bring it into view.
+  const rootRef = useRef<HTMLElement>(null);
   useEffect(() => subscribeScienceChatOpenRequests((request) => {
     setOpen(true);
+    rootRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     if (request.message) void send(request.message);
   }), []);
 
@@ -985,6 +983,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
   return (
     <aside
+      ref={rootRef}
       className={inline ? 'science-chat science-chat-inline' : 'science-chat'}
       data-testid={inline ? 'science-chat-inline' : 'science-chat-drawer'}
       role={inline ? 'region' : 'dialog'}
@@ -1017,12 +1016,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <div className="science-chat-log" ref={scrollRef}>
         {turns.length === 0 && (
-          <section className="science-chat-empty" aria-label="Rozpocznij badanie">
-            <span>ONE CHAT · ONE LAB</span>
-            <h2>Co chcesz zbadać?</h2>
-            <p>Opisz cel. Genesis wybierze właściwe laboratorium i pokaże wynik.</p>
-            <div>{QUICK_STARTS.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
-          </section>
+          <ResearchLauncher
+            onNavigate={(hash) => { window.location.hash = hash; setOpen(false); }}
+            onCommand={(command) => void send(command)}
+          />
         )}
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>

@@ -37,7 +37,7 @@ describe('search index', () => {
 
   it('finds CERN, drugs and the human atlas, which are screens, not plugin labs', () => {
     const index = buildDestinationIndex();
-    expect(filterSearchIndex(index, 'cern').map((e) => e.hash)).toEqual(['#/cern-complex', '#/physics/cms-z']);
+    expect(filterSearchIndex(index, 'cern').map((e) => e.hash).sort()).toEqual(['#/cern-complex', '#/physics/cms-z']);
     expect(filterSearchIndex(index, 'leki').map((e) => e.hash)).toContain('#/drug');
     expect(filterSearchIndex(index, 'mózg').map((e) => e.hash)).toContain('#/human-biology-lab');
   });

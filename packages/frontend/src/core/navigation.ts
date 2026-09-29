@@ -40,6 +40,8 @@ export interface NavItem {
   readonly description?: string;
   /** An alternative screen of the capability with this id: listed folded under it, never at top level. */
   readonly variantOf?: string;
+  /** Extra search words (Polish and English) for the global search. */
+  readonly keywords?: string;
 }
 
 export interface NavSection {
@@ -62,12 +64,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       { id: 'home', label: 'Genesis', icon: '◉', hash: '#/', primary: true, description: 'Start: co Genesis sprawdza i jak to zweryfikować' },
       { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Jeden dialog prowadzący całe badanie' },
-      { id: 'science', label: 'Drug Discovery', icon: '💊', hash: '#/drug', description: 'Docking, retrosynteza, Evidence i Replay' },
-      { id: 'human-biology-lab', label: 'Human Explorer', icon: '🧍', hash: '#/human-biology-lab', description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
-      { id: 'reviewer', label: 'Reviewer Room', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
-      { id: 'evidence', label: 'Evidence & Replay', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
+      { id: 'science', label: 'Drug Discovery', icon: '💊', hash: '#/drug', description: 'Docking, retrosynteza, Evidence i Replay', keywords: 'leki lek chemia docking imatinib vina' },
+      { id: 'human-biology-lab', label: 'Human Explorer', icon: '🧍', hash: '#/human-biology-lab', description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka', keywords: 'człowiek ciało szkielet mózg narząd anatomia biologia' },
+      { id: 'reviewer', label: 'Reviewer Room', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN', keywords: 'recenzent dowód podpis csrn' },
+      { id: 'evidence', label: 'Evidence & Replay', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie', keywords: 'dowód replay powtórzenie' },
       { id: 'scientific-worlds', label: 'Laboratorium', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
-      { id: 'cms-open-data', label: 'CERN / CMS Open Data', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
+      { id: 'cms-open-data', label: 'CERN / CMS Open Data', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC', keywords: 'cern cms bozon mion fizyka cząstki open data' },
       { id: 'discover', label: 'Research Console', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
     ],
   },
@@ -209,3 +211,59 @@ export function activeNavId(hash: string): string | null {
   }
   return best ? best.id : null;
 }
+
+/* ==========================================================================
+   RESEARCH LAUNCHER — the five research topics shown in Zapytaj and search.
+   This is presentation only: which topics, in which order, with which labels.
+   Whether an action runs, and what kind of knowledge it yields, comes from
+   genesisCapabilityRegistry; routes come from the menu above or the router.
+   An action whose capability is not AVAILABLE/PARTIAL is not shown.
+   ========================================================================== */
+
+export type LaunchTarget =
+  /** An entry of this menu (its hash). */
+  | { readonly kind: 'nav'; readonly navId: string }
+  /** A registry capability, opened at its visualizationRoute. */
+  | { readonly kind: 'capability'; readonly capabilityId: string }
+  /** A FABRIC / CUSTOM_FLOW capability, started through the one Science Chat with an existing command. */
+  | { readonly kind: 'chat'; readonly capabilityId: string; readonly command: string }
+  /** A routed screen that has no menu entry of its own (e.g. the verified discovery track). */
+  | { readonly kind: 'route'; readonly hash: string };
+
+export interface ResearchAction { readonly label: string; readonly target: LaunchTarget; /** Extra (Polish) search words. */ readonly keywords?: string }
+export interface ResearchTopic { readonly id: string; readonly label: string; readonly icon: string; readonly actions: readonly ResearchAction[] }
+
+export const RESEARCH_TOPICS: readonly ResearchTopic[] = [
+  {
+    id: 'topic-drug', label: 'Drug Discovery', icon: '💊', actions: [
+      { label: 'Open Drug Discovery', target: { kind: 'capability', capabilityId: 'drug-discovery' } },
+      { label: 'Find candidates for BCR-ABL', target: { kind: 'chat', capabilityId: 'drug-discovery', command: 'Znajdź kandydatów dla BCR-ABL (cel imatynibu).' } },
+      { label: 'Verified imatinib example', target: { kind: 'route', hash: '#/discovery-track' }, keywords: 'zweryfikowany przykład imatynib odkrycie' },
+    ],
+  },
+  {
+    id: 'topic-molecules', label: 'Molecules', icon: '🧪', actions: [
+      { label: 'Molecule Lab (3D)', target: { kind: 'nav', navId: 'molecule' }, keywords: 'cząsteczka molekuła chemia' },
+      { label: 'RDKit reference analysis', target: { kind: 'nav', navId: 'precision' }, keywords: 'rdkit właściwości deskryptory' },
+    ],
+  },
+  {
+    id: 'topic-human', label: 'Human Biology', icon: '🧍', actions: [
+      { label: 'Human Explorer: body → organ → tissue → cell', target: { kind: 'nav', navId: 'human-biology-lab' } },
+      { label: 'Smoking and the lungs', target: { kind: 'capability', capabilityId: 'biology-lung-impact' }, keywords: 'płuca palenie papierosy' },
+    ],
+  },
+  {
+    id: 'topic-cern', label: 'CERN', icon: '⚛', actions: [
+      { label: 'CMS Open Data Z→μμ', target: { kind: 'capability', capabilityId: 'cern-cms-open-data' } },
+      { label: 'CERN Complex', target: { kind: 'capability', capabilityId: 'cern-complex' }, keywords: 'kompleks hala tunel detektor lhc' },
+    ],
+  },
+  {
+    id: 'topic-physics', label: 'Physics', icon: '🕳', actions: [
+      { label: 'Black hole', target: { kind: 'capability', capabilityId: 'physics-black-hole' }, keywords: 'czarna dziura' },
+      { label: 'Three-body problem', target: { kind: 'capability', capabilityId: 'physics-three-body' }, keywords: 'trzy ciała' },
+      { label: 'Spacetime', target: { kind: 'capability', capabilityId: 'spacetime' }, keywords: 'czasoprzestrzeń' },
+    ],
+  },
+];

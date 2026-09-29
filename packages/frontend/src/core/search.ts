@@ -1,4 +1,6 @@
 import { getLabs } from './registry';
+import { NAV_SECTIONS } from './navigation';
+import { resolvedResearchTopics } from './researchLauncher';
 
 /**
  * Indeks wyszukiwania globalnego — płaska lista laboratoriów i ich
@@ -17,23 +19,33 @@ export interface SearchEntry {
   keywords: string; // znormalizowany tekst do dopasowania
   /** Set for product screens outside the plugin registry: navigate here instead of `#/lab/<labId>`. */
   hash?: string;
+  /** Set for Research Launcher actions that start an existing Science Chat command instead of navigating. */
+  command?: string;
 }
 
-/** Product screens that are not plugin labs (so the registry never listed them), in grant order. */
-const DESTINATIONS: readonly { hash: string; icon: string; name: string; tagline: string; extra: string }[] = [
-  { hash: '#/drug', icon: '💊', name: 'Drug Discovery', tagline: 'Docking, retrosynteza, Evidence i Replay', extra: 'leki lek chemia docking imatinib vina' },
-  { hash: '#/human-biology-lab', icon: '🧍', name: 'Human Explorer', tagline: 'Atlas człowieka: skóra, szkielet, narządy, mózg', extra: 'czlowiek cialo szkielet mozg narzad anatomia biologia' },
-  { hash: '#/reviewer', icon: '🔎', name: 'Reviewer Room', tagline: 'Sprawdź dowody i podpis CSRN', extra: 'recenzent dowod podpis csrn' },
-  { hash: '#/evidence', icon: '📋', name: 'Evidence & Replay', tagline: 'Pochodzenie wyników i powtórzenie', extra: 'dowod replay powtorzenie' },
-  { hash: '#/cern-complex', icon: '⚛', name: 'Kompleks CERN', tagline: 'Hala, tunel i komora detektora', extra: 'cern lhc fizyka czastki detektor' },
-  { hash: '#/physics/cms-z', icon: '⚛', name: 'CERN CMS Z→μμ', tagline: 'Prawdziwe dane CMS: pik bozonu Z', extra: 'cern cms bozon z mion fizyka czastki open data' },
-];
-
+/**
+ * Product screens that are not plugin labs, read from the ONE navigation model:
+ * the main menu first, then every Research Launcher action (so Zapytaj, the
+ * menu and search list the same capabilities). Plugin labs (`#/lab/<id>`) come
+ * from `buildSearchIndex` and are not repeated here.
+ */
 export function buildDestinationIndex(): SearchEntry[] {
-  return DESTINATIONS.map((d) => ({
-    labId: d.hash, expId: '__base', icon: d.icon, labName: d.name, expName: d.name, tagline: d.tagline, hash: d.hash,
-    keywords: normalize(`${d.name} ${d.tagline} ${d.extra}`),
-  }));
+  const entries: SearchEntry[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, icon: string, name: string, tagline: string, extra: string, target: { hash?: string; command?: string }): void => {
+    if (seen.has(key) || /^#\/lab\//.test(target.hash ?? '')) return;
+    seen.add(key);
+    entries.push({ labId: key, expId: '__base', icon, labName: name, expName: name, tagline, ...target, keywords: normalize(`${name} ${tagline} ${extra}`) });
+  };
+  for (const item of NAV_SECTIONS.flatMap((section) => section.items)) {
+    if (item.hash && item.hash !== '#/') add(item.hash, item.icon, item.label, item.description ?? '', item.keywords ?? '', { hash: item.hash });
+  }
+  for (const { topic, actions } of resolvedResearchTopics()) {
+    for (const action of actions) {
+      add(action.hash ?? `chat:${action.chatCommand}`, topic.icon, action.label, topic.label, `${topic.label} ${action.keywords ?? ''}`, action.hash ? { hash: action.hash } : { command: action.chatCommand });
+    }
+  }
+  return entries;
 }
 
 const PL_MAP: Record<string, string> = {

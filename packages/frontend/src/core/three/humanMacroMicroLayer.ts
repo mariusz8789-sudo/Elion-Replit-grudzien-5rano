@@ -5,6 +5,7 @@ import { CANONICAL_ANATOMY_LAYER_SHELL, type CanonicalAnatomyLayerId } from '../
 import { disposeSceneResources } from './graphics/lifecycle';
 import { attachAnatomyLayerShellMetadata, resolveAnatomyLayerShell, type AnatomyLayerPresentation } from './anatomyIntegrationShell';
 import { addPremiumCellMembraneDetail, addPremiumOrganSurfaceDetail } from './premiumMacroMicroDetails';
+import type { FullAtlasOrganMesh } from './bodyParts3dFullAtlas';
 
 /**
  * V7 — HUMAN MACRO → MICRO VISUAL LAYER.
@@ -124,6 +125,24 @@ function organColor(id: string): number {
   if (/kidney/i.test(id)) return 0x824b52;
   if (/stomach|intestine|pancreas/i.test(id)) return 0xb77968;
   return 0xa76368;
+}
+
+/** The organ close-up from its own BodyParts3D structures, centred and sized like the ellipsoid it replaces. */
+function buildAtlasOrganModel(THREE: typeof THREE_NS, node: AnatomyNode, atlas: FullAtlasOrganMesh): THREE_NS.Group {
+  const root = new THREE.Group(); root.name = `macro-organ:${node.id}`;
+  const rotor = createPresentationStage(THREE, root, 0.7);
+  if (!atlas.geometry.boundingBox) atlas.geometry.computeBoundingBox();
+  const box = atlas.geometry.boundingBox!;
+  const size = box.getSize(new THREE.Vector3()); const centre = box.getCenter(new THREE.Vector3());
+  const displayScale = 0.72 / Math.max(size.x, size.y, size.z, 1e-6);
+  const organ = new THREE.Mesh(atlas.geometry, biologicalMaterial(THREE, organColor(node.id), { emissive: 0x210a0d, roughness: 0.5 }));
+  organ.name = 'organ:bodyparts3d';
+  organ.userData.geometryRole = 'BODYPARTS3D_REFERENCE';
+  organ.userData.structures = atlas.partCount;
+  organ.scale.setScalar(displayScale);
+  organ.position.copy(centre).multiplyScalar(-displayScale);
+  rotor.add(organ);
+  markModel(root, 'organ'); addShadows(root); return root;
 }
 
 function buildOrganModel(THREE: typeof THREE_NS, node: AnatomyNode): THREE_NS.Group {
@@ -370,6 +389,7 @@ export class HumanMacroMicroLayer {
   private artifact: BiologyArtifact | null = null;
   private time = 0;
   private anatomyLayers: readonly AnatomyLayerPresentation[];
+  private atlasOrgans: ReadonlyMap<string, FullAtlasOrganMesh> | null = null;
 
   constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
     this.group = new THREE.Group(); this.group.name = 'genesis-human-macro-micro-layer'; this.group.visible = false;
@@ -407,6 +427,11 @@ export class HumanMacroMicroLayer {
     this.artifact = null; this.rebuild();
   }
 
+  /** Organs with real atlas geometry replace their dimension ellipsoid in the close-up. */
+  setAtlasOrgans(organs: ReadonlyMap<string, FullAtlasOrganMesh> | null): void {
+    this.atlasOrgans = organs; if (!this.artifact) this.rebuild();
+  }
+
   setArtifact(artifact: BiologyArtifact | null): void {
     this.artifact = artifact; this.rebuild();
   }
@@ -427,7 +452,8 @@ export class HumanMacroMicroLayer {
     }
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);
-    this.replace(organ ? buildOrganModel(this.THREE, organ) : null);
+    const atlasOrgan = organ ? this.atlasOrgans?.get(organ.id) : undefined;
+    this.replace(organ ? atlasOrgan ? buildAtlasOrganModel(this.THREE, organ, atlasOrgan) : buildOrganModel(this.THREE, organ) : null);
   }
 
   private refreshAnatomyLayers(): void {

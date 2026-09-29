@@ -9,7 +9,7 @@ describe('Chemistry Live Lab panel', () => {
   it('is reached through the research-mode chemistry entry, which opens the main Laboratory at the titration station', () => {
     const item = NAV_ITEMS.find((i) => i.id === 'chemistry');
     expect(item?.hash).toBe('#/scientific-worlds?station=st-titration');
-    expect(MORE_SECTIONS.find((s) => s.id === 'more-chemistry')?.items.map((i) => i.id)).toContain('chemistry');
+    expect(MORE_SECTIONS.find((s) => s.id === 'more-ls')?.items.map((i) => i.id)).toContain('chemistry');
     expect(NAV_ITEMS.some((i) => i.hash === '#/chemistry-live-lab')).toBe(false);
   });
 

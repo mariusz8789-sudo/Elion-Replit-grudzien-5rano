@@ -123,7 +123,7 @@ export function decideNextAction(counts: Record<MatrixKind, number>): { title: s
     title: 'Przejrzyj pełną mapę w Matrix',
     why: 'Pętla jest domknięta na wszystkich etapach — Matrix pokazuje relacje między nimi.',
     cta: 'Otwórz Genesis Matrix',
-    hash: '#/matrix',
+    hash: '#/matrix-map',
   };
 }
 

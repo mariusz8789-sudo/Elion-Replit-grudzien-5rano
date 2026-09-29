@@ -1,7 +1,8 @@
 import { summary as run3Summary } from '../../../../../docs/evidence/astex-redock-benchmark-2026-09-27-run3.json';
 import { topK, topKDenominator, samplingCeilingInPool, vsVinaBaseline } from '../../../../../docs/evidence/astex-run7-gnina-rescore.json';
 import { summary as redockSummary, engines as redockEngines, protocol as redockProtocol } from '../../../../../docs/evidence/finalist-falsification-2026-09-27.json';
-import { replayVerdict as retroReplay, synthesis as retroSynthesis } from '../../../../../docs/evidence/imatinib-retrosynthesis-2026-09-27.json';
+import { replayVerdict as retroReplay, synthesis as retroSynthesis, run as retroRun, finishedAt as retroFinishedAt } from '../../../../../docs/evidence/imatinib-retrosynthesis-2026-09-27.json';
+import run8Status from '../../../../../docs/evidence/run8-status.json';
 import genesisKeyFile from '../../../../../docs/keys/genesis-csrn-signing-key.json';
 
 /**
@@ -57,6 +58,9 @@ export const IMATINIB = {
   routeSteps: retroSynthesis.topRoute.steps,
   retroEngine: retroSynthesis.engine,
   replay: retroReplay,
+  inputHash: retroRun.inputHash,
+  outputHash: retroRun.outputHash,
+  finishedAt: retroFinishedAt,
   files: {
     redock: 'docs/evidence/finalist-falsification-2026-09-27.json',
     retro: 'docs/evidence/imatinib-retrosynthesis-2026-09-27.json',
@@ -72,3 +76,20 @@ export const CSRN_KEY: { readonly generated: boolean; readonly status: string; r
   status: KEY.status,
   keyId: KEY.keyId,
 };
+
+/**
+ * Run 8, the pre-registered unseen benchmark, as its committed status record
+ * (`docs/evidence/run8-status.json`). The run itself lives on the research branch;
+ * main carries only this status line, dated, so the dashboard never claims
+ * "running" without saying when that was recorded.
+ */
+export const RUN8 = {
+  title: run8Status.title,
+  status: run8Status.status,
+  startedAt: run8Status.startedAt,
+  recordedAt: run8Status.recordedAt,
+  complexes: run8Status.complexes,
+  dataset: run8Status.dataset,
+  seeds: run8Status.seeds,
+  file: 'docs/evidence/run8-status.json',
+} as const;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 
@@ -160,6 +160,13 @@ export function AppShell({ children, chat, chatInline = false }: {
   const menuCloseRef = useRef<HTMLButtonElement>(null);
   /** The research mode, collapsed by default — see MORE_ITEMS. */
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Groups inside "Więcej" that are unfolded; all start folded so the list is group names, not a wall. */
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = (id: string): void => setOpenGroups((open) => {
+    const next = new Set(open);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   /** Capabilities whose alternative screens (variants) are unfolded. */
   const [openVariants, setOpenVariants] = useState<ReadonlySet<string>>(() => new Set());
   const toggleVariants = (id: string): void => setOpenVariants((open) => {
@@ -202,6 +209,10 @@ export function AppShell({ children, chat, chatInline = false }: {
     setMenuOpen(false);
   };
 
+  // The group holding the active screen stays unfolded, so the user sees where they are.
+  const groupUnfolded = (group: { id: string; items: readonly NavItem[] }): boolean =>
+    openGroups.has(group.id) || group.items.some((item) => item.id === active || navVariants(item.id).some((v) => v.id === active));
+
   const sections = (
     <>
       {NAV_SECTIONS.map((section) => (
@@ -218,10 +229,19 @@ export function AppShell({ children, chat, chatInline = false }: {
           <span className="shell-nav-label">{RESEARCH_MODE_LABEL}</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
+          <NavButton item={MORE_OVERVIEW_ITEM} active={active === MORE_OVERVIEW_ITEM.id} onNavigate={() => go(MORE_OVERVIEW_ITEM)} />
           {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
             <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
-              <h3 className="shell-nav-subgroup-title" id={`${group.id}-title`}>{group.label}</h3>
-              {group.items.map((item) => {
+              <button
+                className="shell-nav-group-toggle"
+                id={`${group.id}-title`}
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={groupUnfolded(group)}
+              >
+                <span>{group.label}</span>
+                <span aria-hidden="true">{groupUnfolded(group) ? '−' : '+'}</span>
+              </button>
+              {groupUnfolded(group) && group.items.map((item) => {
                 const variants = navVariants(item.id);
                 // The active screen being a variant keeps its capability unfolded, so the user sees where they are.
                 const unfolded = openVariants.has(item.id) || variants.some((v) => v.id === active);
@@ -293,7 +313,7 @@ export function AppShell({ children, chat, chatInline = false }: {
             onClick={() => go(item)}
           >
             <span aria-hidden="true">{item.icon}</span>
-            <span>{item.label.split(' ')[0]}</span>
+            <span>{item.shortLabel ?? item.label.split(' ')[0]}</span>
           </button>
         ))}
         <button

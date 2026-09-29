@@ -101,13 +101,12 @@ describe('research mode shows one entry per capability; alternative screens fold
 
   it('the known duplicate families collapse to one visible entry each', () => {
     const family = (id: string) => [id, ...navVariants(id).map((v) => v.id)];
-    expect(family('science')).toEqual(expect.arrayContaining(['science', 'discover', 'campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
-    expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'evidence', 'discovery-log']));
+    expect(family('campaign')).toEqual(expect.arrayContaining(['campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
+    expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'discovery-log']));
     expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-map', 'first-person-lab', 'world-director']));
     // CMS Open Data (an offline analysis of one checksummed event file) and the CERN complex (a
     // walk-through world) are two capabilities, not one with a spare view. Only the detector chamber
     // is a view OF the complex, so only it folds.
-    expect(family('cms-open-data')).toEqual(['cms-open-data']);
     expect(family('cern-complex')).toEqual(['cern-complex', 'collider']);
     expect(top.length).toBeLessThanOrEqual(26);
   });
@@ -117,5 +116,25 @@ describe('research mode shows one entry per capability; alternative screens fold
     expect(MORE_ITEMS.find((item) => item.id === 'physics')?.hash).toBe('#/scientific-worlds?station=st-window');
     expect(activeNavId('#/scientific-worlds?station=st-titration')).toBe('chemistry');
     expect(activeNavId('#/scientific-worlds')).toBe('scientific-worlds');
+  });
+});
+
+describe('the main menu is the owner\'s list, in his order', () => {
+  it('lists the eight destinations first, navigation only; everything else sits under "Więcej"', () => {
+    expect(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.label))).toEqual([
+      'Dashboard', 'Drug Discovery', 'Human Explorer', 'Reviewer Room', 'Evidence & Replay',
+      'Laboratory', 'CERN / CMS', 'Research Console',
+    ]);
+    const main = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.hash)));
+    expect(MORE_ITEMS.filter((item) => item.hash !== undefined && main.has(item.hash))).toEqual([]);
+  });
+});
+
+describe('Ask is an action in the bottom bar, not a menu entry', () => {
+  it('bottom bar reads Home, Ask, Lab; the menu has no chat item', async () => {
+    const { ASK_ITEM, PRIMARY_NAV_ITEMS } = await import('../core/navigation');
+    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Home', 'Ask', 'Lab']);
+    expect(ASK_ITEM.kind).toBe('chat');
+    expect(NAV_SECTIONS.flatMap((section) => section.items).some((item) => item.kind === 'chat')).toBe(false);
   });
 });

@@ -34,8 +34,9 @@ test('the one chat freezes the hypothesis and plan, then confirmation runs it li
   }, { t: reg.token, u: reg.user });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-
-  const chat = page.getByTestId('science-chat-inline');
+  // Ask is a separate view since the Dashboard decision (2026-09-29): open the one ScienceChat first.
+  await page.getByRole('button', { name: 'Otwórz Science Chat' }).click();
+  const chat = page.getByTestId('science-chat-drawer');
   await chat.getByLabel('Wiadomość do Science Chat').fill('Find drug candidates for Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1');
   await chat.getByRole('button', { name: 'Wyślij' }).click();
 

@@ -152,6 +152,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour', variantOf: 'investor-demo' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
+  { id: 'account', label: 'Konto — zaloguj się lub załóż konto', icon: '👤', hash: '#/konto', description: 'Logowanie, rejestracja i profil konta (uczeń, student, nauczyciel, badacz, instytucja)' },
   { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
 ];
 
@@ -175,7 +176,7 @@ const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] =
   { id: 'more-physics', label: 'Physics, Quantum & CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
   { id: 'more-worlds', label: 'World & Digital Twin', ids: ['worlds', 'whatif'] },
   { id: 'more-learning', label: 'Education', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
-  { id: 'more-system', label: 'Platform', ids: ['projects', 'settings'] },
+  { id: 'more-system', label: 'Platform', ids: ['account', 'projects', 'settings'] },
   { id: 'more-showcase', label: 'Showcases (experiments)', ids: ['myths-theories', 'decipherment'] },
 ];
 

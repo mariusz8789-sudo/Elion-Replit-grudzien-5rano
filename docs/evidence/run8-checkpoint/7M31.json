@@ -1,0 +1,131 @@
+{
+ "pdbId": "7M31",
+ "ligand": "TDR",
+ "seeds": [
+  42,
+  1042,
+  2042,
+  3042,
+  4042
+ ],
+ "inputs": {
+  "ok": true,
+  "cif": "/tmp/claude-0/pb-bench/structures/raw_from_pdb/7m31.cif",
+  "pdb": "/tmp/claude-0/run8/data/7m31.pdb",
+  "sourceCifSha256": "e11c5c77045063096fbeffbd61b5dae92cd9b46a40cccfdfdd158fb047f0be79",
+  "receptorInputPdbSha256": "10f871bfee3082f0e0117fed673b3a07939bac370bef1ff5a4dfec4cfafe0570"
+ },
+ "listedLigand": "TDR",
+ "inputSha256": "10f871bfee3082f0e0117fed673b3a07939bac370bef1ff5a4dfec4cfafe0570",
+ "run3LigandHeavyAtoms": 9,
+ "rule1": {
+  "rule": "covalentLinkedLigandResidues",
+  "toleranceA": 0.4,
+  "absorbed": [],
+  "nearestRejected": [
+   {
+    "residue": "SF4:B1103",
+    "heavyAtoms": 8,
+    "closestContactA": 15.09,
+    "covalentCutoffA": 2.63,
+    "shortfallA": 12.46
+   },
+   {
+    "residue": "SF4:B1104",
+    "heavyAtoms": 8,
+    "closestContactA": 23.251,
+    "covalentCutoffA": 2.11,
+    "shortfallA": 21.141
+   },
+   {
+    "residue": "FMN:B1108",
+    "heavyAtoms": 31,
+    "closestContactA": 23.339,
+    "covalentCutoffA": 1.72,
+    "shortfallA": 21.619
+   }
+  ],
+  "changed": false
+ },
+ "ligandHeavyAtoms": 9,
+ "ligandResidue": "TDR",
+ "ccdTemplate": "TDR",
+ "ligandElementsFromCcd": 0,
+ "center": [
+  23.741,
+  41.326,
+  48.997
+ ],
+ "boxSize": [
+  20.0,
+  20.0,
+  20.0
+ ],
+ "cofactorsKept": [
+  {
+   "residue": "FMN:A1107",
+   "heavyAtoms": 31,
+   "pdbqtAtoms": 37
+  }
+ ],
+ "cofactorsNotKept": [],
+ "rule2ModifiedResiduesKept": [],
+ "rule2ModifiedResiduesNotTyped": [],
+ "preparation": {
+  "receptorPdb": "/tmp/claude-0/run8/work/7M31/receptor_clean.pdb",
+  "ligandSdf": "/tmp/claude-0/run8/work/7M31/ligand.sdf",
+  "center": [
+   23.741,
+   41.326,
+   48.997
+  ],
+  "boxSize": [
+   20.0,
+   20.0,
+   20.0
+  ],
+  "extraRigidPdbqtPaths": [
+   "/tmp/claude-0/run8/work/7M31/cofactor_FMN_A1107.pdbqt"
+  ],
+  "sharedByAllSeeds": true
+ },
+ "seedRuns": [
+  {
+   "seed": 42,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue GLU corresponding to key C:52",
+   "poses": []
+  },
+  {
+   "seed": 1042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue GLU corresponding to key C:52",
+   "poses": []
+  },
+  {
+   "seed": 2042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue GLU corresponding to key C:52",
+   "poses": []
+  },
+  {
+   "seed": 3042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue GLU corresponding to key C:52",
+   "poses": []
+  },
+  {
+   "seed": 4042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: pdb_to_residue_mols\n    raise RuntimeError(msg) \n    ^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: unable to build rdkit mol for residue GLU corresponding to key C:52",
+   "poses": []
+  }
+ ],
+ "status": "DOCKING_FAILED",
+ "pool": [],
+ "poolSize": 0,
+ "gninaOrdered": [],
+ "anyNativeLike": false,
+ "top1Success": false,
+ "wallClockSeconds": 13.9
+}

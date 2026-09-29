@@ -1,0 +1,101 @@
+{
+ "pdbId": "7QF4",
+ "ligand": "RBF",
+ "seeds": [
+  42,
+  1042,
+  2042,
+  3042,
+  4042
+ ],
+ "inputs": {
+  "ok": true,
+  "cif": "/tmp/claude-0/pb-bench/structures/raw_from_pdb/7qf4.cif",
+  "pdb": "/tmp/claude-0/run8/data/7qf4.pdb",
+  "sourceCifSha256": "91bc1d6ecea74aecf26b17bc237deee31a9d77df8f8522c479ebab6137e82b43",
+  "receptorInputPdbSha256": "26ef2665ebf2e981e00159603ffd8765ca90b037ae38f6a03d5b2cfebf272a28"
+ },
+ "listedLigand": "RBF",
+ "inputSha256": "26ef2665ebf2e981e00159603ffd8765ca90b037ae38f6a03d5b2cfebf272a28",
+ "run3LigandHeavyAtoms": 27,
+ "rule1": {
+  "rule": "covalentLinkedLigandResidues",
+  "toleranceA": 0.4,
+  "absorbed": [],
+  "nearestRejected": [],
+  "changed": false
+ },
+ "ligandHeavyAtoms": 27,
+ "ligandResidue": "RBF",
+ "ccdTemplate": "RBF",
+ "ligandElementsFromCcd": 0,
+ "center": [
+  -0.588,
+  -4.744,
+  -11.573
+ ],
+ "boxSize": [
+  20.0,
+  20.0,
+  20.0
+ ],
+ "cofactorsKept": [],
+ "cofactorsNotKept": [],
+ "rule2ModifiedResiduesKept": [],
+ "rule2ModifiedResiduesNotTyped": [],
+ "preparation": {
+  "receptorPdb": "/tmp/claude-0/run8/work/7QF4/receptor_clean.pdb",
+  "ligandSdf": "/tmp/claude-0/run8/work/7QF4/ligand.sdf",
+  "center": [
+   -0.588,
+   -4.744,
+   -11.573
+  ],
+  "boxSize": [
+   20.0,
+   20.0,
+   20.0
+  ],
+  "extraRigidPdbqtPaths": [],
+  "sharedByAllSeeds": true
+ },
+ "seedRuns": [
+  {
+   "seed": 42,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: ve unknown residues by building chemical templates... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning",
+   "poses": []
+  },
+  {
+   "seed": 1042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: ve unknown residues by building chemical templates... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning",
+   "poses": []
+  },
+  {
+   "seed": 2042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: ve unknown residues by building chemical templates... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning",
+   "poses": []
+  },
+  {
+   "seed": 3042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: ve unknown residues by building chemical templates... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning",
+   "poses": []
+  },
+  {
+   "seed": 4042,
+   "status": "DOCKING_FAILED",
+   "error": "redock_poses_failed: receptor_prep_failed: ve unknown residues by building chemical templates... \n  warnings.warn(\"Trying to resolve unknown residues by building chemical templates... \", RuntimeWarning",
+   "poses": []
+  }
+ ],
+ "status": "DOCKING_FAILED",
+ "pool": [],
+ "poolSize": 0,
+ "gninaOrdered": [],
+ "anyNativeLike": false,
+ "top1Success": false,
+ "wallClockSeconds": 112.6
+}

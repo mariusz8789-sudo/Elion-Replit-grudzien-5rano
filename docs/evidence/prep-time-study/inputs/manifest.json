@@ -1,0 +1,52 @@
+[
+ {
+  "pdbId": "5SAK",
+  "ligand": "ZRY",
+  "sourceCifSha256": "4142f5d94c0711598448d7d0f95cf823ef39d7971d45a9d5b2a2123dd8c23d47"
+ },
+ {
+  "pdbId": "6ZC3",
+  "ligand": "JOR",
+  "sourceCifSha256": "49386400635d4d012d840d7e7036dd02442d92a8558e313f680630cbd2d72b2a"
+ },
+ {
+  "pdbId": "7DQL",
+  "ligand": "4CL",
+  "sourceCifSha256": "524ba599e12c64003cc0eb64ae404279fa7b9f1dd686858b3f30aa08ac5444ef"
+ },
+ {
+  "pdbId": "7L7C",
+  "ligand": "XQ1",
+  "sourceCifSha256": "275d902fb012e6224043d10f1e3596c5a9f087987dbc1429fe414b645180466b"
+ },
+ {
+  "pdbId": "7NGW",
+  "ligand": "UAW",
+  "sourceCifSha256": "71da88fb52adf2f8c0ad03bb0f01e73220de8040f601b4792654627c943b26b6"
+ },
+ {
+  "pdbId": "7PL1",
+  "ligand": "SFG",
+  "sourceCifSha256": "609ebabc73d1e424c3a14681b9886be1188907a0cc3cd97f7416f8646f122d58"
+ },
+ {
+  "pdbId": "7RZL",
+  "ligand": "NPO",
+  "sourceCifSha256": "7299bc01cd19afbcc02e6ecde2a049a56364032adcee422801a21e983aac0898"
+ },
+ {
+  "pdbId": "7UQ3",
+  "ligand": "O2U",
+  "sourceCifSha256": "d6dcd30f5d06666b26524614ee6ca2bad39afd166317899d2bfb4ba0758ae13e"
+ },
+ {
+  "pdbId": "7XBV",
+  "ligand": "APC",
+  "sourceCifSha256": "a91849cd262d17b43b8ae6f688bf308e19d357eeeb430ca85501d37f89e1b47c"
+ },
+ {
+  "pdbId": "8B8H",
+  "ligand": "OJQ",
+  "sourceCifSha256": "dd8cdf19da4d3c8878e74c2a7e102a92c56f25aa439a2309cfd0b06b7be649e3"
+ }
+]

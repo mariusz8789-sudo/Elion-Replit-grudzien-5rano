@@ -1,0 +1,83 @@
+{
+ "kind": "GENESIS_PREP_TIME_STUDY_ARM",
+ "measuredAt": "2026-09-29T01:24:26+00:00",
+ "hostCpuCount": 4,
+ "complexes": 10,
+ "machineSecondsTotal": 5.3,
+ "machineSecondsPerComplexMean": 0.53,
+ "activeHumanSeconds": 0,
+ "activeHumanNote": "Zero by construction: this arm is one command. The operator types it and is free until it returns. Machine time is reported separately and is NOT claimed as a saving - a person running the same tools would wait for their own machine too.",
+ "whatWasProduced": "receptor.pdb, ligand.sdf and box.json per complex, judged by scripts/prep-time-study-check.py, the same gate as the manual arm",
+ "perCase": [
+  {
+   "pdbId": "5SAK",
+   "ligand": "ZRY",
+   "machineSeconds": 3.98,
+   "ligandHeavyAtoms": 18,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "6ZC3",
+   "ligand": "JOR",
+   "machineSeconds": 0.06,
+   "ligandHeavyAtoms": 15,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7DQL",
+   "ligand": "4CL",
+   "machineSeconds": 0.08,
+   "ligandHeavyAtoms": 9,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7L7C",
+   "ligand": "XQ1",
+   "machineSeconds": 0.09,
+   "ligandHeavyAtoms": 21,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7NGW",
+   "ligand": "UAW",
+   "machineSeconds": 0.06,
+   "ligandHeavyAtoms": 17,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7PL1",
+   "ligand": "SFG",
+   "machineSeconds": 0.06,
+   "ligandHeavyAtoms": 27,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7RZL",
+   "ligand": "NPO",
+   "machineSeconds": 0.59,
+   "ligandHeavyAtoms": 10,
+   "extraRigidFiles": 2
+  },
+  {
+   "pdbId": "7UQ3",
+   "ligand": "O2U",
+   "machineSeconds": 0.08,
+   "ligandHeavyAtoms": 12,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "7XBV",
+   "ligand": "APC",
+   "machineSeconds": 0.09,
+   "ligandHeavyAtoms": 31,
+   "extraRigidFiles": 0
+  },
+  {
+   "pdbId": "8B8H",
+   "ligand": "OJQ",
+   "machineSeconds": 0.21,
+   "ligandHeavyAtoms": 22,
+   "extraRigidFiles": 1
+  }
+ ]
+}

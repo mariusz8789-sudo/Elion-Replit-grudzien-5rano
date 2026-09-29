@@ -158,17 +158,25 @@ export const MORE_ITEMS: readonly NavItem[] = [
 /** The research-mode label, shared by the desktop sidebar and the mobile sheet. */
 export const RESEARCH_MODE_LABEL = 'More · Scientific OS';
 
-/** One entry per capability, in purpose groups; `variantOf` entries fold under their capability. */
+/**
+ * The first entry of the More disclosure: the whole catalogue on one page
+ * (`#/more`), every capability with its audit status.
+ */
+export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'All capabilities', icon: '▦', hash: '#/more', description: 'Wszystko w 7 grupach, ze statusem z audytu' };
+
+/**
+ * One entry per capability, in the owner's groups (29 Sep 2026, same as
+ * `core/scientificOs/catalogue.ts`); `variantOf` entries fold under their capability.
+ */
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
-  { id: 'more-drug', label: 'Odkrywanie leków', ids: ['campaign'] },
-  { id: 'more-chemistry', label: 'Chemia', ids: ['chemistry'] },
-  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv', 'myths-theories'] },
-  { id: 'more-human', label: 'Człowiek i biologia', ids: ['virtual-bio'] },
-  { id: 'more-evidence', label: 'Dowody i pamięć', ids: ['memory'] },
-  { id: 'more-worlds', label: 'Światy i symulacje', ids: ['worlds', 'whatif'] },
-  { id: 'more-learning', label: 'Nauka i eksploracja', ids: ['inquiry', 'dome-world', 'protection-priority', 'decipherment', 'glossary'] },
-  { id: 'more-public', label: 'Administracja i bezpieczeństwo', ids: ['cyber', 'clockwork', 'sovereign'] },
-  { id: 'more-system', label: 'System i projekty', ids: ['investor-demo', 'meta-cognition', 'projects', 'settings'] },
+  { id: 'more-ls', label: 'Life Sciences', ids: ['campaign', 'chemistry', 'virtual-bio'] },
+  { id: 'more-evidence', label: 'Evidence & Verification', ids: ['memory', 'meta-cognition'] },
+  { id: 'more-public', label: 'Government & Public Sector', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
+  { id: 'more-physics', label: 'Physics, Quantum & CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
+  { id: 'more-worlds', label: 'World & Digital Twin', ids: ['worlds', 'whatif'] },
+  { id: 'more-learning', label: 'Education', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
+  { id: 'more-system', label: 'Platform', ids: ['projects', 'settings'] },
+  { id: 'more-showcase', label: 'Showcases (experiments)', ids: ['myths-theories', 'decipherment'] },
 ];
 
 const byId = new Map(MORE_ITEMS.map((item) => [item.id, item] as const));
@@ -185,7 +193,7 @@ export function navVariants(id: string): readonly NavItem[] {
 }
 
 /** Flat view, for lookups and for the mobile primary bar. */
-export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), ...MORE_ITEMS];
+export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), MORE_OVERVIEW_ITEM, ...MORE_ITEMS];
 
 /**
  * ASK — the one command input. It is an action, not a destination, so it is

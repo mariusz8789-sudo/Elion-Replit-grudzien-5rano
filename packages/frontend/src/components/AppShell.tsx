@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 
@@ -229,6 +229,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           <span className="shell-nav-label">{RESEARCH_MODE_LABEL}</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
+          <NavButton item={MORE_OVERVIEW_ITEM} active={active === MORE_OVERVIEW_ITEM.id} onNavigate={() => go(MORE_OVERVIEW_ITEM)} />
           {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
             <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
               <button

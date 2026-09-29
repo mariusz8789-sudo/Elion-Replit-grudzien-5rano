@@ -25,7 +25,7 @@ describe('StartHero dashboard', () => {
     const html = await render();
     expect(html).toContain('data-testid="start-hero"');
     expect(html).toContain('Genesis · Scientific OS');
-    expect(html).toContain('Verifiable computational drug discovery.');
+    expect(html).toContain('<em>Verifiable</em> computational drug discovery.');
     expect(html).toContain('data-testid="home-command"');
     expect(html).toContain('placeholder="What do you want to investigate?"');
     expect(html).toContain('checking backend…');
@@ -33,62 +33,81 @@ describe('StartHero dashboard', () => {
     expect(html).not.toContain('undefined');
   });
 
-  it('shows four areas, each with one sentence, one status and a real route', async () => {
+  it('is the approved command centre: hero with Running now and Latest verified, bento, and the More strip', async () => {
     const html = await render();
-    const cards: readonly [string, string, string][] = [
-      ['drug', 'Design, test and falsify computational drug candidates.', '#/drug'],
-      ['biology', 'Explore anatomy from body to organ, tissue and cell.', '#/human-biology-lab'],
-      ['evidence', 'Verify where a result came from and reproduce it.', '#/reviewer'],
-      ['physics', 'Run physical models and inspect real CMS Open Data.', '#/physics/cms-z'],
-    ];
-    for (const [id, line, hash] of cards) {
+    for (const id of ['home-running', 'home-latest', 'home-live-view', 'home-area-drug', 'home-area-biology', 'home-area-evidence', 'home-area-physics', 'home-recent', 'home-engines', 'home-more']) {
+      expect(html).toContain(`data-testid="${id}"`);
+    }
+    for (const [id, hash] of [['drug', '#/drug'], ['biology', '#/human-biology-lab'], ['evidence', '#/reviewer'], ['physics', '#/physics/cms-z']] as const) {
       const start = html.indexOf(`data-testid="home-area-${id}"`);
-      expect(start).toBeGreaterThan(-1);
-      const card = html.slice(start, html.indexOf('</article>', start));
-      expect(card).toContain(line);
-      expect(card).toContain(`href="${hash}"`);
-      expect(card).toContain('hp-area-status');
+      expect(html.slice(start, html.indexOf('</article>', start))).toContain(`href="${hash}"`);
     }
     // Human Biology states the path, never an atlas count.
     const bio = html.slice(html.indexOf('data-testid="home-area-biology"'), html.indexOf('data-testid="home-area-evidence"'));
-    expect(bio).toContain('Body → organ → tissue → cell');
+    expect(bio).toContain('Body');
     expect(bio.replace(/<[^>]*>/g, ' ')).not.toMatch(/\d/);
   });
 
-  it('the drug status comes from the committed Astex records, with the training-data caveat visible', async () => {
+  it('Running now is the committed Run 8 status record, dated, with no progress number', async () => {
+    const html = await render();
+    const run8 = json('docs/evidence/run8-status.json') as { status: string; complexes: number; dataset: string; seeds: number };
+    const card = html.slice(html.indexOf('data-testid="home-running"'), html.indexOf('data-testid="home-latest"'));
+    expect(card).toContain(run8.status === 'RUNNING' ? 'RUNNING NOW' : 'LATEST BENCHMARK');
+    expect(card).toContain(`${run8.complexes}</b> unseen ${run8.dataset} complexes · ${run8.seeds} seeds · pre-registered`);
+    expect(card).toContain('recorded ');
+    expect(card).not.toMatch(/\d+\s*\/\s*308/);
+  });
+
+  it('the drug numbers come from the committed Astex records, with the training-data caveat visible', async () => {
     const html = await render();
     const run3 = json('docs/evidence/astex-redock-benchmark-2026-09-27-run3.json') as { summary: { successes: number } };
     const run7 = json('docs/evidence/astex-run7-gnina-rescore.json') as { topK: { top1: number } };
     const drug = html.slice(html.indexOf('data-testid="home-area-drug"'), html.indexOf('data-testid="home-area-biology"'));
-    expect(drug).toContain(`Vina baseline ${run3.summary.successes}/85 · GNINA dev ${run7.topK.top1}/85`);
-    expect(drug).toContain('not validation: 76 of 85 complexes are in GNINA&#x27;s training data.');
-    expect(html).not.toMatch(/independently validated|validated drug|clinically proven/i);
+    expect(drug).toContain(`${run3.summary.successes}<small>/85</small>`);
+    expect(drug).toContain(`${run7.topK.top1}<small>/85</small>`);
+    expect(drug).toContain('Vina baseline · pre-registered');
+    expect(drug).toContain('GNINA rescoring · development');
+    expect(drug).toContain('76 of these 85 complexes are in GNINA&#x27;s training data. This is development, not independent validation.');
+    expect(html).not.toMatch(/independently validated|validated drug|clinically proven|government-ready/i);
   });
 
-  it('evidence and replay statuses come from the records, CSRN from the key file', async () => {
+  it('evidence and replay come from the records, CSRN from the key file', async () => {
     const html = await render();
-    const retro = json('docs/evidence/imatinib-retrosynthesis-2026-09-27.json') as { replayVerdict: string };
-    expect(html).toContain(`Replay ${retro.replayVerdict}`);
+    const retro = json('docs/evidence/imatinib-retrosynthesis-2026-09-27.json') as { replayVerdict: string; run: { inputHash: string; outputHash: string } };
+    expect(html).toContain(`REPLAY ${retro.replayVerdict}`);
+    expect(html).toContain(retro.run.inputHash.slice(0, 8));
+    expect(html).toContain(retro.run.outputHash.slice(0, 8));
     const key = json('docs/keys/genesis-csrn-signing-key.json') as { status: string; keyId: string | null };
     const csrn = html.slice(html.indexOf('data-testid="home-csrn"'), html.indexOf('</p>', html.indexOf('data-testid="home-csrn"')));
-    if (key.status === 'ACTIVE' && key.keyId) expect(csrn).toContain(`SIGNED · ${key.keyId}`);
-    else expect(csrn).toContain('PENDING · key not generated yet');
-    expect(html).toContain('No Genesis prediction has been tested in a laboratory yet.');
+    if (key.status === 'ACTIVE' && key.keyId) expect(csrn).toContain(`CSRN SIGNED · ${key.keyId}`);
+    else expect(csrn).toContain('CSRN KEY PENDING');
+    expect(csrn).toContain('no lab test yet');
   });
 
   it('recent research is read from Scientific Memory and says so honestly when empty', async () => {
     const html = await render();
     expect(html).toContain('data-testid="home-recent-empty"');
-    expect(html).toContain('No runs saved yet.');
+    expect(html).toContain('No runs saved in this browser yet.');
   });
 
-  it('engines wait for the server, and the broader row links only, without Cyber/Mirror/Myths', async () => {
+  it('live sources wait for the server instead of showing numbers', async () => {
     const html = await render();
-    expect(html).toContain('checking this server…');
-    expect(html).not.toContain('hp-tone-ok" title="Reads molecules');
-    const broader = html.slice(html.indexOf('data-testid="home-broader"'));
-    for (const href of ['#/lab/quantum', '#/cern-complex', '#/virtual-bio', '#/world-director']) expect(broader).toContain(`href="${href}"`);
-    expect(html).not.toMatch(/Cyber|Mirror|Myth|DICOM|OMNICORE|MoveX/);
+    expect(html).toContain('Checking this server…');
+    expect(html).toContain('Reading CMS data from the server…');
+  });
+
+  it('the More strip shows the five owner groups with counts from the audit catalogue, and no showcase names', async () => {
+    const html = await render();
+    const { SCIENTIFIC_OS, labelCounts } = await import('../core/scientificOs/catalogue');
+    const strip = html.slice(html.indexOf('data-testid="home-more"'));
+    for (const id of ['ls', 'gov', 'phys', 'world', 'edu']) {
+      const g = SCIENTIFIC_OS.find((x) => x.id === id)!;
+      expect(strip).toContain(`href="#/more?group=${id}" data-testid="home-group-${id}"`);
+      const tile = strip.slice(strip.indexOf(`data-testid="home-group-${id}"`));
+      expect(tile).toContain(`${g.items.length} capabilities · ${labelCounts(g).AVAILABLE} available`);
+    }
+    expect(strip).toContain('href="#/more"');
+    expect(html).not.toMatch(/Mirror|Myth|DICOM|OMNICORE|MoveX|CICADA/);
   });
 });
 

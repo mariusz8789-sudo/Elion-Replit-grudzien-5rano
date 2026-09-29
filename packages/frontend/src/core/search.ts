@@ -1,4 +1,5 @@
 import { getLabs } from './registry';
+import { SCIENTIFIC_OS, labelOf } from './scientificOs/catalogue';
 
 /**
  * Indeks wyszukiwania globalnego — płaska lista laboratoriów i ich
@@ -17,6 +18,43 @@ export interface SearchEntry {
   keywords: string; // znormalizowany tekst do dopasowania
   /** Set for product screens outside the plugin registry: navigate here instead of `#/lab/<labId>`. */
   hash?: string;
+  /** Set for capabilities reached through Ask: open Ask with this command filled in ('' = empty Ask). */
+  ask?: string;
+}
+
+/**
+ * Human goals come first: what a person wants to do, in their words, pointing at
+ * the screen that does it. Then the product workflows (DESTINATIONS), then every
+ * capability of More · Scientific OS, and the plugin labs last.
+ */
+const GOALS: readonly { hash: string; icon: string; name: string; tagline: string; extra: string }[] = [
+  { hash: '#/drug', icon: '🎯', name: 'Find drug candidates for a target', tagline: 'Docking campaign with Evidence and Replay', extra: 'goal cel lek kandydat bialko target znajdz' },
+  { hash: '#/reviewer', icon: '🧐', name: 'Check whether a result is real', tagline: 'Try to break it in the Reviewer Room', extra: 'goal sprawdz wynik prawdziwy weryfikacja tamper' },
+  { hash: '#/evidence', icon: '🔁', name: 'Reproduce a result', tagline: 'Replay a run and compare hashes', extra: 'goal powtorz odtworz replay reproduce' },
+  { hash: '#/human-biology-lab', icon: '🫀', name: 'Explore the human body', tagline: 'Body → organ → tissue → cell', extra: 'goal cialo anatomia organ narzad komorka' },
+  { hash: '#/physics/cms-z', icon: '📈', name: 'Look at real particle-physics data', tagline: 'CMS Open Data, Z boson peak', extra: 'goal dane fizyka czastki cern' },
+  { hash: '#/research-console?panel=gov', icon: '📑', name: 'Check a claim against a clinical trial', tagline: 'D-063 claim audit on SURPASS-2', extra: 'goal twierdzenie badanie kliniczne claim audit d-063 surpass rzad government' },
+  { hash: '#/clockwork', icon: '⏱', name: 'Track statutory deadlines of a public office', tagline: 'CLOCKWORK', extra: 'goal termin urzad kpa deadline government' },
+  { hash: '#/more', icon: '▦', name: 'See everything Genesis can do', tagline: 'More · Scientific OS, with honest statuses', extra: 'goal wszystko wiecej more katalog capabilities' },
+];
+
+export function buildGoalIndex(): SearchEntry[] {
+  return GOALS.map((g) => ({
+    labId: `goal:${g.hash}`, expId: '__base', icon: g.icon, labName: g.name, expName: g.name, tagline: g.tagline, hash: g.hash,
+    keywords: normalize(`${g.name} ${g.tagline} ${g.extra}`),
+  }));
+}
+
+/** Every catalogue capability that has a door (a route or Ask). Found by typing, not listed on a blank query. */
+export function buildCapabilityIndex(): SearchEntry[] {
+  return SCIENTIFIC_OS.flatMap((group) => group.items
+    .filter((c) => c.hash !== undefined || c.ask !== undefined)
+    .map((c) => ({
+      labId: `cap:${c.id}`, expId: 'capability', icon: '▦', labName: group.name, expName: c.name,
+      tagline: `${labelOf(c.state)} · ${c.what}`,
+      ...(c.hash !== undefined ? { hash: c.hash } : { ask: c.ask }),
+      keywords: normalize(`${c.name} ${c.what} ${group.name} ${c.source}`),
+    })));
 }
 
 /** Product screens that are not plugin labs (so the registry never listed them), in grant order. */

@@ -1,0 +1,13 @@
+{
+  "kind": "GENESIS_RUN_STATUS",
+  "run": "Run 8",
+  "title": "Unseen docking benchmark",
+  "status": "RUNNING",
+  "startedAt": "2026-09-28T21:00:00Z",
+  "recordedAt": "2026-09-29T04:45:00Z",
+  "complexes": 308,
+  "dataset": "PoseBusters",
+  "seeds": 5,
+  "preregistration": "47c7239f",
+  "note": "Status record only. The run, its protocol and its results live on the research branch and are not changed here. Per-case progress is not copied to main; the verdict is published when the run finishes, whatever it is. Whoever publishes the result updates status and recordedAt in this file."
+}

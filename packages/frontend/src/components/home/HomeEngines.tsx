@@ -35,7 +35,7 @@ export const HOME_ENGINES: readonly HomeEngine[] = [
   { name: 'Biopython', role: 'Reads protein structures and sequences.', toolId: 'biopython', record: null },
 ];
 
-type Live = { phase: 'checking' } | { phase: 'ready'; byId: ReadonlyMap<string, ToolchainEntry> } | { phase: 'unreachable' };
+export type Live = { phase: 'checking' } | { phase: 'ready'; byId: ReadonlyMap<string, ToolchainEntry> } | { phase: 'unreachable' };
 
 export function liveLabel(engine: HomeEngine, live: Live): { text: string; tone: 'ok' | 'warn' | 'bad' | 'muted' } {
   if (engine.toolId === null) return { text: engine.note ?? 'Not a registered runtime', tone: 'muted' };
@@ -74,7 +74,7 @@ export function HomeEngines(): React.ReactElement {
 }
 
 /** The live toolchain answer, shared by the full panel and the dashboard row. */
-function useLiveToolchain(): Live {
+export function useLiveToolchain(): Live {
   const [live, setLive] = useState<Live>({ phase: 'checking' });
   useEffect(() => {
     let cancelled = false;

@@ -70,6 +70,7 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
+const ScientificOsScreen = lazy(() => import('./components/ScientificOsScreen').then((m) => ({ default: m.ScientificOsScreen })));
 const StartHero = lazy(() => import('./components/StartHero').then((m) => ({ default: m.StartHero })));
 const WorldsHubScreen = lazy(() => import('./components/WorldsHubScreen').then((m) => ({ default: m.WorldsHubScreen })));
 const DiscoveryHallScreen = lazy(() => import('./components/visual-simulation/DiscoveryHallScreen').then((m) => ({ default: m.DiscoveryHallScreen })));
@@ -181,12 +182,15 @@ type Route =
   | { kind: 'world-director' }
   | { kind: 'meta-cognition' }
   | { kind: 'mirror' }
-  | { kind: 'discovery-track' };
+  | { kind: 'discovery-track' }
+  | { kind: 'more' };
 
 export function parseHash(): Route {
   const h = window.location.hash;
   const lab = h.match(/^#\/lab\/([\w-]+)/);
   if (lab) return { kind: 'lab', id: lab[1] };
+  // More · Scientific OS, the whole catalogue; `?group=<id>` opens one group.
+  if (h === '#/more' || h.startsWith('#/more?')) return { kind: 'more' };
   if (h === '#/settings') return { kind: 'settings' };
   if (h === '#/memory') return { kind: 'memory' };
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
@@ -224,7 +228,8 @@ export function parseHash(): Route {
   if (h === '#/city' || (h.startsWith('#/city3d?') && new URLSearchParams(h.split('?')[1]).get('view') === '2d')) return { kind: 'city' };
   if (h === '#/city3d' || h.startsWith('#/city3d?')) return { kind: 'city3d' };
   if (h === '#/scientific-city') return { kind: 'scientific-city' };
-  if (h === '#/concept') return { kind: 'concept' };
+  // `?mode=philosopher` (the Simulation Question cut) is read by the film screen itself.
+  if (h === '#/concept' || h.startsWith('#/concept?')) return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/genesis-world') return { kind: 'genesis-world' };
   // Temporal cinematic (place + year) is a World Director mode (`#/world-director?mode=temporal&place=…&year=…`);
@@ -476,6 +481,16 @@ export default function App() {
         <div className="app">
           <TopBar title="Reviewer Room" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><ReviewerRoomScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'more') {
+      return (
+        <div className="app">
+          <TopBar title="More · Scientific OS" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><ScientificOsScreen /></HeavyRoute>
           {overlays}
         </div>
       );

@@ -291,9 +291,10 @@ export class AgentLabScene3D implements Sim3D {
     const abort = new AbortController(); this.fullAtlasAbort = abort;
     this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'LOADING' });
     loadFullAtlas(THREE, abort.signal).then((atlas) => {
-      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); return; }
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); for (const o of atlas.organs?.values() ?? []) o.geometry.dispose(); return; }
       this.fullAtlasAbort = null; this.fullAtlas = atlas;
       for (const t of this.twins) t.applyFullAtlas(atlas);
+      this.macroMicro?.setAtlasOrgans(atlas.organs ?? null);
       this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'READY', structures: atlas.structures, concepts: atlas.concepts, triangles: atlas.triangles });
     }).catch((error: unknown) => {
       if (abort.signal.aborted) return;
@@ -1132,6 +1133,7 @@ export class AgentLabScene3D implements Sim3D {
     this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
     this.fullAtlasAbort?.abort(); this.fullAtlasAbort = null; this.fullAtlasState = FULL_ATLAS_IDLE;
     for (const sys of this.fullAtlas?.systems ?? []) sys.geometry.dispose();
+    for (const organ of this.fullAtlas?.organs?.values() ?? []) organ.geometry.dispose();
     this.fullAtlas = null;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;

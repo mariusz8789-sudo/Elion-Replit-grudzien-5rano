@@ -1,5 +1,6 @@
 import type * as THREE_NS from 'three';
 import { BODYPARTS3D_ATTRIBUTION, BODYPARTS3D_LICENSE } from './bodyParts3dPilot';
+import { EXPLORE_ORGANS } from './anatomyExplore';
 
 /**
  * The FULL BodyParts3D 4.0 male reference body (2,234 source meshes) as packed by the MIT-licensed
@@ -48,13 +49,11 @@ export const FULL_ATLAS_SYSTEM_COLOR: Readonly<Record<string, number>> = {
 export const FULL_ATLAS_HIDDEN_BY_DEFAULT: readonly string[] = ['integumentary', 'reproductive'];
 
 /**
- * Whole organs assembled from their atlas structures, for the organ close-up. The brain is every
- * nervous-system structure in the skull (gyri, white matter, deep nuclei, brainstem, cerebellum),
- * without the cranial nerves and their branches.
+ * Organs assembled from their own atlas structures (brain, heart, eyes, airways, abdominal and pelvic
+ * organs — see EXPLORE_ORGANS), each structure kept as its own geometry so a tap can name it.
  */
-export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPart) => boolean>> = {
-  brain: (p) => p.system === 'nervous' && p.bounds[0]![1]! > 1.35 && !/nerve|ganglion|branch|spinal/i.test(p.name),
-};
+export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPart) => boolean>> =
+  Object.fromEntries(EXPLORE_ORGANS.map((o) => [o.id, o.atlas]));
 
 export interface FullAtlasOrganPart {
   readonly name: string;

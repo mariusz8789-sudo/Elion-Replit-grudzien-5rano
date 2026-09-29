@@ -411,6 +411,8 @@ export class HumanMacroMicroLayer {
   private selectedRegion: string | null = null;
   /** Rotation the person set by dragging; auto-rotation stops once they touch the organ. */
   private manualYaw: number | null = null;
+  /** The organ on its own plinth: off while the person explores the organ inside the body. */
+  private organStage = true;
 
   constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
     this.group = new THREE.Group(); this.group.name = 'genesis-human-macro-micro-layer'; this.group.visible = false;
@@ -455,6 +457,12 @@ export class HumanMacroMicroLayer {
     this.atlasOrgans = organs; if (!this.artifact) this.rebuild();
   }
 
+  /** Show (or keep away) the separate organ plinth; tissue and microscope views always show. */
+  setOrganStage(on: boolean): void {
+    if (this.organStage === on) return;
+    this.organStage = on; if (!this.artifact) this.rebuild();
+  }
+
   setArtifact(artifact: BiologyArtifact | null): void {
     this.artifact = artifact; this.rebuild();
   }
@@ -475,6 +483,7 @@ export class HumanMacroMicroLayer {
       this.replace(artifact.cell.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
     }
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
+    if (!this.organStage) { this.replace(null); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);
     const atlasOrgan = organ ? this.atlasOrgans?.get(organ.id) : undefined;
     this.replace(organ ? atlasOrgan ? buildAtlasOrganModel(this.THREE, organ, atlasOrgan) : buildOrganModel(this.THREE, organ) : null);

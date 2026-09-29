@@ -168,12 +168,17 @@ export function useThreeLoop(
           const r = canvas.getBoundingClientRect();
           return { x: e.clientX - r.left, y: e.clientY - r.top };
         };
-        const down = (e: PointerEvent) => { const p = toLocal(e); sim.pointer?.(p.x, p.y, 'down'); };
-        const move = (e: PointerEvent) => { const p = toLocal(e); sim.pointer?.(p.x, p.y, 'move'); };
-        const up = (e: PointerEvent) => { const p = toLocal(e); sim.pointer?.(p.x, p.y, 'up'); };
+        const down = (e: PointerEvent) => {
+          // Capture keeps a drag that leaves the canvas (or crosses a label) owned by the canvas until release.
+          try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic events have no active pointer */ }
+          const p = toLocal(e); sim.pointer?.(p.x, p.y, 'down', e.pointerId);
+        };
+        const move = (e: PointerEvent) => { const p = toLocal(e); sim.pointer?.(p.x, p.y, 'move', e.pointerId); };
+        const up = (e: PointerEvent) => { const p = toLocal(e); sim.pointer?.(p.x, p.y, 'up', e.pointerId); };
         canvas.addEventListener('pointerdown', down);
         canvas.addEventListener('pointermove', move);
         canvas.addEventListener('pointerup', up);
+        canvas.addEventListener('pointercancel', up);
 
         let last = performance.now();
         let statsAt = 0;
@@ -284,6 +289,7 @@ export function useThreeLoop(
           canvas.removeEventListener('pointerdown', down);
           canvas.removeEventListener('pointermove', move);
           canvas.removeEventListener('pointerup', up);
+          canvas.removeEventListener('pointercancel', up);
         };
       })
       .catch((err) => {

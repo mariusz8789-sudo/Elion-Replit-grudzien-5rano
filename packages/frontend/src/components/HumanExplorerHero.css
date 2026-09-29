@@ -132,3 +132,16 @@
 .human-twin-tag.is-real_measurement { color: #86efac; }
 .human-twin-source { font-size: 9px; color: #94a3b8; }
 .human-twin-caveat { margin: 8px 0 0; font-size: 10px; letter-spacing: 0.04em; color: #7dd3fc; }
+
+/* Brain close-up guide: the tapped structure and the region chips, above the body → cell path. */
+.human-brain-card { position: absolute; left: 4%; bottom: 142px; width: min(560px, 92%); pointer-events: auto; background: #04101dee; border: 1px solid #52778766; border-radius: 14px; padding: 10px 12px; color: #e8f6ff; }
+.human-brain-picked { margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: 15px; }
+.human-brain-picked strong { color: #7fe3ff; font-weight: 650; }
+.human-brain-picked span { color: #bcd3df; font-size: 13px; }
+.human-brain-picked small { flex-basis: 100%; color: #a9c1cf; font-size: 12.5px; line-height: 1.35; }
+.human-brain-regions { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.human-brain-regions::-webkit-scrollbar { display: none; }
+.human-brain-regions .sw-chip { flex: none; }
+@media (max-width: 900px) {
+  .human-brain-card { left: 14px; right: 14px; width: auto; bottom: calc(172px + env(safe-area-inset-bottom, 0px)); padding: 8px 10px; }
+}

@@ -12,7 +12,9 @@ test('Looking Glass is asked from the one Science Chat and has no composer of it
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  const chat = page.getByTestId('science-chat-inline');
+  // Ask is a separate view since the Dashboard decision (2026-09-29): open the one ScienceChat first.
+  await page.getByRole('button', { name: 'Otwórz Science Chat' }).click();
+  const chat = page.getByTestId('science-chat-drawer');
   await chat.getByLabel('Wiadomość do Science Chat').fill('/świat Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
   await chat.getByRole('button', { name: 'Wyślij' }).click();
   await expect(page).toHaveURL(/#\/looking-glass\?q=/);

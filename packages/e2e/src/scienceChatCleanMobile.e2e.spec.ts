@@ -9,9 +9,10 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 390, height: 844 }
     await page.setViewportSize(viewport);
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/');
-
-    const chat = page.getByTestId('science-chat-inline');
-    await expect(chat.getByRole('heading', { name: 'Co chcesz zbadać?' })).toBeVisible();
+    // Ask is a separate view since the Dashboard decision (2026-09-29): open the one ScienceChat first.
+    await page.getByRole('button', { name: 'Otwórz Science Chat' }).click();
+    const chat = page.getByTestId('science-chat-drawer');
+    await expect(chat.getByRole('heading', { name: 'What do you want to investigate?' })).toBeVisible();
     await expect(chat).not.toContainText('Cześć! Jestem Science Chat');
     await expect(chat.locator('.next-move-panel')).toHaveCount(0);
     await expect(chat.locator('.science-chat-examples')).toHaveCount(0);

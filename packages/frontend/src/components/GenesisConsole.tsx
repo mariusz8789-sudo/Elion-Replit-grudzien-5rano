@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { runScientificDiscovery } from '../core/orchestrator/orchestrator';
 import { parseProblem } from '../core/orchestrator/nl';
@@ -76,6 +76,15 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [autoplay]);
+  // `#/research-console?panel=gov` is the direct door to the D-063 government services, which otherwise
+  // sit folded at the bottom of this console: open the fold and bring the panel into view.
+  const servicesRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const panel = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('panel');
+    if (panel !== 'gov' || servicesRef.current === null) return;
+    servicesRef.current.open = true;
+    document.getElementById('gov-services')?.scrollIntoView?.({ block: 'start' });
+  }, []);
   const [nl, setNl] = useState(initialGuide !== null ? CANONICAL_QUESTION : DEFAULT_NL);
   const [source, setSource] = useState<Source>(initialGuide !== null ? 'REAL_PRODUCTION' : 'SANDBOX');
   const [domainId, setDomainId] = useState<GenesisDomainId>('LOWER_HARM');
@@ -423,11 +432,11 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         />
       )}
 
-      <details className="gu-sandbox">
+      <details className="gu-sandbox" ref={servicesRef}>
         <summary className="gu-sandbox-summary">Inne eksperymenty i usługi — Genesis Mind, Discovery Challenge, usługi rządowe, status źródeł dowodów</summary>
         <MindPanel />
         <ChallengePanel />
-        <GovServicesPanel />
+        <div id="gov-services"><GovServicesPanel /></div>
         <EvidenceSourceStatusPanel />
       </details>
     </main>

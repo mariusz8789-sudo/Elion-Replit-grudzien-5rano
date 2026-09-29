@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildDestinationIndex, buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
+import { buildCapabilityIndex, buildDestinationIndex, buildGoalIndex, buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
+import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { track } from '../core/analytics';
 import { useFocusTrap } from '../core/useFocusTrap';
 
@@ -10,7 +11,8 @@ import { useFocusTrap } from '../core/useFocusTrap';
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const index = useMemo(() => [...buildDestinationIndex(), ...buildSearchIndex()], []);
+  // Order is the ranking: human goals, then workflows, then capabilities, then technical labs.
+  const index = useMemo(() => [...buildGoalIndex(), ...buildDestinationIndex(), ...buildCapabilityIndex(), ...buildSearchIndex()], []);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   useFocusTrap(panelRef, true);
@@ -29,8 +31,9 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => setActive(0), [query]);
 
   const go = (e: SearchEntry) => {
-    window.location.hash = e.hash ?? `#/lab/${e.labId}`;
     onClose();
+    if (e.ask !== undefined) { requestOpenScienceChat(e.ask || undefined); return; }
+    window.location.hash = e.hash ?? `#/lab/${e.labId}`;
   };
 
   return (
@@ -40,14 +43,14 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
         className="overlay-panel search-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Szukaj laboratorium lub eksperymentu"
+        aria-label="Search Genesis"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <input
           ref={inputRef}
           type="search"
           className="glossary-search"
-          placeholder="Szukaj laboratorium lub eksperymentu…"
+          placeholder="Search a goal, a workflow or a capability…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -71,7 +74,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
                 >
                   <span className="icon" aria-hidden="true">{r.icon}</span>
                   <span className="sr-body">
-                    <span className="sr-name">{r.expId === '__base' ? r.labName : `${r.labName} · ${r.expName}`}</span>
+                    <span className="sr-name">{r.expId === '__base' ? r.labName : `${r.expName} · ${r.labName}`}</span>
                     <span className="sr-tag">{r.tagline}</span>
                   </span>
                 </button>

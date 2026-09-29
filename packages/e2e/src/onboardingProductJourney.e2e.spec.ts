@@ -46,8 +46,9 @@ test('the ready example enters the one Chat and creates a canonical titration pl
   await expect(page.getByTestId('start-hero')).toBeVisible();
   await expect(page.locator('.ws-stage')).toHaveCount(0);
   await page.getByTestId('door-guided-demo').click();
-
-  const chat = page.locator('.science-chat-inline');
+  // Ask is a separate view since the Dashboard decision (2026-09-29): open the one ScienceChat first.
+  await page.getByRole('button', { name: 'Otwórz Science Chat' }).click();
+  const chat = page.getByTestId('science-chat-drawer');
   await expect(chat).toContainText('Oblicz miareczkowanie kwasowo-zasadowe NaOH.');
   await expect(chat).toContainText(/chemistry-titration|miareczkowanie/i);
 });
@@ -57,8 +58,9 @@ test('one Chat opens the existing live black-hole model in its 3D laboratory', a
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
   await page.goto('/');
-
-  const chat = page.getByTestId('science-chat-inline');
+  // Ask is a separate view since the Dashboard decision (2026-09-29): open the one ScienceChat first.
+  await page.getByRole('button', { name: 'Otwórz Science Chat' }).click();
+  const chat = page.getByTestId('science-chat-drawer');
   await chat.getByLabel('Wiadomość do Science Chat').fill('Pokaż czarną dziurę');
   await chat.getByRole('button', { name: 'Wyślij' }).click();
   await expect(page).toHaveURL(/#\/lab\/einstein$/);

@@ -41,9 +41,9 @@ describe('decideNextAction — grounded in real counts, never a generated recomm
     expect(action.hash).toBe('#/what-if');
   });
 
-  it('a loop that is closed at every stage points back at the Matrix map', () => {
+  it('a loop that is closed at every stage points back at the Matrix system map', () => {
     const action = decideNextAction(counts({ HYPOTHESIS: 2, EVIDENCE: 1, SCENARIO: 1 }));
-    expect(action.hash).toBe('#/matrix');
+    expect(action.hash).toBe('#/matrix-map');
   });
 });
 

@@ -1,0 +1,27 @@
+{
+ "pdbId": "7NF3",
+ "ligand": "4LU",
+ "seeds": [
+  42,
+  1042,
+  2042,
+  3042,
+  4042
+ ],
+ "inputs": {
+  "ok": true,
+  "cif": "/tmp/claude-0/pb-bench/structures/raw_from_pdb/7nf3.cif",
+  "pdb": "/tmp/claude-0/run8/data/7nf3.pdb",
+  "sourceCifSha256": "64ef6e9a0761d03ab88c56589f48df219428f41572b6c157411d4a28914bcd3e",
+  "receptorInputPdbSha256": "ac93c33c601f9ed5925586e120c173ba52355ad52e8273d53cd01c1dbe0882a7"
+ },
+ "status": "PREPARATION_FAILED",
+ "error": "no_ccd_template_with_37_heavy_atoms",
+ "seedRuns": [],
+ "pool": [],
+ "poolSize": 0,
+ "gninaOrdered": [],
+ "anyNativeLike": false,
+ "top1Success": false,
+ "wallClockSeconds": 0.4
+}

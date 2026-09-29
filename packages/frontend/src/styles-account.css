@@ -103,3 +103,8 @@
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Language switch (PL / EN / عربي) under the account entry: sidebar and the "Więcej" sheet. */
+.shell-lang { display: flex; gap: 6px; margin: 6px 0 10px; }
+.shell-lang-btn { flex: 1; min-height: 34px; border-radius: 10px; border: 1px solid var(--border, #2b4150); background: transparent; color: var(--text-faint, #9fb3bd); font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+.shell-lang-btn.is-on { background: rgba(92, 214, 232, 0.14); border-color: var(--cyan, #5cd6e8); color: var(--text, #e8f4f7); }

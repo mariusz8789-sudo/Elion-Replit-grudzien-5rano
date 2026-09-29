@@ -3,6 +3,8 @@ import { FULL_ATLAS_HIDDEN_BY_DEFAULT, FULL_ATLAS_SYSTEM_COLOR, type FullAtlasOr
 import { AtlasPartPicker, type AtlasPickSystem } from './atlasPartPicker';
 import { brainRegionOf } from './brainParts';
 import { anatomySideOf } from './anatomyNamesPl';
+import { organName, structureText, tx } from './explorerText';
+import { getLocale } from '../i18n';
 import { EXPLORE_ORGANS, organsInRegion, regionOfAtlasPoint, REGION_LABEL, structureLabel, type BodyRegionId, type ExploreHitData, type ExploreState } from './anatomyExplore';
 
 /**
@@ -187,10 +189,11 @@ export class AnatomyFocusLayer {
     const out: { name: string; label: string; system: string; regionId: BodyRegionId; score: number }[] = [];
     const seen = new Set<string>();
     for (const { system, range } of this.picker.all()) {
-      const base = structureLabel(null, range.name, system).label;
+      const base = structureText(null, range.name, system).label;
       const side = anatomySideOf(range.name);
-      const label = side ? `${base} (${side} strona)` : base;
-      const hay = norm(`${label} ${range.name}`);
+      // Polish names drop the side; the English atlas name already carries it.
+      const label = side && getLocale() === 'pl' ? `${base} (${side} ${tx('side')})` : base;
+      const hay = norm(`${label} ${structureLabel(null, range.name, system).label} ${range.name}`);
       const at = hay.indexOf(q);
       if (at < 0 || seen.has(range.name)) continue;
       seen.add(range.name);
@@ -255,17 +258,17 @@ export class AnatomyFocusLayer {
     if (state.level === 'REGION' || state.level === 'ORGAN') {
       // The organ in focus keeps its neighbours' names beside it: a tap on one moves to that organ.
       return organsInRegion(state.regionId).filter((o) => this.groups.has(o.id)).slice(0, 6)
-        .map((o) => ({ key: o.id, text: o.label, hit: { kind: 'organ', id: o.id } as const, world: at(this.groups.get(o.id)!) }));
+        .map((o) => ({ key: o.id, text: organName(o.id), hit: { kind: 'organ', id: o.id } as const, world: at(this.groups.get(o.id)!) }));
     }
     const range = this.partRange(state);
     if (range && state.structure) {
       if (this.hiddenSystems.has(state.system!)) return [];
       const c = this.rangeBox(range, new this.THREE.Box3()).getCenter(new this.THREE.Vector3()).applyMatrix4(this.atlasGroup.matrixWorld);
-      return [{ key: state.structure, text: structureLabel(null, state.structure, state.system).label, hit: { kind: 'part', name: state.structure, system: state.system! }, world: c }];
+      return [{ key: state.structure, text: structureText(null, state.structure, state.system).label, hit: { kind: 'part', name: state.structure, system: state.system! }, world: c }];
     }
     if (state.level === 'STRUCTURE' && state.structure) {
       const mesh = this.groups.get(state.organId!)?.children.find((c) => c.userData.partName === state.structure);
-      return mesh ? [{ key: state.structure, text: structureLabel(state.organId, state.structure).label, hit: { kind: 'structure', name: state.structure }, world: at(mesh) }] : [];
+      return mesh ? [{ key: state.structure, text: structureText(state.organId, state.structure).label, hit: { kind: 'structure', name: state.structure }, world: at(mesh) }] : [];
     }
     return [];
   }

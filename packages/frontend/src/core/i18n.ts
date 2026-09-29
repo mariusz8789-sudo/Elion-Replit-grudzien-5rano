@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 /**
  * Szkielet i18n — jedno miejsce prawdy dla tekstów UI (nie treści naukowej
  * eksperymentów, która na razie zostaje po polsku w kodzie labów; to
@@ -76,6 +77,9 @@ const ar: Dictionary = {
   'explorer.tissue': 'نسيج', 'explorer.cell': 'خلية', 'explorer.organelle': 'عضية', 'explorer.molecule': 'جزيء', 'explorer.dna': 'DNA', 'explorer.rna': 'RNA', 'explorer.atp': 'ATP',
   'explorer.evidence': 'الأدلة', 'explorer.provenance': 'مصدر البيانات', 'explorer.simulation': 'محاكاة', 'explorer.realImage': 'صورة حقيقية', 'explorer.realDataset': 'مجموعة بيانات حقيقية',
   'explorer.reconstructed': 'إعادة بناء', 'explorer.simulated': 'محاكاة', 'explorer.illustrative': 'توضيحية', 'explorer.zoom': 'تكبير', 'explorer.source': 'المصدر',
+  'explorer.organ': 'العضو', 'explorer.atoms': 'الذرات', 'explorer.stomach': 'المعدة', 'explorer.pancreas': 'البنكرياس', 'explorer.smallIntestine': 'الأمعاء الدقيقة',
+  'explorer.systemsRail': 'أجهزة الجسم', 'explorer.macroToMicro': 'من الكبير إلى الدقيق', 'explorer.magnification': 'التكبير', 'explorer.scale': 'المقياس',
+  'explorer.section': 'مقطع', 'explorer.cutaway': 'قطع', 'explorer.isolate': 'اعزل العضو', 'explorer.showAll': 'أظهر الكل',
   'explorer.unknown': 'غير معروف', 'explorer.hypothesis': 'فرضية', 'explorer.falsification': 'التفنيد', 'explorer.nextTest': 'الاختبار التالي', 'explorer.fact': 'حقيقة', 'explorer.verified': 'موثّق', 'explorer.insufficientEvidence': 'أدلة غير كافية',
 };
 
@@ -92,8 +96,24 @@ export function getLocale(): Locale {
   return currentLocale;
 }
 
+const LOCALE_KEY = 'genesis.locale';
+
+/** The languages the switcher offers: Polish, English, Arabic (UAE). */
+export const UI_LOCALES: readonly Locale[] = ['pl', 'en', 'ar'];
+export const LOCALE_SHORT: Readonly<Record<Locale, string>> = { pl: 'PL', en: 'EN', es: 'ES', ar: 'عربي' };
+
+/** The language chosen earlier in this browser, applied once at start (Polish when none or storage is blocked). */
+export function initLocale(): Locale {
+  let saved: string | null = null;
+  try { saved = globalThis.localStorage?.getItem(LOCALE_KEY) ?? null; } catch { saved = null; }
+  const locale = isLocale(saved) ? saved : 'pl';
+  setLocale(locale);
+  return locale;
+}
+
 export function setLocale(locale: Locale): void {
   currentLocale = locale;
+  try { globalThis.localStorage?.setItem(LOCALE_KEY, locale); } catch { /* storage blocked: the choice lasts this visit */ }
   // RTL for Arabic: the document direction follows the locale; ids, hashes and symbols are untouched.
   if (typeof document !== 'undefined') { document.documentElement.dir = LOCALE_DIRECTION[locale]; document.documentElement.lang = locale; }
   listeners.forEach((fn) => fn(currentLocale));
@@ -104,7 +124,14 @@ export function subscribeLocale(fn: (locale: Locale) => void): () => void {
   return () => listeners.delete(fn);
 }
 
+/** Current language as React state: the component re-renders when the language changes. */
+export function useLocale(): Locale {
+  const [locale, set] = useState<Locale>(currentLocale);
+  useEffect(() => { const off = subscribeLocale(set); return () => { off(); }; }, []);
+  return locale;
+}
+
 /** Tłumaczy klucz; brak w aktywnym słowniku spada na polski, brak wszędzie zwraca sam klucz (widoczny błąd, nie cichy pusty tekst). */
 export function t(key: string, locale: Locale = currentLocale): string {
-  return DICTIONARIES[locale][key] ?? pl[key] ?? key;
+  return DICTIONARIES[locale][key] ?? (locale === 'ar' ? en[key] : undefined) ?? pl[key] ?? key;
 }

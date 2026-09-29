@@ -1,9 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 import { useSession } from '../core/backend/session';
 import { profileLabel, profileOfUser } from '../core/accountProfiles';
+import { LOCALE_NATIVE_NAME, LOCALE_SHORT, UI_LOCALES, setLocale, useLocale } from '../core/i18n';
+import { navDescription, navGroupLabel, navLabel, navShortLabel, shellText } from '../core/navigationText';
+
+/** PL / EN / عربي: the whole page switches, Arabic reads right to left. */
+function LanguageSwitch(): JSX.Element {
+  const locale = useLocale();
+  return (
+    <div className="shell-lang" role="group" aria-label={shellText('language')} data-testid="language-switch">
+      {UI_LOCALES.map((l) => (
+        <button key={l} type="button" lang={l} className={`shell-lang-btn${locale === l ? ' is-on' : ''}`} aria-pressed={locale === l} title={LOCALE_NATIVE_NAME[l]} onClick={() => setLocale(l)} data-testid={`language-${l}`}>{LOCALE_SHORT[l]}</button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Account entry of the shell: "Zaloguj się" when signed out, the user's name
@@ -11,7 +25,7 @@ import { profileLabel, profileOfUser } from '../core/accountProfiles';
  */
 function useAccountEntry(): { signedIn: boolean; title: string; subtitle: string; short: string } {
   const session = useSession();
-  if (!session) return { signedIn: false, title: 'Zaloguj się', subtitle: 'lub załóż konto', short: 'Zaloguj' };
+  if (!session) return { signedIn: false, title: shellText('signIn'), subtitle: shellText('orSignUp'), short: shellText('signInShort') };
   const name = session.user.displayName || session.user.email;
   return { signedIn: true, title: name, subtitle: profileLabel(profileOfUser(session.user)), short: name.split(/\s+/)[0] ?? name };
 }
@@ -169,8 +183,8 @@ function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolea
     >
       <span className="shell-nav-icon" aria-hidden="true">{item.icon}</span>
       <span className="shell-nav-text">
-        <span className="shell-nav-label">{item.label}</span>
-        {item.description !== undefined && <span className="shell-nav-desc">{item.description}</span>}
+        <span className="shell-nav-label">{navLabel(item)}</span>
+        {navDescription(item) !== undefined && <span className="shell-nav-desc">{navDescription(item)}</span>}
       </span>
       {planned && <span className="shell-nav-badge">wkrótce</span>}
     </button>
@@ -186,6 +200,8 @@ export function AppShell({ children, chat, chatInline = false }: {
       mounted twice, so its conversation never forks. */
   chatInline?: boolean;
 }): JSX.Element {
+  // The menu re-renders in the chosen language.
+  useLocale();
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuCloseRef = useRef<HTMLButtonElement>(null);
@@ -252,7 +268,7 @@ export function AppShell({ children, chat, chatInline = false }: {
     <>
       {NAV_SECTIONS.map((section) => (
         <div className="shell-nav-section" key={section.id}>
-          {section.label && <h2 className="shell-nav-section-title">{section.label}</h2>}
+          {section.label && <h2 className="shell-nav-section-title">{navGroupLabel(section)}</h2>}
           {section.items.map((item) => (
             <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
           ))}
@@ -261,7 +277,7 @@ export function AppShell({ children, chat, chatInline = false }: {
       <div className="shell-nav-section">
         <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
-          <span className="shell-nav-label">{RESEARCH_MODE_LABEL}</span>
+          <span className="shell-nav-label">{shellText('moreAll')}</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
           <NavButton item={MORE_OVERVIEW_ITEM} active={active === MORE_OVERVIEW_ITEM.id} onNavigate={() => go(MORE_OVERVIEW_ITEM)} />
@@ -273,7 +289,7 @@ export function AppShell({ children, chat, chatInline = false }: {
                 onClick={() => toggleGroup(group.id)}
                 aria-expanded={groupUnfolded(group)}
               >
-                <span>{group.label}</span>
+                <span>{navGroupLabel(group)}</span>
                 <span aria-hidden="true">{groupUnfolded(group) ? '−' : '+'}</span>
               </button>
               {groupUnfolded(group) && group.items.map((item) => {
@@ -288,9 +304,9 @@ export function AppShell({ children, chat, chatInline = false }: {
                         className="shell-nav-variants-toggle"
                         onClick={() => toggleVariants(item.id)}
                         aria-expanded={unfolded}
-                        aria-label={`${unfolded ? 'Ukryj' : 'Pokaż'} inne widoki: ${item.label} (${variants.length})`}
+                        aria-label={`${shellText(unfolded ? 'hideViews' : 'showViews')} ${shellText('otherViews')}: ${navLabel(item)} (${variants.length})`}
                       >
-                        {unfolded ? '−' : '+'} inne widoki ({variants.length})
+                        {unfolded ? '−' : '+'} {shellText('otherViews')} ({variants.length})
                       </button>
                     )}
                     {unfolded && variants.length > 0 && (
@@ -317,7 +333,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           the HUD stays borderless while text keeps its contrast. */}
       <div className="hud-scrim" aria-hidden="true" />
     <div className="shell">
-      <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
+      <aside className="shell-sidebar" aria-label={shellText('navigation')}>
         <button className="shell-brand" onClick={() => { window.location.hash = ''; }} aria-label="Genesis Physics — Start">
           <GenesisWordmark size={30} />
         </button>
@@ -330,6 +346,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           <span className="shell-hud-bars"><i /><i /><i /><i /></span>
         </div>
         <AccountEntry active={accountActive} onNavigate={goAccount} />
+        <LanguageSwitch />
         <nav className="shell-nav">{sections}</nav>
         <a className="shell-domain" href="https://genesis-physics.com" target="_blank" rel="noreferrer">genesis-physics.com</a>
       </aside>
@@ -341,7 +358,7 @@ export function AppShell({ children, chat, chatInline = false }: {
       {!chatInline && chat}
 
       {/* Mobile: a real command bar, not a shrunken sidebar. */}
-      <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)" data-testid="mobile-navigation">
+      <nav className="shell-mobilebar" aria-label={`${shellText('navigation')} (mobile)`} data-testid="mobile-navigation">
         {PRIMARY_NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -349,13 +366,13 @@ export function AppShell({ children, chat, chatInline = false }: {
             onClick={() => go(item)}
           >
             <span aria-hidden="true">{item.icon}</span>
-            <span>{item.shortLabel ?? item.label.split(' ')[0]}</span>
+            <span>{navShortLabel(item)}</span>
           </button>
         ))}
         <button
           className={`shell-mobilebar-item shell-mobilebar-account${accountActive ? ' active' : ''}`}
           onClick={goAccount}
-          aria-label={account.signedIn ? `Konto: ${account.title} (${account.subtitle})` : 'Zaloguj się lub załóż konto'}
+          aria-label={account.signedIn ? `${shellText('account')}: ${account.title} (${account.subtitle})` : shellText('signInOrUp')}
           data-testid="mobile-account"
         >
           <span aria-hidden="true">👤</span>
@@ -368,20 +385,21 @@ export function AppShell({ children, chat, chatInline = false }: {
           aria-controls="genesis-mobile-menu"
         >
           <span aria-hidden="true">☰</span>
-          <span>Więcej</span>
+          <span>{shellText('more')}</span>
         </button>
       </nav>
 
       {menuOpen && (
         <>
-          <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu" tabIndex={-1} />
+          <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label={shellText('closeMenu')} tabIndex={-1} />
           <div id="genesis-mobile-menu" className="shell-sheet" role="dialog" aria-modal="true" aria-label="Pełne menu Genesis">
             <div className="shell-sheet-head">
-              <span><strong>Więcej</strong><small>Wszystkie obszary Genesis</small></span>
-              <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
+              <span><strong>{shellText('more')}</strong><small>{shellText('allAreas')}</small></span>
+              <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label={shellText('closeMenu')}>✕</button>
             </div>
             <div className="shell-sheet-body">
               <AccountEntry active={accountActive} onNavigate={goAccount} />
+              <LanguageSwitch />
               {sections}
             </div>
           </div>

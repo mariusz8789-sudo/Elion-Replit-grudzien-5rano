@@ -6,6 +6,7 @@ import { LabShell } from './components/LabShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
+import { AccountScreen } from './components/AccountScreen';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
@@ -119,6 +120,7 @@ type Route =
   | { kind: 'home' }
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
+  | { kind: 'account' }
   | { kind: 'memory' }
   | { kind: 'dossier' }
   | { kind: 'discovery-log' }
@@ -192,6 +194,7 @@ export function parseHash(): Route {
   // More · Scientific OS, the whole catalogue; `?group=<id>` opens one group.
   if (h === '#/more' || h.startsWith('#/more?')) return { kind: 'more' };
   if (h === '#/settings') return { kind: 'settings' };
+  if (h === '#/konto' || h.startsWith('#/konto?')) return { kind: 'account' };
   if (h === '#/memory') return { kind: 'memory' };
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
@@ -285,6 +288,8 @@ export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     if (hasCompletedOnboarding()) return false;
     if (parseHash().kind === 'home') { markOnboardingComplete(); return false; }
+    // A direct link to sign in / register opens the form, not the tour in front of it.
+    if (parseHash().kind === 'account') return false;
     return true;
   });
   const lastLabId = useRef<string | null>(null);
@@ -439,6 +444,16 @@ export default function App() {
         <div className="app">
           <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
           <SettingsScreen onReplayOnboarding={() => setOnboardingOpen(true)} />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'account') {
+      return (
+        <div className="app">
+          <TopBar title="👤 Konto" onSearch={() => setSearchOpen(true)} />
+          <AccountScreen />
           {overlays}
         </div>
       );

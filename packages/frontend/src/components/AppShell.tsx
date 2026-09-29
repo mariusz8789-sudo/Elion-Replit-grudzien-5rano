@@ -2,6 +2,37 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
+import { useSession } from '../core/backend/session';
+import { profileLabel, profileOfUser } from '../core/accountProfiles';
+
+/**
+ * Account entry of the shell: "Zaloguj się" when signed out, the user's name
+ * and profile when signed in. Always leads to `#/konto` (AccountScreen).
+ */
+function useAccountEntry(): { signedIn: boolean; title: string; subtitle: string; short: string } {
+  const session = useSession();
+  if (!session) return { signedIn: false, title: 'Zaloguj się', subtitle: 'lub załóż konto', short: 'Zaloguj' };
+  const name = session.user.displayName || session.user.email;
+  return { signedIn: true, title: name, subtitle: profileLabel(profileOfUser(session.user)), short: name.split(/\s+/)[0] ?? name };
+}
+
+function AccountEntry({ active, onNavigate }: { active: boolean; onNavigate: () => void }): JSX.Element {
+  const entry = useAccountEntry();
+  return (
+    <button
+      className={`shell-account${active ? ' active' : ''}${entry.signedIn ? ' signed-in' : ''}`}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      data-testid="shell-account"
+    >
+      <span className="shell-account-icon" aria-hidden="true">👤</span>
+      <span className="shell-account-text">
+        <strong>{entry.title}</strong>
+        <small>{entry.subtitle}</small>
+      </span>
+    </button>
+  );
+}
 
 /**
  * Range sliders everywhere get a filled, glowing segment (styles-2040.css,
@@ -202,6 +233,10 @@ export function AppShell({ children, chat, chatInline = false }: {
   /** HUD readout under the brand: the real current route, nothing invented. */
   const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
+  const account = useAccountEntry();
+  const goAccount = (): void => { window.location.hash = '#/konto'; setMenuOpen(false); };
+  const accountActive = active === 'account';
+
   const go = (item: NavItem): void => {
     if (item.kind === 'chat') { requestOpenScienceChat(); setMenuOpen(false); return; }
     if (!item.hash) return;
@@ -294,6 +329,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           {hudTelemetry !== '' && <span className="shell-hud-telemetry">{hudTelemetry}</span>}
           <span className="shell-hud-bars"><i /><i /><i /><i /></span>
         </div>
+        <AccountEntry active={accountActive} onNavigate={goAccount} />
         <nav className="shell-nav">{sections}</nav>
         <a className="shell-domain" href="https://genesis-physics.com" target="_blank" rel="noreferrer">genesis-physics.com</a>
       </aside>
@@ -317,6 +353,15 @@ export function AppShell({ children, chat, chatInline = false }: {
           </button>
         ))}
         <button
+          className={`shell-mobilebar-item shell-mobilebar-account${accountActive ? ' active' : ''}`}
+          onClick={goAccount}
+          aria-label={account.signedIn ? `Konto: ${account.title} (${account.subtitle})` : 'Zaloguj się lub załóż konto'}
+          data-testid="mobile-account"
+        >
+          <span aria-hidden="true">👤</span>
+          <span>{account.short}</span>
+        </button>
+        <button
           className={`shell-mobilebar-item${menuOpen ? ' active' : ''}`}
           onClick={() => setMenuOpen((open) => !open)}
           aria-expanded={menuOpen}
@@ -335,7 +380,10 @@ export function AppShell({ children, chat, chatInline = false }: {
               <span><strong>Więcej</strong><small>Wszystkie obszary Genesis</small></span>
               <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
             </div>
-            <div className="shell-sheet-body">{sections}</div>
+            <div className="shell-sheet-body">
+              <AccountEntry active={accountActive} onNavigate={goAccount} />
+              {sections}
+            </div>
           </div>
         </>
       )}

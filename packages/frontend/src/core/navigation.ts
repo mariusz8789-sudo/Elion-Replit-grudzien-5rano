@@ -67,7 +67,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { id: 'human-biology-lab', label: 'Człowiek · Human Explorer', shortLabel: 'Człowiek', icon: '🧍', hash: '#/human-biology-lab', primary: true, description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
       { id: 'reviewer', label: 'Pokój recenzenta', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
       { id: 'evidence', label: 'Dowody i powtórzenie', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
-      { id: 'scientific-worlds', label: 'Laboratorium', shortLabel: 'Lab', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
+      { id: 'scientific-worlds', label: 'Laboratorium', icon: '⌬', hash: '#/scientific-worlds', description: 'Jedna przestrzeń dla eksperymentów Genesis' },
       { id: 'cms-open-data', label: 'CERN · dane CMS', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
       { id: 'discover', label: 'Konsola badań', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
     ],
@@ -152,6 +152,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour', variantOf: 'investor-demo' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
+  { id: 'account', label: 'Konto — zaloguj się lub załóż konto', icon: '👤', hash: '#/konto', description: 'Logowanie, rejestracja i profil konta (uczeń, student, nauczyciel, badacz, instytucja)' },
   { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
 ];
 
@@ -175,7 +176,7 @@ const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] =
   { id: 'more-physics', label: 'Fizyka, kwanty i CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
   { id: 'more-worlds', label: 'Świat i cyfrowy bliźniak', ids: ['worlds', 'whatif'] },
   { id: 'more-learning', label: 'Edukacja', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
-  { id: 'more-system', label: 'Platforma', ids: ['projects', 'settings'] },
+  { id: 'more-system', label: 'Platforma', ids: ['account', 'projects', 'settings'] },
   { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment'] },
 ];
 
@@ -203,7 +204,7 @@ export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) 
 export const ASK_ITEM: NavItem = { id: 'chat', label: 'Zapytaj', shortLabel: 'Zapytaj', icon: '✦', kind: 'chat', description: 'Opisz zadanie badawcze; Genesis kieruje je do modelu, silnika albo zweryfikowanego ekranu' };
 
 /**
- * Mobile bottom bar, left to right: Start, Zapytaj, Człowiek, Laboratorium (AppShell adds Więcej).
+ * Mobile bottom bar, left to right: Start, Zapytaj, Człowiek (AppShell adds Konto and Więcej).
  * Five fixed, always visible targets in plain words (Apple HIG tab bars, NN/g on hidden navigation).
  */
 export const PRIMARY_NAV_ITEMS: readonly NavItem[] = (() => {

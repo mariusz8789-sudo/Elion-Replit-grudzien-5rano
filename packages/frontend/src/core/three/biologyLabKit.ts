@@ -552,6 +552,17 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   };
 }
 
+/** Edge-lit glass: transparent where it faces the camera, glowing where it turns away (Fresnel). */
+function createChamberRimMaterial(THREE: typeof THREE_NS): THREE_NS.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    name: 'twin:chamber-rim-glass',
+    uniforms: { tint: { value: new THREE.Color(0x8fdcff) } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 tint; varying vec3 vN; varying vec3 vV; void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.2); gl_FragColor = vec4(tint * (0.02 + f * 0.55), 1.0); }',
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  });
+}
+
 export interface TwinChamberOptions {
   position: THREE_NS.Vector3Tuple; radius: number; height: number;
   glass: THREE_NS.Material; palette: GenesisMaterialPalette;
@@ -574,7 +585,9 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   // Everything the twin camera opens: the glass shell. Earlier versions added twelve ribs and four
   // pilasters around it; on mobile they read as prison bars and obscured the hero subject.
   const enclosure = new THREE.Group(); enclosure.name = 'twin:chamber-enclosure'; g.add(enclosure);
-  enclosure.add(createGlassChamber(THREE, opts.glass, { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: false, radialSegments: 48 }));
+  // The vitrine reads as glass only at its edges (a Fresnel rim, additive): the owner's reference is a
+  // luminous glass cylinder around the body, and the centre of the glass never veils the subject.
+  enclosure.add(createGlassChamber(THREE, createChamberRimMaterial(THREE), { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: true, radialSegments: 64 }));
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(opts.radius + 0.2, opts.radius + 0.1, 0.18, 48), opts.palette.BRUSHED_METAL); crown.position.y = opts.height + 0.29; g.add(crown);
   const ring = createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 1.4, baseColor: 0x123047 });
   const top = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.02, 0.03, 10, 64), ring); top.rotation.x = Math.PI / 2; top.position.y = opts.height + 0.19; g.add(top);

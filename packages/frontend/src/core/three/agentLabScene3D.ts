@@ -1042,7 +1042,7 @@ export class AgentLabScene3D implements Sim3D {
       // the view narrows — one isolated organ, or an active section — and eases back out when it widens.
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
-      if (this.chamberGlass) this.chamberGlass.visible = false;
+      if (this.chamberGlass) this.chamberGlass.visible = this.macroMicro?.group.visible !== true;
       if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
@@ -1050,7 +1050,7 @@ export class AgentLabScene3D implements Sim3D {
       const portrait = camera.aspect < 1;
       const macroVisible = this.macroMicro?.group.visible === true;
       // The close-up is the subject: close enough that the organ fills the free middle of the screen.
-      const dist = portrait ? (macroVisible ? 2.05 : tight ? 3.0 : 4.0) : (macroVisible ? 1.35 : tight ? 2.3 : 2.5);
+      const dist = portrait ? (macroVisible ? 2.05 : tight ? 3.0 : 3.45) : (macroVisible ? 1.35 : tight ? 2.3 : 2.5);
       // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
       const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
       const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : macroVisible ? 1.58 : tight ? 1.45 : 1.4;

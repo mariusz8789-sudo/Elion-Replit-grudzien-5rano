@@ -1,0 +1,27 @@
+{
+ "pdbId": "7L00",
+ "ligand": "XCJ",
+ "seeds": [
+  42,
+  1042,
+  2042,
+  3042,
+  4042
+ ],
+ "inputs": {
+  "ok": true,
+  "cif": "/tmp/claude-0/pb-bench/structures/raw_from_pdb/7l00.cif",
+  "pdb": "/tmp/claude-0/run8/data/7l00.pdb",
+  "sourceCifSha256": "2bc1288e22c1545c85e7ce06187c175ebb0132b2c5e795dbe9bfc66ac7c8c7b1",
+  "receptorInputPdbSha256": "1bb820042bc520e28c5ad44e562cb588463608be9657e6b3267423203729dcf4"
+ },
+ "status": "PREPARATION_FAILED",
+ "error": "no_ccd_template_with_28_heavy_atoms",
+ "seedRuns": [],
+ "pool": [],
+ "poolSize": 0,
+ "gninaOrdered": [],
+ "anyNativeLike": false,
+ "top1Success": false,
+ "wallClockSeconds": 0.7
+}

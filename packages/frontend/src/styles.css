@@ -4761,6 +4761,14 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .science-chat-empty > div { display: flex; justify-content: center; flex-wrap: wrap; gap: .45rem; }
 .science-chat-empty button { padding: .48rem .8rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); background: rgba(92, 214, 232, .06); cursor: pointer; }
 .science-chat-empty button:hover { border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
+.science-chat-empty > .sc-engine-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; text-align: left; }
+.sc-engine-grid button { display: flex; flex-direction: column; gap: .15rem; padding: .6rem .75rem; border-radius: .7rem; }
+.sc-engine-grid b { font-size: .88rem; font-weight: 650; }
+.sc-engine-grid small { color: var(--cyan); font: 500 .68rem/1.2 var(--font-mono); letter-spacing: .02em; }
+.sc-engine-row { display: flex; gap: .35rem; overflow-x: auto; padding: .35rem .75rem 0; scrollbar-width: none; }
+.sc-engine-row::-webkit-scrollbar { display: none; }
+.sc-engine-row button { flex: none; padding: .3rem .65rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-dim); background: transparent; font: 500 .72rem/1.2 var(--font-mono); cursor: pointer; }
+.sc-engine-row button.on { color: var(--text); border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
 .sc-long-answer > summary { cursor: pointer; list-style: none; display: grid; gap: .55rem; }
 .sc-long-answer > summary::-webkit-details-marker { display: none; }
 .sc-long-answer > summary b { color: var(--cyan); font: 650 .68rem/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
@@ -5807,12 +5815,12 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   .science-chat:not(.science-chat-inline) {
     left: .5rem;
     right: .5rem;
-    top: auto;
+    /* One chat on the screen: the drawer covers the page above it, so no second field shows through. */
+    top: calc(.5rem + env(safe-area-inset-top, 0px));
     bottom: calc(4.4rem + var(--safe-bottom));
     z-index: 55;
     width: auto;
-    height: min(68vh, 38rem);
-    height: min(68dvh, 38rem);
+    height: auto;
     max-height: calc(100vh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
     max-height: calc(100dvh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
     border-radius: .9rem .9rem .35rem .35rem;

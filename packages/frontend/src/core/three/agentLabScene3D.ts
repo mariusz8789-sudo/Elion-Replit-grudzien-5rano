@@ -35,7 +35,7 @@ import { evaluateVisualReality, type VisualRealityResult } from './graphics/visu
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
 import { AnatomyFocusLayer, type ExploreHit } from './anatomyFocusLayer';
-import { EXPLORE_BODY, exploreBack, exploreInto, type ExploreState } from './anatomyExplore';
+import { EXPLORE_BODY, exploreBack, exploreInto, type BodyRegionId, type ExploreState } from './anatomyExplore';
 import { createHolographicResearchCompanion, type HolographicResearchCompanion } from './holographicResearchCompanion';
 import { createPremiumLabDetail, type PremiumLabDetailHandle } from './premiumLabDetail';
 import { createPremiumHumanDetail, type PremiumHumanDetailHandle } from './premiumHumanDetail';
@@ -214,6 +214,21 @@ export class AgentLabScene3D implements Sim3D {
   exploreSelect(hit: ExploreHit): void { this.applyExplore(exploreInto(this.explore, hit)); }
   exploreBack(): void { this.applyExplore(exploreBack(this.explore)); }
   exploreReset(): void { this.applyExplore(EXPLORE_BODY); }
+  /** Layers taken off the body (muscles, bones, ...): what lies under them can then be tapped. */
+  private exploreHidden: readonly string[] = [];
+  private exploreForceShow: readonly string[] = [];
+  setExploreHiddenSystems(systems: readonly string[], forceShow: readonly string[] = []): void {
+    this.exploreHidden = [...systems]; this.exploreForceShow = [...forceShow];
+    this.focusLayer?.setHiddenSystems(this.exploreHidden, this.exploreForceShow);
+  }
+  searchStructures(query: string): { name: string; label: string; system: string; regionId: BodyRegionId }[] { return this.focusLayer?.search(query) ?? []; }
+  /** Search: fly straight to a structure by its atlas name (in its body region). */
+  exploreFind(name: string, regionId: BodyRegionId): boolean {
+    const found = this.focusLayer?.findPart(name);
+    if (!found) return false;
+    this.applyExplore({ level: 'STRUCTURE', regionId, organId: null, structure: found.name, system: found.system });
+    return true;
+  }
   /** Pinch / wheel: closer (< 1) or further (> 1) than the fitted framing, within sane bounds. */
   zoomExplore(factor: number): void { this.exploreZoom = Math.min(1.8, Math.max(0.45, this.exploreZoom * factor)); }
   /** "Osobno": the organ on its own plinth beside the body (the earlier close-up), or back into the body. */
@@ -257,7 +272,8 @@ export class AgentLabScene3D implements Sim3D {
     this.focusLayer?.dispose(); this.focusLayer = null;
     const atlasGroup = this.twins[0]?.getAtlasGroup();
     if (!this.THREE || !atlasGroup || !this.fullAtlas?.organs) return;
-    this.focusLayer = new AnatomyFocusLayer(this.THREE, atlasGroup, this.fullAtlas.organs, this.fullAtlas.heightMeters);
+    this.focusLayer = new AnatomyFocusLayer(this.THREE, atlasGroup, this.fullAtlas.organs, this.fullAtlas.heightMeters, this.fullAtlas.systems);
+    this.focusLayer.setHiddenSystems(this.exploreHidden, this.exploreForceShow);
     this.focusLayer.apply(this.explore);
     this.twins[0]?.setProxiesHidden(this.explore.level !== 'BODY');
     this.twins[0]?.setAtlasFade(this.explore.level === 'ORGAN' || this.explore.level === 'STRUCTURE' ? 0.45 : 1);

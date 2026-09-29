@@ -25,8 +25,8 @@ import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
 import type { GuideLevel } from '../core/guide/narrationModel';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import HumanExplorerPanel from './HumanExplorerPanel';
-import AnatomySelectionHUD, { AnatomyLabels, type ExploreAction } from './AnatomySelectionHUD';
-import { EXPLORE_BODY, exploreOrgan, type ExploreState } from '../core/three/anatomyExplore';
+import AnatomySelectionHUD, { AnatomyLabels, type ExploreAction, type LadderLevel, type StructureResult } from './AnatomySelectionHUD';
+import { EXPLORE_BODY, exploreOrgan, hiddenAtlasSystems, type ExploreState } from '../core/three/anatomyExplore';
 import { macroMicroLevelForArtifact } from '../core/three/humanMacroMicroLayer';
 import { createScientificWorldsCognitiveCore } from '../core/scientificWorlds/cognitiveBridge';
 import { scienceMemoryPort } from '../core/scientificWorlds/scienceMemoryPort';
@@ -503,12 +503,16 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [explore, setExplore] = useState<ExploreState>(EXPLORE_BODY);
   const [exploreIsolated, setExploreIsolated] = useState(false);
   const autoGhost = useRef(false);
+  const [onlySystem, setOnlySystem] = useState<string | null>(null);
+  const [peeled, setPeeled] = useState<readonly string[]>([]);
+  const filtered = useRef(false); filtered.current = onlySystem !== null || peeled.length > 0;
   const surfaceRef = useRef<TwinSurfaceMode>('NORMAL');
   useEffect(() => {
     sim.setExploreListener((next) => {
       setExplore(next); setExploreIsolated(false);
       // Going inside, the skin steps back so the organs in their places show; coming back out restores it.
-      if (next.level !== 'BODY' && surfaceRef.current === 'NORMAL') { autoGhost.current = true; surfaceRef.current = 'GHOST'; setSurface('GHOST'); sim.setTwinSurface('GHOST'); }
+      // Arms and legs have no inner organs: their muscles stay solid so a tap names them.
+      if (next.level !== 'BODY' && surfaceRef.current === 'NORMAL' && !filtered.current && next.regionId !== 'arms' && next.regionId !== 'legs') { autoGhost.current = true; surfaceRef.current = 'GHOST'; setSurface('GHOST'); sim.setTwinSurface('GHOST'); }
       if (next.level === 'BODY' && autoGhost.current) { autoGhost.current = false; if (surfaceRef.current === 'GHOST') { surfaceRef.current = 'NORMAL'; setSurface('NORMAL'); sim.setTwinSurface('NORMAL'); } }
     });
     return () => sim.setExploreListener(null);
@@ -603,6 +607,29 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, enabled));
   };
   const exploreMicro = explore.level !== 'BODY' ? bioArtifact : null;
+  const applyLayers = (only: string | null, peel: readonly string[]): void => {
+    setOnlySystem(only); setPeeled(peel);
+    const { hidden, forceShow } = hiddenAtlasSystems(only, peel);
+    sim.setExploreHiddenSystems(hidden, forceShow);
+    // A chosen system or a peeled layer is looked at solid, so its structures can be tapped and named.
+    if ((only !== null || peel.length > 0) && surfaceRef.current !== 'NORMAL') applySurface('NORMAL');
+  };
+  const exploreLadder = (level: LadderLevel): void => {
+    if (level === 'body') { setBioArtifact(null); sim.clearMacroArtifact(); sim.exploreReset(); return; }
+    if (level === 'organ') { if (exploreMicro) { setBioArtifact(null); setSession(null); sessionRef.current = null; sim.clearMacroArtifact(); } return; }
+    const organ = EXPLORER_ORGANS.find((o) => o.organId === exploreOrgan(explore.organId)?.explorerOrganId);
+    if (!organ) return;
+    const lt = nextLogicalTime(); const label = `${exploreOrgan(explore.organId)?.label ?? ''} → ${level}`;
+    submitCommands(explorerCommands(organ, level, label, lt, { manifest: sim.manifest, selectedNodeId: anatomyRef.current.selectedNodeId, sessions, worldId: BIOLOGY_WORLD_ID, seed: 7 }), label);
+  };
+  const exploreMagnify = (m: number): void => {
+    const lt = nextLogicalTime();
+    const bloodNow = exploreMicro?.kind === 'hyperscope' && exploreMicro.cell?.tissueType === 'BLOOD';
+    const organ = EXPLORER_ORGANS.find((o) => o.organId === exploreOrgan(explore.organId)?.explorerOrganId);
+    const label = bloodNow ? `Mikroskop ${m}× · krew (model referencyjny)` : `Mikroskop ${m}× · ${exploreOrgan(explore.organId)?.label ?? ''}`;
+    if (bloodNow) submitCommands(bloodMagnificationCommands(m, label, lt), label);
+    else if (organ) submitCommands(magnificationCommands(organ, m, label, lt), label);
+  };
   const exploreBack = (): void => {
     if (exploreMicro) { setBioArtifact(null); setSession(null); sessionRef.current = null; sim.clearMacroArtifact(); return; }
     if (exploreIsolated) { setExploreIsolated(false); sim.setExploreIsolated(null); return; }
@@ -1094,14 +1121,19 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
           onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
           exploring={camera === 'TWIN' && explore.level !== 'BODY'}
+          hudOn={camera === 'TWIN' && sim.hasExploreAtlas()}
           exploreReady={camera === 'TWIN' && sim.hasExploreAtlas()}
         />
       )}
-      {world === 'biology' && explorerOpen && camera === 'TWIN' && explore.level !== 'BODY' && <>
-        <AnatomyLabels read={readExploreLabels} onPick={(hit) => sim.exploreSelect(hit)} />
+      {world === 'biology' && explorerOpen && camera === 'TWIN' && sim.hasExploreAtlas() && <>
+        {explore.level !== 'BODY' && <AnatomyLabels read={readExploreLabels} onPick={(hit) => sim.exploreSelect(hit)} />}
         <AnatomySelectionHUD explore={explore} micro={exploreMicro} isolated={exploreIsolated} sectionOn={cutaway.enabled}
           busy={agentState !== 'IDLE' && agentState !== 'BLOCKED' && agentState !== 'ARRIVED'} surface={surface} onSurface={applySurface}
-          onBack={exploreBack} onAction={exploreAction} />
+          onBack={exploreBack} onAction={exploreAction}
+          onlySystem={onlySystem} onSystem={(id) => applyLayers(id, peeled)} peeled={peeled}
+          onPeel={(id) => applyLayers(onlySystem, peeled.includes(id) ? peeled.filter((p) => p !== id) : [...peeled, id])}
+          search={(q) => sim.searchStructures(q)} onFind={(r: StructureResult) => sim.exploreFind(r.name, r.regionId)}
+          onLadder={exploreLadder} onMagnify={exploreMagnify} />
       </>}
       {world !== 'biology' && commandControls}
     </main>

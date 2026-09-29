@@ -47,6 +47,20 @@ export const FULL_ATLAS_SYSTEM_COLOR: Readonly<Record<string, number>> = {
 /** Systems the explorer starts with switched off, as the source viewer does (surface and reproductive). */
 export const FULL_ATLAS_HIDDEN_BY_DEFAULT: readonly string[] = ['integumentary', 'reproductive'];
 
+/**
+ * Whole organs assembled from their atlas structures, for the organ close-up. The brain is every
+ * nervous-system structure in the skull (gyri, white matter, deep nuclei, brainstem, cerebellum),
+ * without the cranial nerves and their branches.
+ */
+export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPart) => boolean>> = {
+  brain: (p) => p.system === 'nervous' && p.bounds[0]![1]! > 1.35 && !/nerve|ganglion|branch|spinal/i.test(p.name),
+};
+
+export interface FullAtlasOrganMesh {
+  readonly geometry: THREE_NS.BufferGeometry;
+  readonly partCount: number;
+}
+
 export interface FullAtlasSystemMesh {
   readonly system: string;
   readonly geometry: THREE_NS.BufferGeometry;
@@ -56,6 +70,8 @@ export interface FullAtlasSystemMesh {
 
 export interface LoadedFullAtlas {
   readonly systems: readonly FullAtlasSystemMesh[];
+  /** Organ id → that organ's own atlas structures merged (see FULL_ATLAS_ORGAN_PARTS). */
+  readonly organs?: ReadonlyMap<string, FullAtlasOrganMesh>;
   readonly structures: number;
   readonly concepts: number;
   readonly triangles: number;
@@ -144,8 +160,14 @@ export async function loadFullAtlas(
     const geometry = mergeSystemParts(THREE, parts, buffers);
     systems.push({ system, geometry, partCount: parts.length, triangles: (geometry.index?.count ?? 0) / 3 });
   }
+  const organs = new Map<string, FullAtlasOrganMesh>();
+  for (const [organId, selects] of Object.entries(FULL_ATLAS_ORGAN_PARTS)) {
+    const parts = manifest.parts.filter(selects);
+    if (parts.length) organs.set(organId, { geometry: mergeSystemParts(THREE, parts, buffers), partCount: parts.length });
+  }
   return {
     systems,
+    organs,
     structures: manifest.parts.length,
     concepts: manifest.concepts?.length ?? 0,
     triangles: systems.reduce((s, x) => s + x.triangles, 0),

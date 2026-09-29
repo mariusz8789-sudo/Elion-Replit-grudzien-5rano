@@ -391,10 +391,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     const plan = planActions(parsed.commands, def.catalog, controller.station);
     say('system', describePlan(parsed.commands.length, parsed.unresolved, plan.steps.map((s) => s.kind), plan.rejected));
     if (plan.steps.length === 0) return;
-    const started = controller.startPlan(plan);
+    // Human Explorer: the atlas answers the tap directly; the lab agent is an optional demonstration layer, not a
+    // precondition. Same plan, same sealed session and Evidence, no walk between stations.
+    const started = controller.startPlan(plan, { direct: world === 'biology' });
     if (!started.ok) say('system', `Agent nie może przyjąć planu: ${started.reason}.`);
     else { setBlocked(null); const first = plan.steps.find((s) => 'stationId' in s); sim.setHighlight(first && 'stationId' in first ? first.stationId : null); }
-  }, [controller, def, say, sim]);
+  }, [controller, def, say, sim, world]);
   const submit = useCallback((raw: string) => {
     const t = raw.trim(); if (!t) return;
     say('user', t);

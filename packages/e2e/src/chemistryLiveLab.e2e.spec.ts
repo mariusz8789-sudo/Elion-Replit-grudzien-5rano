@@ -22,6 +22,9 @@ async function openFromMenu(page: Page): Promise<void> {
   await page.goto('/#/');
   const more = page.locator('.shell-nav-more');
   if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  // Każda grupa w „Więcej” jest zwinięta; rozwiń wszystkie.
+  const groups = page.locator('.shell-nav-group-toggle[aria-expanded="false"]');
+  while (await groups.count() > 0) await groups.first().click();
   await page.getByRole('button', { name: /Chemia — stanowisko miareczkowania/ }).first().click();
   await expect(page.getByTestId('chem-live-lab')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('chem-live-lab')).toHaveAttribute('data-embedded', 'true');

@@ -99,10 +99,12 @@
   .human-context.is-left { left: 14px; right: 14px; }
   .human-hero:is(.has-context, .has-inspector) .human-hero-path,
   .human-hero:is(.has-context, .has-inspector) .human-hero-action { visibility: hidden; }
-  .human-hero-heading { top: 65px; left: 20px; max-width: 260px; }
+  .human-hero-heading { top: 65px; left: 20px; right: 20px; max-width: none; }
   .human-hero-heading h1 { font-size: 30px; margin: 7px 0; }
-  .human-hero-heading p { font-size: 11px; margin-bottom: 6px; }
-  .human-hero-tools { top: 184px; left: 14px; right: 14px; gap: 4px; justify-content: center; }
+  .human-hero-heading p { font-size: 11px; margin-bottom: 6px; max-width: none; }
+  /* One line each on a phone, so the surface chips below never sit on top of the text; the full attribution is in the title. */
+  .human-model-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .human-hero-tools { top: 196px; left: 14px; right: 14px; gap: 4px; justify-content: center; }
   .human-hero-tools .sw-chip { padding: 8px 10px; min-height: 38px; font-size: 10px; }
   .human-hero-path { bottom: calc(111px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; justify-content: space-between; border-radius: 12px; padding: 4px; }
   .human-hero-path button { flex: 1; padding: 8px 4px; align-items: center; min-width: 0; }

@@ -166,7 +166,10 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (artifact && IMAGE_KINDS.has(artifact.kind)) drawBiologyArtifact({ ctx, canvas, texture: { needsUpdate: false } }, artifact, manifest);
+    if (artifact && IMAGE_KINDS.has(artifact.kind)) { drawBiologyArtifact({ ctx, canvas, texture: { needsUpdate: false } }, artifact, manifest); return; }
+    // No capture yet: say what to do instead of showing an empty black field.
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.8)'; ctx.font = '600 22px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Wybierz powiększenie powyżej', canvas.width / 2, canvas.height / 2);
   }, [artifact, manifest]);
 
   const run = (commands: readonly WorldCommand[], label: string): void => { onCommands(commands, label, commands[0]?.requestedAtLogicalTime ?? 0); };
@@ -200,9 +203,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
         <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
         <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
-        {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur · {BODYPARTS3D_ATTRIBUTION}</span>}
+        {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures} title={BODYPARTS3D_ATTRIBUTION}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur · {BODYPARTS3D_ATTRIBUTION}</span>}
         {referenceAnatomy?.fullAtlas?.status === 'LOADING' && <span className="human-model-label" data-testid="bp3d-full-atlas-loading">Wczytywanie pełnego atlasu anatomicznego…</span>}
-        {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
+        {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])} title={BODYPARTS3D_ATTRIBUTION}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
       {/* HERO → twin (D-146): what the finalist is, what it was docked against, where that target sits, and
           what kind of knowledge each line is. RESOLVED came from the canonical run; UNRESOLVED says why and

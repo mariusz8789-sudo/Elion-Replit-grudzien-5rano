@@ -131,8 +131,9 @@
     inset: auto 0.55rem calc(4.25rem + var(--safe-bottom)) !important;
     z-index: 80 !important;
     width: auto !important;
-    height: min(64dvh, 34rem) !important;
-    max-height: calc(100dvh - 6rem - var(--safe-bottom)) !important;
+    /* Sized to its content: a short menu is a short drawer, never a panel of empty space. */
+    height: auto !important;
+    max-height: min(64dvh, calc(100dvh - 6rem - var(--safe-bottom))) !important;
     overflow: hidden !important;
     border: 1px solid rgba(119, 232, 242, 0.28) !important;
     border-radius: 1rem !important;
@@ -143,7 +144,7 @@
   }
 
   .shell-sheet-head {
-    min-height: 3.8rem;
+    min-height: 3.2rem;
     padding: 0.55rem 0.65rem 0.55rem 1rem !important;
     background: rgba(5, 17, 22, 0.98);
   }
@@ -176,7 +177,7 @@
 
   .shell-sheet .shell-nav-section {
     display: grid !important;
-    gap: 0.18rem !important;
+    gap: 0.08rem !important;
     padding: 0.15rem 0 !important;
     position: static !important;
   }
@@ -196,9 +197,9 @@
     align-items: center !important;
     gap: 0.58rem !important;
     width: 100% !important;
-    min-height: 2.8rem !important;
+    min-height: 2.65rem !important;
     margin: 0 !important;
-    padding: 0.48rem 0.65rem !important;
+    padding: 0.4rem 0.65rem !important;
     border: 0 !important;
     border-radius: 0.65rem !important;
     background: transparent !important;

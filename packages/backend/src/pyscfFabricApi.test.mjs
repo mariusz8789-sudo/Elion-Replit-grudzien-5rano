@@ -6,6 +6,7 @@ import { detect } from './compute/qmAdapter.mjs';
 
 const runtime = detect();
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'pyscf-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0',
   modelId: 'quantum-chemistry-pyscf-h2-rhf',
@@ -28,7 +29,7 @@ test('Fabric contract exposes the bounded real PySCF H2 RHF model', () => {
 
 if (runtime.available) {
   test('Fabric API runs a real PySCF H2 RHF/STO-3G single point with dynamic engine provenance', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.contractVersion, '1.0.0');
     assert.equal(response.body.run.status, 'ok');
@@ -43,7 +44,7 @@ if (runtime.available) {
   });
 
   test('Fabric API runs the real PySCF H2 RHF/6-31G comparison arm', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: { ...request, inputs: { bondLengthAngstrom: 0.74, basis: '6-31g' } }, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: { ...request, inputs: { bondLengthAngstrom: 0.74, basis: '6-31g' } }, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.run.status, 'ok');
     assert.equal(response.body.run.modelVersion, '1.1.0');
@@ -55,14 +56,14 @@ if (runtime.available) {
     assert.equal(response.body.persisted, false);
   });
   test('Fabric API rejects unsupported basis instead of passing an unregistered variant', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: { ...request, inputs: { bondLengthAngstrom: 0.74, basis: 'cc-pvdz' } }, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: { ...request, inputs: { bondLengthAngstrom: 0.74, basis: 'cc-pvdz' } }, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
     assert.equal(response.body.run.error, 'unsupported_basis');
   });
 } else {
   test('Fabric API rejects PySCF execution instead of emitting fabricated quantum output without runtime', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
     assert.equal(response.body.run.error, 'capability_unavailable');

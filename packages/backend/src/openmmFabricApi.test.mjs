@@ -6,6 +6,7 @@ import { detect } from './compute/openmmAdapter.mjs';
 
 const runtime = detect();
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'openmm-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0',
   modelId: 'biology-openmm-md-1vii-reference',
@@ -26,7 +27,7 @@ test('Fabric contract exposes the bounded real OpenMM CPU MD reference model', (
 
 if (runtime.available) {
   test('Fabric API runs real OpenMM CPU molecular dynamics for public PDB 1VII', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.run.status, 'ok');
     assert.equal(response.body.run.outputs.atomCountAfterHydrogenAddition, 596);
@@ -40,14 +41,14 @@ if (runtime.available) {
   });
 } else {
   test('Fabric API rejects MD instead of creating synthetic output when OpenMM is unavailable', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
   });
 }
 
 test('Fabric API rejects MD step count outside the bounded benchmark domain', () => {
-  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', query: {}, token: null, body: { ...request, inputs: { steps: 5 } } });
+  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', query: {}, token: authToken, body: { ...request, inputs: { steps: 5 } } });
   assert.equal(response.status, 400);
   assert.equal(response.body.run.status, 'rejected');
 });

@@ -126,6 +126,7 @@ import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeInges
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
+import { createComputeAdmission } from './compute/computeAdmission.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
 import { runIngest, listProposals, publishProposal, rejectProposal, proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { runQuantum, describeQuantum } from './quantumApi.mjs';
@@ -144,6 +145,7 @@ const TRIAL_STATUSES = new Set(['baseline', 'draft', 'promising', 'failed']);
 let localVideoRuntimeCache = null;
 let localVideoRuntimeCachedAt = 0;
 const LOCAL_VIDEO_RUNTIME_CACHE_MS = 60_000;
+const heavyComputeAdmission = createComputeAdmission();
 
 const ok = (body, status = 200) => ({ status, body });
 const err = (status, error, message) => ({ status, body: { error, ...(message ? { message } : {}) } });
@@ -199,6 +201,40 @@ function reasoningProviderOf(ctx) {
   return ctx.reasoningProvider ?? BLOCKED_REASONING_PROVIDER;
 }
 
+function isHeavyRegistryModel(modelId) {
+  const model = getModel(String(modelId ?? ''));
+  const honesty = model?.provenance?.honesty;
+  return model?.kind === 'external-engine'
+    || model?.kind === 'external-data'
+    || (typeof honesty === 'string' && honesty.startsWith('real_external_engine'));
+}
+
+function heavyComputeRoute(seg, method, body) {
+  if (method !== 'POST' || seg[0] !== 'compute') return null;
+  if (seg.length === 3 && seg[1] === 'admet' && seg[2] === 'predict') return 'admet-predict';
+  if (seg.length === 3 && seg[1] === 'qm' && seg[2] === 'singlepoint') return 'qm-singlepoint';
+  if (seg.length === 2 && seg[1] === 'run' && isHeavyRegistryModel(body.modelId)) return `model:${body.modelId}`;
+  if (seg.length === 3 && seg[1] === 'fabric' && seg[2] === 'run' && isHeavyRegistryModel(body.modelId)) return `model:${body.modelId}`;
+  return null;
+}
+
+function runHeavyCompute(db, ctx, operation, execute) {
+  const user = getUserByToken(db, ctx.token);
+  if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić kosztowne obliczenie naukowe.');
+  const admission = ctx.computeAdmission ?? heavyComputeAdmission;
+  const ticket = admission.acquire(user.id);
+  if (!ticket.ok) {
+    if (ticket.reason === 'busy') return err(503, 'compute_busy', 'Inne kosztowne obliczenie jest już wykonywane. Spróbuj ponownie później.');
+    if (ticket.reason === 'rate_limited') return err(429, 'compute_rate_limited', 'Limit kosztownych obliczeń dla tego użytkownika został wyczerpany.');
+    return err(403, 'compute_admission_denied');
+  }
+  try {
+    return execute(user, operation);
+  } finally {
+    ticket.release();
+  }
+}
+
 export function handleApi(db, ctx) {
   const { method, pathname } = ctx;
   const body = ctx.body ?? {};
@@ -221,6 +257,15 @@ export function handleApi(db, ctx) {
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
   if (seg[0] === 'compute') {
+    const heavyOperation = heavyComputeRoute(seg, method, body);
+    if (heavyOperation) {
+      return runHeavyCompute(db, ctx, heavyOperation, () => {
+        if (seg.length === 2 && seg[1] === 'run') return runComputeHandler(db, ctx, body);
+        if (seg.length === 3 && seg[1] === 'fabric' && seg[2] === 'run') return runFabricHandler(db, ctx, body);
+        if (seg.length === 3 && seg[1] === 'admet' && seg[2] === 'predict') return runAdmetHandler(body);
+        return runQuantumSinglePointHandler(body);
+      });
+    }
     if (seg[1] === 'local-video' && seg[2] === 'runtime' && seg.length === 3 && method === 'GET') {
       return ok({
         capabilities: listLocalVideoCapabilities(),
@@ -276,13 +321,10 @@ export function handleApi(db, ctx) {
       return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
     if (seg[1] === 'admet' && seg[2] === 'predict' && seg.length === 3 && method === 'POST') {
-      const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
-      const r = predictAdmet(smiles);
-      return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+      return runAdmetHandler(body);
     }
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
-      const r = runQuantumSinglePoint(body ?? {});
-      return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+      return runQuantumSinglePointHandler(body);
     }
     return err(404, 'not_found');
   }
@@ -1018,6 +1060,17 @@ export function handleApi(db, ctx) {
   }
 
   return err(404, 'not_found');
+}
+
+function runAdmetHandler(body) {
+  const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
+  const r = predictAdmet(smiles);
+  return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+}
+
+function runQuantumSinglePointHandler(body) {
+  const r = runQuantumSinglePoint(body ?? {});
+  return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
 }
 
 /* ---------------- Handlery uwierzytelniania ---------------- */

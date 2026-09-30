@@ -92,6 +92,7 @@ interface StationVisual {
 const FLOOR_Y = 0;
 const CEILING_Y = 3.6;
 const THREE_MATH_DEG = Math.PI / 180;
+const BIOLOGY_HALL_HEIGHT_M = 7.5;
 // 'nervous' too: the atlas's own copy of the brain would cover the organ view's glass shell in solid white.
 const BRAIN_FOCUS_HIDDEN: readonly string[] = ['skeletal', 'muscular', 'connective', 'integumentary', 'nervous'];
 /** createTwinChamber lifts its anchor 0.2 m above the floor; the twin stands on it. */
@@ -864,7 +865,8 @@ export class AgentLabScene3D implements Sim3D {
    * (layered ceiling, glass curtain walls, twin chamber, manipulators, stations). Same class, same pipeline, same cameras.
    */
   private initBiology(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, palette: GenesisMaterialPalette, tier: ReturnType<typeof detectRenderTier>): void {
-    this.ceilingY = BIOLOGY_SCENE.dimensionsMeters.y;
+    // The hall is taller than the pack's 4.2 m room: a high ceiling over the chamber is what makes it read as the main machine.
+    this.ceilingY = Math.max(BIOLOGY_SCENE.dimensionsMeters.y, BIOLOGY_HALL_HEIGHT_M);
     const H = this.ceilingY;
     // D-132: the biology lab's own grade — deep black point, dark mirrored floor, light on the twin.
     this.grade = WORLD_GRADES.biology;
@@ -1283,8 +1285,9 @@ export class AgentLabScene3D implements Sim3D {
         if (this.fovFrom !== null) fov = this.fovFrom + (this.exploreFov - this.fovFrom) * e;
         if (k >= 1) this.focusTween = null;
       } else {
-        this.twinCamPos.lerp(this.scratchA, cameraEase(5));
-        this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
+        // Reduced motion copies (a lerp by 1 can wobble in the last bit and turn a held camera by a hair).
+        if (reducedMotion) { this.twinCamPos.copy(this.scratchA); this.twinCamLook.copy(this.scratchB); }
+        else { this.twinCamPos.lerp(this.scratchA, cameraEase(5)); this.twinCamLook.lerp(this.scratchB, cameraEase(7.7)); }
         fov = camera.fov + (this.exploreFov - camera.fov) * cameraEase(5);
       }
       if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -1329,7 +1332,7 @@ export class AgentLabScene3D implements Sim3D {
     if (d < outside) { d = outside; this.exploreFov = THREE.MathUtils.radToDeg(2 * Math.atan(needed / (2 * (d - size.z / 2)))); }
     const visible = needed;
     this.scratchA.set(c.x, c.y + d * 0.05, c.z + d);
-    this.scratchB.set(c.x + (this.researchLayoutOpen && !portrait ? visible * camera.aspect * 0.12 : 0), c.y - (portrait ? visible * 0.06 : 0), c.z);
+    this.scratchB.set(c.x + (this.researchLayoutOpen && !portrait ? visible * camera.aspect * 0.12 : 0), c.y - (portrait ? visible * 0.1 : 0), c.z);
   }
 
   /**

@@ -621,7 +621,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   };
   const exploreLadder = (level: LadderLevel): void => {
     if (level === 'body') { setBioArtifact(null); sim.clearMacroArtifact(); sim.exploreReset(); return; }
-    if (level === 'organ') { if (exploreMicro) { setBioArtifact(null); setSession(null); sessionRef.current = null; sim.clearMacroArtifact(); } return; }
+    const leaveMicro = (): void => { setBioArtifact(null); setSession(null); sessionRef.current = null; sim.clearMacroArtifact(); };
+    // Structure: back from the microscope to the tapped structure. Organ: up from the structure too.
+    if (level === 'structure') { if (exploreMicro) leaveMicro(); return; }
+    if (level === 'organ') { if (exploreMicro) leaveMicro(); if (explore.level === 'STRUCTURE' && explore.organId) sim.exploreBack(); return; }
     const organ = EXPLORER_ORGANS.find((o) => o.organId === exploreOrgan(explore.organId)?.explorerOrganId);
     if (!organ) return;
     const lt = nextLogicalTime(); const label = `${exploreOrgan(explore.organId)?.label ?? ''} → ${level}`;

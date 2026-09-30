@@ -127,7 +127,7 @@ const KIND: Readonly<Record<string, Triple>> = {
 export function atlasKindName(system: string): string { return getLocale() === 'pl' ? SYSTEM_PL[system] ?? system : KIND[system] ? pick(KIND[system]) : system; }
 
 const LADDER: Readonly<Record<string, Triple>> = {
-  body: ['Ciało', 'Body', 'الجسم'], organ: ['Narząd', 'Organ', 'العضو'], tissue: ['Tkanka', 'Tissue', 'النسيج'], cell: ['Komórka', 'Cell', 'الخلية'],
+  body: ['Ciało', 'Body', 'الجسم'], organ: ['Narząd', 'Organ', 'العضو'], structure: ['Struktura', 'Structure', 'البنية'], tissue: ['Tkanka', 'Tissue', 'النسيج'], cell: ['Komórka', 'Cell', 'الخلية'],
   organelle: ['Organellum', 'Organelle', 'العُضيّة'], molecule: ['Cząsteczka', 'Molecule', 'الجزيء'], dna: ['DNA', 'DNA', 'DNA'],
 };
 export function ladderName(level: string, fallback: string): string { const t = LADDER[level]; return t ? pick(t) : fallback; }

@@ -83,7 +83,8 @@ function toLabStation(s: BiologyPackStation): LabStation {
 export const BIOLOGY_STATIONS: readonly LabStation[] = GENESIS_LAB_STATIONS.map(toLabStation);
 
 /** The central Human Digital Twin chamber (platform + glass cylinder) is the island the agent walks around. */
-export const TWIN_CHAMBER: { readonly position: Vec2; readonly radius: number; readonly height: number } = { position: { x: 0, z: 0 }, radius: 1.15, height: 3.1 };
+/** Monumental on purpose: the lab's central machine, twice the human's height (reference: the Human Digital Twin lab). */
+export const TWIN_CHAMBER: { readonly position: Vec2; readonly radius: number; readonly height: number } = { position: { x: 0, z: 0 }, radius: 1.4, height: 3.8 };
 
 /**
  * Operator consoles in a ring around the chamber (the reference's desks around the central machine). Scenery

@@ -18,9 +18,9 @@ import { deleteView, notePlace, readNote, readViews, saveView, writeNote, type S
 
 export type ExploreAction = 'section' | 'microscope' | 'cell' | 'blood' | 'isolate' | 'vessels' | 'nerves' | 'function';
 /** The macro → micro ladder of the reference (Ciało 1 m … DNA 0,1 nm); each rung runs the existing instrument. */
-export type LadderLevel = 'body' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule' | 'dna';
+export type LadderLevel = 'body' | 'organ' | 'structure' | 'tissue' | 'cell' | 'organelle' | 'molecule' | 'dna';
 export const LADDER: readonly (readonly [LadderLevel, string, string])[] = [
-  ['body', 'Ciało', '1 m'], ['organ', 'Narząd', '10 cm'], ['tissue', 'Tkanka', '1 mm'], ['cell', 'Komórka', '10 µm'],
+  ['body', 'Ciało', '1 m'], ['organ', 'Narząd', '10 cm'], ['structure', 'Struktura', '1 cm'], ['tissue', 'Tkanka', '1 mm'], ['cell', 'Komórka', '10 µm'],
   ['organelle', 'Organellum', '1 µm'], ['molecule', 'Cząsteczka', '1 nm'], ['dna', 'DNA', '0,1 nm'],
 ];
 export const MAGNIFICATIONS: readonly number[] = [5, 25, 100, 500, 1000];
@@ -110,7 +110,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
     ?? (explore.level === 'REGION' ? tx('hintRegion') : tx('hintBody'));
   const microscopeOk = Boolean(organ?.explorerOrganId);
   const ladderOn = microscopeOk && (explore.level === 'ORGAN' || explore.level === 'STRUCTURE') && !blood;
-  const currentRung: LadderLevel = microLevel ?? (explore.level === 'BODY' ? 'body' : 'organ');
+  const currentRung: LadderLevel = microLevel ?? (explore.level === 'BODY' ? 'body' : explore.level === 'STRUCTURE' ? 'structure' : 'organ');
   const actions: readonly (readonly [ExploreAction, string, boolean])[] = caption
     ? [['blood', tx('blood'), !blood]]
     : atBody ? []
@@ -199,7 +199,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
         </section>
       </aside>
       {ladderOn && <nav className="ax-ladder" aria-label={tx('macroToMicro')} data-testid="anatomy-ladder">
-        {LADDER.map(([level, label, scale]) => <button key={level} type="button" className={`ax-rung${currentRung === level ? ' is-on' : ''}`} aria-current={currentRung === level ? 'step' : undefined} disabled={busy} onClick={() => onLadder(level)} data-testid={`anatomy-rung-${level}`}><strong>{ladderName(level, label)}</strong><small>{scale}</small></button>)}
+        {LADDER.map(([level, label, scale]) => <button key={level} type="button" className={`ax-rung${currentRung === level ? ' is-on' : ''}`} aria-current={currentRung === level ? 'step' : undefined} disabled={busy || (level === 'structure' && !explore.structure)} onClick={() => onLadder(level)} data-testid={`anatomy-rung-${level}`}><strong>{ladderName(level, label)}</strong><small>{scale}</small></button>)}
       </nav>}
       <section className="ax-sheet" aria-live="polite" data-testid="anatomy-sheet">
         <div className="ax-name">

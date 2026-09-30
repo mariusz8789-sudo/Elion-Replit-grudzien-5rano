@@ -245,3 +245,19 @@ body:has(.ax-hud) .human-subject-target { display: none; }
 @media (max-width: 899px) {
   body:has(.ax-hud[data-focus="LAB_WIDE"]) .human-hero .human-hero-heading :is(h1, p:first-of-type) { display: none; }
 }
+
+/* Phone: the controls give the body more room — one-line level chips, slimmer tabs, a two-line description. */
+@media (max-width: 899px) {
+  .ax-hud { gap: 5px; }
+  .ax-tab { min-height: 32px; font-size: 12px; }
+  .ax-ladder { padding: 3px; border-radius: 12px; }
+  .ax-rung { flex-direction: row; gap: 4px; min-width: 0; padding: 5px 10px; align-items: baseline; }
+  .ax-rung small { display: none; }
+  .ax-rung.is-on small { display: inline; }
+  .ax-sheet { padding: 8px 12px; gap: 6px; }
+  .ax-name strong { font-size: 16px; }
+  .ax-name span { -webkit-line-clamp: 2; font-size: 12px; }
+  .ax-act { min-height: 34px; padding: 0 12px; }
+  .ax-discovery { margin-top: 2px; }
+  .ax-discovery summary { min-height: 26px; }
+}

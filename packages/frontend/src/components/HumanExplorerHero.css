@@ -217,3 +217,9 @@ body:has(.ax-hud) .context-guide-launch { display: none; }
 .ax-view { display: flex; gap: 4px; align-items: stretch; }
 .ax-view .ax-item { flex: 1; min-width: 0; }
 .ax-x { flex: none; width: 34px; border-radius: 10px; border: 1px solid #54748566; background: transparent; color: #b4c6ce; font-size: 16px; cursor: pointer; }
+/* Desktop with the anatomy menu open: the big title would sit under the left menu, so only the model and
+   atlas credit stay, as one small line at the top centre. */
+@media (min-width: 900px) {
+  .human-hero.has-hud .human-hero-heading { top: 14px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center; background: none; display: flex; flex-direction: column; gap: 2px; }
+  .human-hero.has-hud .human-hero-heading :is(.human-eyebrow, h1, p) { display: none; }
+}

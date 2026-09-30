@@ -92,6 +92,8 @@ interface StationVisual {
 const FLOOR_Y = 0;
 const CEILING_Y = 3.6;
 const THREE_MATH_DEG = Math.PI / 180;
+// 'nervous' too: the atlas's own copy of the brain would cover the organ view's glass shell in solid white.
+const BRAIN_FOCUS_HIDDEN: readonly string[] = ['skeletal', 'muscular', 'connective', 'integumentary', 'nervous'];
 /** createTwinChamber lifts its anchor 0.2 m above the floor; the twin stands on it. */
 const TWIN_ANCHOR_HEIGHT = 0.2;
 
@@ -236,7 +238,12 @@ export class AgentLabScene3D implements Sim3D {
   private exploreForceShow: readonly string[] = [];
   setExploreHiddenSystems(systems: readonly string[], forceShow: readonly string[] = []): void {
     this.exploreHidden = [...systems]; this.exploreForceShow = [...forceShow];
-    this.focusLayer?.setHiddenSystems(this.exploreHidden, this.exploreForceShow);
+    this.applyHiddenSystems();
+  }
+  /** Looking into the brain, the skull and the head's muscles step aside (only while it is in focus). */
+  private applyHiddenSystems(): void {
+    const brain = this.explore.organId === 'brain' && (this.explore.level === 'ORGAN' || this.explore.level === 'STRUCTURE');
+    this.focusLayer?.setHiddenSystems(brain ? [...new Set([...this.exploreHidden, ...BRAIN_FOCUS_HIDDEN])] : this.exploreHidden, this.exploreForceShow);
   }
   /** A PNG of what the camera sees right now (drawn once more so the image is never an empty buffer). */
   capturePng(): string | null {
@@ -288,6 +295,7 @@ export class AgentLabScene3D implements Sim3D {
     // Any descent (a tap, a search, a saved view) starts at the chamber, never from across the hall.
     if (this.labWide) { this.labWide = false; this.onLabWide?.(false); }
     this.explore = state;
+    this.applyHiddenSystems();
     this.focusLayer?.apply(state);
     for (const t of this.twins.slice(0, 1)) { t.setProxiesHidden(deeper); t.setAtlasFade(state.level === 'ORGAN' || state.level === 'STRUCTURE' ? 0.45 : 1); }
     this.macroMicro?.setOrganStage(!deeper);

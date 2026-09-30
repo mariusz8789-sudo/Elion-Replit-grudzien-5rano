@@ -213,7 +213,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
             <button key={id} type="button" className={`ax-act${id === 'microscope' ? ' is-primary' : ''}${isOn(id) ? ' is-on' : ''}`} aria-pressed={isOn(id)} disabled={busy && (id === 'microscope' || id === 'blood' || id === 'isolate')} onClick={() => act(id)} data-testid={`anatomy-${id}`}>{busy && id === 'microscope' ? tx('working') : label}</button>
           ))}
         </div>}
-        {sectionOn && <div className="ax-section" data-testid="anatomy-section">
+        {sectionOn && <div className="ax-section" data-testid="anatomy-section-controls">
           <span className="ax-surfaces" role="group" aria-label={tx('section')}>
             {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const satisfies readonly SectionAxis[]).map((a) => <button key={a} type="button" className={`ax-surf${section.axis === a ? ' is-on' : ''}`} aria-pressed={section.axis === a} onClick={() => onSectionMove({ ...section, axis: a })} data-testid={`anatomy-axis-${a.toLowerCase()}`}>{tx(`axis${a}`)}</button>)}
           </span>

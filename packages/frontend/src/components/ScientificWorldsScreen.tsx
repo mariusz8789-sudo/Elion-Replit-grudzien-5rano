@@ -519,6 +519,9 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   }, [sim]);
   const [labWide, setLabWide] = useState(true);
   useEffect(() => { sim.setLabWideListener(setLabWide); return () => sim.setLabWideListener(null); }, [sim]);
+  // The camera walks for 0.85 s; measure the body on screen again once it has arrived.
+  const [, setArrived] = useState(0);
+  useEffect(() => { const t = window.setTimeout(() => setArrived((n) => n + 1), 1300); return () => window.clearTimeout(t); }, [labWide]);
   const readExploreLabels = useCallback(() => sim.getExploreLabels(), [sim]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */

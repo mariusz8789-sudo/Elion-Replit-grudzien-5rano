@@ -38,6 +38,20 @@ const ORGAN_COLOR: Readonly<Record<string, number>> = {
   stomach: 0xc99a70, liver: 0x8f4a3c, pancreas: 0xd8b07a, intestine: 0xc8957a, spleen: 0x8a4a5a, kidneys: 0xa0584c, bladder: 0xc9a07f, rectum: 0xb8806a,
 };
 
+/**
+ * The brain's outer shell (the lobes' cortex and the white matter under it). With the brain in focus it
+ * turns to faint glass, so the deep structures (hippocampus, amygdala, thalamus...) show and take the tap.
+ */
+const BRAIN_OUTER: ReadonlySet<string> = new Set(['frontal', 'parietal', 'temporal', 'occipital', 'white', 'other']);
+/** Deep landmarks named on the brain once it is in focus; the first atlas part matching each key is labelled. */
+const BRAIN_LANDMARKS: readonly ((name: string) => boolean)[] = [
+  (n) => n.includes('hippocampus') && !n.includes('parahippocampal'),
+  (n) => n.includes('amygdala'),
+  (n) => n.includes('thalamus') && !/hypothalamus|stria|sub/.test(n),
+  (n) => n.includes('cerebell'),
+  (n) => n.includes('pons'),
+];
+
 /** The atlas system each explored organ belongs to, so peeling a layer also peels its organs. */
 const ORGAN_SYSTEM: Readonly<Record<string, string>> = { brain: 'nervous', eyes: 'sensory', heart: 'cardiac', airways: 'respiratory', aorta: 'arterial', spleen: 'lymphatic', kidneys: 'urinary', bladder: 'urinary' };
 
@@ -47,6 +61,7 @@ export class AnatomyFocusLayer {
   private readonly mats: THREE_NS.MeshStandardMaterial[] = [];
   private readonly dim: THREE_NS.MeshStandardMaterial;
   private readonly picked: THREE_NS.MeshStandardMaterial;
+  private readonly ghost: THREE_NS.MeshBasicMaterial;
   private readonly ray: THREE_NS.Raycaster;
   private state: ExploreState | null = null;
   /** The body's outline in atlas units (feet at y = 0), measured once from the systems' own bounds. */
@@ -71,6 +86,8 @@ export class AnatomyFocusLayer {
     };
     this.dim = mat(0x9fb4c0, { transparent: true, opacity: 0.14, depthWrite: false });
     this.picked = mat(0x7fe3ff, { emissive: 0x2fc7ff, emissiveIntensity: 0.75 });
+    // Unlit and very faint: lit (rim-lit) gyri, dozens deep, would otherwise add up to a white blob.
+    this.ghost = new THREE.MeshBasicMaterial({ color: 0x5f7d92, transparent: true, opacity: 0.05, depthWrite: false });
     const pickSystems: AtlasPickSystem[] = [];
     for (const sys of systems) {
       const mesh = atlasGroup.children.find((c) => c.name === `atlas:${sys.system}`) as THREE_NS.Mesh | undefined;
@@ -136,8 +153,9 @@ export class AnatomyFocusLayer {
         if (others) { mesh.material = this.dim; continue; }
         if (!selected) { mesh.material = base; continue; }
         // The tapped structure glows; the rest of its organ keeps its colours (a hundred dimmed layers would add up to white).
-        if (state.level === 'STRUCTURE') mesh.material = mesh.userData.partName === state.structure ? this.picked : base;
-        else mesh.material = base;
+        const outer = id === 'brain' && BRAIN_OUTER.has(brainRegionOf(mesh.userData.partName as string).id);
+        if (state.level === 'STRUCTURE' && mesh.userData.partName === state.structure) mesh.material = this.picked;
+        else mesh.material = outer ? this.ghost : base;
         // The selected organ glows a little so the eye lands on it; the others keep their own colour.
         (base as THREE_NS.MeshStandardMaterial).emissiveIntensity = selected ? 0.3 : 0.08;
       }
@@ -156,7 +174,8 @@ export class AnatomyFocusLayer {
     let best: { hit: ExploreHit; d: number } | null = null;
     const consider = (hit: ExploreHit, d: number): void => { if (!best || d < best.d) best = { hit, d }; };
     if (state.level === 'ORGAN' || (state.level === 'STRUCTURE' && state.organId)) {
-      const own = this.ray.intersectObjects(partsOf([state.organId!]), false)[0];
+      // Glass (the brain's ghosted shell) lets the tap through to what lies inside it.
+      const own = this.ray.intersectObjects(partsOf([state.organId!]), false).find((h) => (h.object as THREE_NS.Mesh).material !== this.ghost);
       if (own) consider({ kind: 'structure', name: own.object.userData.partName as string }, own.distance);
     }
     if (state.level !== 'BODY') {
@@ -257,8 +276,17 @@ export class AnatomyFocusLayer {
     const at = (o: THREE_NS.Object3D): THREE_NS.Vector3 => this.localCentre(o).clone().applyMatrix4(this.atlasGroup.matrixWorld);
     if (state.level === 'REGION' || state.level === 'ORGAN') {
       // The organ in focus keeps its neighbours' names beside it: a tap on one moves to that organ.
-      return organsInRegion(state.regionId).filter((o) => this.groups.has(o.id)).slice(0, 6)
+      const organs: ExploreLabel[] = organsInRegion(state.regionId).filter((o) => this.groups.has(o.id)).slice(0, 6)
         .map((o) => ({ key: o.id, text: organName(o.id), hit: { kind: 'organ', id: o.id } as const, world: at(this.groups.get(o.id)!) }));
+      if (state.level !== 'ORGAN' || state.organId !== 'brain') return organs;
+      const parts = this.groups.get('brain')?.children ?? [];
+      const deep = BRAIN_LANDMARKS.flatMap((test) => {
+        const mesh = parts.find((c) => test(String(c.userData.partName).toLowerCase()));
+        if (!mesh) return [];
+        const name = mesh.userData.partName as string;
+        return [{ key: `brain-${name}`, text: structureText('brain', name).label, hit: { kind: 'structure', name } as const, world: at(mesh) }];
+      });
+      return [...organs.filter((o) => o.key !== 'brain'), ...deep];
     }
     const range = this.partRange(state);
     if (range && state.structure) {
@@ -294,5 +322,6 @@ export class AnatomyFocusLayer {
     for (const g of this.groups.values()) g.removeFromParent();
     this.groups.clear();
     for (const m of this.mats) m.dispose();
+    this.ghost.dispose();
   }
 }

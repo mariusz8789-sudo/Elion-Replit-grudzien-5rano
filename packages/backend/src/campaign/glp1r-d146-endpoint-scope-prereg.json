@@ -1,0 +1,47 @@
+{
+  "decisionId": "D-146",
+  "title": "GLP-1R endpoint role — sentence scope for binding language",
+  "supersedesNothing": "D-145 stands. Its sealed counts are not edited, recomputed or withdrawn. D-146 is a second, independent classification pass under one changed rule, reported side by side with D-145.",
+  "question": "Does binding language that appears ONLY where a description recounts how its cell line or reagent was characterised, and never where it states what was measured, justify filing that assay as UNKNOWN/CONFLICTING_SIGNALS?",
+  "frozenAt": "2026-09-30T01:30:00Z",
+  "author": "Claude, for Mariusz (mariusz8789-sudo)",
+  "baseCommit": "d23a89b416560c9531348d09f44f608134180268",
+  "authorisation": "Mariusz, 2026-09-30 01:24Z, in the project thread: prepare D-146 as a separate preregistration and do not recount before the rule is frozen.",
+
+  "whyThisExists": {
+    "observation": "Under D-145's frozen rules, 107 rows (CHEMBL5732842, 54 rows; CHEMBL5732843, 53 rows) were filed UNKNOWN/CONFLICTING_SIGNALS. Both are HTRF cAMP agonist assays whose descriptions also recount that the CHO clone's receptor density was established by 125I-GLP-1 saturation binding.",
+    "problem": "D-145's binding test reads the whole description as one text. It cannot tell a sentence that says what was measured from a sentence that says where the cell line came from.",
+    "honesty": "This correction was noticed AFTER D-145's counts were known, and it plausibly changes D-145's verdict. That is precisely why it is preregistered separately, why the rule below is written without reference to any desired count, and why the decision to run it was Mariusz's and not Claude's."
+  },
+
+  "ruleUnderTest": {
+    "name": "endpoint-scoped signal detection",
+    "statement": "A signal term (binding, cAMP, transducer, allosteric, antagonist) counts only when it occurs inside an ENDPOINT SENTENCE. A term occurring only outside every endpoint sentence is recorded as context and does not set a role.",
+    "sentenceSplit": "The description is split on /(?<=[.;])\\s+/ after normalising whitespace. Each fragment is a sentence.",
+    "endpointSentenceDefinition": "A sentence is an ENDPOINT SENTENCE when it contains any of: a determination phrase (/\\b(EC50|IC50|Ki|Kd)\\b[^.;]{0,80}\\b(determination|determined|calculated|measured|values? were)\\b/i, or /\\bwas determined (with|using|by)\\b/i, or /\\bassessed as\\b/i, or /\\bmeasur(e|ed|ing)\\b[^.;]{0,40}\\b(activity|response|accumulation|production|level|signal)\\b/i), OR it is the FIRST sentence of the description when no other sentence qualifies.",
+    "fallback": "If no sentence qualifies as an endpoint sentence under the definition above, the assay keeps exactly the role D-145 gave it. D-146 never invents a role where the text gives none.",
+    "everythingElseUnchanged": "The four roles, their definitions, the requirement that agonism be stated AND a cAMP-arm readout be named, the ban on using standardType, the UNKNOWN-on-ambiguity rule, the species and system flags, the deduplication rule, the scaffold method and the sufficiency criterion are all exactly as frozen in D-145."
+  },
+
+  "prespecifiedOutcomes": {
+    "note": "Both directions are written down before the rule is run, so neither can be presented as the expected one afterwards.",
+    "ifRolesChange": "Report D-145 and D-146 counts side by side, per assay, with the sentence that carried the decisive term quoted in each direction. Then apply the UNCHANGED sufficiency criterion, including the real production scaffold split.",
+    "ifVerdictBecomesSufficient": "That is a result, not a permission. It licenses exactly one thing: a separately preregistered model-development arm. It does not start training, does not alter the gate, and does not nominate any candidate.",
+    "ifVerdictStaysInsufficient": "D-145's conclusion stands, now known to survive the strongest correction available, which makes the data shortfall a firmer finding than before.",
+    "ifRolesDoNotChange": "Record that the scope rule had no effect and close D-146."
+  },
+
+  "forbidden": [
+    "editing glp1r-validation-gate.json or any sealed artefact, D-145's included",
+    "any further rule change once this file is committed — a third pass needs a third preregistration",
+    "tuning the sentence-split or endpoint-sentence regexes after seeing any D-146 count",
+    "training any model, running any docking, or ranking any candidate under this decision",
+    "treating a changed role as evidence about the biology: this changes what Genesis can READ from a description, and nothing about the receptor"
+  ],
+
+  "outputs": [
+    "packages/backend/src/campaign/glp1r-d146-endpoint-scope.sealed.json — per-assay before/after, counts, the unchanged sufficiency criterion re-applied, and the verdict"
+  ],
+
+  "boundary": "A classification pass over text that Genesis already holds. No new measurement, no new data, no biological claim."
+}

@@ -61,14 +61,14 @@ import { hashPassword, verifyPassword, generateToken, validateRegistration } fro
 import { createHash } from 'node:crypto';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
-import { listCapabilities } from './compute/capabilities.mjs';
+import { listCapabilitiesMetadata } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
 import { runJob, requestCancel, enqueueJob } from './compute/jobs.mjs';
 import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
-import { listToolchain, getTool } from './campaign/toolchain.mjs';
+import { listToolchainMetadata, getToolMetadata } from './campaign/toolchain.mjs';
 import { createAgentRun, getAgentRun, listAgentRuns, readResearchState, appendResearchStateEvent } from './agentRun.mjs';
 import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolveContradiction } from './knowledgeRegistry.mjs';
 import { buildCognitiveState } from './cognitiveState.mjs';
@@ -297,7 +297,7 @@ export function handleApi(db, ctx) {
         return err(400, 'scientific_state_promotion_rejected', error instanceof Error ? error.message : String(error));
       }
     }
-    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilities() });
+    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilitiesMetadata() });
     if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
     if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {
       const m = getModel(seg[2]);
@@ -306,10 +306,10 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
     if (seg[1] === 'fabric' && seg[2] === 'contract' && seg.length === 3 && method === 'GET') return ok({ contract: buildFabricContract(listModels()) });
     if (seg[1] === 'fabric' && seg[2] === 'run' && seg.length === 3 && method === 'POST') return runFabricHandler(db, ctx, body);
-    // Rejestr Toolchain (P6): status silników ustalony w runtime realną walidacją.
-    if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchain() });
+    // Publiczny, pasywny widok rejestru; walidacja zachodzi na chronionych ścieżkach wykonania.
+    if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchainMetadata() });
     if (seg[1] === 'toolchain' && seg.length === 3 && method === 'GET') {
-      const t = getTool(seg[2]);
+      const t = getToolMetadata(seg[2]);
       return t ? ok({ tool: t }) : err(404, 'not_found');
     }
     // Runtime scientific-environment audit (Priority 1): realna sonda + persystencja.

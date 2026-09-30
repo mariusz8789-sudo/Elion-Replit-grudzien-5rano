@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENESIS_IDENTITY } from './genesisIdentity.mjs';
 import { buildSelfModel, engineSelfView, countAwaitingMeasurements, readSealedGateFailures } from './genesisSelfModel.mjs';
-import { listToolIds, TOOL_STATUS } from './campaign/toolchain.mjs';
+import { listToolIds, TOOL_STATUS, _resetValidation, _validationRunCount } from './campaign/toolchain.mjs';
 import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { createCampaign, addEvent } from './campaign/persistence.mjs';
@@ -104,6 +104,14 @@ describe('ENTITY-1 SelfModel', () => {
     assert.deepEqual(model.engines.map((e) => e.toolId), ['future-engine']);
     const real = buildSelfModel({ runtime: { engines: [] }, ingestion: { sources: [] } });
     assert.deepEqual(real.engines.map((e) => e.toolId), listToolIds());
+  });
+
+  test('the default public self model reads a cold toolchain without executing reference cases', () => {
+    _resetValidation();
+    const model = buildSelfModel({ runtime: { engines: [] }, ingestion: { sources: [] } });
+    assert.equal(_validationRunCount(), 0);
+    assert.ok(model.engines.length > 0);
+    assert.ok(model.engines.every((engine) => engine.localStatus === TOOL_STATUS.UNVALIDATED));
   });
 
   test('an engine whose reference case failed is BLOCKED, with the adapter still acknowledged', () => {

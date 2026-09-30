@@ -43,7 +43,7 @@ import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
-import { listToolchain } from './campaign/toolchain.mjs';
+import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
@@ -440,7 +440,7 @@ const server = http.createServer(async (req, res) => {
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => {
+      toolchain: listToolchainMetadata().map((tool) => {
         const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
         const remote = effectiveByTool.get(id);
         return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };

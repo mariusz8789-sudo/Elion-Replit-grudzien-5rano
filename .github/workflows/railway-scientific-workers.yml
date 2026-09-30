@@ -35,6 +35,13 @@ jobs:
       - name: Build the pinned worker image
         run: docker build -f "${{ matrix.dockerfile }}" -t "genesis-worker-${{ matrix.group }}:ci" .
 
+      - name: Create an ephemeral worker service token
+        run: |
+          set -euo pipefail
+          worker_token="$(openssl rand -hex 32)"
+          echo "::add-mask::$worker_token"
+          echo "GENESIS_SCIENTIFIC_WORKER_TOKEN=$worker_token" >> "$GITHUB_ENV"
+
       - name: Start the worker as its non-root image user
         run: |
           set -euo pipefail
@@ -42,6 +49,7 @@ jobs:
             -p 8090:8090 \
             -e PORT=8090 \
             -e GENESIS_WORKER_GROUP="${{ matrix.group }}" \
+            -e GENESIS_SCIENTIFIC_WORKER_TOKEN \
             "genesis-worker-${{ matrix.group }}:ci"
 
       - name: Verify health, allowlist and every real reference case
@@ -57,11 +65,14 @@ jobs:
           done
 
           node -e "const h=require('/tmp/worker-health.json'); if(!h.ok || h.workerGroup !== '${{ matrix.group }}') throw new Error('invalid health: '+JSON.stringify(h));"
-          curl --fail --silent http://127.0.0.1:8090/engines > /tmp/worker-engines.json
+          curl --fail --silent \
+            -H "authorization: Bearer $GENESIS_SCIENTIFIC_WORKER_TOKEN" \
+            http://127.0.0.1:8090/engines > /tmp/worker-engines.json
 
           for engine in ${{ matrix.engines }}; do
             curl --fail --silent --show-error \
               -X POST "http://127.0.0.1:8090/engines/$engine/reference-case" \
+              -H "authorization: Bearer $GENESIS_SCIENTIFIC_WORKER_TOKEN" \
               -H 'content-type: application/json' \
               -d '{}' > "/tmp/$engine.json"
             ENGINE="$engine" node -e "const r=require('/tmp/'+process.env.ENGINE+'.json'); if(!r.ok || r.toolId !== process.env.ENGINE || r.status !== 'AVAILABLE' || !r.outputHash) throw new Error('reference case not AVAILABLE: '+JSON.stringify(r));"

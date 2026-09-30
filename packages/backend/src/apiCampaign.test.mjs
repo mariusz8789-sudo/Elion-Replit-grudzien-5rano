@@ -5,6 +5,7 @@ import { handleApi } from './api.mjs';
 import { runJob } from './compute/jobs.mjs';
 import { detect } from './compute/rdkitAdapter.mjs';
 import { detect as admetDetect } from './compute/admetAdapter.mjs';
+import { _resetValidation, _validationRunCount, TOOL_STATUS } from './campaign/toolchain.mjs';
 
 /**
  * Router API Kampanii Naukowej (Scientific Acceleration Engine). Dowodzi, że
@@ -28,23 +29,31 @@ function makeProject(token) {
 }
 
 describe('toolchain registry route', () => {
-  test('GET /api/compute/toolchain lists engines (public)', () => {
+  test('GET /api/compute/toolchain exposes passive metadata without running a reference case', () => {
+    _resetValidation();
     const r = call('GET', '/api/compute/toolchain');
     assert.equal(r.status, 200);
     const rdkit = r.body.toolchain.find((t) => t.toolId === 'rdkit');
     assert.ok(rdkit);
     assert.equal(rdkit.license, 'BSD-3-Clause');
-    // Status ustalony w runtime realną walidacją; nie jest zmyślony.
-    assert.ok(['AVAILABLE', 'BLOCKED_BY_RUNTIME', 'VALIDATION_FAILED'].includes(rdkit.status));
+    assert.equal(rdkit.status, TOOL_STATUS.UNVALIDATED);
     // ADMET + toksyczność (jeden silnik, dwie zdolności) rejestrowane obok RDKit.
     const admet = r.body.toolchain.find((t) => t.toolId === 'admet');
     const tox = r.body.toolchain.find((t) => t.toolId === 'toxicity');
     assert.ok(admet && tox);
     assert.equal(admet.evidenceClass, 'MODEL_ESTIMATE');
-    assert.ok(rdkit.package && rdkit.environment && rdkit.provenance);
-    assert.equal(typeof rdkit.availability, 'boolean');
-    assert.ok(['VALIDATED_REFERENCE_CASE', 'NOT_EXECUTED'].includes(rdkit.executionStatus));
+    assert.ok(rdkit.package && rdkit.provenance);
+    assert.equal(rdkit.environment, null);
+    assert.equal(rdkit.availability, false);
+    assert.equal(rdkit.executionStatus, 'NOT_EXECUTED');
     assert.match(rdkit.fingerprint, /^[a-f0-9]{16}$/);
+    const detail = call('GET', '/api/compute/toolchain/rdkit');
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.tool.status, TOOL_STATUS.UNVALIDATED);
+    const capabilities = call('GET', '/api/compute/capabilities');
+    assert.equal(capabilities.status, 200);
+    assert.equal(capabilities.body.capabilities.find((capability) => capability.id === 'docking').status, 'UNVALIDATED');
+    assert.equal(_validationRunCount(), 0, 'anonymous metadata GET must not start any engine or reference case');
   });
 
   test('GET /api/compute/admet/endpoints exposes the 52-endpoint catalog with published TDC metrics (public)', (t) => {

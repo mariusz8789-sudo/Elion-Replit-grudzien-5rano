@@ -75,6 +75,7 @@ import { buildCognitiveState } from './cognitiveState.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
+import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun } from './researchRun.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
@@ -643,6 +644,38 @@ export function handleApi(db, ctx) {
       if (seg[3] === 'contradictions' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveContradiction(db, projectId, seg[4], body, user.id));
       return err(404, 'not_found');
     }
+    // ---- R1-a Research Run: one question → one run id → the model PROPOSES a plan (researchRun.mjs) ----
+    // A research run is an agent run of RESEARCH_RUN_DOMAIN; only the server writes its research state.
+    if (seg[2] === 'research-runs') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ researchRuns: listResearchRuns(db, projectId) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const started = startResearchRun(db, projectId, body, { userId: user.id });
+        if (!started.ok) return started.error === 'invalid_research_run' ? err(400, 'invalid_research_run', 'question jest wymagane.') : { status: 409, body: { error: started.error } };
+        return ok({ deduped: started.deduped, researchRun: started.researchRun }, started.deduped ? 200 : 201);
+      }
+      const current = getResearchRun(db, projectId, seg[3]);
+      if (!current) return err(404, 'not_found');
+      if (seg.length === 4) {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        return ok({ researchRun: current });
+      }
+      if (seg.length === 5 && seg[4] === 'proposals') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const provider = reasoningProviderOf(ctx);
+          let selfModel;
+          try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: provider.describe() }); } catch { selfModel = null; }
+          const result = await proposeResearchPlan(db, projectId, current.researchRunId, { provider, selfModel, userId: user.id });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = { NOT_FOUND: 404, RUN_NOT_PROPOSABLE: 409, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, rejected: result.rejected ?? null } };
+        })();
+      }
+      return err(404, 'not_found');
+    }
     if (seg[2] === 'agent-runs') {
       if (seg.length === 3) {
         if (method === 'GET') return ok({ runs: listAgentRuns(db, projectId) });
@@ -651,6 +684,7 @@ export function handleApi(db, ctx) {
           const goal = typeof body?.goal === 'string' ? body.goal.trim().slice(0, 2000) : '';
           const domain = typeof body?.domain === 'string' ? body.domain.trim().slice(0, 200) : '';
           if (!goal || !domain) return err(400, 'invalid_agent_run', 'goal i domain są wymagane.');
+          if (domain === RESEARCH_RUN_DOMAIN) return err(409, 'server_managed_run', 'Przebieg badawczy tworzy się przez /research-runs.');
           return ok({ run: createAgentRun(db, { projectId, goal, domain, createdBy: user.id }) }, 201);
         }
         return err(405, 'method_not_allowed');
@@ -662,6 +696,8 @@ export function handleApi(db, ctx) {
         if (method === 'GET') return ok({ researchState: readResearchState(db, run.id) });
         if (method === 'POST') {
           if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          // R1-a: a research run's state is written only by the server, after validation.
+          if (run.domain === RESEARCH_RUN_DOMAIN) return err(409, 'server_managed_run', 'Stan tego przebiegu zapisuje wyłącznie serwer.');
           const result = appendResearchStateEvent(db, run.id, body?.event);
           if (!result.ok) {
             const status = result.error === 'step_index_conflict' || result.error === 'chain_mismatch' || result.error === 'state_integrity_failure' ? 409 : 400;

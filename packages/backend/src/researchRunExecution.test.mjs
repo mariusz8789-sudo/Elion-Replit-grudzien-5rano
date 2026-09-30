@@ -99,6 +99,8 @@ describe('R1-b research run execution', () => {
     assert.deepEqual(records.map((r) => r.kind), ['PREREGISTRATION', 'SESSION']);
     assert.equal(records[0].id, x.frozen.preregistrationRecordId);
     assert.equal(records[0].fingerprint, x.frozen.predictionFingerprint);
+    assert.equal(records[0].contentHash, x.frozen.preregistrationFingerprint);
+    assert.equal(x.frozen.protocolId, x.frozen.preregistrationKey);
     assert.equal(records[0].projectId, project.id);
     assert.ok(verifyExperimentRecordChain(db, x.frozen.preregistrationKey).ok);
     const frozenAt = rr.researchState.events.find((e) => e.type === 'PREDICTIONS_FROZEN').seq;
@@ -110,6 +112,10 @@ describe('R1-b research run execution', () => {
     assert.equal(e.researchRunId, runId);
     assert.equal(e.predictionFingerprint, x.frozen.predictionFingerprint);
     assert.equal(e.preregistrationRecordId, x.frozen.preregistrationRecordId);
+    assert.equal(e.preregistrationFingerprint, x.frozen.preregistrationFingerprint);
+    assert.equal(e.protocolId, x.frozen.protocolId);
+    assert.equal(e.experimentId, x.experimentId);
+    assert.ok(Date.parse(e.startedAt) <= Date.parse(e.finishedAt));
     assert.equal(e.engine.engineId, 'rdkit');
     assert.equal(e.engine.version, RDKIT.version);
     assert.match(e.engine.toolchainFingerprint, /^[0-9a-f]{16}$/);
@@ -121,7 +127,7 @@ describe('R1-b research run execution', () => {
 
     // Falsification: server-derived, sealed, and scoped to this protocol only.
     const f = x.falsification;
-    assert.equal(f.verdict, 'CONFIRMED');
+    assert.equal(f.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
     assert.equal(f.serverVerdict, 'SUPPORTED');
     assert.equal(f.preregCheck, 'MATCH');
     assert.equal(f.verdictCheck, 'MATCH');
@@ -144,7 +150,7 @@ describe('R1-b research run execution', () => {
 
     const second = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
     assert.equal(second.status, 201);
-    assert.equal(second.body.experiment.falsification.verdict, 'REFUTED');
+    assert.equal(second.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
     assert.equal(second.body.experiment.falsification.serverVerdict, 'FALSIFIED');
     assert.equal(second.body.experiment.falsification.criteria[0].observed, e.output.crippenLogP);
 
@@ -288,13 +294,17 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       const executed = await server.api('POST', `${base}/research-runs/${id}/experiments`, { token: owner.token });
       assert.equal(executed.status, 201, JSON.stringify(executed.body));
       const x = executed.body.experiment;
-      assert.equal(x.falsification.verdict, 'CONFIRMED');
+      assert.equal(x.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
       assert.equal(x.execution.engine.version, RDKIT.version);
 
-      // After a restart: the chain, the sealed record and the evidence proposal are all still there.
+      // After a restart: the recovered run is identical, event for event, and says what comes next.
+      const before = (await server.api('GET', `${base}/research-runs/${id}`, { token: owner.token })).body.researchRun;
       await server.kill();
       server = await boot(dbPath, modelUrl);
       const after = (await server.api('GET', `${base}/research-runs/${id}`, { token: owner.token })).body.researchRun;
+      assert.deepEqual(after.researchState, before.researchState);
+      assert.deepEqual(after.experiments, before.experiments);
+      assert.equal(after.nextStep, before.nextStep);
       assert.equal(after.researchState.chain.ok, true);
       assert.equal(after.experiments.length, 1);
       assert.equal(after.experiments[0].execution.outputHash, x.execution.outputHash);
@@ -306,7 +316,7 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       assert.equal(same.body.status, 'ALREADY_EXECUTED');
       const next = await server.api('POST', `${base}/research-runs/${id}/experiments`, { token: owner.token });
       assert.equal(next.status, 201);
-      assert.equal(next.body.experiment.falsification.verdict, 'REFUTED');
+      assert.equal(next.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
     } finally {
       await server?.kill();
       await new Promise((r) => model.close(r));

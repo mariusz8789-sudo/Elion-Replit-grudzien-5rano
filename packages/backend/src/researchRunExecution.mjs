@@ -15,7 +15,7 @@
  *                        publishing it stays a human decision
  *   NEXT_EXPERIMENT      the next proposal, chosen by a fixed rule from the plan, not by a model
  *
- * CONFIRMED / REFUTED / INCONCLUSIVE describe only this frozen hypothesis under this protocol (engine,
+ * SUPPORTED_WITHIN_PROTOCOL / FALSIFIED_WITHIN_PROTOCOL / INCONCLUSIVE describe only this frozen hypothesis under this protocol (engine,
  * input, criteria). They are never a statement of scientific truth.
  *
  * An engine that is not available now gives BLOCKED and nothing is written past what already exists:
@@ -33,7 +33,7 @@ import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from '.
 export const EXECUTION_RECORD_VERSION = 'research-run-execution@1';
 export const VERDICT_SCOPE = 'Applies only to this frozen hypothesis under this protocol (engine, input, criteria). It is not a statement of scientific truth.';
 /** experimentMemory's verdict vocabulary → the words Genesis shows for one protocol. */
-export const PROTOCOL_VERDICT = Object.freeze({ SUPPORTED: 'CONFIRMED', FALSIFIED: 'REFUTED', WEAKENED: 'INCONCLUSIVE', UNRESOLVED: 'INCONCLUSIVE' });
+export const PROTOCOL_VERDICT = Object.freeze({ SUPPORTED: 'SUPPORTED_WITHIN_PROTOCOL', FALSIFIED: 'FALSIFIED_WITHIN_PROTOCOL', WEAKENED: 'INCONCLUSIVE', UNRESOLVED: 'INCONCLUSIVE' });
 const EVIDENCE_CLASSES = new Set(['REAL_ENGINE_OUTPUT', 'MODEL_ESTIMATE', 'REFERENCE_DATA', 'SIMULATED', 'DERIVED']);
 /**
  * The ledger requires a confidence. 0.5 is not a belief score: it keeps a computational result at
@@ -121,7 +121,7 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
   }
   return {
     action: 'HUMAN_REVIEW',
-    reason: lastVerdict === 'INCONCLUSIVE' ? 'INCONCLUSIVE_UNDER_PROTOCOL_AND_NO_FURTHER_EXECUTABLE_EXPERIMENT' : 'NO_FURTHER_EXECUTABLE_EXPERIMENT_IN_PLAN',
+    reason: lastVerdict === PROTOCOL_VERDICT.UNRESOLVED ? 'INCONCLUSIVE_UNDER_PROTOCOL_AND_NO_FURTHER_EXECUTABLE_EXPERIMENT' : 'NO_FURTHER_EXECUTABLE_EXPERIMENT_IN_PLAN',
     planNextActions: (plan?.nextActions ?? []).map((a) => a.action),
   };
 }
@@ -162,7 +162,9 @@ function freeze(db, projectId, runId, hypothesis, x, userId) {
       criteria: x.criteria,
       rejectedPredictions: x.rejectedPredictions,
       preregistrationKey,
+      protocolId: preregistrationKey,
       preregistrationRecordId: prereg.record.id,
+      preregistrationFingerprint: prereg.record.contentHash,
       predictionFingerprint: prereg.record.fingerprint,
       frozenBefore: 'ENGINE_EXECUTION',
       scope: VERDICT_SCOPE,
@@ -188,7 +190,9 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
     researchRunId: runId,
     experimentId: frozen.experimentId,
     hypothesisId: frozen.hypothesisId,
+    protocolId: frozen.protocolId,
     preregistrationRecordId: frozen.preregistrationRecordId,
+    preregistrationFingerprint: frozen.preregistrationFingerprint,
     predictionFingerprint: frozen.predictionFingerprint,
     engine: {
       engineId: frozen.engineId, engineName: engine.engineName ?? null, version: engine.version ?? null,
@@ -241,7 +245,9 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
       researchRunId: runId,
       experimentId: frozen.experimentId,
       hypothesisId: frozen.hypothesisId,
+      protocolId: frozen.protocolId,
       predictionFingerprint: frozen.predictionFingerprint,
+      preregistrationFingerprint: frozen.preregistrationFingerprint,
       sealRecordId: sealed.record.id,
       preregCheck: body.preregCheck,
       verdictCheck: body.verdictCheck,

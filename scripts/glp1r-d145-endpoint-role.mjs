@@ -33,7 +33,7 @@ const A3_DIR = path.join(ROOT, 'data/transcription/glp1r-a3');
 const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json');
 const ROLES_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-assay-roles.json');
 const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d145-endpoint-role.sealed.json');
-const SCAFFOLD_PATH = process.env.GLP1R_D145_SCAFFOLDS || path.join(ROOT, 'artifacts/glp1r-d145-scaffolds.json');
+const SCAFFOLD_PATH = path.join(ROOT, 'artifacts/glp1r-d145-scaffolds.json');
 const PCHEMBL_TOLERANCE = 0.02;
 const TARGET = 'CHEMBL1784';
 

@@ -17,9 +17,10 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 RDLogger.DisableLog("rdApp.*")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Defaults are D-145; GLP1R_SCAFFOLD_IN / GLP1R_SCAFFOLD_OUT point it at another pass (D-146).
-IN_PATH = os.environ.get("GLP1R_SCAFFOLD_IN", os.path.join(ROOT, "artifacts", "glp1r-d145-functional-smiles.json"))
-OUT_PATH = os.environ.get("GLP1R_SCAFFOLD_OUT", os.path.join(ROOT, "artifacts", "glp1r-d145-scaffolds.json"))
+# Defaults are D-145. Pass two paths to point it at another pass (D-146):
+#   python3 scripts/glp1r-d145-scaffolds.py <in.json> <out.json>
+IN_PATH = sys.argv[1] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d145-functional-smiles.json")
+OUT_PATH = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d145-scaffolds.json")
 
 if not os.path.exists(IN_PATH):
     sys.exit(f"missing {IN_PATH} — run scripts/glp1r-d145-endpoint-role.mjs first")

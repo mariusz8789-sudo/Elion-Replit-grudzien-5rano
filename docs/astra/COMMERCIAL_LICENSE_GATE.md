@@ -37,9 +37,9 @@ Every item actually executed, embedded, redistributed or shown to a customer rec
 | ChEMBL | `CONDITIONAL` | Pin release and comply with CC BY-SA/data attribution; verify exact exported subset |
 | PubChem | `CONDITIONAL` | PubChem aggregates hundreds of contributors; pin record/FTP release, preserve source attribution, and review the originating source licence because PubChem availability is not a blanket commercial licence |
 | RCSB PDB structures | `CONDITIONAL` | Record entry provenance, citations and third-party annotations; target remains runtime/data gated |
-| BindingDB curated data | `CONDITIONAL` | Current publication states CC BY 4.0; pin dump and attribution; verify source-record restrictions |
+| BindingDB curated data | `CONDITIONAL` | BindingDB-curated records are CC BY 4.0, while inherited ChEMBL records retain CC BY-SA 3.0; pin the dump, preserve origin and apply the correct attribution/share-alike terms per record |
 | Reactome data | `APPROVED` | Data and derived files are CC0; still pin release and cite as scientific provenance |
-| Human Protein Atlas | `CONDITIONAL` | CC BY 4.0 for copyrightable database parts; item citation required; third-party fields need separate review |
+| Human Protein Atlas | `CONDITIONAL` | CC BY 4.0 for copyrightable database parts; item/version citation required; third-party fields need separate review. Commercial delivery excludes NC subsets such as listed AlphaFold 3 content unless separate rights are obtained |
 | Europe PMC metadata/API | `CONDITIONAL` | Use supported APIs and retain provenance |
 | Europe PMC full text | `CONDITIONAL` | Article-specific licence controls reuse; only approved OA subset content may be redistributed |
 | Scientific publications generally | `CONDITIONAL` | Citation metadata is distinct from copyrighted full text/figures; check each article |

@@ -172,6 +172,9 @@ describe('ENTITY-3 claim proposals from an external model', () => {
     const res = await proposeScientificClaim(db, project.id, { question: 'second' }, { provider: hanging, timeoutMs: 50, userId: owner.user.id });
     assert.equal(res.ok, false);
     assert.equal(res.status, 'PROVIDER_TIMEOUT');
+    class APIConnectionTimeoutError extends Error {}
+    const sdkTimeout = createReasoningProvider({ ANTHROPIC_API_KEY: 'k' }, { AnthropicCtor: class { constructor() { this.messages = { create: async () => { throw new APIConnectionTimeoutError(); } }; } } });
+    assert.equal((await proposeScientificClaim(db, project.id, { question: 'sdk' }, { provider: sdkTimeout })).status, 'PROVIDER_TIMEOUT');
     const viaError = await proposeScientificClaim(db, project.id, { question: 'third' }, { provider: fakeProvider(new ReasoningProviderError('TIMEOUT', 't')) });
     assert.equal(viaError.status, 'PROVIDER_TIMEOUT');
     assert.deepEqual(snapshot(db, project.id), before);

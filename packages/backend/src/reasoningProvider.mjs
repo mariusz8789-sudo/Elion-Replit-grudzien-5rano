@@ -18,7 +18,12 @@
  *     GENESIS_REASONING_API_KEY (optional for local)
  * Without a working configuration the provider reports BLOCKED_BY_PROVIDER_CONFIGURATION and never calls out.
  */
-import Anthropic, { APIConnectionTimeoutError, APIUserAbortError } from '@anthropic-ai/sdk';
+// The SDK is loaded on first use, not at import: api.mjs imports this module, and jobs that run the router without
+// installing the backend's npm dependencies (the PySCF benchmark) must not fail on a provider they never call.
+let sdkModule = null;
+const loadAnthropic = async () => (sdkModule ??= await import('@anthropic-ai/sdk')).default;
+/** The SDK's timeout and abort errors; matched by class name so no SDK import is needed to recognise them. */
+const isTimeout = (err) => ['APIConnectionTimeoutError', 'APIUserAbortError'].includes(err?.constructor?.name);
 
 export const REASONING_ADAPTER_VERSION = 'entity3-reasoning-adapter@1';
 export const DEFAULT_REASONING_TIMEOUT_MS = 60_000;
@@ -51,7 +56,7 @@ function describeOf(providerId, model) {
 function anthropicProvider(env, AnthropicCtor) {
   if (!env.ANTHROPIC_API_KEY) return blocked('ANTHROPIC_KEY_MISSING', 'ANTHROPIC_CLAUDE');
   const model = env.GENESIS_REASONING_MODEL || env.GENESIS_AI_MODEL || DEFAULT_ANTHROPIC_MODEL;
-  const client = new AnthropicCtor({ apiKey: env.ANTHROPIC_API_KEY });
+  let client = null;
   return {
     providerId: 'ANTHROPIC_CLAUDE',
     model,
@@ -61,12 +66,13 @@ function anthropicProvider(env, AnthropicCtor) {
     async complete({ system, prompt, timeoutMs = DEFAULT_REASONING_TIMEOUT_MS }) {
       let response;
       try {
+        client ??= new (AnthropicCtor ?? await loadAnthropic())({ apiKey: env.ANTHROPIC_API_KEY });
         response = await client.messages.create(
           { model, max_tokens: 4096, system, messages: [{ role: 'user', content: prompt }] },
           { timeout: timeoutMs, maxRetries: 0 },
         );
       } catch (err) {
-        if (err instanceof APIConnectionTimeoutError || err instanceof APIUserAbortError) throw new ReasoningProviderError('TIMEOUT', 'Reasoning provider timed out.');
+        if (isTimeout(err)) throw new ReasoningProviderError('TIMEOUT', 'Reasoning provider timed out.');
         throw new ReasoningProviderError('UPSTREAM', `Reasoning provider failed (status ${err?.status ?? 'none'}).`);
       }
       if (response?.stop_reason === 'refusal') throw new ReasoningProviderError('REFUSED', 'Reasoning provider declined the request.');
@@ -114,7 +120,7 @@ function openAiCompatibleProvider(env, kind, fetchImpl) {
 }
 
 /** Builds the configured provider from the backend environment. Injectable for tests; never reads the frontend. */
-export function createReasoningProvider(env = process.env, { AnthropicCtor = Anthropic, fetchImpl = globalThis.fetch } = {}) {
+export function createReasoningProvider(env = process.env, { AnthropicCtor = null, fetchImpl = globalThis.fetch } = {}) {
   const kind = (env.GENESIS_REASONING_PROVIDER || (env.ANTHROPIC_API_KEY ? 'anthropic' : '')).toLowerCase();
   if (!kind) return blocked('NO_PROVIDER_CONFIGURED');
   if (kind === 'anthropic') return anthropicProvider(env, AnthropicCtor);

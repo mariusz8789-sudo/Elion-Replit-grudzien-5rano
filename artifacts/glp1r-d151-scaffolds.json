@@ -1,0 +1,33 @@
+{
+  "status": "OK",
+  "method": "Bemis-Murcko via RDKit MurckoScaffold, independent of the production rdkitAdapter",
+  "rdkitVersion": "2026.03.6",
+  "compounds": 157,
+  "parsed": 157,
+  "unparseable": 0,
+  "distinctScaffolds": 61,
+  "largestScaffoldShare": 0.1274,
+  "scaffoldSizeHistogram": [
+    20,
+    19,
+    16,
+    11,
+    10,
+    4,
+    4,
+    4,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    2,
+    2,
+    2,
+    2,
+    1,
+    1
+  ],
+  "acyclicCompounds": 0
+}

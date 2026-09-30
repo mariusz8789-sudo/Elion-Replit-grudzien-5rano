@@ -1,0 +1,1959 @@
+{
+  "decisionId": "D-152",
+  "preregFingerprint": "a42f4cb9ee04f2d1",
+  "source": "data/transcription/glp1r-a3",
+  "assays": {
+    "CHEMBL1048996": {
+      "assayId": "CHEMBL1048996",
+      "evidence": "Agonist activity at human GLP1R expressed in CHO cells assessed as stimulation of intracellular [3H]cAMP accumulation after 30 mins by scintillation proximity assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 23,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL1211651": {
+      "assayId": "CHEMBL1211651",
+      "evidence": "Agonist activity at human GLP-1 receptor expressed in CHO cells assessed as increase in cAMP production",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL1227945": {
+      "assayId": "CHEMBL1227945",
+      "evidence": "Agonist activity at GLP1R expressed in HEK293 cells assessed as stimulation of cAMP production by luciferase reporter gene assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 30,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL1246709": {
+      "assayId": "CHEMBL1246709",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 12,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL1648248": {
+      "assayId": "CHEMBL1648248",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL1924543": {
+      "assayId": "CHEMBL1924543",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 6,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL1925821": {
+      "assayId": "CHEMBL1925821",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL1937452": {
+      "assayId": "CHEMBL1937452",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "KI"
+      ]
+    },
+    "CHEMBL3090286": {
+      "assayId": "CHEMBL3090286",
+      "evidence": "Agonist activity at human GLP-1R expressed in African green monkey COS7 cells assessed as stimulation of cAMP production",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3388519": {
+      "assayId": "CHEMBL3388519",
+      "evidence": "Positive allosteric modulation of human recombinant GLP1 receptor expressed in 9-3-H cells by calcium mobilization assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3388529": {
+      "assayId": "CHEMBL3388529",
+      "evidence": "Positive allosteric modulation of human recombinant GLP1 receptor expressed in 9-3-H cells by calcium mobilization assay in presence of EC20 of GLP1",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3388531": {
+      "assayId": "CHEMBL3388531",
+      "evidence": "Positive allosteric modulation of human recombinant GLP1 receptor expressed in 9-3-H cells by calcium mobilization assay in presence of EC20 of exenatide",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3388533": {
+      "assayId": "CHEMBL3388533",
+      "evidence": "Positive allosteric modulation of human recombinant GLP1 receptor expressed in 9-3-H cells by calcium mobilization assay in presence of EC20 of liragulitide",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3428277": {
+      "assayId": "CHEMBL3428277",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO cells assessed as cAMP accumulation incubated for 30 mins",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3620282": {
+      "assayId": "CHEMBL3620282",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in BHK cells after 3 hrs by CRE firefly luciferase reporter gene assay in absence of human serum albumin",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3994845": {
+      "assayId": "CHEMBL3994845",
+      "evidence": "Agonist activity at human GLP1R expressed in CHO cells assessed as cAMP accumulation incubated for 30 mins by LANCE assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 13,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL3994846": {
+      "assayId": "CHEMBL3994846",
+      "evidence": "Agonist activity at human GLP1R expressed in CHOK1 cells assessed as induction of beta-galactosidase-tagged beta-arrestin2 recruitment incubated for 90 mins by PathHunter enzyme complementation assay",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 13,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4018830": {
+      "assayId": "CHEMBL4018830",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in HEK293 cells harboring mCerulean and mCitrine fused Epac protein assessed as increase in cAMP level up to 30 mins by fluorescence assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4052169": {
+      "assayId": "CHEMBL4052169",
+      "evidence": "Agonist activity at human GLP-1 receptor expressed in HEK293 cells assessed as cAMP accumulation after 30 mins by HTRF assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4132519": {
+      "assayId": "CHEMBL4132519",
+      "evidence": "Agonist activity at full length human GLP1R expressed in HEK293 cells assessed as increase in cAMP accumulation after 20 mins by HTRF assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4258224": {
+      "assayId": "CHEMBL4258224",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in HEK293 cells assessed as increase in cAMP level after 30 mins by HTRF method",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4344291": {
+      "assayId": "CHEMBL4344291",
+      "evidence": "Displacement of [125I]GLP-1 from human GLP-1R (7 to 36 residues) expressed in HEK293 or CHO cell membranes after 120 mins by radioligand binding assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "BINDING_AFFINITY",
+      "reason": "BINDING_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "BINDING_AFFINITY",
+        "d151Reason": "BINDING_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4356181": {
+      "assayId": "CHEMBL4356181",
+      "evidence": "Positive allosteric modulator activity at human GLP-1R expressed in PSC-HEK293 cells in presence of EC20 level of GLP1(9-36)NH2 incubated for 30 mins by HTRF cAMP assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4356183": {
+      "assayId": "CHEMBL4356183",
+      "evidence": "Positive allosteric modulator activity at GLP-1R in human 1.1B4 cells in presence of EC20 level of GLP1(9-36)NH2 incubated for 30 mins by HTRF cAMP assay",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4371651": {
+      "assayId": "CHEMBL4371651",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in HEK293 cells assessed as increase in cAMP accumulation after 24 hrs by luciferase reporter gene assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4371653": {
+      "assayId": "CHEMBL4371653",
+      "evidence": "Agonist activity at Rluc8 fused human GLP1 receptor expressed in HEK293 cells assessed co-expressing GFP-tagged beta-arrestin1 assessed as increase in beta-arrestin1 recruitment after 20 to 40 mins by BRET assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4371655": {
+      "assayId": "CHEMBL4371655",
+      "evidence": "Agonist activity at Rluc8 fused human GLP1 receptor expressed in HEK293 cells assessed co-expressing GFP-tagged beta-arrestin2 assessed as increase in beta-arrestin2 recruitment after 20 to 40 mins by BRET assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4400243": {
+      "assayId": "CHEMBL4400243",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in HEK293 cells assessed as induction of cAMP levels after 20 mins by time-resolved fluorescence analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4671906": {
+      "assayId": "CHEMBL4671906",
+      "evidence": "Agonist activity at human GLP-1 receptor expressed in HEK293 cells assessed as induction of cAMP accumulation incubated for 30 mins by HTRF assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4704627": {
+      "assayId": "CHEMBL4704627",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as stimulation of cAMP accumulation incubated for 20 mins in presence of 0% HSA",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4704628": {
+      "assayId": "CHEMBL4704628",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as stimulation of cAMP accumulation incubated for 20 mins in presence of 4.4% HSA",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL4713464": {
+      "assayId": "CHEMBL4713464",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as stimulation of cAMP accumulation by FRET assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097251": {
+      "assayId": "CHEMBL5097251",
+      "evidence": "Positive allosteric modulator activity at human GLP-1R expressed in HEK293 cells assessed as potentiation of EC20 GLP-1(9-36) induced cAMP accumulation in presence of IBMX relative to GLP-1(9-36)",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097277": {
+      "assayId": "CHEMBL5097277",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as potentiation of GLP-1(7-36) induced cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097278": {
+      "assayId": "CHEMBL5097278",
+      "evidence": "Partial agonist activity at human GLP-1R expressed in HEK293 cells assessed as potentiation of GLP-1(9-36) induced cAMP accumulation in presence of IBMX",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097282": {
+      "assayId": "CHEMBL5097282",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as potentiation of GLP-1(9-36) induced cAMP accumulation in presence of IBMX",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097286": {
+      "assayId": "CHEMBL5097286",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO-K1 cells assessed as potentiation of GLP-1(9-36) induced beta-arrestin recruitment",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5097288": {
+      "assayId": "CHEMBL5097288",
+      "evidence": "Positive allosteric modulator activity at human GLP-1R transfected in rat INS-1 832/13 cells assessed as potentiation of GLP-1(9-36) induced cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5130383": {
+      "assayId": "CHEMBL5130383",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO cells coexpressing beta-arrestin-2 assessed as reduction in cAMP accumulation incubated for 2 hrs under dark condition by LANCE cAMP assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 7,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5130384": {
+      "assayId": "CHEMBL5130384",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO cells coexpressing beta-arrestin-2 assessed as stimulation intracellular calcium mobilization measured after 180 secs by Fluo-3-AM dye based fluorescence assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 13,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5130385": {
+      "assayId": "CHEMBL5130385",
+      "evidence": "Agonist activity at human GLP-1R assessed as increase in ERK1/2 phosphorylation at Thr202/Tyr204 residues incubated for 20 mins by AlphaLISA assay",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 14,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5130386": {
+      "assayId": "CHEMBL5130386",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO cells coexpressing beta-arrestin-2 assessed as increase in beta arrestin-2 recruitment incubated for 1 hr by chemiluminescence based pathHunter assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 14,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5146164": {
+      "assayId": "CHEMBL5146164",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as cAMP release incubated for 20 min by HTRF analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5146214": {
+      "assayId": "CHEMBL5146214",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO cells assessed as cAMP release incubated for 20 min by HTRF analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168494": {
+      "assayId": "CHEMBL5168494",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO-K1 cells assessed as cAMP accumulation incubated for 30 mins in presence of BETP by BETP sensitized time-resolved fluorescence assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168495": {
+      "assayId": "CHEMBL5168495",
+      "evidence": "Agonist activity at human GLP-1R expressed in CHO-K1 cells assessed as cAMP accumulation incubated for 30 mins in absence of BETP by plate reader method",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 6,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168497": {
+      "assayId": "CHEMBL5168497",
+      "evidence": "Agonist activity at FAP-tagged human GLP-1R expressed in HEK293 cells assessed as receptor internalization",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168498": {
+      "assayId": "CHEMBL5168498",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) expressed in candidate selection CHO cells assessed as cAMP accumulation incubated for 30 mins by plate reader method",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168501": {
+      "assayId": "CHEMBL5168501",
+      "evidence": "Agonist activity at human GLP-1R expressed in PathHunter CHO-K1 GLP1R beta-arrestin-2 cell assessed as induction of beta-arrestin 2 recruitment incubated for 90 mins in presence of BETP by PathHunter assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168503": {
+      "assayId": "CHEMBL5168503",
+      "evidence": "Agonist activity at human GLP-1R expressed in PathHunter CHO-K1 GLP1R beta-arrestin-2 cells assessed as induction of beta-arrestin 2 recruitment incubated for 90 mins in absence of BETP by PathHunter assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168510": {
+      "assayId": "CHEMBL5168510",
+      "evidence": "Agonist activity at human GLP-1R expressed in PathHunter CHO-K1 GLP1R beta-arrestin-1 cell assessed as induction of beta-arrestin 1 recruitment incubated for 90 mins by pathHunter assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5168512": {
+      "assayId": "CHEMBL5168512",
+      "evidence": "Agonist activity at human GLP-1R expressed in PathHunter CHO-K1 GLP1R beta-arrestin-2 cell assessed as induction of beta-arrestin 2 recruitment incubated for 90 mins by pathHunter assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5344082": {
+      "assayId": "CHEMBL5344082",
+      "evidence": "Agonist activity at N-terminal HA-tagged human GLP-1R expressed in HEK293 cells assessed as effect on intracellular cAMP accumulation incubated for 30 mins by LANCA ultra cAMP assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5344102": {
+      "assayId": "CHEMBL5344102",
+      "evidence": "Agonist activity at N-terminal HA-tagged human GLP-1R expressed in HEK293 cells assessed as change in intracellular calcium level by Fluo-4 AM dye based calcium mobilization assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5344104": {
+      "assayId": "CHEMBL5344104",
+      "evidence": "Partial agonist activity at N-terminal HA-tagged human GLP-1R expressed in HEK293 cells co-expressing Smbit-beta-arrestin 1/2 and GLP-1R-LgBit assessed as beta-arrestin-1 recruitment measured after 5 mins by bioluminescence based NanoBiT assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5344106": {
+      "assayId": "CHEMBL5344106",
+      "evidence": "Partial agonist activity at N-terminal HA-tagged human GLP-1R expressed in HEK293 cells co-expressing Smbit-beta-arrestin 1/2 and GLP-1R-LgBit assessed as beta-arrestin-2 recruitment measured after 5 mins by bioluminescence based NanoBiT assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5356070": {
+      "assayId": "CHEMBL5356070",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) expressed in HEK293 cells assessed as cAMP accumulation incubated for 30 mins by HTRF method",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5366264": {
+      "assayId": "CHEMBL5366264",
+      "evidence": "Agonist activity at GLP-1 receptor (unknown origin) expressed in CHO cells by cAMP assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5366266": {
+      "assayId": "CHEMBL5366266",
+      "evidence": "Displacement of [125I]-GLP1 from GLP-1 receptor (unknown origin) expressed in CHO cells membrane pre-incubated for 10 mins followed by [125I]-GLP1 addition and measured after 180 mins by microbeta scintillation counting method",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "BINDING_AFFINITY",
+      "reason": "BINDING_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "BINDING_AFFINITY",
+        "d151Reason": "BINDING_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5534277": {
+      "assayId": "CHEMBL5534277",
+      "evidence": "Agonist activity at human GLP-1 receptor expressed in HEK293 cells assessed as cAMP level measured after 60 mins by HTRF based assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5552312": {
+      "assayId": "CHEMBL5552312",
+      "evidence": "Agonist activity human GLP-1R stably expressed in HEK293 cells assessed as reduction in intracellular cAMP level incubated for 30 mins by multiplate reader analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 5,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5552314": {
+      "assayId": "CHEMBL5552314",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) transfected in HEK293 cells assessed as beta-arrestin1 recruitment incubated for 5 mins by Envision multiplate reader analysis",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 5,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5552316": {
+      "assayId": "CHEMBL5552316",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) transfected in HEK293 cells assessed as beta-arrestin2 recruitment incubated for 5 mins by Envision multiplate reader analysis",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 5,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5582336": {
+      "assayId": "CHEMBL5582336",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as accumulation of cAMP preincubated for 30 mins followed by d2-labeled cAMP addition and anti-cAMP cryptate addition measured after 60 mins by HTRF assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5732842": {
+      "assayId": "CHEMBL5732842",
+      "evidence": "CHO GLP-1R Clone H6-Assay 1: GLP-1R-mediated agonist activity was determined with a cell-based functional assay utilizing an HTRF (Homogeneous Time-Resolved Fluorescence) cAMP detection kit (cAMP HI Range Assay Kit;",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": true,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CONFLICTING_SIGNALS"
+      },
+      "rowsInCombinedSet": 54,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5732843": {
+      "assayId": "CHEMBL5732843",
+      "evidence": "CHO GLP-1R Clone C6-Assay 2: GLP-1R-mediated agonist activity was determined with a cell-based functional assay utilizing an HTRF (Homogeneous Time-Resolved Fluorescence) cAMP detection kit (cAMP HI Range Assay Kit;",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": true,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CONFLICTING_SIGNALS"
+      },
+      "rowsInCombinedSet": 53,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5734588": {
+      "assayId": "CHEMBL5734588",
+      "evidence": "GLP-1 Assay with GLP1 Endogenous Agonist: To assess the effects of test compounds on GLP-1 or glucagon potency and efficacy, a high-throughput calcium mobilization assay was used essentially as previously described (Morris L C, Days E L, Turney M, Mi D, Lindsl…",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5734589": {
+      "assayId": "CHEMBL5734589",
+      "evidence": "GLP-1 Assay with EX-4 Synthetic Agonist: To assess the effects of test compounds on GLP-1 or glucagon potency and efficacy, a high-throughput calcium mobilization assay was used essentially as previously described (Morris L C, Days E L, Turney M, Mi D, Lindsle…",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "ALLOSTERIC_MODULATION_NOT_AGONISM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL5736145": {
+      "assayId": "CHEMBL5736145",
+      "evidence": "By using a 4 parameter logistic regression analysis by XLfit (ver 5.4.0.8), dose-response curves of the each Example Compound were created, and the half maximal (50%) effective concentrations (EC50) were calculated.",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "UNCLASSIFIABLE_UNDER_FROZEN_RULES",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6083343": {
+      "assayId": "CHEMBL6083343",
+      "evidence": "Agonist activity at human GLP-1 receptor expressed in HEK293 cells assessed as cAMP level measured after 60 mins by HTRF assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6112172": {
+      "assayId": "CHEMBL6112172",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) expressed in HEK293 cells co-expressing CRE-Luc assessed as increase in intracellular cAMP accumulation by luciferase based assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6112173": {
+      "assayId": "CHEMBL6112173",
+      "evidence": "Agonist activity at GLP-1R (unknown origin) expressed in HEK293 cells co-expressing CRE-Luc assessed as increase in intracellular cAMP accumulation in presence of 2% HSA by luciferase based assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6113405": {
+      "assayId": "CHEMBL6113405",
+      "evidence": "Agonist activity at N-terminal hemagglutinin-tagged human GLP-1R expressed in CHO cells co-transfected with pcDNA3.0 assessed as increase in intracellular cAMP accumulation incubated for 30 mins by microplate reader analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6113416": {
+      "assayId": "CHEMBL6113416",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as beta-arrestin2 recruitment incubated for 5 mins by bioluminescence based Envision multiplate reader analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6113417": {
+      "assayId": "CHEMBL6113417",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as beta-arrestin1 recruitment incubated for 5 mins by bioluminescence based Envision multiplate reader analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6118765": {
+      "assayId": "CHEMBL6118765",
+      "evidence": "Agonist activity at GLP-1 receptor (unknown origin) overexpressed in CHO-K1 cells assessed as cAMP production incubated for 30 mins by HitHunter cAMP assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6118766": {
+      "assayId": "CHEMBL6118766",
+      "evidence": "Agonist activity at GLP-1 receptor (unknown origin) overexpressed in CHO-K1 cells assessed as cAMP production incubated for 30 mins in presence of HSA by HitHunter cAMP assay",
+      "speciesStated": false,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 2,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6140092": {
+      "assayId": "CHEMBL6140092",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells coexpressing CRE LUC incubated for 5 hrs by luciferase based microplate reader analysis",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL6140116": {
+      "assayId": "CHEMBL6140116",
+      "evidence": "Agonist activity at human GLP-1R expressed in HEK293 cells assessed as beta-arrestin recruitment",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "OTHER_FUNCTIONAL",
+      "reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL677178": {
+      "assayId": "CHEMBL677178",
+      "evidence": "Potency measured using recombinant human GLP-1 receptor expressed in Baby Hamster Kidney (BHK)cells",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "NO_READOUT_AND_NO_MECHANISM_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+      },
+      "rowsInCombinedSet": 36,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL828878": {
+      "assayId": "CHEMBL828878",
+      "evidence": "Effective concentration against human GLP1 receptor expressed in CHO cells with 1%DMSO",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "NO_READOUT_AND_NO_MECHANISM_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL829559": {
+      "assayId": "CHEMBL829559",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL829998": {
+      "assayId": "CHEMBL829998",
+      "evidence": "Effective concentration against human GLP1 receptor expressed in CHO cells",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "UNKNOWN",
+      "reason": "NO_READOUT_AND_NO_MECHANISM_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": true,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+      },
+      "rowsInCombinedSet": 9,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL874550": {
+      "assayId": "CHEMBL874550",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 9,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL884187": {
+      "assayId": "CHEMBL884187",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL911100": {
+      "assayId": "CHEMBL911100",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL923944": {
+      "assayId": "CHEMBL923944",
+      "evidence": "Agonist activity at human GLP1 assessed as stimulation of cAMP",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 30,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL923946": {
+      "assayId": "CHEMBL923946",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 14,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL937687": {
+      "assayId": "CHEMBL937687",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 8,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL937690": {
+      "assayId": "CHEMBL937690",
+      "evidence": "Agonist activity at human GLP1R expressed in CHO cells assessed as stimulation of cAMP production",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 8,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL940048": {
+      "assayId": "CHEMBL940048",
+      "evidence": "Agonist activity at human GLP1 receptor expressed in BHK cells assessed as cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "source": "data/transcription/glp1r-a3",
+      "role": "FUNCTIONAL_AGONISM",
+      "reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "scope": {
+        "applied": true,
+        "usedFirstSentenceFallback": false,
+        "endpointSentenceCount": 1,
+        "changedFromD145": false,
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL972348": {
+      "assayId": "CHEMBL972348",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL972349": {
+      "assayId": "CHEMBL972349",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "EC50"
+      ]
+    },
+    "CHEMBL977343": {
+      "assayId": "CHEMBL977343",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 8,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL991608": {
+      "assayId": "CHEMBL991608",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 16,
+      "standardTypes": [
+        "IC50"
+      ]
+    },
+    "CHEMBL991609": {
+      "assayId": "CHEMBL991609",
+      "role": "UNKNOWN",
+      "reason": "BLOCKED_BY_DATA_ACCESS",
+      "evidence": "no assay description is available offline and ChEMBL is not reachable from this environment",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "source": "none",
+      "scope": {
+        "applied": false,
+        "reason": "NO_DESCRIPTION"
+      },
+      "rowsInCombinedSet": 20,
+      "standardTypes": [
+        "EC50"
+      ]
+    }
+  }
+}

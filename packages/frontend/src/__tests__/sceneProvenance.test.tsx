@@ -132,6 +132,13 @@ describe('U0-b badge', () => {
     expect(html).toContain('Tylko do oglądania');
   });
 
+  it('a measured-data scene says the measurement is published by others, not made by Genesis', () => {
+    const html = renderToStaticMarkup(<SceneProvenanceBadge sceneId="lab:universe:hubbletension" />);
+    expect(html).toContain('Opublikowane dane pomiarowe');
+    expect(html).toContain('Genesis sam tych pomiarów nie wykonał');
+    expect(html).toContain('Riess');
+  });
+
   it('renders nothing for an unknown scene rather than guessing', () => {
     expect(renderToStaticMarkup(<SceneProvenanceBadge sceneId="lab:nope:nope" />)).toBe('');
   });

@@ -16,7 +16,9 @@ import type { FlagshipEpistemicStatus } from '../../../../core/src/flagship/epis
  * both: `basis` (this file) and `reliability` (the existing scale).
  *
  * The five bases are the labels Mariusz asked for (30 Sep 2026):
- *   MEASURED_DATA             real measured values are what the scene shows
+ *   MEASURED_DATA             real measured values, published by others, are what the scene shows.
+ *                             Genesis only displays them; a measurement Genesis made itself
+ *                             (a lab run with Evidence/Replay) would need its own basis.
  *   COMPUTED_MODEL            computed from equations of a theory or model
  *   HISTORICAL_RECONSTRUCTION a documented past event rebuilt from sources
  *   ALLEGED_CLAIM             what a claim or testimony says happened, not verified
@@ -35,7 +37,7 @@ export type SceneBasis = 'MEASURED_DATA' | 'COMPUTED_MODEL' | 'HISTORICAL_RECONS
 export const SCENE_BASES: readonly SceneBasis[] = ['MEASURED_DATA', 'COMPUTED_MODEL', 'HISTORICAL_RECONSTRUCTION', 'ALLEGED_CLAIM', 'FICTION'];
 
 export const SCENE_BASIS_LABELS_PL: Readonly<Record<SceneBasis, string>> = {
-  MEASURED_DATA: 'Pomiar',
+  MEASURED_DATA: 'Opublikowane dane pomiarowe',
   COMPUTED_MODEL: 'Obliczenie z teorii',
   HISTORICAL_RECONSTRUCTION: 'Rekonstrukcja historyczna',
   ALLEGED_CLAIM: 'Relacja, niepotwierdzona',
@@ -43,7 +45,7 @@ export const SCENE_BASIS_LABELS_PL: Readonly<Record<SceneBasis, string>> = {
 };
 
 export const SCENE_BASIS_EXPLANATIONS_PL: Readonly<Record<SceneBasis, string>> = {
-  MEASURED_DATA: 'Scena pokazuje wartości zmierzone w prawdziwych eksperymentach lub obserwacjach.',
+  MEASURED_DATA: 'Scena pokazuje wartości zmierzone i opublikowane przez innych badaczy (źródła poniżej). Genesis sam tych pomiarów nie wykonał, tylko je pokazuje.',
   COMPUTED_MODEL: 'Scena jest wyliczona z równań teorii lub modelu. Nie jest zapisem pomiaru.',
   HISTORICAL_RECONSTRUCTION: 'Scena odtwarza udokumentowane wydarzenie na podstawie źródeł. Szczegóły bez źródła są dopowiedziane.',
   ALLEGED_CLAIM: 'Scena pokazuje, jak według relacji miało to wyglądać. Nie pokazuje, jak było.',

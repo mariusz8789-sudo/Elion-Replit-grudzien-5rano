@@ -3,7 +3,7 @@ import { SCENE_BASIS_EXPLANATIONS_PL, SCENE_BASIS_LABELS_PL, type SceneManifest 
 import { getSceneManifest } from '../core/sceneProvenance/labSceneManifests';
 
 const SECTIONS: ReadonlyArray<readonly [keyof SceneManifest, string]> = [
-  ['measuredDataRefs', 'Prawdziwe dane pomiarowe'],
+  ['measuredDataRefs', 'Dane pomiarowe (kto je zmierzył i opublikował)'],
   ['modelRefs', 'Teoria i równania'],
   ['sourceRefs', 'Źródła historyczne'],
   ['assumptions', 'Założenia'],

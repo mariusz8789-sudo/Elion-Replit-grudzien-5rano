@@ -76,6 +76,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun } from './researchRun.mjs';
+import { executeResearchExperiment } from './researchRunExecution.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
@@ -673,6 +674,17 @@ export function handleApi(db, ctx) {
           const status = { NOT_FOUND: 404, RUN_NOT_PROPOSABLE: 409, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null, rejected: result.rejected ?? null } };
         })();
+      }
+      // R1-b: a person starts the execution; the server freezes the prediction, runs the engine,
+      // falsifies, proposes evidence and the next experiment (researchRunExecution.mjs).
+      if (seg.length === 5 && seg[4] === 'experiments') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const hypothesisId = typeof body?.hypothesisId === 'string' && body.hypothesisId.trim() ? body.hypothesisId.trim().slice(0, 200) : null;
+        const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
+        if (result.ok) return ok(result, result.deduped ? 200 : 201);
+        const status = { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
       }
       return err(404, 'not_found');
     }

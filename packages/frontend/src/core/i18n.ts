@@ -60,7 +60,7 @@ const pl: Dictionary = {
 // Celowo pusty — patrz komentarz u góry pliku. Klucze spadają na `pl` przez
 // fallback w t(), więc pusty słownik nie psuje niczego, gdyby ktoś ustawił
 // locale='en' zanim tłumaczenie powstanie.
-const en: Dictionary = { ...EXPLORER_EN };
+const en: Dictionary = { ...EXPLORER_EN, skipLink: 'Skip to content' };
 
 // Pack-supplied (GENESIS_ULTIMATE multilingual), verbatim; the pack's own catalog is the source of these strings.
 const es: Dictionary = {
@@ -77,6 +77,7 @@ const ar: Dictionary = {
   'explorer.tissue': 'نسيج', 'explorer.cell': 'خلية', 'explorer.organelle': 'عضية', 'explorer.molecule': 'جزيء', 'explorer.dna': 'DNA', 'explorer.rna': 'RNA', 'explorer.atp': 'ATP',
   'explorer.evidence': 'الأدلة', 'explorer.provenance': 'مصدر البيانات', 'explorer.simulation': 'محاكاة', 'explorer.realImage': 'صورة حقيقية', 'explorer.realDataset': 'مجموعة بيانات حقيقية',
   'explorer.reconstructed': 'إعادة بناء', 'explorer.simulated': 'محاكاة', 'explorer.illustrative': 'توضيحية', 'explorer.zoom': 'تكبير', 'explorer.source': 'المصدر',
+  skipLink: 'انتقل إلى المحتوى',
   'explorer.organ': 'العضو', 'explorer.atoms': 'الذرات', 'explorer.stomach': 'المعدة', 'explorer.pancreas': 'البنكرياس', 'explorer.smallIntestine': 'الأمعاء الدقيقة',
   'explorer.systemsRail': 'أجهزة الجسم', 'explorer.macroToMicro': 'من الكبير إلى الدقيق', 'explorer.magnification': 'التكبير', 'explorer.scale': 'المقياس',
   'explorer.section': 'مقطع', 'explorer.cutaway': 'قطع', 'explorer.isolate': 'اعزل العضو', 'explorer.showAll': 'أظهر الكل',

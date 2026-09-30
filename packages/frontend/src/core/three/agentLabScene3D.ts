@@ -314,7 +314,8 @@ export class AgentLabScene3D implements Sim3D {
     const atlasGroup = this.twins[0]?.getAtlasGroup();
     if (!this.THREE || !atlasGroup || !this.fullAtlas?.organs) return;
     this.focusLayer = new AnatomyFocusLayer(this.THREE, atlasGroup, this.fullAtlas.organs, this.fullAtlas.heightMeters, this.fullAtlas.systems);
-    this.focusLayer.setHiddenSystems(this.exploreHidden, this.exploreForceShow);
+    this.applyHiddenSystems();
+    this.focusLayer.setClipping(this.twins[0]?.getCutawayPlane() ?? null);
     this.focusLayer.apply(this.explore);
     this.twins[0]?.setProxiesHidden(this.explore.level !== 'BODY');
     this.twins[0]?.setAtlasFade(this.explore.level === 'ORGAN' || this.explore.level === 'STRUCTURE' ? 0.45 : 1);
@@ -594,6 +595,7 @@ export class AgentLabScene3D implements Sim3D {
     if (state.enabled && Math.abs(this.twinYaw - Math.round(this.twinYaw / (Math.PI * 2)) * Math.PI * 2) > 1e-3) this.cutawaySettled = false;
     if (this.renderer) this.renderer.localClippingEnabled = state.enabled;
     for (const t of this.twins) t.setCutaway(state);
+    this.focusLayer?.setClipping(this.twins[0]?.getCutawayPlane() ?? null);
   }
   getTwinCutaway(): CutawayState { return this.cutawayState; }
 

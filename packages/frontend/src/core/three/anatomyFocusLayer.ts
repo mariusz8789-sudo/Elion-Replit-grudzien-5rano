@@ -128,6 +128,11 @@ export class AnatomyFocusLayer {
     if (this.state) this.apply(this.state);
   }
 
+  /** The open section cuts the explored organs too (their own materials are not the atlas's). */
+  setClipping(plane: THREE_NS.Plane | null): void {
+    for (const m of [...this.mats, this.ghost]) { m.clippingPlanes = plane ? [plane] : null; m.side = plane ? this.THREE.DoubleSide : this.THREE.FrontSide; m.needsUpdate = true; }
+  }
+
   /** Organs the atlas actually provides (a region with none still focuses, it just offers no organ). */
   hasOrgan(id: string): boolean { return this.groups.has(id); }
 

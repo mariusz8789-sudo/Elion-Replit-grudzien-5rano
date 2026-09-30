@@ -61,3 +61,27 @@ Known blockers:
 - claim-to-source binding belongs to S2 and is not duplicated here.
 
 Rollback: revert the S1 commit; no database migration or production route depends on it.
+
+## S2 — Literature → ResearchRun contract
+
+Problem: ResearchRun needs a bounded way to request literature for an existing claim without acquiring a second lifecycle or treating model extraction as Evidence.
+
+Delivered:
+
+- `ClaimEvidenceLink` proposal contract with `SUPPORTS`, `CONTRADICTS`, `CONTEXT_ONLY`, `METHOD_SOURCE`, `UNKNOWN`;
+- thin `createResearchRunLiteraturePort()` adapter over S1 `searchLiterature`;
+- structured support, contradictions, missing-evidence and access-blocker output;
+- source-ID admission: a linker cannot cite a source absent from the retrieved source set;
+- all extracted relationships are forcibly `PROPOSED`, `NOT_EVIDENCE`, `humanReviewed:false` even if an external linker claims otherwise;
+- no database write, lifecycle event, Evidence publication or ResearchRun core modification.
+
+Public contracts:
+
+- `packages/backend/src/literature/claimEvidenceLink.mjs`
+- `packages/backend/src/literature/researchRunLiteraturePort.mjs`
+
+Claude integration: instantiate the port once and call `findForClaim({ researchRunId, claimId, claim, query? })` from the existing ResearchRun orchestration point. Any later admission into Evidence must use the canonical Evidence review path; this port never performs that transition.
+
+Validation: `node --test packages/backend/src/literatureFoundation.test.mjs packages/backend/src/researchRunLiteraturePort.test.mjs packages/backend/src/researchRun.test.mjs` — 19 pass, 0 fail.
+
+Rollback: revert the S2 commit; ResearchRun core and persistence are untouched.

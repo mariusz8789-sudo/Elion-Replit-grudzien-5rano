@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_OVERVIEW_ITEM, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, navVariants, type NavItem } from '../core/navigation';
+import { MORE_OVERVIEW_ITEM, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { menuForProfile } from '../core/profileNavigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 import { useSession } from '../core/backend/session';
@@ -250,6 +251,11 @@ export function AppShell({ children, chat, chatInline = false }: {
   const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
   const account = useAccountEntry();
+  // Uczeń, student i nauczyciel dostają krótsze menu (core/profileNavigation.ts); gość, badacz i instytucja — pełne.
+  const session = useSession();
+  const profile = profileOfUser(session?.user);
+  const menu = menuForProfile(profile);
+  const navVariants = menu.variants;
   const goAccount = (): void => { window.location.hash = '#/konto'; setMenuOpen(false); };
   const accountActive = active === 'account';
 
@@ -266,7 +272,7 @@ export function AppShell({ children, chat, chatInline = false }: {
 
   const sections = (
     <>
-      {NAV_SECTIONS.map((section) => (
+      {menu.main.map((section) => (
         <div className="shell-nav-section" key={section.id}>
           {section.label && <h2 className="shell-nav-section-title">{navGroupLabel(section)}</h2>}
           {section.items.map((item) => (
@@ -277,11 +283,11 @@ export function AppShell({ children, chat, chatInline = false }: {
       <div className="shell-nav-section">
         <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
-          <span className="shell-nav-label">{shellText('moreAll')}</span>
+          <span className="shell-nav-label">{menu.simplified ? shellText('more') : shellText('moreAll')}</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
-          <NavButton item={MORE_OVERVIEW_ITEM} active={active === MORE_OVERVIEW_ITEM.id} onNavigate={() => go(MORE_OVERVIEW_ITEM)} />
-          {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
+          {menu.showOverview && <NavButton item={MORE_OVERVIEW_ITEM} active={active === MORE_OVERVIEW_ITEM.id} onNavigate={() => go(MORE_OVERVIEW_ITEM)} />}
+          {menu.more.filter((group) => group.items.length > 0).map((group) => (
             <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
               <button
                 className="shell-nav-group-toggle"
@@ -394,7 +400,7 @@ export function AppShell({ children, chat, chatInline = false }: {
           <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label={shellText('closeMenu')} tabIndex={-1} />
           <div id="genesis-mobile-menu" className="shell-sheet" role="dialog" aria-modal="true" aria-label="Pełne menu Genesis">
             <div className="shell-sheet-head">
-              <span><strong>{shellText('more')}</strong><small>{shellText('allAreas')}</small></span>
+              <span><strong>{shellText('more')}</strong><small>{menu.simplified ? `${shellText('profileMenu')}: ${profileLabel(profile)}` : shellText('allAreas')}</small></span>
               <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label={shellText('closeMenu')}>✕</button>
             </div>
             <div className="shell-sheet-body">

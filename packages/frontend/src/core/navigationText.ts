@@ -83,6 +83,7 @@ const SHELL = {
   hideViews: ['Ukryj', 'Hide', 'إخفاء'],
   navigation: ['Nawigacja Genesis', 'Genesis navigation', 'تنقل Genesis'],
   language: ['Język', 'Language', 'اللغة'],
+  profileMenu: ['Menu dla profilu', 'Menu for profile', 'قائمة الملف الشخصي'],
 } as const satisfies Record<string, readonly [string, string, string]>;
 
 export function shellText(key: keyof typeof SHELL, locale: Locale = getLocale()): string {

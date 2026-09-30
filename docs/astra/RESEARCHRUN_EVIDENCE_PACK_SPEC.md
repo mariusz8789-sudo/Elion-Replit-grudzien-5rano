@@ -58,7 +58,7 @@ Verification reports separate outcomes:
 - `VALID_INTEGRITY_ONLY`: fingerprints and replay/integrity checks pass, without organizational authenticity;
 - `VALID_TRUSTED`: **PLANNED** and permitted only after an organizational signing key and signature verification exist.
 
-`SUPPORTED`, `REFUTED` and `INCONCLUSIVE` describe only a frozen hypothesis evaluated under its preregistered protocol. They are not universal scientific truth.
+ResearchRun exposes `CONFIRMED`, `REFUTED` and `INCONCLUSIVE`; the sealed experiment record retains its lower-level `SUPPORTED`, `WEAKENED`, `FALSIFIED` or `UNRESOLVED` verdict. Both vocabularies describe only a frozen hypothesis evaluated under its preregistered protocol and are not universal scientific truth.
 
 ## Acceptance invariants
 

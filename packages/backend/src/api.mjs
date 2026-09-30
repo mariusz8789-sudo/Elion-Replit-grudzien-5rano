@@ -74,6 +74,8 @@ import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolv
 import { buildCognitiveState } from './cognitiveState.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
+import { proposeScientificClaim } from './claimProposal.mjs';
+import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
 import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
@@ -190,6 +192,12 @@ function sanitizeNumberMap(obj, maxKeys = 64) {
  * @param db  otwarta baza (store.mjs)
  * @param ctx { method, pathname, token, body }  body już sparsowane (obiekt) lub null
  */
+/** The backend reasoning provider comes from server.mjs (built from its environment); without one, it is blocked. */
+const BLOCKED_REASONING_PROVIDER = createReasoningProvider({});
+function reasoningProviderOf(ctx) {
+  return ctx.reasoningProvider ?? BLOCKED_REASONING_PROVIDER;
+}
+
 export function handleApi(db, ctx) {
   const { method, pathname } = ctx;
   const body = ctx.body ?? {};
@@ -592,8 +600,26 @@ export function handleApi(db, ctx) {
       if (method !== 'GET') return err(405, 'method_not_allowed');
       return (async () => {
         let selfModel;
-        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db) }); } catch { selfModel = null; }
+        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: reasoningProviderOf(ctx).describe() }); } catch { selfModel = null; }
         return ok({ cognitiveState: buildCognitiveState(db, projectId, { selfModel }) });
+      })();
+    }
+    // ENTITY-3: an external model proposes; the answer is validated and stored as PROPOSED, never as knowledge.
+    if (seg[2] === 'claim-proposals' && seg.length === 3) {
+      if (method === 'GET') {
+        const { chain, claims } = readKnowledgeRegistry(db, projectId);
+        return chain.ok ? ok({ chain, proposals: claims }) : { status: 409, body: { error: 'state_integrity_failure', chain } };
+      }
+      if (method !== 'POST') return err(405, 'method_not_allowed');
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+      return (async () => {
+        const provider = reasoningProviderOf(ctx);
+        let selfModel;
+        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: provider.describe() }); } catch { selfModel = null; }
+        const result = await proposeScientificClaim(db, projectId, body, { provider, selfModel, userId: user.id });
+        if (result.ok) return ok(result, result.deduped ? 200 : 201);
+        const status = { INVALID_REQUEST: 400, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null, chain: result.chain ?? null } };
       })();
     }
     if (seg[2] === 'knowledge-registry') {

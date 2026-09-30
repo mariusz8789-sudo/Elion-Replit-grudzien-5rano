@@ -1540,7 +1540,7 @@ export interface GenesisSelfModel {
   engines: SelfModelEngine[];
   availableEngines: string[];
   blockedEngines: { toolId: string; blockedBy: string | null }[];
-  knownModels: { kind: string; status?: string; model?: string | null; target?: string; ruleId?: string | null; ruleFingerprint?: string | null }[];
+  knownModels: { kind: string; status?: string; providerId?: string | null; model?: string | null; target?: string; ruleId?: string | null; ruleFingerprint?: string | null }[];
   failedGates: { source: string; evaluationId: string | null; arm: string | null; reasons: string[]; computedAt: string | null }[];
   missingCapabilities: { id: string; label: string; status: string; requires: string | null }[];
   dataAccessBlockers: { source: string; status: string; pinnedFallbackIds: string[] }[];
@@ -1593,6 +1593,7 @@ export interface GenesisCognitiveState {
   activeHypotheses: { source: string; status: string; [key: string]: unknown }[];
   knowledgeGaps: RegistryGap[] | UnknownSection;
   contradictions: RegistryContradiction[] | UnknownSection;
+  proposedClaims: ScientificClaimProposal[] | UnknownSection;
   blockedCapabilities: { kind: string; id: string; blockedBy: string | null }[] | UnknownSection;
   pendingExperiments: { kind: string; id: string; [key: string]: unknown }[];
   runningExperiments: { kind: string; id: string; [key: string]: unknown }[];
@@ -1617,4 +1618,50 @@ export async function resolveKnowledgeGap(token: string, projectId: string, gapI
 
 export async function recordKnowledgeContradiction(token: string, projectId: string, contradiction: unknown): Promise<ApiResult<{ contradiction: RegistryContradiction; deduped: boolean }>> {
   return request('POST', `/projects/${projectId}/knowledge-registry/contradictions`, { token, body: contradiction });
+}
+
+/* ---------------- ENTITY-3: an external model proposes, the backend validates, the registry keeps it PROPOSED ---------------- */
+
+export interface ExperimentProposalDecision {
+  kind: string;
+  engineId: string | null;
+  description: string | null;
+  parameters: Record<string, unknown>;
+  parameterChanges: { target: string | null; to: unknown }[];
+  executedByModel: false;
+  decision: 'REJECTED_MALFORMED' | 'REJECTED_FROZEN_THRESHOLD' | 'HUMAN_APPROVAL_REQUIRED' | 'BLOCKED_BY_SELF_MODEL' | 'BLOCKED_BY_RUNTIME' | 'PROPOSED';
+  reason: string | null;
+}
+
+export interface ScientificClaimProposal {
+  proposalId: string;
+  contractVersion: number;
+  question: string | null;
+  claim: string;
+  claimType: 'HYPOTHESIS' | 'PREDICTION' | 'MECHANISM_PROPOSAL' | 'OPEN_QUESTION';
+  hypothesisId: string | null;
+  assumptions: string[];
+  supportingEvidenceRefs: string[];
+  contradictingEvidenceRefs: string[];
+  missingEvidence: string[];
+  uncertainty: { level: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN'; statement: string | null };
+  falsificationProposal: string;
+  experimentProposal: ExperimentProposalDecision | null;
+  unresolvedEvidenceRefs: { field: string; ref: string; reason: string }[];
+  degradations: { field: string; from: unknown; to: unknown; reason: string }[];
+  generatedBy: { kind: 'EXTERNAL_REASONING_MODEL'; providerId: string; model: string | null; version: string };
+  epistemicStatus: 'NOT_EVIDENCE';
+  status: 'PROPOSED';
+  proposedAt: string;
+}
+
+/** Asks the backend's configured reasoning model. Failure statuses: BLOCKED_BY_PROVIDER_CONFIGURATION, PROVIDER_TIMEOUT, REJECTED_MALFORMED_RESPONSE, ... */
+export async function proposeScientificClaim(
+  token: string, projectId: string, input: { question: string; hypothesisId?: string | null },
+): Promise<ApiResult<{ ok: true; status: 'PROPOSED'; deduped: boolean; proposal: ScientificClaimProposal }>> {
+  return request('POST', `/projects/${projectId}/claim-proposals`, { token, body: input });
+}
+
+export async function listClaimProposals(token: string, projectId: string): Promise<ApiResult<{ proposals: ScientificClaimProposal[] }>> {
+  return request('GET', `/projects/${projectId}/claim-proposals`, { token });
 }

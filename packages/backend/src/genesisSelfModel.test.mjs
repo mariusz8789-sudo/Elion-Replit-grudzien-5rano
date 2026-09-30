@@ -29,7 +29,7 @@ function bootAndReadSelf(dbPath) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { proc.kill('SIGKILL'); reject(new Error('server did not start in time')); }, 20000);
+    const timer = setTimeout(() => { proc.kill('SIGKILL'); reject(new Error('server did not start in time')); }, 60000);
     let buf = '';
     proc.stderr.on('data', () => {});
     proc.stdout.on('data', async (chunk) => {

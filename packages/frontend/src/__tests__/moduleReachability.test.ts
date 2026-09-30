@@ -109,6 +109,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // contradictions into the backend knowledge registry. No screen reads the cognitive state yet; the
   // chat and Start that would call it belong to the Human Explorer thread.
   'core/mind/knowledgeRegistryAdapter.ts': 'ENTITY-2 registry adapter; wired to a screen in a later step',
+  // ENTITY-3: the canonical model router's port to the backend reasoning adapter. No screen asks the model yet.
+  'core/experimentFabric/backendReasoningPort.ts': 'ENTITY-3 router port to the backend adapter; wired to a screen in a later step',
   // --- D-136 real external medical dataset boundary (NIfTI-1/DICOM Part-10), recovered 2026-09-27 from
   // claude/genesis-c1-visual-snapshot (0efeb774), which the 2026-09-25 consolidation skipped. A strict
   // provenance/format/checksum gate built before any UI consumes it; no dataset has been handed to Genesis yet,

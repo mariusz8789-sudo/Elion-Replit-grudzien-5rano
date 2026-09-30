@@ -5,6 +5,7 @@ import { useThreeLoop } from '../core/three/useThreeLoop';
 import { Controls, defaultParams } from './Controls';
 import { NarratorPanel } from './NarratorPanel';
 import { HonestyBadge } from './HonestyBadge';
+import { labSceneId } from '../core/sceneProvenance/labSceneManifests';
 import { CustomExperimentTab } from './CustomExperimentTab';
 import { ConsequenceChainPanel } from './ConsequenceChainPanel';
 import { narrate } from '../narrator/engine';
@@ -209,7 +210,7 @@ function BelowStage({
 }) {
   return (
     <>
-      <HonestyBadge level={exp.honesty} note={exp.honestyNote} />
+      <HonestyBadge level={exp.honesty} note={exp.honestyNote} sceneId={labSceneId(lab.id, exp.id)} />
       <details className="lab-advanced-controls">
         <summary>Parametry i analiza</summary>
         <div className="lab-advanced-controls-body">
@@ -272,7 +273,7 @@ function ConsequenceExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabD
   }, [lab.id, exp.id]);
   return (
     <div className="consequence-stage">
-      <ConsequenceChainPanel spec={spec} honesty={exp.honesty} honestyNote={exp.honestyNote} experimentId={exp.id} />
+      <ConsequenceChainPanel spec={spec} honesty={exp.honesty} honestyNote={exp.honestyNote} experimentId={exp.id} sceneId={labSceneId(lab.id, exp.id)} />
     </div>
   );
 }

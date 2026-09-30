@@ -18,6 +18,11 @@ const MAX_SMILES = 500;
 export const RESEARCH_RUN_EXECUTORS = Object.freeze({
   rdkit: Object.freeze({
     engineId: 'rdkit',
+    /**
+     * The canonical Scientific Run capability this output is stored under, so the existing replay
+     * (campaign/verify.mjs, the 'molecular-descriptors' replayer) re-runs the same RDKit call.
+     */
+    scienceCapability: 'molecular-descriptors',
     inputShape: '{ "smiles": string }',
     /** Output fields of compute/rdkit_worker.py `descriptors` a prediction may name, and their type. */
     observables: Object.freeze({

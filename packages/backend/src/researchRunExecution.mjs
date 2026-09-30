@@ -13,7 +13,11 @@
  *                        from the frozen criticality (experimentMemory.deriveVerdict)
  *   EVIDENCE_UPDATE      an evidence PROPOSAL in the canonical ledger (knowledgeApi.proposeStructuredEvidence);
  *                        publishing it stays a human decision
- *   NEXT_EXPERIMENT      the next proposal, chosen by a fixed rule from the plan, not by a model
+ *   (replay)             R1-c: the engine output is also a canonical Scientific Run (science_runs), and the
+ *                        existing replay (campaign/verify.mjs) re-runs it once and compares output hashes;
+ *                        the verification row is the existing append-only one
+ *   NEXT_EXPERIMENT      the next proposal, chosen by a fixed rule from the plan, not by a model; it carries
+ *                        the replay verdict, and anything but MATCH stops at HUMAN_REVIEW
  *
  * SUPPORTED_WITHIN_PROTOCOL / FALSIFIED_WITHIN_PROTOCOL / INCONCLUSIVE describe only this frozen hypothesis under this protocol (engine,
  * input, criteria). They are never a statement of scientific truth.
@@ -29,6 +33,9 @@ import { deriveVerdict, preregisterExperiment, sealExperimentSession } from './e
 import { proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION } from './researchRun.mjs';
 import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
+import { getScienceRun, listScienceRunVerifications, saveScienceRun } from './store.mjs';
+import { sha256Hex16 } from './provenance.mjs';
+import { VERDICT as REPLAY_VERDICT, verifyScienceRun } from './campaign/verify.mjs';
 
 export const EXECUTION_RECORD_VERSION = 'research-run-execution@1';
 export const VERDICT_SCOPE = 'Applies only to this frozen hypothesis under this protocol (engine, input, criteria). It is not a statement of scientific truth.';
@@ -40,6 +47,10 @@ const EVIDENCE_CLASSES = new Set(['REAL_ENGINE_OUTPUT', 'MODEL_ESTIMATE', 'REFER
  * 'candidate' in classifyClaim, never 'verified', whatever the verdict.
  */
 const EVIDENCE_CONFIDENCE = 0.5;
+/** Replay outcome for an experiment whose engine rejected the input: there is no output to re-run. */
+export const REPLAY_NOT_APPLICABLE = 'NOT_APPLICABLE';
+/** The canonical Scientific Run id of one experiment's engine output. Deterministic, so a retry never stores it twice. */
+export const scienceRunIdOf = (researchRunId, experimentId) => `rr-${sha256Hex(canonicalJson({ researchRunId, experimentId })).slice(0, 32)}`;
 
 export const experimentIdOf = (researchRunId, hypothesisId) => `exp-${fnv1a(canonicalJson({ researchRunId, hypothesisId }))}`;
 /** Scientific memory is keyed by campaign id; a research-run experiment gets its own key there. */
@@ -111,7 +122,10 @@ export function judgeCriteria(criteria, execution, executor) {
 
 /* ---------------- the next experiment (a fixed rule, no model) ---------------- */
 
-export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors) {
+export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null) {
+  if (replayVerdict && replayVerdict !== REPLAY_VERDICT.MATCH && replayVerdict !== REPLAY_NOT_APPLICABLE) {
+    return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
+  }
   for (const h of plan?.hypotheses ?? []) {
     if (doneHypothesisIds.has(h.hypothesisId)) continue;
     const x = executabilityOf(h, executors);
@@ -187,6 +201,8 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
   const res = executor.run(frozen.input);
   if (!res.ok && res.status === 'BLOCKED') return { ok: false, status: 'BLOCKED', engineId: frozen.engineId, reason: res.reason };
   const output = res.ok ? res.output : { error: res.error ?? null, reason: res.reason ?? null };
+  // Only a real engine output becomes a Scientific Run; an input the engine rejected has nothing to replay.
+  const scienceRunId = res.ok && executor.scienceCapability ? scienceRunIdOf(runId, frozen.experimentId) : null;
   const execution = {
     recordVersion: EXECUTION_RECORD_VERSION,
     researchRunId: runId,
@@ -210,6 +226,7 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
     startedAt,
     finishedAt: now(),
     durationMs: Date.now() - t0,
+    scienceRunId,
   };
   if (execution.inputHash !== frozen.inputHash) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: 'input_hash_drift' };
 
@@ -240,6 +257,19 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
     if (!sealed.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: sealed.error };
     const body = sealed.record.body;
     if (body.preregCheck !== 'MATCH' || body.verdictCheck !== 'MATCH') return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: `seal_${body.preregCheck}_${body.verdictCheck}` };
+    if (scienceRunId) {
+      // Same shape as orchestrator.mjs persistDescriptorScienceRun, so the existing replayer applies unchanged.
+      saveScienceRun(db, {
+        id: scienceRunId, projectId, campaignId: null, candidateId: null,
+        engine: execution.engine.engineLabel, engineVersion: execution.engine.engineLabel,
+        capability: executor.scienceCapability, method: execution.engine.engineName ?? frozen.engineId,
+        status: 'ok', evidenceClass: 'COMPUTATIONAL',
+        inputs: frozen.input, outputs: res.output,
+        provenance: { researchRunId: runId, experimentId: frozen.experimentId, executionRecordVersion: EXECUTION_RECORD_VERSION },
+        inputHash: sha256Hex16(frozen.input), outputHash: sha256Hex16(res.output),
+        durationMs: execution.durationMs,
+      });
+    }
     const handoff = appendServerResearchStateEvent(db, runId, 'EXPERIMENT_HANDOFF', execution);
     if (!handoff.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: handoff.error };
     const falsified = appendServerResearchStateEvent(db, runId, 'SELF_FALSIFICATION', {
@@ -286,6 +316,19 @@ function evidenceInputOf(runId, x) {
   };
 }
 
+function replaySummary(v) {
+  return { verificationId: v.id, verdict: v.verdict, originalOutputHash: v.originalOutputHash, replayOutputHash: v.replayOutputHash, replayEngineVersion: v.replayEngineVersion, verifiedAt: v.createdAt };
+}
+
+function firstReplayOf(db, x) {
+  const scienceRunId = x.execution.scienceRunId ?? null;
+  if (!scienceRunId || !getScienceRun(db, scienceRunId)) return { verdict: REPLAY_NOT_APPLICABLE, reason: `engine status ${x.execution.status}: no engine output to replay` };
+  const existing = listScienceRunVerifications(db, scienceRunId);
+  if (existing.length) return replaySummary(existing[0]);
+  const v = verifyScienceRun(db, scienceRunId);
+  return v.ok ? replaySummary(v.verification) : { verdict: REPLAY_VERDICT.REPLAY_UNSUPPORTED, reason: v.error };
+}
+
 function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, proposeEvidence) {
   const before = getResearchRun(db, projectId, runId);
   const x = before.experiments.find((e) => e.experimentId === experimentId);
@@ -294,6 +337,9 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
   // returns the same proposal, so a crash between here and the append below cannot duplicate it.
   const proposed = x.evidence ? { ok: true, proposalId: x.evidence.evidenceProposalId, record: { contentHash: x.evidence.evidenceContentHash } } : proposeEvidence(evidenceInputOf(runId, x));
   if (!proposed.ok) return { ok: false, status: 'EVIDENCE_PROPOSAL_FAILED', reason: proposed.error };
+  // Replay once, through the existing verifier. A crash after it leaves the row behind and the first
+  // row is reused, so the engine is not replayed again on resume.
+  const replay = x.next ? null : firstReplayOf(db, x);
 
   return inWriteTransaction(db, () => {
     const current = getResearchRun(db, projectId, runId);
@@ -319,7 +365,8 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
         contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
         researchRunId: runId,
         experimentId,
-        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors),
+        replay,
+        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict),
         decidedBy: 'GENESIS_FIXED_RULE',
         status: 'PROPOSED',
       });
@@ -395,4 +442,28 @@ export function executeResearchExperiment(db, projectId, runId, {
     experiment: researchRun.experiments.find((e) => e.experimentId === experimentId),
     researchRun,
   };
+}
+
+/**
+ * Replays one executed experiment again on request (R1-c) through the existing verifier. Every attempt
+ * is a new append-only verification row; the chain keeps the first one in NEXT_EXPERIMENT.
+ * Returns { ok, verification, replays } or { ok:false, status }.
+ */
+export function replayResearchExperiment(db, projectId, runId, experimentId) {
+  const view = getResearchRun(db, projectId, runId);
+  if (!view) return { ok: false, status: 'NOT_FOUND' };
+  if (!view.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
+  const x = view.experiments.find((e) => e.experimentId === experimentId);
+  if (!x) return { ok: false, status: 'EXPERIMENT_NOT_FOUND' };
+  if (!x.execution) return { ok: false, status: 'NOT_EXECUTED' };
+  const scienceRunId = x.execution.scienceRunId ?? null;
+  if (!scienceRunId || !getScienceRun(db, scienceRunId)) return { ok: false, status: 'NOTHING_TO_REPLAY', reason: `engine status ${x.execution.status}` };
+  const v = verifyScienceRun(db, scienceRunId);
+  if (!v.ok) return { ok: false, status: 'REPLAY_FAILED', reason: v.error };
+  return { ok: true, experimentId, verification: replaySummary(v.verification), replays: listResearchExperimentReplays(db, scienceRunId) };
+}
+
+/** Every replay of one experiment, oldest first. */
+export function listResearchExperimentReplays(db, scienceRunId) {
+  return listScienceRunVerifications(db, scienceRunId).map(replaySummary);
 }

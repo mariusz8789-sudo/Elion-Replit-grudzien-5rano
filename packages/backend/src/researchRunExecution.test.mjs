@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDatabase, listExperimentRecords, verifyExperimentRecordChain } from './store.mjs';
+import { openDatabase, getScienceRun, listExperimentRecords, verifyExperimentRecordChain } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
 import { listProposals } from './knowledgeApi.mjs';
@@ -148,6 +148,21 @@ describe('R1-b research run execution', () => {
     assert.deepEqual([x.next.proposal.action, x.next.proposal.hypothesisId], ['EXECUTE_NEXT_HYPOTHESIS', plan.hypotheses[1].hypothesisId]);
     assert.equal(rr.nextStep, 'AWAITING_EXECUTION');
 
+    // R1-c: the engine output is a canonical Scientific Run, replayed once by the existing verifier before
+    // the next experiment is proposed. Replaying again on request adds a row and never rewrites the chain.
+    const sr = getScienceRun(db, e.scienceRunId);
+    assert.equal(sr.capability, 'molecular-descriptors');
+    assert.equal(sr.projectId, project.id);
+    assert.deepEqual(sr.outputs, e.output);
+    assert.equal(x.next.replay.verdict, 'MATCH');
+    assert.equal(x.next.replay.originalOutputHash, x.next.replay.replayOutputHash);
+    const replayUrl = `${base}/research-runs/${runId}/experiments/${x.experimentId}/replays`;
+    const replayAgain = await call('POST', replayUrl, { token: owner.token });
+    assert.equal(replayAgain.status, 201, JSON.stringify(replayAgain.body));
+    assert.equal(replayAgain.body.verification.verdict, 'MATCH');
+    assert.deepEqual((await call('GET', replayUrl, { token: owner.token })).body.replays.map((r) => r.verdict), ['MATCH', 'MATCH']);
+    assert.deepEqual((await call('GET', `${base}/research-runs/${runId}`, { token: owner.token })).body.researchRun.researchState.events.length, rr.researchState.events.length);
+
     const second = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
     assert.equal(second.status, 201);
     assert.equal(second.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
@@ -158,6 +173,11 @@ describe('R1-b research run execution', () => {
     const third = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
     assert.equal(third.status, 201);
     assert.equal(third.body.experiment.execution.status, 'ENGINE_REJECTED_INPUT');
+    assert.equal(third.body.experiment.execution.scienceRunId, null, 'a rejected input stores no Scientific Run');
+    assert.equal(third.body.experiment.next.replay.verdict, 'NOT_APPLICABLE');
+    const nothing = await call('POST', `${base}/research-runs/${runId}/experiments/${third.body.experimentId}/replays`, { token: owner.token });
+    assert.equal(nothing.status, 409);
+    assert.equal(nothing.body.error, 'NOTHING_TO_REPLAY');
     assert.equal(third.body.experiment.falsification.verdict, 'INCONCLUSIVE');
     assert.equal(third.body.experiment.next.proposal.action, 'HUMAN_REVIEW');
     assert.equal(third.body.researchRun.nextStep, 'AWAITING_HUMAN_REVIEW');
@@ -172,6 +192,20 @@ describe('R1-b research run execution', () => {
     const final = (await call('GET', `${base}/research-runs/${runId}`, { token: owner.token })).body.researchRun;
     assert.equal(final.experiments.length, 3);
     assert.equal(final.researchState.chain.ok, true);
+  });
+
+  test('an engine output that does not replay stops the run at HUMAN_REVIEW', needsRdkit, async () => {
+    const { db, project, runId } = await planned('rb5@lab.org');
+    // An engine answer that the real engine does not reproduce, e.g. a corrupted or substituted result.
+    const skewed = { ...DEFAULT_RESEARCH_TOOLS, executors: { rdkit: { ...DEFAULT_RESEARCH_TOOLS.executors.rdkit, run: (input) => {
+      const r = DEFAULT_RESEARCH_TOOLS.executors.rdkit.run(input);
+      return { ...r, output: { ...r.output, molWt: r.output.molWt + 1 } };
+    } } } };
+    const r = executeResearchExperiment(db, project.id, runId, { tools: skewed });
+    assert.equal(r.ok, true);
+    assert.equal(r.experiment.next.replay.verdict, 'DRIFT');
+    assert.deepEqual([r.experiment.next.proposal.action, r.experiment.next.proposal.reason], ['HUMAN_REVIEW', 'REPLAY_DRIFT']);
+    assert.equal(r.researchRun.nextStep, 'AWAITING_HUMAN_REVIEW');
   });
 
   test('engine not available now: BLOCKED, nothing written, nothing substituted', needsRdkit, async () => {
@@ -317,6 +351,15 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       assert.equal(after.nextStep, 'AWAITING_EXECUTION');
       const proposals = (await server.api('GET', '/api/knowledge/proposals')).body.proposals;
       assert.equal(proposals.filter((p) => p.proposalId === x.evidence.evidenceProposalId && p.status === 'pending').length, 1);
+      // R1-c after the restart: the replay recorded in the chain still stands, a fresh replay of the
+      // stored run matches, and a person publishes the evidence through the existing ledger route.
+      assert.equal(after.experiments[0].next.replay.verdict, 'MATCH');
+      const replayed = await server.api('POST', `${base}/research-runs/${id}/experiments/${x.experimentId}/replays`, { token: owner.token });
+      assert.equal(replayed.status, 201, JSON.stringify(replayed.body));
+      assert.equal(replayed.body.verification.verdict, 'MATCH');
+      assert.equal(replayed.body.verification.replayOutputHash, after.experiments[0].next.replay.originalOutputHash);
+      const published = await server.api('POST', `/api/knowledge/proposals/${x.evidence.evidenceProposalId}/publish`, { token: owner.token });
+      assert.equal(published.status, 200, JSON.stringify(published.body));
       const same = await server.api('POST', `${base}/research-runs/${id}/experiments`, { token: owner.token, body: { hypothesisId: x.frozen.hypothesisId } });
       assert.equal(same.status, 200);
       assert.equal(same.body.status, 'ALREADY_EXECUTED');

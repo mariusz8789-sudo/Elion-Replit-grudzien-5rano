@@ -76,7 +76,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun } from './researchRun.mjs';
-import { executeResearchExperiment } from './researchRunExecution.mjs';
+import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
@@ -686,6 +686,18 @@ export function handleApi(db, ctx) {
         // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
         const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
         return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
+      }
+      // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
+      if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {
+        const x = current.experiments.find((e) => e.experimentId === seg[5]);
+        if (!x) return err(404, 'not_found');
+        if (method === 'GET') return ok({ experimentId: x.experimentId, replays: x.execution?.scienceRunId ? listResearchExperimentReplays(db, x.execution.scienceRunId) : [] });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = replayResearchExperiment(db, projectId, current.researchRunId, x.experimentId);
+        if (result.ok) return ok(result, 201);
+        const status = { NOT_FOUND: 404, EXPERIMENT_NOT_FOUND: 404, NOT_EXECUTED: 409, NOTHING_TO_REPLAY: 409, STATE_INTEGRITY_FAILURE: 409, REPLAY_FAILED: 502 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null } };
       }
       return err(404, 'not_found');
     }

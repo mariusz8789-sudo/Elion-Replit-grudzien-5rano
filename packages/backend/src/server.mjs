@@ -347,7 +347,7 @@ function handlePersistApi(req, res, url) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
   // ENTITY-3: each claim proposal is one paid call to the external reasoning model — same budget as /api/ask.
-  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
+  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments(\/[^/]+\/replays)?))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
   }
   const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;

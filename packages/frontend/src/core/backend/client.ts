@@ -1514,3 +1514,40 @@ export async function publishKnowledgeProposal(
 export async function rejectKnowledgeProposal(token: string, proposalId: string): Promise<ApiResult<Record<string, never>>> {
   return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/reject`, { token });
 }
+
+/* ---------------- ENTITY-1: Genesis's view of itself (GET /api/genesis/self) ---------------- */
+
+/** One engine: the adapter exists (`capabilityExists`) and, separately, whether its runtime works now. */
+export interface SelfModelEngine {
+  toolId: string;
+  engineName: string;
+  capabilityId: string | null;
+  capabilityExists: true;
+  runtimeAvailableNow: boolean;
+  status: 'AVAILABLE' | 'BLOCKED';
+  blockedBy: string | null;
+  reason: string | null;
+  proof: { kind: 'LOCAL_REFERENCE_CASE' | 'REMOTE_REAL_EXECUTION'; [key: string]: unknown } | null;
+  statement: string;
+}
+
+export interface GenesisSelfModel {
+  schemaVersion: number;
+  generatedAt: string;
+  identity: { entityId: string; mission: string; constitutionVersion: string; identitySchemaVersion: number };
+  references: Record<string, string>;
+  environment: Record<string, unknown>;
+  engines: SelfModelEngine[];
+  availableEngines: string[];
+  blockedEngines: { toolId: string; blockedBy: string | null }[];
+  knownModels: { kind: string; status?: string; model?: string | null; target?: string; ruleId?: string | null; ruleFingerprint?: string | null }[];
+  failedGates: { source: string; evaluationId: string | null; arm: string | null; reasons: string[]; computedAt: string | null }[];
+  missingCapabilities: { id: string; label: string; status: string; requires: string | null }[];
+  dataAccessBlockers: { source: string; status: string; pinnedFallbackIds: string[] }[];
+  awaitingMeasurements: { known: boolean; candidates: number; campaigns: number };
+}
+
+/** Unauthenticated, like /api/health: it carries no project data. */
+export async function getGenesisSelfModel(): Promise<ApiResult<GenesisSelfModel>> {
+  return request<GenesisSelfModel>('GET', '/genesis/self');
+}

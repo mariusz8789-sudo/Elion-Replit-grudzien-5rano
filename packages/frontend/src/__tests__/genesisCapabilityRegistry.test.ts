@@ -3,6 +3,7 @@ import {
   getGenesisCapability,
   listGenesisCapabilities,
   matchGenesisCapabilityIntent,
+  withLiveRuntime,
 } from '../core/capabilities/genesisCapabilityRegistry';
 import { resolveCommand } from '../core/scienceChat/resolveCommand';
 
@@ -72,12 +73,23 @@ describe('canonical Genesis capability registry', () => {
     expect(resolveCommand(message, null).action).toEqual({ type: 'openRoute', hash });
   });
 
-  it('only calls workers AVAILABLE after persisted real execution proof', () => {
+  it('never claims an engine runtime works from a static list; only the live self model can', () => {
     const workers = listGenesisCapabilities().filter(({ domain }) => domain === 'compute-worker');
-    expect(workers.filter(({ readiness }) => readiness === 'AVAILABLE').map(({ id }) => id).sort()).toEqual([
+    expect(workers.map(({ id }) => id).sort()).toEqual([
       'worker-admet', 'worker-biopython', 'worker-openmm', 'worker-pymeep', 'worker-pyscf', 'worker-toxicity', 'worker-vina',
     ]);
-    expect(getGenesisCapability('worker-pymeep')).toMatchObject({ readiness: 'AVAILABLE', selectionMode: 'CUSTOM_FLOW', replaySupport: 'CANONICAL' });
+    expect(workers.filter(({ readiness }) => readiness === 'AVAILABLE')).toEqual([]);
+    expect(withLiveRuntime(workers, null).filter(({ readiness }) => readiness === 'AVAILABLE')).toEqual([]);
+
+    const live = withLiveRuntime(listGenesisCapabilities(), { engines: [
+      { toolId: 'pymeep', runtimeAvailableNow: true, statement: 'PyMeep: runtime działa teraz.' },
+      { toolId: 'openmm', runtimeAvailableNow: false, statement: 'Mam adapter OpenMM, ale obecnie runtime jest niedostępny (BLOCKED_BY_RUNTIME).' },
+    ] });
+    expect(live.filter(({ domain, readiness }) => domain === 'compute-worker' && readiness === 'AVAILABLE').map(({ id }) => id)).toEqual(['worker-pymeep']);
+    expect(live.find(({ id }) => id === 'worker-pymeep')).toMatchObject({ readiness: 'AVAILABLE', selectionMode: 'CUSTOM_FLOW', replaySupport: 'CANONICAL' });
+    expect(live.find(({ id }) => id === 'worker-pymeep')?.blockedReason).toBeUndefined();
+    expect(live.find(({ id }) => id === 'worker-openmm')).toMatchObject({ readiness: 'BLOCKED_BY_RUNTIME', blockedReason: expect.stringMatching(/^Mam adapter OpenMM/) });
+    expect(live.find(({ id }) => id === 'chemistry-titration')).toEqual(getGenesisCapability('chemistry-titration'));
   });
 
   it('keeps virtual animals fail-closed until governed assets and models exist', () => {

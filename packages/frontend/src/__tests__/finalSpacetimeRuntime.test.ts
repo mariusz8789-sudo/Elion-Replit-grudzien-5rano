@@ -60,7 +60,9 @@ describe('final canonical spacetime/world product runtime', () => {
     const hash = recordDirectedPromptWorld(ledger, directed);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
     expect(ledger.verifyLedger()).toMatchObject({ ok: true });
-    const record = ledger.toSnapshot().records[0]!;
+    // ENTITY-0: recorded as a pending proposal, not as active evidence.
+    expect(ledger.getActive()).toHaveLength(0);
+    const record = ledger.toSnapshot().proposals[0]!.record;
     expect(record.claim).toContain(directed.world.generated.worldId);
     expect(record.claim).toContain(`graphFingerprint=${directed.deterministicFingerprint}`);
     expect(record.claim).toContain('epistemic=MODEL');

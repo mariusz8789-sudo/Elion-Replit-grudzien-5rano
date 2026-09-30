@@ -126,8 +126,9 @@ describe('D-128 — session statuses and the ★ scale onto the canonical rank (
     expect(m.sessionStatusToCanonicalReliability('SPECULATIVE')).toBe('SPECULATIVE_MODEL');
     expect(m.sessionStatusToCanonicalReliability('INSUFFICIENT_EVIDENCE')).toBe('UNSUPPORTED_CLAIM');
     expect(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('MODEL'))).toBeLessThan(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('REAL_OBSERVATION')));
-    expect([0, 1, 2, 3, 4, 5, 9, Number.NaN].map((n) => m.starScaleToCanonicalReliability(n))).toEqual(['UNSUPPORTED_CLAIM', 'SPECULATIVE_MODEL', 'HYPOTHESIS', 'THEORETICAL_MODEL', 'WELL_SUPPORTED_MODEL', 'ESTABLISHED_SCIENCE', 'ESTABLISHED_SCIENCE', 'UNSUPPORTED_CLAIM']);
-    expect(m.starScaleToCanonicalReliability(m.countFilledStars('★★★☆☆'))).toBe('THEORETICAL_MODEL');
-    expect(m.starScaleToCanonicalReliability(4.9)).toBe('WELL_SUPPORTED_MODEL');
+    // ENTITY-0: a model's own ★ rating never lifts a claim above HYPOTHESIS.
+    expect([0, 1, 2, 3, 4, 5, 9, Number.NaN].map((n) => m.starScaleToCanonicalReliability(n))).toEqual(['UNSUPPORTED_CLAIM', 'SPECULATIVE_MODEL', 'HYPOTHESIS', 'HYPOTHESIS', 'HYPOTHESIS', 'HYPOTHESIS', 'HYPOTHESIS', 'UNSUPPORTED_CLAIM']);
+    expect(m.starScaleToCanonicalReliability(m.countFilledStars('★★★★★'))).toBe('HYPOTHESIS');
+    expect(m.starScaleToCanonicalReliability(4.9)).not.toBe('ESTABLISHED_SCIENCE');
   });
 });

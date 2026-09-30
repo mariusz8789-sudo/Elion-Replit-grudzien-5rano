@@ -983,6 +983,38 @@ export async function getExperimentMemory(token: string, projectId: string, camp
   return r.ok ? { ok: true, data: r.data.memory } : r;
 }
 
+/* ---------------- Genesis Mind research state (ENTITY-0) ---------------- */
+
+export interface AgentRunSummary {
+  readonly id: string;
+  readonly projectId: string;
+  readonly goal: string;
+  readonly domain: string;
+  readonly status: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface PersistedResearchState {
+  readonly events: readonly unknown[];
+  readonly chain: { readonly ok: boolean; readonly length: number; readonly head: string | null; readonly brokenAt: number | null; readonly reason: string | null };
+}
+
+export async function createAgentRun(token: string, projectId: string, goal: string, domain: string): Promise<ApiResult<{ run: AgentRunSummary }>> {
+  return request('POST', `/projects/${projectId}/agent-runs`, { token, body: { goal, domain } });
+}
+
+export async function getPersistedResearchState(token: string, projectId: string, runId: string): Promise<ApiResult<PersistedResearchState>> {
+  const r = await request<{ researchState: PersistedResearchState }>('GET', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token });
+  return r.ok ? { ok: true, data: r.data.researchState } : r;
+}
+
+export async function appendPersistedResearchStateEvent(
+  token: string, projectId: string, runId: string, event: unknown,
+): Promise<ApiResult<{ event: unknown; head: string; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token, body: { event } });
+}
+
 /**
  * THE FINAL PROTOCOL — the artefact the experiment ends with, assembled by the backend from persisted
  * state only. The shape is deliberately loose here: the frontend shows what the record contains and

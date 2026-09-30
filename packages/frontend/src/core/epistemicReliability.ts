@@ -167,13 +167,21 @@ export function sessionStatusToCanonicalReliability(status: SessionEpistemicStat
   }
 }
 
-/** The ★ count (0–5) of the /api/ask label onto the canonical rank; anything outside 0–5 is UNSUPPORTED, never rounded up. */
+/**
+ * The ★ count (0–5) of the /api/ask label onto the canonical rank.
+ *
+ * ENTITY-0: those stars are the language model's OWN rating of its own
+ * answer. A model's self-assessment is not evidence, so it can never lift a
+ * claim above HYPOTHESIS — five stars used to map to ESTABLISHED_SCIENCE,
+ * which let a model declare its own words settled science. Anything above
+ * HYPOTHESIS has to come from an evidence path, not from this function.
+ * Non-finite input is UNSUPPORTED, never rounded up.
+ */
+export const MODEL_SELF_RATING_CEILING: EpistemicStatus = 'HYPOTHESIS';
+
 export function starScaleToCanonicalReliability(stars: number): EpistemicStatus {
   const n = Number.isFinite(stars) ? Math.floor(stars) : 0;
-  if (n >= 5) return 'ESTABLISHED_SCIENCE';
-  if (n === 4) return 'WELL_SUPPORTED_MODEL';
-  if (n === 3) return 'THEORETICAL_MODEL';
-  if (n === 2) return 'HYPOTHESIS';
+  if (n >= 2) return MODEL_SELF_RATING_CEILING;
   if (n === 1) return 'SPECULATIVE_MODEL';
   return 'UNSUPPORTED_CLAIM';
 }

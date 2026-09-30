@@ -1,7 +1,25 @@
-// packages/frontend/src/core/physics.ts
+// packages/core/src/physics/relativity.ts
+var CODATA_2018 = Object.freeze({
+  G: 66743e-15,
+  c: 299792458,
+  label: "CODATA 2018 (c exact by SI definition)"
+});
+var ROUNDED_4_SIG = Object.freeze({
+  G: 6674e-14,
+  c: 2998e5,
+  label: "rounded to 4 significant figures (frontend labs)"
+});
 function lorentzGamma(beta) {
   return 1 / Math.sqrt(1 - beta * beta);
 }
+function inverseLorentzGamma(beta) {
+  return Math.sqrt(1 - beta * beta);
+}
+function schwarzschildRadius(massKg, constants) {
+  return 2 * constants.G * massKg / (constants.c * constants.c);
+}
+
+// packages/frontend/src/core/physics.ts
 function lorentzTime(ct, x, beta) {
   return lorentzGamma(beta) * (ct - beta * x);
 }
@@ -19,10 +37,8 @@ function decayRemaining(halfLives) {
 function kardashevPower(K) {
   return Math.pow(10, 10 * K + 6);
 }
-function schwarzschildRadius(massKg) {
-  const G2 = 6674e-14;
-  const C = 2998e5;
-  return 2 * G2 * massKg / (C * C);
+function schwarzschildRadius2(massKg) {
+  return schwarzschildRadius(massKg, ROUNDED_4_SIG);
 }
 function singletCorrelation(a, b) {
   return -Math.cos(a - b);
@@ -254,8 +270,8 @@ function mondAcceleration(newtonianAccel, a0 = MOND_A0_ASTRO) {
   if (newtonianAccel <= 0) return 0;
   return (newtonianAccel + Math.sqrt(newtonianAccel * newtonianAccel + 4 * newtonianAccel * a0)) / 2;
 }
-var G_SI = 6674e-14;
-var C_SI = 2998e5;
+var G_SI = ROUNDED_4_SIG.G;
+var C_SI = ROUNDED_4_SIG.c;
 var M_SUN_KG = 1989e27;
 function chirpMassSolar(m1Solar, m2Solar) {
   return Math.pow(m1Solar * m2Solar, 3 / 5) / Math.pow(m1Solar + m2Solar, 1 / 5);
@@ -2791,6 +2807,7 @@ export {
   exponentialDiskMass,
   gaussianPdf,
   hillFormula,
+  inverseLorentzGamma,
   iscoFrequency,
   isothermalHaloMass,
   kardashevPower,
@@ -2826,7 +2843,7 @@ export {
   sampleLocalHiddenPair,
   sampleSingletPair,
   schwarzschildGeodesicRHS,
-  schwarzschildRadius,
+  schwarzschildRadius2 as schwarzschildRadius,
   semfBindingEnergy,
   semfBindingPerNucleon,
   semfStabilityGradient,

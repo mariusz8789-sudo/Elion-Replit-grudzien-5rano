@@ -1,4 +1,5 @@
 import { fnv1a, canonicalJson } from '../events/hash';
+import { readJSON, remove, writeJSON } from '../storage';
 import type { Hypothesis } from '../experimentFabric/beliefRevision';
 import { modelSpecFingerprint, normalizeModelSpec, renderModelSpec, type ModelSpec } from './modelSpace';
 
@@ -133,13 +134,129 @@ type LogEntry =
   | { readonly entryType: 'RECORD'; readonly record: Omit<FalsifiedModelRecord, 'supersededBy'> }
   | { readonly entryType: 'OVERRIDE'; readonly override: OverrideEntry };
 
-// Append-only, process-lifetime log. See module doc for exactly what this is
-// (and is not) a substitute for.
-let LOG: LogEntry[] = [];
+/*
+ * ENTITY-0 — PERSISTENCE. Until ENTITY-0 this log was a plain process-lifetime
+ * array, so a reload forgot every falsification and Genesis could walk back
+ * into a path it had already disproved. The log is now written through a
+ * persistence port after every append and read back (and re-verified) on
+ * first use. The default port is the browser's local storage via the shared
+ * `core/storage.ts`, the same place Science Memory lives: it survives a reload
+ * or a browser restart on that device, not a different device. Where no
+ * storage exists (Node scripts, private mode) the log still works in memory
+ * and `falsifiedModelRegistryPersistence()` says so instead of pretending.
+ *
+ * A stored log that does not re-verify is never repaired and never
+ * overwritten: every call fails closed with `STATE_INTEGRITY_FAILURE`.
+ */
+export const FALSIFIED_MODEL_REGISTRY_STORAGE_KEY = 'falsified-model-registry/v1';
 
-/** Test-only escape hatch — production code has no reason to ever call this. */
+export interface FalsifiedModelRegistrySnapshot {
+  readonly schema: 'falsified-model-registry/v1';
+  readonly entries: readonly LogEntry[];
+  /** fnv1a over the canonical entries — catches a dropped, reordered or edited entry. */
+  readonly digest: string;
+}
+
+export interface FalsifiedModelRegistryPersistencePort {
+  load(): unknown;
+  save(snapshot: FalsifiedModelRegistrySnapshot): boolean;
+  clear(): void;
+}
+
+export class FalsifiedModelRegistryIntegrityError extends Error {
+  readonly code = 'STATE_INTEGRITY_FAILURE' as const;
+  constructor(public readonly reason: string) {
+    super(`STATE_INTEGRITY_FAILURE: the stored falsified-model registry does not re-verify (${reason}); it was not repaired or overwritten.`);
+    this.name = 'FalsifiedModelRegistryIntegrityError';
+  }
+}
+
+const localStoragePort: FalsifiedModelRegistryPersistencePort = {
+  load: () => readJSON<unknown>(FALSIFIED_MODEL_REGISTRY_STORAGE_KEY, null),
+  save: (snapshot) => writeJSON(FALSIFIED_MODEL_REGISTRY_STORAGE_KEY, snapshot),
+  clear: () => remove(FALSIFIED_MODEL_REGISTRY_STORAGE_KEY),
+};
+
+// Append-only log. In memory it is only a cache of what the port holds.
+let LOG: LogEntry[] = [];
+let persistencePort: FalsifiedModelRegistryPersistencePort = localStoragePort;
+let loaded = false;
+let loadFailure: FalsifiedModelRegistryIntegrityError | null = null;
+let lastSavePersisted: boolean | null = null;
+
+function digestOf(entries: readonly LogEntry[]): string {
+  return fnv1a(canonicalJson(entries));
+}
+
+/** Re-derives every stored fingerprint at its own log position; the first mismatch is reported, never fixed. */
+function verifyStoredEntries(raw: unknown): LogEntry[] {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new FalsifiedModelRegistryIntegrityError('not_a_snapshot');
+  const snapshot = raw as Partial<FalsifiedModelRegistrySnapshot>;
+  if (snapshot.schema !== 'falsified-model-registry/v1' || !Array.isArray(snapshot.entries)) throw new FalsifiedModelRegistryIntegrityError('unknown_schema');
+  const entries = snapshot.entries as LogEntry[];
+  if (snapshot.digest !== digestOf(entries)) throw new FalsifiedModelRegistryIntegrityError('digest_mismatch');
+  entries.forEach((entry, sequence) => {
+    if (entry?.entryType === 'RECORD') {
+      const { recordId, fingerprint, recordedAt: _recordedAt, ...base } = entry.record;
+      if (storedRecordFingerprint(base, sequence) !== fingerprint || recordId !== fingerprint) throw new FalsifiedModelRegistryIntegrityError(`record_fingerprint_mismatch@${sequence}`);
+    } else if (entry?.entryType === 'OVERRIDE') {
+      const o = entry.override;
+      const expected = fnv1a(canonicalJson({ recordId: o.overriddenRecordId, newEvidenceId: o.newEvidenceId, reason: o.reason, sequence }));
+      if (expected !== o.overrideId) throw new FalsifiedModelRegistryIntegrityError(`override_fingerprint_mismatch@${sequence}`);
+    } else {
+      throw new FalsifiedModelRegistryIntegrityError(`unknown_entry@${sequence}`);
+    }
+  });
+  return entries;
+}
+
+function ensureLoaded(): void {
+  if (loadFailure) throw loadFailure;
+  if (loaded) return;
+  const raw = persistencePort.load();
+  try {
+    LOG = raw === null || raw === undefined ? [] : verifyStoredEntries(raw);
+  } catch (error) {
+    loadFailure = error instanceof FalsifiedModelRegistryIntegrityError ? error : new FalsifiedModelRegistryIntegrityError('unreadable');
+    throw loadFailure;
+  }
+  loaded = true;
+}
+
+function appendEntry(entry: LogEntry): void {
+  LOG.push(entry);
+  lastSavePersisted = persistencePort.save({ schema: 'falsified-model-registry/v1', entries: LOG, digest: digestOf(LOG) });
+}
+
+/** Whether the last append actually reached durable storage. `null` = nothing appended yet in this process. */
+export function falsifiedModelRegistryPersistence(): { readonly lastSavePersisted: boolean | null } {
+  return { lastSavePersisted };
+}
+
+/** Test-only escape hatch — production code has no reason to ever call this. Clears memory AND the stored log. */
 export function resetFalsifiedModelRegistryForTests(): void {
+  persistencePort.clear();
   LOG = [];
+  loaded = true;
+  loadFailure = null;
+  lastSavePersisted = null;
+}
+
+/** Test-only: swap the persistence port (e.g. an in-memory fake standing in for local storage). */
+export function setFalsifiedModelRegistryPersistenceForTests(port: FalsifiedModelRegistryPersistencePort | null): void {
+  persistencePort = port ?? localStoragePort;
+  LOG = [];
+  loaded = false;
+  loadFailure = null;
+  lastSavePersisted = null;
+}
+
+/** Test-only: forget the in-memory cache, as a process restart would; the next call re-reads the port. */
+export function simulateFalsifiedModelRegistryRestartForTests(): void {
+  LOG = [];
+  loaded = false;
+  loadFailure = null;
+  lastSavePersisted = null;
 }
 
 /**
@@ -191,6 +308,7 @@ export interface RecordFalsificationInput {
 }
 
 export function recordFalsification(input: RecordFalsificationInput): FalsifiedModelRecord {
+  ensureLoaded();
   if (input.evidence.status !== 'FALSIFIED_WITHIN_PROTOCOL') {
     throw new Error(
       `falsifiedModelRegistry.recordFalsification: refusing to record — evidence Hypothesis status is "${input.evidence.status}", not "FALSIFIED_WITHIN_PROTOCOL". A record must trace to a real falsification verdict, never be asserted.`,
@@ -211,7 +329,7 @@ export function recordFalsification(input: RecordFalsificationInput): FalsifiedM
   const recordedAt = new Date().toISOString();
   const recordId = fingerprint;
   const stored: Omit<FalsifiedModelRecord, 'supersededBy'> = { recordId, fingerprint, ...base, recordedAt };
-  LOG.push({ entryType: 'RECORD', record: stored });
+  appendEntry({ entryType: 'RECORD', record: stored });
   return { ...stored, supersededBy: null };
 }
 
@@ -224,6 +342,7 @@ export interface OverrideFalsificationInput {
 
 /** "Jawnie logować override + nowe evidence ID": appends a new entry; never mutates or removes the record it counters. */
 export function overrideFalsification(input: OverrideFalsificationInput): OverrideEntry {
+  ensureLoaded();
   const target = LOG.find((e): e is Extract<LogEntry, { entryType: 'RECORD' }> => e.entryType === 'RECORD' && e.record.recordId === input.recordId);
   if (target === undefined) {
     throw new Error(`falsifiedModelRegistry.overrideFalsification: no falsification record with recordId "${input.recordId}" exists — nothing to override.`);
@@ -242,17 +361,19 @@ export function overrideFalsification(input: OverrideFalsificationInput): Overri
     reason: input.reason,
     recordedAt: new Date().toISOString(),
   };
-  LOG.push({ entryType: 'OVERRIDE', override });
+  appendEntry({ entryType: 'OVERRIDE', override });
   return override;
 }
 
 /** All RECORD entries, most recent last, as fully-derived views (`supersededBy` resolved). */
 export function listFalsifiedModelRecords(): readonly FalsifiedModelRecord[] {
+  ensureLoaded();
   return LOG.filter((e): e is Extract<LogEntry, { entryType: 'RECORD' }> => e.entryType === 'RECORD')
     .map((e) => resolveRecordView(e.record));
 }
 
 export function listOverrides(): readonly OverrideEntry[] {
+  ensureLoaded();
   return LOG.filter((e): e is Extract<LogEntry, { entryType: 'OVERRIDE' }> => e.entryType === 'OVERRIDE').map((e) => e.override);
 }
 

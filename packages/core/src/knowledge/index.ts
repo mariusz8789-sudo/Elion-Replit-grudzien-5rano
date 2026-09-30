@@ -6,3 +6,4 @@ export * from './ledgerPersistence.js';
 export * from './LaypersonAssistant.js';
 export * from './ProposeOnlyLearner.js';
 export * from './ingestion/index.js';
+export * from './generatedRecordAdmission.js';

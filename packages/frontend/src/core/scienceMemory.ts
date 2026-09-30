@@ -51,6 +51,7 @@ import type { RealExperimentRequest, ReferenceMeasurementRequest } from './exper
 import type { FalsificationCriterion, HypothesisAssessment } from './experimentFabric/scientificDiscovery';
 import type { KnowledgeEpistemicStatus } from './knowledge/supplementalRegistry';
 import type { DataProvenance } from './dataProvenance';
+import { assertEpistemicConsistency } from './epistemicConsistency';
 import type { EpistemicStatus } from './generator/recipe';
 import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
@@ -788,6 +789,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (!validStats(input.stats ?? {})) throw new Error('Statystyki muszą zawierać wyłącznie skończone liczby.');
   if (!validObservations(input.observations)) throw new Error('Obserwacje muszą zawierać wyłącznie skończone wartości lub serie liczbowe.');
   if (!validExecution(input.execution)) throw new Error('Execution musi mieć kompletne provenance; status completed wymaga resultOrigin real-engine.');
+  // ENTITY-0: the record's stated status may not claim more than its own data provenance supports.
+  assertEpistemicConsistency({ epistemicStatus: input.epistemicStatus, dataProvenance: input.execution?.dataProvenance, resultOrigin: input.execution?.resultOrigin });
   if (input.evidencePackId !== undefined && !nonEmptyString(input.evidencePackId)) throw new Error('Evidence Pack musi mieć niepusty identyfikator.');
   if (input.evidenceChainId !== undefined && !nonEmptyString(input.evidenceChainId)) throw new Error('Evidence chain musi mieć niepusty identyfikator.');
   if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
@@ -925,7 +928,10 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
     honesty: run.result.status === 'completed' ? 'exact' : 'simplified',
     honestyNote: `Fabric status=${run.result.status}; resultOrigin=${run.provenance.resultOrigin}.`,
     assumptions: [...run.result.assumptions],
-    epistemicStatus: run.result.status === 'completed' ? 'OBSERVED' : 'UNKNOWN',
+    // ENTITY-0: a completed solver run is a SIMULATION, not an observation. Before the central
+    // consistency check existed, every completed Fabric run (e.g. a Schwarzschild-radius calculation)
+    // was stored as OBSERVED; only reference or real-experimental data may carry that status.
+    epistemicStatus: run.result.status !== 'completed' ? 'UNKNOWN' : run.provenance.dataProvenance === 'SIMULATED' ? 'SIMULATION' : 'OBSERVED',
     ...(biotech === undefined ? {} : { biotech }),
   });
 }

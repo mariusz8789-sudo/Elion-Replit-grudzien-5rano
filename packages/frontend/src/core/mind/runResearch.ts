@@ -1,4 +1,5 @@
-import { ResearchStateLog } from './researchState';
+import { ResearchStateLog, type ResearchStateEvent } from './researchState';
+import type { KeyedRecordStore } from '../provenance/recordStore';
 import { MindFailClosedError, runMindDiscovery, type MindDiscoveryResult, type RunMindDiscoveryOptions } from './mindDiscovery';
 import type { ProblemRecord } from '../orchestrator/contracts';
 import type { MindTerminal } from './contracts';
@@ -22,6 +23,13 @@ export interface RunResearchOptions {
   readonly maxRounds: number;
   /** Provenance only (D-040 clock rule). */
   readonly now: () => string;
+  /**
+   * ENTITY-0: where this run's transition log is kept. Omitted = in memory, as before. Pass an
+   * `AgentRunResearchStateStore` (one fresh agent run per research run) and the log survives a
+   * restart. It must be empty: continuing a half-finished run is not part of ENTITY-0, and
+   * appending a second PROBLEM_FORMALIZED to someone else's history would be silent corruption.
+   */
+  readonly stateStore?: KeyedRecordStore<ResearchStateEvent>;
   /**
    * Builds round N's options. `previous` is round N-1's real result, so a
    * round can genuinely act on what the last one learned — excluding forms it
@@ -57,14 +65,19 @@ export interface ReplayResearchResult {
  * proxy for a multi-round result, the same role `auditFingerprint`/`verdict` play for a single round.
  */
 export async function replayResearch(options: RunResearchOptions): Promise<ReplayResearchResult> {
-  const first = await runResearch(options);
-  const second = await runResearch(options);
+  // A replay compares two independent runs, so neither may write into the caller's durable log.
+  const inMemory = { ...options, stateStore: undefined };
+  const first = await runResearch(inMemory);
+  const second = await runResearch(inMemory);
   const ok = first.terminal === second.terminal && first.stateHead === second.stateHead;
   return Object.freeze({ ok, first, second });
 }
 
 export async function runResearch(options: RunResearchOptions): Promise<RunResearchResult> {
-  const log = new ResearchStateLog();
+  const log = options.stateStore ? await ResearchStateLog.open(options.stateStore) : new ResearchStateLog();
+  if ((await log.events()).length > 0) {
+    throw new MindFailClosedError('the supplied research state store already holds events — a new run needs a fresh log', 'CORRUPTED_RESEARCH_STATE');
+  }
   await log.append('PROBLEM_FORMALIZED', options.now(), { problemId: options.problem.problemId, problemFingerprint: options.problem.fingerprint });
 
   const rounds: MindDiscoveryResult[] = [];

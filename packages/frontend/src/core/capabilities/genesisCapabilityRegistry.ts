@@ -45,6 +45,8 @@ export interface GenesisCapability {
   showInShowcase?: boolean;
 }
 
+const RUNTIME_NOT_READ = 'Runtime status not read yet: an adapter exists, but this static list never claims it works now (GET /api/genesis/self).';
+
 const capabilities: readonly GenesisCapability[] = [
   {
     id: 'main-laboratory', label: 'Main 3D Laboratory', description: 'Canonical laboratory world with stations, central digital twin and session evidence.',
@@ -168,27 +170,28 @@ const capabilities: readonly GenesisCapability[] = [
     execution: { kind: 'route', id: 'NOT_IMPLEMENTED' }, readiness: 'PROTOTYPE', epistemicLabel: 'PROTOTYPE', visualizationRoute: null,
     evidenceSupport: 'NONE', replaySupport: 'NONE', nextExperimentSupport: false, limitations: ['Modules must be reviewed and connected individually.'], blockedReason: 'No canonical public runtime consumer; mounting the package as a second product is rejected.',
   },
+  // The heavy engines. This static list only says the adapter EXISTS; it never claims the runtime works,
+  // because whether it works is a fact of this moment (worker health + a persisted real run) that
+  // lives in the backend. `withLiveRuntime` overlays it from GET /api/genesis/self (ENTITY-1).
   ...([
-    ['pyscf', 'AVAILABLE', 'CANONICAL'],
-    ['openmm', 'AVAILABLE', 'PARTIAL'],
-    ['vina', 'AVAILABLE', 'CANONICAL'],
-    ['biopython', 'AVAILABLE', 'PARTIAL'],
-    ['admet', 'AVAILABLE', 'CANONICAL'],
-    ['toxicity', 'AVAILABLE', 'CANONICAL'],
-    ['pymeep', 'AVAILABLE', 'CANONICAL'],
-  ] as const).map(([worker, readiness, replaySupport]): GenesisCapability => ({
-    id: `worker-${worker}`, label: `${worker} worker`, description: readiness === 'AVAILABLE'
-      ? 'Existing private Railway worker with a successful canonical real execution proof.'
-      : 'Optional scientific worker awaiting a deployed and verified runtime.',
-    userIntents: [], domain: 'compute-worker', selectionMode: readiness === 'AVAILABLE' ? 'CUSTOM_FLOW' : 'UNAVAILABLE',
-    execution: { kind: 'worker', id: worker }, readiness, epistemicLabel: 'MODEL', visualizationRoute: '#/drug',
-    evidenceSupport: readiness === 'AVAILABLE' ? 'CANONICAL' : 'NONE', replaySupport,
-    nextExperimentSupport: readiness === 'AVAILABLE',
+    ['pyscf', 'CANONICAL'],
+    ['openmm', 'PARTIAL'],
+    ['vina', 'CANONICAL'],
+    ['biopython', 'PARTIAL'],
+    ['admet', 'CANONICAL'],
+    ['toxicity', 'CANONICAL'],
+    ['pymeep', 'CANONICAL'],
+  ] as const).map(([worker, replaySupport]): GenesisCapability => ({
+    id: `worker-${worker}`, label: `${worker} worker`, description: 'Scientific engine adapter; whether its runtime works now is read live from the backend.',
+    userIntents: [], domain: 'compute-worker', selectionMode: 'UNAVAILABLE',
+    execution: { kind: 'worker', id: worker }, readiness: 'BLOCKED_BY_RUNTIME', epistemicLabel: 'MODEL', visualizationRoute: '#/drug',
+    evidenceSupport: 'NONE', replaySupport,
+    nextExperimentSupport: false,
     limitations: replaySupport === 'PARTIAL'
       ? ['Real execution and canonical Evidence are available; deterministic replay is not supported for this capability.']
       : ['Availability requires both current worker health and a persisted real remote ScienceRun proof.'],
-    ...(readiness === 'AVAILABLE' ? {} : { blockedReason: 'No configured, live Railway worker with a successful canonical execution proof.' }),
-    runtimeStatusSource: '/api/health',
+    blockedReason: RUNTIME_NOT_READ,
+    runtimeStatusSource: '/api/genesis/self',
   })),
 ];
 
@@ -212,4 +215,32 @@ export function matchGenesisCapabilityIntent(message: string): GenesisCapability
     .filter(({ intent }) => intent.length > 0 && normalized.includes(intent)));
   matches.sort((a, b) => b.intent.length - a.intent.length);
   return matches[0]?.capability;
+}
+
+/** What `withLiveRuntime` needs from the backend self model (GET /api/genesis/self). */
+export interface LiveRuntimeEngine {
+  readonly toolId: string;
+  readonly runtimeAvailableNow: boolean;
+  readonly statement: string;
+}
+
+/**
+ * ENTITY-1: overlays the live runtime onto the engine capabilities. An engine is AVAILABLE only when the
+ * backend self model says its runtime works now; otherwise it stays blocked, with the backend's own
+ * sentence ("Mam adapter …, ale …"). Without a self model nothing is promoted.
+ */
+export function withLiveRuntime(
+  list: readonly GenesisCapability[],
+  selfModel: { readonly engines: readonly LiveRuntimeEngine[] } | null,
+): GenesisCapability[] {
+  const byTool = new Map((selfModel?.engines ?? []).map((engine) => [engine.toolId, engine]));
+  return list.map((capability) => {
+    if (capability.domain !== 'compute-worker') return capability;
+    const engine = byTool.get(capability.execution.id);
+    if (!engine?.runtimeAvailableNow) {
+      return { ...capability, readiness: 'BLOCKED_BY_RUNTIME', selectionMode: 'UNAVAILABLE', blockedReason: engine?.statement ?? RUNTIME_NOT_READ };
+    }
+    const { blockedReason: _blocked, ...rest } = capability;
+    return { ...rest, readiness: 'AVAILABLE', selectionMode: 'CUSTOM_FLOW', evidenceSupport: 'CANONICAL', nextExperimentSupport: true };
+  });
 }

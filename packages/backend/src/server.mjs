@@ -44,6 +44,7 @@ import { handleApi } from './api.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
+import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +65,12 @@ const startedAt = Date.now();
 let scientificRuntimeCache = null;
 let scientificRuntimeCachedAt = 0;
 const SCIENTIFIC_RUNTIME_CACHE_MS = 15_000;
+async function refreshScientificRuntime() {
+  if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
+    scientificRuntimeCache = await buildScientificRuntimeStatus(db);
+    scientificRuntimeCachedAt = Date.now();
+  }
+}
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
@@ -400,10 +407,7 @@ const server = http.createServer(async (req, res) => {
     // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
     // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
     const dbState = checkDatabaseState(db);
-    if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
-      scientificRuntimeCache = await buildScientificRuntimeStatus(db);
-      scientificRuntimeCachedAt = Date.now();
-    }
+    await refreshScientificRuntime();
     const effectiveByTool = new Map(scientificRuntimeCache.engines.map((engine) => [engine.id, engine]));
     return json(res, 200, {
       ok: true,
@@ -436,6 +440,23 @@ const server = http.createServer(async (req, res) => {
       }),
       scientificWorkers: scientificRuntimeCache,
     });
+  }
+  if (req.method === 'GET' && req.url === '/api/genesis/self') {
+    // ENTITY-1: the same sources as /api/health, assembled as Genesis's view of itself. Like /api/health
+    // it is unauthenticated, so it carries no project data: lab work awaiting a measurement is a count.
+    const dbState = checkDatabaseState(db);
+    await refreshScientificRuntime();
+    return json(res, 200, buildSelfModel({
+      db,
+      runtime: scientificRuntimeCache,
+      reasoningModel: { configured: hasKey, model: hasKey ? MODEL : null },
+      environment: {
+        version: VERSION, commit: BUILD.commit, commitShort: BUILD.commitShort, commitSource: BUILD.commitSource, builtAt: BUILD.builtAt,
+        uptimeSec: Math.round((Date.now() - startedAt) / 1000), node: process.versions.node, arch: process.arch,
+        db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
+        workers: scientificRuntimeCache.groups,
+      },
+    }));
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);

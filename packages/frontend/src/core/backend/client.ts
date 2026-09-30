@@ -983,6 +983,38 @@ export async function getExperimentMemory(token: string, projectId: string, camp
   return r.ok ? { ok: true, data: r.data.memory } : r;
 }
 
+/* ---------------- Genesis Mind research state (ENTITY-0) ---------------- */
+
+export interface AgentRunSummary {
+  readonly id: string;
+  readonly projectId: string;
+  readonly goal: string;
+  readonly domain: string;
+  readonly status: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface PersistedResearchState {
+  readonly events: readonly unknown[];
+  readonly chain: { readonly ok: boolean; readonly length: number; readonly head: string | null; readonly brokenAt: number | null; readonly reason: string | null };
+}
+
+export async function createAgentRun(token: string, projectId: string, goal: string, domain: string): Promise<ApiResult<{ run: AgentRunSummary }>> {
+  return request('POST', `/projects/${projectId}/agent-runs`, { token, body: { goal, domain } });
+}
+
+export async function getPersistedResearchState(token: string, projectId: string, runId: string): Promise<ApiResult<PersistedResearchState>> {
+  const r = await request<{ researchState: PersistedResearchState }>('GET', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token });
+  return r.ok ? { ok: true, data: r.data.researchState } : r;
+}
+
+export async function appendPersistedResearchStateEvent(
+  token: string, projectId: string, runId: string, event: unknown,
+): Promise<ApiResult<{ event: unknown; head: string; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token, body: { event } });
+}
+
 /**
  * THE FINAL PROTOCOL — the artefact the experiment ends with, assembled by the backend from persisted
  * state only. The shape is deliberately loose here: the frontend shows what the record contains and
@@ -1481,4 +1513,108 @@ export async function publishKnowledgeProposal(
 /** Requires a signed-in approver — the backend returns 401 without a token. */
 export async function rejectKnowledgeProposal(token: string, proposalId: string): Promise<ApiResult<Record<string, never>>> {
   return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/reject`, { token });
+}
+
+/* ---------------- ENTITY-1: Genesis's view of itself (GET /api/genesis/self) ---------------- */
+
+/** One engine: the adapter exists (`capabilityExists`) and, separately, whether its runtime works now. */
+export interface SelfModelEngine {
+  toolId: string;
+  engineName: string;
+  capabilityId: string | null;
+  capabilityExists: true;
+  runtimeAvailableNow: boolean;
+  status: 'AVAILABLE' | 'BLOCKED';
+  blockedBy: string | null;
+  reason: string | null;
+  proof: { kind: 'LOCAL_REFERENCE_CASE' | 'REMOTE_REAL_EXECUTION'; [key: string]: unknown } | null;
+  statement: string;
+}
+
+export interface GenesisSelfModel {
+  schemaVersion: number;
+  generatedAt: string;
+  identity: { entityId: string; mission: string; constitutionVersion: string; identitySchemaVersion: number };
+  references: Record<string, string>;
+  environment: Record<string, unknown>;
+  engines: SelfModelEngine[];
+  availableEngines: string[];
+  blockedEngines: { toolId: string; blockedBy: string | null }[];
+  knownModels: { kind: string; status?: string; model?: string | null; target?: string; ruleId?: string | null; ruleFingerprint?: string | null }[];
+  failedGates: { source: string; evaluationId: string | null; arm: string | null; reasons: string[]; computedAt: string | null }[];
+  missingCapabilities: { id: string; label: string; status: string; requires: string | null }[];
+  dataAccessBlockers: { source: string; status: string; pinnedFallbackIds: string[] }[];
+  awaitingMeasurements: { known: boolean; candidates: number; campaigns: number };
+}
+
+/** Unauthenticated, like /api/health: it carries no project data. */
+export async function getGenesisSelfModel(): Promise<ApiResult<GenesisSelfModel>> {
+  return request<GenesisSelfModel>('GET', '/genesis/self');
+}
+
+/* ---------------- ENTITY-2: cognitive state (a view) and the knowledge registry (persisted) ---------------- */
+
+/** A section whose source failed verification is reported, never filled in. */
+export interface UnknownSection { status: 'UNKNOWN'; reason: string; brokenAt?: number | null }
+
+export interface RegistryGap {
+  gapId: string;
+  question: string;
+  source: { kind: string; ref: string | null };
+  relatedHypotheses: string[];
+  missingEvidence: string[];
+  requiredCapability: string | null;
+  createdEvidenceRefs: string[];
+  status: 'OPEN' | 'RESOLVED';
+  openedAt: string;
+  resolvedAt: string | null;
+  resolvedEvidenceRefs: string[];
+}
+
+export interface RegistryContradiction {
+  contradictionId: string;
+  type: string;
+  claimA: { recordId: string | null; source: string | null; statement: string | null };
+  claimB: { recordId: string | null; source: string | null; statement: string | null };
+  evidenceRefs: string[];
+  reason: string | null;
+  status: 'UNRESOLVED' | 'RESOLVED';
+  epistemicState: 'CONFLICTING_EVIDENCE' | 'RESOLVED_BY_NEW_EVIDENCE';
+  resolution: { statement: string; evidenceRefs: string[]; resolvedBy: string | null; at: string } | null;
+}
+
+export interface GenesisCognitiveState {
+  schemaVersion: number;
+  projectId: string;
+  generatedAt: string;
+  view: 'MATERIALIZED_VIEW';
+  currentGoals: { kind: string; id: string; goal: string; domain: string; status: string }[];
+  activeQuestions: { kind: string; [key: string]: unknown }[];
+  activeHypotheses: { source: string; status: string; [key: string]: unknown }[];
+  knowledgeGaps: RegistryGap[] | UnknownSection;
+  contradictions: RegistryContradiction[] | UnknownSection;
+  blockedCapabilities: { kind: string; id: string; blockedBy: string | null }[] | UnknownSection;
+  pendingExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  runningExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  awaitingExternalMeasurements: { campaignId: string; candidateId: string | null; requestEventId: string; objective: string | null }[];
+  recentEvidenceRefs: string[];
+  proposedNextActions: { status: 'PROPOSED'; kind: string; [key: string]: unknown }[];
+  integrity: { researchRuns: { runId: string; ok: boolean; [key: string]: unknown }[]; knowledgeRegistry: { ok: boolean; brokenAt: number | null; reason: string | null } };
+}
+
+export async function getCognitiveState(token: string, projectId: string): Promise<ApiResult<GenesisCognitiveState>> {
+  const r = await request<{ cognitiveState: GenesisCognitiveState }>('GET', `/projects/${projectId}/cognitive-state`, { token });
+  return r.ok ? { ok: true, data: r.data.cognitiveState } : r;
+}
+
+export async function openKnowledgeGap(token: string, projectId: string, gap: unknown): Promise<ApiResult<{ gap: RegistryGap; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps`, { token, body: gap });
+}
+
+export async function resolveKnowledgeGap(token: string, projectId: string, gapId: string, evidenceRefs: readonly string[]): Promise<ApiResult<{ gap: RegistryGap }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps/${encodeURIComponent(gapId)}/resolve`, { token, body: { evidenceRefs } });
+}
+
+export async function recordKnowledgeContradiction(token: string, projectId: string, contradiction: unknown): Promise<ApiResult<{ contradiction: RegistryContradiction; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/contradictions`, { token, body: contradiction });
 }

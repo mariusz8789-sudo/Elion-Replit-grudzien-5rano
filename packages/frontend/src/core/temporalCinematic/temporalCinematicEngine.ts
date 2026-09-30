@@ -6,6 +6,7 @@ import { applyGeometryRenderReadiness, type RenderReadinessReport } from './rend
 import type { CameraMode } from './promptParser';
 import type { BuildingType } from '../worldModel/ecs/geometry';
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '@genesis/core/knowledge/generatedRecordAdmission.js';
 
 /**
  * Canonical Temporal Cinematic orchestration. V6 only adds the option to ask the existing world
@@ -107,12 +108,12 @@ export function recordTemporalCaptureArtifact(ledger: EvidenceLedger, input: Tem
   if (!/^[a-f0-9]{64}$/i.test(input.artifactSha256)) throw new Error('TEMPORAL_CAPTURE_INVALID_SHA256');
   if (!/^[a-f0-9]{8,}$/i.test(input.semanticFingerprint)) throw new Error('TEMPORAL_CAPTURE_INVALID_FINGERPRINT');
   if (!Number.isFinite(input.seconds) || input.seconds < 0) throw new Error('TEMPORAL_CAPTURE_INVALID_TIME');
-  return ledger.addRecord({
+  return proposeGeneratedRecord(ledger, {
     sourceUrl: `genesis://temporal-capture/${input.worldId}/${encodeURIComponent(input.artifactFile)}`,
     sourceTimestamp: null,
     claim: `Browser capture artifact ${input.artifactFile}; sha256=${input.artifactSha256}; semanticFingerprint=${input.semanticFingerprint}; world=${input.worldId}; place=${input.place}; year=${input.year}; time=${input.seconds}; view=${input.viewMode}`,
     claimType: 'observation',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis Temporal Cinematic Capture', independentSourceIds: [] },
-  }).record.contentHash;
+  });
 }

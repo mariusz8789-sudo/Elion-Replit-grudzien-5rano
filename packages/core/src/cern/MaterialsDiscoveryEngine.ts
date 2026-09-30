@@ -1,5 +1,6 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { stableStringify, sha256hex, type EvidenceLedger, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '../knowledge/generatedRecordAdmission.js';
 import { mulberry32 } from '../determinism.js';
 export { mulberry32 };
 export interface IonSpec { readonly species: string; readonly charge: number; readonly radiusPm: number; readonly count: number; readonly atomicMassU: number; }
@@ -56,6 +57,6 @@ export class MaterialsDiscoveryEngine {
   }
   commitToLedger(ledger: EvidenceLedger, c: CrystalStructure): string {
     const input: NewEvidenceInput = { sourceUrl: 'genesis://cern/mat/' + c.id, sourceTimestamp: null, claim: 'crystal ' + c.name + ' lattice=' + c.lattice + ' a=' + c.aPm + 'pm K=' + c.bulkModulusGPa + 'GPa stable=' + c.stable, claimType: 'model', confidence: 1, provenance: { sourceKind: 'dataset', retrievedBy: 'materials-discovery-engine', independentSourceIds: [] } };
-    return ledger.addRecord(input).record.contentHash;
+    return proposeGeneratedRecord(ledger, input);
   }
 }

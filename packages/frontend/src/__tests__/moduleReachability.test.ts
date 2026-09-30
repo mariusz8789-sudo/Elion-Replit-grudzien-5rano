@@ -101,6 +101,14 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // --- ENTITY-0 (2026-09-30): the durable store for Genesis Mind's research state, backed by the
+  // backend's agent-run steps. Its first caller is `runResearch({ stateStore })`; no screen starts a
+  // persisted Mind run yet — that belongs to ENTITY-2's cognitive state, not to a UI change here.
+  'core/mind/agentRunResearchStateStore.ts': 'ENTITY-0 durable research-state store; wired to a screen in a later ENTITY phase',
+  // --- ENTITY-2 (2026-09-30): maps observation gaps, knowledge gaps, OPEN_QUESTION items and hunted
+  // contradictions into the backend knowledge registry. No screen reads the cognitive state yet; the
+  // chat and Start that would call it belong to the Human Explorer thread.
+  'core/mind/knowledgeRegistryAdapter.ts': 'ENTITY-2 registry adapter; wired to a screen in a later step',
   // --- D-136 real external medical dataset boundary (NIfTI-1/DICOM Part-10), recovered 2026-09-27 from
   // claude/genesis-c1-visual-snapshot (0efeb774), which the 2026-09-25 consolidation skipped. A strict
   // provenance/format/checksum gate built before any UI consumes it; no dataset has been handed to Genesis yet,

@@ -6,6 +6,7 @@ import { einsteinBlackHole3D } from './experiments/einstein-blackhole-3d';
 import { einsteinChirp } from './experiments/einstein-chirp';
 import { einsteinKerr3D } from './experiments/einstein-kerr3d';
 import { einsteinAstroConsequence } from './experiments/einstein-astro-consequence';
+import { schwarzschildRadius } from '../core/physics';
 
 /**
  * Einstein Lab — flagowe laboratorium Genesis OS. Domyślny (bazowy)
@@ -17,8 +18,6 @@ import { einsteinAstroConsequence } from './experiments/einstein-astro-consequen
  * `experiments` jako „Ugięcie światła (2D)".
  */
 
-const G = 6.674e-11;
-const C = 2.998e8;
 const MSUN = 1.989e30;
 
 interface Photon { x: number; y: number; vx: number; vy: number; dead: boolean; trail: { x: number; y: number }[] }
@@ -244,7 +243,7 @@ const einsteinWeakField2D: ExperimentDef = {
   createSim: () => new GravityLightSim(),
   narrate(p) {
     const M = 10 ** Number(p.mass) * MSUN;
-    const rs = (2 * G * M) / (C * C);
+    const rs = schwarzschildRadius(M);
     const metric = String(p.metric);
     const blocks: NarrationBlock[] = [
       {

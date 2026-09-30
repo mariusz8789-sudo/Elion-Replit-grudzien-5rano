@@ -196,3 +196,20 @@ export function appendResearchStateEvent(db, agentRunId, event) {
   });
   return { ok: true, deduped: false, event: stored, head: stored.transitionFingerprint };
 }
+
+/**
+ * Server-side twin of the frontend's event builder (R1-a): the backend itself extends a run's
+ * research state, with the same chain rule, instead of trusting a client to compute the head.
+ * Goes through appendResearchStateEvent, so every check above still applies.
+ */
+export function appendServerResearchStateEvent(db, agentRunId, type, payload, at = new Date().toISOString()) {
+  const current = readResearchState(db, agentRunId);
+  if (!current.chain.ok) return { ok: false, error: 'state_integrity_failure', chain: current.chain };
+  const seq = current.events.length;
+  const stored = JSON.parse(canonicalJson(payload ?? null));
+  const payloadFingerprint = fnv1a(canonicalJson(stored));
+  return appendResearchStateEvent(db, agentRunId, {
+    seq, type, at, payload: stored, payloadFingerprint,
+    transitionFingerprint: researchTransition(current.chain.head, type, payloadFingerprint, seq),
+  });
+}

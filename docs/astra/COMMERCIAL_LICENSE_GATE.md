@@ -35,6 +35,7 @@ Every item actually executed, embedded, redistributed or shown to a customer rec
 | PoseBusters package | `CONDITIONAL` | BSD package; pin version and notices |
 | PoseBusters benchmark inputs | `UNKNOWN` | Third-party structural datasets require their own licence/provenance review |
 | ChEMBL | `CONDITIONAL` | Pin release and comply with CC BY-SA/data attribution; verify exact exported subset |
+| PubChem | `CONDITIONAL` | PubChem aggregates hundreds of contributors; pin record/FTP release, preserve source attribution, and review the originating source licence because PubChem availability is not a blanket commercial licence |
 | RCSB PDB structures | `CONDITIONAL` | Record entry provenance, citations and third-party annotations; target remains runtime/data gated |
 | BindingDB curated data | `CONDITIONAL` | Current publication states CC BY 4.0; pin dump and attribution; verify source-record restrictions |
 | Reactome data | `APPROVED` | Data and derived files are CC0; still pin release and cite as scientific provenance |
@@ -57,6 +58,7 @@ The commercial release manifest includes only the transitive closure of componen
 - [Reactome licence](https://reactome.org/license)
 - [Human Protein Atlas licence](https://www.proteinatlas.org/about/licence)
 - [Europe PMC copyright](https://europepmc.org/Copyright) and [Open Access subset](https://europepmc.org/downloads/openaccess)
+- [PubChem downloads and source-specific licensing](https://pubchem.ncbi.nlm.nih.gov/docs/downloads)
 - [GNINA upstream licence explanation](https://github.com/gnina/gnina#license)
 - [PoseBusters package record](https://pypi.org/project/posebusters/)
 - [CMS Open Data policy](https://opendata.cern.ch/record/415/files/CMS-Data-Policy-1.3.pdf)

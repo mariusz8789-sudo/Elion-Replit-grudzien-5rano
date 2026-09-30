@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * D-145 — GLP-1R endpoint role diagnostic.
+ * D-151 — GLP-1R endpoint role diagnostic.
  *
  * Answers one question: after honestly separating functional agonism from
  * binding affinity, does Genesis hold enough scientifically appropriate rows
@@ -11,8 +11,8 @@
  * holds, and seals the verdict. It trains nothing, changes no gate, and drops
  * no row for any reason not written in the preregistration.
  *
- * Rules: packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json
- * Run:   node scripts/glp1r-d145-endpoint-role.mjs
+ * Rules: packages/backend/src/campaign/glp1r-d151-endpoint-role-prereg.json
+ * Run:   node scripts/glp1r-d151-endpoint-role.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,10 +30,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 const A1_DIR = path.join(ROOT, 'data/transcription/glp1r-a1');
 const A3_DIR = path.join(ROOT, 'data/transcription/glp1r-a3');
-const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json');
+const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d151-endpoint-role-prereg.json');
 const ROLES_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-assay-roles.json');
-const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d145-endpoint-role.sealed.json');
-const SCAFFOLD_PATH = path.join(ROOT, 'artifacts/glp1r-d145-scaffolds.json');
+const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d151-endpoint-role.sealed.json');
+const SCAFFOLD_PATH = path.join(ROOT, 'artifacts/glp1r-d151-scaffolds.json');
 const PCHEMBL_TOLERANCE = 0.02;
 const TARGET = 'CHEMBL1784';
 
@@ -122,13 +122,13 @@ const blocked = assayIds.filter((a) => roles[a].reason === 'BLOCKED_BY_DATA_ACCE
 console.log(`\nassays with no description (BLOCKED_BY_DATA_ACCESS): ${blocked.length} of ${assayIds.length}`);
 
 // --- scaffolds for the functional arm ---------------------------------------
-// Computed by an external RDKit pass (scripts/glp1r-d145-scaffolds.py) so this
+// Computed by an external RDKit pass (scripts/glp1r-d151-scaffolds.py) so this
 // runner stays free of a Python dependency. Missing file => NOT_COMPUTED.
-const SMILES_PATH = path.join(ROOT, 'artifacts/glp1r-d145-functional-smiles.json');
+const SMILES_PATH = path.join(ROOT, 'artifacts/glp1r-d151-functional-smiles.json');
 fs.mkdirSync(path.dirname(SMILES_PATH), { recursive: true });
-fs.writeFileSync(SMILES_PATH, `${JSON.stringify({ decisionId: 'D-145', functionalAgonismSmiles: [...new Set(byRole('FUNCTIONAL_AGONISM').map((r) => r.canonicalSmiles))].sort() }, null, 2)}\n`);
+fs.writeFileSync(SMILES_PATH, `${JSON.stringify({ decisionId: 'D-151', functionalAgonismSmiles: [...new Set(byRole('FUNCTIONAL_AGONISM').map((r) => r.canonicalSmiles))].sort() }, null, 2)}\n`);
 
-let scaffolds = { status: 'NOT_COMPUTED', note: `run scripts/glp1r-d145-scaffolds.py first (expected at ${path.relative(ROOT, SCAFFOLD_PATH)})` };
+let scaffolds = { status: 'NOT_COMPUTED', note: `run scripts/glp1r-d151-scaffolds.py first (expected at ${path.relative(ROOT, SCAFFOLD_PATH)})` };
 if (fs.existsSync(SCAFFOLD_PATH)) scaffolds = JSON.parse(fs.readFileSync(SCAFFOLD_PATH, 'utf8'));
 
 // --- can the PRODUCTION scaffold split actually fill train and test? ---------
@@ -176,7 +176,7 @@ console.log(`\nverdict: ${verdict}`);
 console.log(`functional-agonism rows ${fa.rows} vs required ${minRows} (MIN_TRAIN ${gate.MIN_TRAIN} + MIN_TEST ${gate.MIN_TEST}) — shortfall ${shortfall}`);
 
 const sealed = {
-  decisionId: 'D-145',
+  decisionId: 'D-151',
   preregFingerprint,
   gateRuleFingerprint: ruleFingerprint,
   gateUnchanged: true,
@@ -189,7 +189,7 @@ const sealed = {
   splitFeasibility,
   sufficiency: { requiredRows: minRows, functionalRows: fa.rows, shortfall, enoughRows, enoughScaffolds, splitOk, verdict },
   knownClassifierLimitations: [
-    'CHEMBL5732842 (54 rows) and CHEMBL5732843 (53 rows) are HTRF cAMP agonist assays whose description ALSO recounts how the cell line was characterised by 125I-GLP-1 saturation binding. The frozen rule matches that binding language and files both as UNKNOWN/CONFLICTING_SIGNALS. A human reader would call them FUNCTIONAL_AGONISM. These 107 rows are the single largest effect in this diagnostic and they are NOT reclassified here: changing a rule after seeing the counts is exactly what the preregistration forbids. Correcting it needs its own preregistration (proposed D-146), decided before it is run.',
+    'CHEMBL5732842 (54 rows) and CHEMBL5732843 (53 rows) are HTRF cAMP agonist assays whose description ALSO recounts how the cell line was characterised by 125I-GLP-1 saturation binding. The frozen rule matches that binding language and files both as UNKNOWN/CONFLICTING_SIGNALS. A human reader would call them FUNCTIONAL_AGONISM. These 107 rows are the single largest effect in this diagnostic and they are NOT reclassified here: changing a rule after seeing the counts is exactly what the preregistration forbids. Correcting it needs its own preregistration (proposed D-152), decided before it is run.',
     'CHEMBL3620282 and CHEMBL6140092 are CRE-luciferase reporter assays. CRE is cAMP-response-element driven, but the descriptions never say cAMP, and the frozen rule requires the reporter to be explicitly cAMP-driven. Filed UNKNOWN. Conservative by design.',
     'CHEMBL5130385 (14 rows) measures ERK1/2 phosphorylation — functional but not the Gs/cAMP arm. The frozen rule has no ERK term, so it falls to UNKNOWN rather than OTHER_FUNCTIONAL. The row count for FUNCTIONAL_AGONISM is unaffected either way.',
   ],
@@ -197,7 +197,7 @@ const sealed = {
 };
 sealed.artifactHash = canonicalHash(sealed);
 
-fs.writeFileSync(ROLES_PATH, `${JSON.stringify({ decisionId: 'D-145', preregFingerprint, source: 'data/transcription/glp1r-a3', assays: roles }, null, 2)}\n`);
+fs.writeFileSync(ROLES_PATH, `${JSON.stringify({ decisionId: 'D-151', preregFingerprint, source: 'data/transcription/glp1r-a3', assays: roles }, null, 2)}\n`);
 fs.writeFileSync(OUT_PATH, `${JSON.stringify(sealed, null, 2)}\n`);
 console.log(`\nsealed -> ${path.relative(ROOT, OUT_PATH)} (${sealed.artifactHash.slice(0, 16)})`);
 console.log(`roles  -> ${path.relative(ROOT, ROLES_PATH)}`);

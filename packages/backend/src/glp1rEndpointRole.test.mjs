@@ -5,13 +5,13 @@ import { classifyAssayRole, ENDPOINT_ROLES } from './campaign/glp1rEndpointRole.
 
 const rec = (description, extra = {}) => ({ record: { targetId: 'CHEMBL1784', assayType: 'F', bao: 'BAO_0000219', format: 'cell-based format', description }, ...extra });
 
-test('D-145 acceptance 1: a binding-only assay never becomes agonism', () => {
+test('D-151 acceptance 1: a binding-only assay never becomes agonism', () => {
   const r = classifyAssayRole(rec('Displacement of [125I]-GLP1 from human GLP1 receptor expressed in BHK cells'));
   assert.equal(r.role, 'BINDING_AFFINITY');
   assert.notEqual(r.role, 'FUNCTIONAL_AGONISM');
 });
 
-test('D-145 acceptance 2: an EC50 is not agonism by itself — a bare potency line stays UNKNOWN', () => {
+test('D-151 acceptance 2: an EC50 is not agonism by itself — a bare potency line stays UNKNOWN', () => {
   // The standardType is deliberately not an input: this description backs 36 EC50 rows in the real pin.
   const r = classifyAssayRole(rec('Potency measured using recombinant human GLP-1 receptor expressed in Baby Hamster Kidney (BHK)cells'));
   assert.equal(r.role, 'UNKNOWN');

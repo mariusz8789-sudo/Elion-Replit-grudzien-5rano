@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""D-145/D-146 scaffold diagnostic: Bemis-Murcko scaffolds of the FUNCTIONAL_AGONISM arm.
+"""D-151/D-152 scaffold diagnostic: Bemis-Murcko scaffolds of the FUNCTIONAL_AGONISM arm.
 
-Reads the compound list written by scripts/glp1r-d145-endpoint-role.mjs (pass 1)
-and writes artifacts/glp1r-d145-scaffolds.json. Independent of the production
+Reads the compound list written by scripts/glp1r-d151-endpoint-role.mjs (pass 1)
+and writes artifacts/glp1r-d151-scaffolds.json. Independent of the production
 pipeline's own scaffold routine, and labelled as such in the sealed artefact.
 
-Run: python3 scripts/glp1r-d145-scaffolds.py
+Run: python3 scripts/glp1r-d151-scaffolds.py
 """
 import json
 import os
@@ -17,13 +17,13 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 RDLogger.DisableLog("rdApp.*")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Defaults are D-145. Pass two paths to point it at another pass (D-146):
-#   python3 scripts/glp1r-d145-scaffolds.py <in.json> <out.json>
-IN_PATH = sys.argv[1] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d145-functional-smiles.json")
-OUT_PATH = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d145-scaffolds.json")
+# Defaults are D-151. Pass two paths to point it at another pass (D-152):
+#   python3 scripts/glp1r-d151-scaffolds.py <in.json> <out.json>
+IN_PATH = sys.argv[1] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d151-functional-smiles.json")
+OUT_PATH = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "artifacts", "glp1r-d151-scaffolds.json")
 
 if not os.path.exists(IN_PATH):
-    sys.exit(f"missing {IN_PATH} — run scripts/glp1r-d145-endpoint-role.mjs first")
+    sys.exit(f"missing {IN_PATH} — run scripts/glp1r-d151-endpoint-role.mjs first")
 
 smiles = json.load(open(IN_PATH))["functionalAgonismSmiles"]
 

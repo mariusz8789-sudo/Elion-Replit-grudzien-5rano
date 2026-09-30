@@ -1,13 +1,13 @@
 /**
- * D-146 — endpoint-scoped role classification for GLP-1R assays.
+ * D-152 — endpoint-scoped role classification for GLP-1R assays.
  *
- * D-145 read each assay description as one block of text, so binding language
+ * D-151 read each assay description as one block of text, so binding language
  * that only recounted how a cell line had been characterised was read as a
  * conflicting endpoint. This pass restricts every signal term to the sentences
- * that say what was MEASURED, and leaves everything else about D-145 alone.
+ * that say what was MEASURED, and leaves everything else about D-151 alone.
  *
  * Rules frozen BEFORE this file existed:
- * campaign/glp1r-d146-endpoint-scope-prereg.json (fingerprint 32c131b48235a556,
+ * campaign/glp1r-d152-endpoint-scope-prereg.json (fingerprint 32c131b48235a556,
  * committed as c4d6a96). The regexes below are transcribed from that file and
  * must not be tuned against any count.
  */
@@ -66,8 +66,8 @@ export function classifyAssayRoleScoped({ record, actionType = '' } = {}) {
       usedFirstSentenceFallback,
       endpointSentenceCount: sentences.length,
       changedFromD145: scoped.role !== baseline.role,
-      d145Role: baseline.role,
-      d145Reason: baseline.reason,
+      d151Role: baseline.role,
+      d151Reason: baseline.reason,
     },
   };
 }

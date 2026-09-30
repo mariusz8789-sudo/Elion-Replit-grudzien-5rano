@@ -1,6 +1,6 @@
 {
-  "decisionId": "D-146",
-  "preregFingerprint": "32c131b48235a556",
+  "decisionId": "D-152",
+  "preregFingerprint": "a42f4cb9ee04f2d1",
   "source": "data/transcription/glp1r-a3",
   "assays": {
     "CHEMBL1048996": {
@@ -16,8 +16,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 23,
       "standardTypes": [
@@ -37,8 +37,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -58,8 +58,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 30,
       "standardTypes": [
@@ -164,8 +164,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -185,8 +185,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -206,8 +206,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -227,8 +227,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -248,8 +248,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -269,8 +269,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -290,8 +290,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -311,8 +311,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 13,
       "standardTypes": [
@@ -332,8 +332,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 13,
       "standardTypes": [
@@ -353,8 +353,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -374,8 +374,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -395,8 +395,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -416,8 +416,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -437,8 +437,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "BINDING_AFFINITY",
-        "d145Reason": "BINDING_READOUT_NAMED"
+        "d151Role": "BINDING_AFFINITY",
+        "d151Reason": "BINDING_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -458,8 +458,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -479,8 +479,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -500,8 +500,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -521,8 +521,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -542,8 +542,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -563,8 +563,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -584,8 +584,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -605,8 +605,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 21,
       "standardTypes": [
@@ -626,8 +626,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 21,
       "standardTypes": [
@@ -647,8 +647,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -668,8 +668,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -689,8 +689,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -710,8 +710,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -731,8 +731,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -752,8 +752,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -773,8 +773,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -794,8 +794,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 7,
       "standardTypes": [
@@ -815,8 +815,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 13,
       "standardTypes": [
@@ -836,8 +836,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
       },
       "rowsInCombinedSet": 14,
       "standardTypes": [
@@ -857,8 +857,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 14,
       "standardTypes": [
@@ -878,8 +878,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -899,8 +899,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -920,8 +920,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -941,8 +941,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 6,
       "standardTypes": [
@@ -962,8 +962,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -983,8 +983,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -1004,8 +1004,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -1025,8 +1025,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1046,8 +1046,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -1067,8 +1067,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 4,
       "standardTypes": [
@@ -1088,8 +1088,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1109,8 +1109,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -1130,8 +1130,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1151,8 +1151,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [
@@ -1172,8 +1172,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1193,8 +1193,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1214,8 +1214,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "BINDING_AFFINITY",
-        "d145Reason": "BINDING_READOUT_NAMED"
+        "d151Role": "BINDING_AFFINITY",
+        "d151Reason": "BINDING_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1235,8 +1235,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1256,8 +1256,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 5,
       "standardTypes": [
@@ -1277,8 +1277,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 5,
       "standardTypes": [
@@ -1298,8 +1298,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 5,
       "standardTypes": [
@@ -1319,8 +1319,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1340,8 +1340,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": true,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "CONFLICTING_SIGNALS"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CONFLICTING_SIGNALS"
       },
       "rowsInCombinedSet": 54,
       "standardTypes": [
@@ -1361,8 +1361,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": true,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "CONFLICTING_SIGNALS"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CONFLICTING_SIGNALS"
       },
       "rowsInCombinedSet": 53,
       "standardTypes": [
@@ -1382,8 +1382,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1403,8 +1403,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "ALLOSTERIC_MODULATION_NOT_AGONISM"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1424,8 +1424,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1445,8 +1445,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1466,8 +1466,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1487,8 +1487,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1508,8 +1508,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1529,8 +1529,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1550,8 +1550,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1571,8 +1571,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1592,8 +1592,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 2,
       "standardTypes": [
@@ -1613,8 +1613,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "AGONISM_STATED_BUT_NO_READOUT_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1634,8 +1634,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "OTHER_FUNCTIONAL",
-        "d145Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
+        "d151Role": "OTHER_FUNCTIONAL",
+        "d151Reason": "FUNCTIONAL_BUT_NOT_CAMP_ARM"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1655,8 +1655,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
       },
       "rowsInCombinedSet": 36,
       "standardTypes": [
@@ -1676,8 +1676,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
       },
       "rowsInCombinedSet": 1,
       "standardTypes": [
@@ -1714,8 +1714,8 @@
         "usedFirstSentenceFallback": true,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "UNKNOWN",
-        "d145Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
+        "d151Role": "UNKNOWN",
+        "d151Reason": "NO_READOUT_AND_NO_MECHANISM_NAMED"
       },
       "rowsInCombinedSet": 9,
       "standardTypes": [
@@ -1786,8 +1786,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 30,
       "standardTypes": [
@@ -1841,8 +1841,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 8,
       "standardTypes": [
@@ -1862,8 +1862,8 @@
         "usedFirstSentenceFallback": false,
         "endpointSentenceCount": 1,
         "changedFromD145": false,
-        "d145Role": "FUNCTIONAL_AGONISM",
-        "d145Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
+        "d151Role": "FUNCTIONAL_AGONISM",
+        "d151Reason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED"
       },
       "rowsInCombinedSet": 3,
       "standardTypes": [

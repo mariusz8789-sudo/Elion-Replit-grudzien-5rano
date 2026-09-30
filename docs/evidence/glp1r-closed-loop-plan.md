@@ -46,10 +46,10 @@ Plik po pliku, z rolą zmiany. Nic tu nie zmienia bramki, zapieczętowanych wyni
 | `packages/backend/src/campaign/glp1rTargetDossier.mjs` (nowy) | budowa GLP1R Target Dossier z pól, które faktycznie istnieją; pola bez źródła oznaczone `UNVERIFIED`, nigdy `VERIFIED` |
 | `packages/backend/src/campaign/glp1rDataset.mjs` | kolumna `endpointRole` (`FUNCTIONAL_AGONISM` / `BINDING_AFFINITY` / `OTHER_FUNCTIONAL` / `UNKNOWN`) w `normalizeGlp1rRows`; brak podstaw → `UNKNOWN`, bez zgadywania |
 | `packages/backend/src/campaign/glp1r-assay-roles.json` (nowy) | tabela 25 `assayId` → rola + źródło rozstrzygnięcia + stan weryfikacji; puste role dopóki brak źródła |
-| `packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json` (nowy) | prerejestracja: reguła klasyfikacji, reguła deduplikacji, gatunek, wymagany cel, minimalne wymagania jakości, definicja „za mało danych" — zapisana **przed** liczeniem |
-| `scripts/glp1r-d145-endpoint-role.mjs` (nowy) | policzenie ról, unikalnych związków i scaffoldów; zapieczętowany wynik |
+| `packages/backend/src/campaign/glp1r-d151-endpoint-role-prereg.json` (nowy) | prerejestracja: reguła klasyfikacji, reguła deduplikacji, gatunek, wymagany cel, minimalne wymagania jakości, definicja „za mało danych" — zapisana **przed** liczeniem |
+| `scripts/glp1r-d151-endpoint-role.mjs` (nowy) | policzenie ról, unikalnych związków i scaffoldów; zapieczętowany wynik |
 | `packages/backend/src/glp1rEndpointRole.test.mjs` (nowy) | testy krytyczne 1 i 2 z punktu 27 |
-| `docs/DECISIONS.md` | wpis D-145 |
+| `docs/DECISIONS.md` | wpis D-151 |
 
 ### PR-B — GLP1R Docking Target
 | Plik | Zmiana |

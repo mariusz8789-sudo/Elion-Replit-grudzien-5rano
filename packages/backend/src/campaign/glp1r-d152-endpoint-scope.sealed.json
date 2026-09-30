@@ -1,12 +1,12 @@
 {
-  "decisionId": "D-146",
-  "preregFingerprint": "32c131b48235a556",
+  "decisionId": "D-152",
+  "preregFingerprint": "a42f4cb9ee04f2d1",
   "gateRuleFingerprint": "d2f77a7e6042f0fc",
   "gateUnchanged": true,
   "baseCommit": "d23a89b416560c9531348d09f44f608134180268",
   "ruleFrozenAtCommit": "c4d6a96",
-  "sufficiencyCriterionFrom": "D-145 (unchanged)",
-  "computedAt": "2026-09-30T01:26:30.964Z",
+  "sufficiencyCriterionFrom": "D-151 (unchanged)",
+  "computedAt": "2026-09-30T15:13:01.846Z",
   "combinedSet": {
     "rows": 638,
     "pin": 287,
@@ -111,7 +111,7 @@
     "splitOk": true,
     "verdict": "SUFFICIENT"
   },
-  "supersedesNothing": "D-145 stands unedited; this is a second pass reported alongside it.",
+  "supersedesNothing": "D-151 stands unedited; this is a second pass reported alongside it.",
   "boundary": "Row counts only. No model was trained, no gate was read for pass/fail, no candidate was ranked. Every assay in this set is a recombinant heterologous expression system and is not evidence of native human tissue pharmacology.",
-  "artifactHash": "95d1b8ee177a32ced168ddb9f984a9152157afe90112bcc7ec3e0d4a66bfcf52"
+  "artifactHash": "e1e25e247eaec202ab0eb7cd5ec6ae6d44332b679a49fa7c2e0c6c57c1b406ca"
 }

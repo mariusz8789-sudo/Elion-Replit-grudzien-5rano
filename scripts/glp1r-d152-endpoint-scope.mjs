@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * D-146 — GLP-1R endpoint role diagnostic, signal terms scoped to the sentences
+ * D-152 — GLP-1R endpoint role diagnostic, signal terms scoped to the sentences
  * that say what was measured. Same data, same gate, same sufficiency criterion
- * as D-145; the ONLY difference is the scoping rule frozen in
- * campaign/glp1r-d146-endpoint-scope-prereg.json before this file existed.
+ * as D-151; the ONLY difference is the scoping rule frozen in
+ * campaign/glp1r-d152-endpoint-scope-prereg.json before this file existed.
  *
  * Answers one question: after honestly separating functional agonism from
  * binding affinity, does Genesis hold enough scientifically appropriate rows
@@ -14,8 +14,8 @@
  * holds, and seals the verdict. It trains nothing, changes no gate, and drops
  * no row for any reason not written in the preregistration.
  *
- * Rules: packages/backend/src/campaign/glp1r-d146-endpoint-scope-prereg.json
- * Run:   node scripts/glp1r-d145-endpoint-role.mjs
+ * Rules: packages/backend/src/campaign/glp1r-d152-endpoint-scope-prereg.json
+ * Run:   node scripts/glp1r-d151-endpoint-role.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,17 +33,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 const A1_DIR = path.join(ROOT, 'data/transcription/glp1r-a1');
 const A3_DIR = path.join(ROOT, 'data/transcription/glp1r-a3');
-const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d146-endpoint-scope-prereg.json');
-const ROLES_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-assay-roles-d146.json');
-const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d146-endpoint-scope.sealed.json');
-const SCAFFOLD_PATH = path.join(ROOT, 'artifacts/glp1r-d146-scaffolds.json');
+const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d152-endpoint-scope-prereg.json');
+const ROLES_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-assay-roles-d152.json');
+const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d152-endpoint-scope.sealed.json');
+const SCAFFOLD_PATH = path.join(ROOT, 'artifacts/glp1r-d152-scaffolds.json');
 const PCHEMBL_TOLERANCE = 0.02;
 const TARGET = 'CHEMBL1784';
 
 const prereg = JSON.parse(fs.readFileSync(PREREG_PATH, 'utf8'));
-// The sufficiency criterion is deliberately NOT restated in D-146: it is read
-// from D-145's frozen file so it cannot drift between the two passes.
-const d145 = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json'), 'utf8'));
+// The sufficiency criterion is deliberately NOT restated in D-152: it is read
+// from D-151's frozen file so it cannot drift between the two passes.
+const d151 = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/backend/src/campaign/glp1r-d151-endpoint-role-prereg.json'), 'utf8'));
 const preregFingerprint = canonicalHash(prereg).slice(0, 16);
 console.log(`prereg ${prereg.decisionId} fingerprint ${preregFingerprint}`);
 
@@ -128,13 +128,13 @@ const blocked = assayIds.filter((a) => roles[a].reason === 'BLOCKED_BY_DATA_ACCE
 console.log(`\nassays with no description (BLOCKED_BY_DATA_ACCESS): ${blocked.length} of ${assayIds.length}`);
 
 // --- scaffolds for the functional arm ---------------------------------------
-// Computed by an external RDKit pass (scripts/glp1r-d145-scaffolds.py (with GLP1R_D146 paths)) so this
+// Computed by an external RDKit pass (scripts/glp1r-d151-scaffolds.py (with GLP1R_D152 paths)) so this
 // runner stays free of a Python dependency. Missing file => NOT_COMPUTED.
-const SMILES_PATH = path.join(ROOT, 'artifacts/glp1r-d146-functional-smiles.json');
+const SMILES_PATH = path.join(ROOT, 'artifacts/glp1r-d152-functional-smiles.json');
 fs.mkdirSync(path.dirname(SMILES_PATH), { recursive: true });
-fs.writeFileSync(SMILES_PATH, `${JSON.stringify({ decisionId: 'D-146', functionalAgonismSmiles: [...new Set(byRole('FUNCTIONAL_AGONISM').map((r) => r.canonicalSmiles))].sort() }, null, 2)}\n`);
+fs.writeFileSync(SMILES_PATH, `${JSON.stringify({ decisionId: 'D-152', functionalAgonismSmiles: [...new Set(byRole('FUNCTIONAL_AGONISM').map((r) => r.canonicalSmiles))].sort() }, null, 2)}\n`);
 
-let scaffolds = { status: 'NOT_COMPUTED', note: `run scripts/glp1r-d145-scaffolds.py (with GLP1R_D146 paths) first (expected at ${path.relative(ROOT, SCAFFOLD_PATH)})` };
+let scaffolds = { status: 'NOT_COMPUTED', note: `run scripts/glp1r-d151-scaffolds.py (with GLP1R_D152 paths) first (expected at ${path.relative(ROOT, SCAFFOLD_PATH)})` };
 if (fs.existsSync(SCAFFOLD_PATH)) scaffolds = JSON.parse(fs.readFileSync(SCAFFOLD_PATH, 'utf8'));
 
 // --- can the PRODUCTION scaffold split actually fill train and test? ---------
@@ -173,7 +173,7 @@ if (!rd.available) {
 const fa = summary.FUNCTIONAL_AGONISM;
 const minRows = gate.MIN_TRAIN + gate.MIN_TEST;
 const enoughRows = fa.rows >= minRows;
-const enoughScaffolds = scaffolds.status === 'OK' ? scaffolds.distinctScaffolds >= d145.sufficiencyCriterion.requires.minimumScaffoldsForDisjointSplit : null;
+const enoughScaffolds = scaffolds.status === 'OK' ? scaffolds.distinctScaffolds >= d151.sufficiencyCriterion.requires.minimumScaffoldsForDisjointSplit : null;
 const splitOk = splitFeasibility.status === 'OK' ? (splitFeasibility.trainMeetsMin && splitFeasibility.testMeetsMin) : null;
 const verdict = enoughRows && enoughScaffolds === true && splitOk === true ? 'SUFFICIENT' : 'INSUFFICIENT_FUNCTIONAL_DATA';
 const shortfall = Math.max(0, minRows - fa.rows);
@@ -182,13 +182,13 @@ console.log(`\nverdict: ${verdict}`);
 console.log(`functional-agonism rows ${fa.rows} vs required ${minRows} (MIN_TRAIN ${gate.MIN_TRAIN} + MIN_TEST ${gate.MIN_TEST}) — shortfall ${shortfall}`);
 
 const sealed = {
-  decisionId: 'D-146',
+  decisionId: 'D-152',
   preregFingerprint,
   gateRuleFingerprint: ruleFingerprint,
   gateUnchanged: true,
   baseCommit: prereg.baseCommit,
   ruleFrozenAtCommit: 'c4d6a96',
-  sufficiencyCriterionFrom: 'D-145 (unchanged)',
+  sufficiencyCriterionFrom: 'D-151 (unchanged)',
   computedAt: new Date().toISOString(),
   combinedSet: { rows: rows.length, pin: rows.filter((r) => r.source === 'PIN').length, a1xa2: rows.filter((r) => r.source === 'A1xA2').length },
   assays: { total: assayIds.length, withDescription: assayIds.length - blocked.length, blockedByDataAccess: blocked },
@@ -196,12 +196,12 @@ const sealed = {
   scaffolds,
   splitFeasibility,
   sufficiency: { requiredRows: minRows, functionalRows: fa.rows, shortfall, enoughRows, enoughScaffolds, splitOk, verdict },
-  supersedesNothing: 'D-145 stands unedited; this is a second pass reported alongside it.',
+  supersedesNothing: 'D-151 stands unedited; this is a second pass reported alongside it.',
   boundary: 'Row counts only. No model was trained, no gate was read for pass/fail, no candidate was ranked. Every assay in this set is a recombinant heterologous expression system and is not evidence of native human tissue pharmacology.',
 };
 sealed.artifactHash = canonicalHash(sealed);
 
-fs.writeFileSync(ROLES_PATH, `${JSON.stringify({ decisionId: 'D-146', preregFingerprint, source: 'data/transcription/glp1r-a3', assays: roles }, null, 2)}\n`);
+fs.writeFileSync(ROLES_PATH, `${JSON.stringify({ decisionId: 'D-152', preregFingerprint, source: 'data/transcription/glp1r-a3', assays: roles }, null, 2)}\n`);
 fs.writeFileSync(OUT_PATH, `${JSON.stringify(sealed, null, 2)}\n`);
 console.log(`\nsealed -> ${path.relative(ROOT, OUT_PATH)} (${sealed.artifactHash.slice(0, 16)})`);
 console.log(`roles  -> ${path.relative(ROOT, ROLES_PATH)}`);

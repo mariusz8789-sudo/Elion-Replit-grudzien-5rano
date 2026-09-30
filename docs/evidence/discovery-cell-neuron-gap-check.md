@@ -259,8 +259,8 @@ W pierwszym przebiegu obowiązuje: kandydat zachowuje jednoznaczną tożsamość
 |---|---|---|
 | 1 | `packages/backend/src/campaign/researchIntake.mjs` | `uniprot`/`species`/`taxonId` w `BUNDLED_TARGETS.GLP1R`, źródłowane z `DECLARED_TARGET_ACCESSIONS`; wystawić w `resolvedGrounding` |
 | 2 | `packages/backend/src/campaign/glp1rDataset.mjs` | kolumny `assayDescription` i `endpointRole` w `normalizeGlp1rRows` |
-| 3 | `packages/backend/src/campaign/glp1r-d145-readout-role-prereg.json` (nowy) | prerejestracja diagnostyki rozdziału odczytów, przed liczeniem |
-| 4 | `scripts/glp1r-d145-readout-role.mjs` (nowy) | policzenie wierszy funkcjonalnych i wiążących, zapieczętowany wynik |
+| 3 | `packages/backend/src/campaign/glp1r-d151-endpoint-role-prereg.json` (nowy) | prerejestracja diagnostyki rozdziału odczytów, przed liczeniem |
+| 4 | `scripts/glp1r-d151-endpoint-role.mjs` (nowy) | policzenie wierszy funkcjonalnych i wiążących, zapieczętowany wynik |
 | 5 | `packages/backend/src/compute/dockingTargets.mjs` + `compute/targets/glp1r-<pdb>/` | rejestracja celu GLP-1R z `SOURCE.json` |
 | 6 | `packages/frontend/src/core/liveExperiment/targetAnatomy.ts` | wpis `GLP1R` z podstawą źródłową i opcjonalnymi `fmaIds` |
 | 7 | `packages/backend/src/campaign/candidateProtocol.mjs` | blok `activityModel`, `inchiKey` u finalistów, mapa testu per cel, poprawka komentarzy :16 i :207 |

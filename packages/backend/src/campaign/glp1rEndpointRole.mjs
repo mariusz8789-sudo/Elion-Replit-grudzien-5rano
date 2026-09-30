@@ -1,5 +1,5 @@
 /**
- * GLP-1R endpoint role classification (D-145).
+ * GLP-1R endpoint role classification (D-151).
  *
  * Says what a GLP-1R assay MEASURES, from its transcribed ChEMBL description.
  * It is descriptive, not a selection policy: it never decides which rows a
@@ -8,7 +8,7 @@
  * Scope note: the Gs/cAMP distinction below is what a GLP-1R AGONIST question
  * needs. It is not a rule for other targets.
  *
- * Rules are frozen in campaign/glp1r-d145-endpoint-role-prereg.json. The two
+ * Rules are frozen in campaign/glp1r-d151-endpoint-role-prereg.json. The two
  * that matter most:
  *   - an EC50 is never by itself evidence of agonism;
  *   - anything not unambiguously one role is UNKNOWN, never a guess.

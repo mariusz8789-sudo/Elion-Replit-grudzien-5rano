@@ -1,12 +1,11 @@
 {
-  "decisionId": "D-145",
-  "title": "GLP-1R endpoint role classification — preregistered rules",
+  "decisionId": "D-151",
+  "title": "GLP-1R endpoint role classification \u2014 preregistered rules",
   "question": "After honestly separating functional agonism from binding affinity, does Genesis hold enough scientifically appropriate GLP-1R rows to train an activity model under the EXISTING frozen gate?",
   "frozenAt": "2026-09-30T01:15:00Z",
   "author": "Claude, for Mariusz (mariusz8789-sudo)",
   "baseCommit": "d23a89b416560c9531348d09f44f608134180268",
   "scope": "GLP-1R (CHEMBL1784) only. This is a per-campaign classification for an agonist question. It is NOT a policy for other targets and does NOT change how any other campaign selects endpoints.",
-
   "disclosureBeforeFreezing": {
     "why": "Preregistration is worthless if it hides what was already seen. Everything below was observed BEFORE this file was frozen.",
     "observed": [
@@ -21,7 +20,6 @@
       "Any classification of the A1-sourced rows."
     ]
   },
-
   "sources": {
     "assayDescriptions": {
       "path": "data/transcription/glp1r-a3/*.psv",
@@ -33,7 +31,6 @@
       "data/transcription/glp1r-a1/*.psv restricted exactly as scripts/glp1r-d144-expanded.mjs admits them (the D-144 combined set)"
     ]
   },
-
   "classificationRules": {
     "appliedTo": "each distinct assayId, never to an individual row",
     "inputsAllowed": [
@@ -42,7 +39,7 @@
       "the A1 actionType field where present"
     ],
     "inputsForbidden": [
-      "standardType alone — an EC50 is NOT evidence of agonism by itself",
+      "standardType alone \u2014 an EC50 is NOT evidence of agonism by itself",
       "the measured value",
       "anything not present in a cited source"
     ],
@@ -56,19 +53,16 @@
     "speciesFlag": "The receptor is recorded as human only where the description says human (or the row's target resolves to CHEMBL1784 with no contrary statement). A description saying 'unknown origin' sets speciesStated=false. This is recorded, never silently corrected.",
     "systemFlag": "Every assay here is a recombinant heterologous expression system (CHO, HEK293, BHK, COS7, 9-3-H). That is recorded and is NOT evidence of native human tissue pharmacology."
   },
-
   "deduplicationRule": {
-    "rowIdentity": "(moleculeId, assayId, standardType) — as already enforced when the D-144 combined set is built",
+    "rowIdentity": "(moleculeId, assayId, standardType) \u2014 as already enforced when the D-144 combined set is built",
     "modellableUnit": "distinct canonicalSmiles within one role; a compound measured in several assays of the same role counts once toward compound count",
     "rowCountForGate": "rows remaining in the role after row-identity deduplication, since the existing gate counts rows"
   },
-
   "scaffoldRule": {
     "method": "Bemis-Murcko scaffold via RDKit MurckoScaffold on the canonical SMILES",
     "note": "Reported as a diagnostic. The production pipeline computes its own scaffold through packages/backend/src/compute/rdkitAdapter.mjs; this count is independent and is labelled as such.",
     "unparseable": "counted separately, never dropped silently"
   },
-
   "sufficiencyCriterion": {
     "gateReferenced": "packages/backend/src/campaign/glp1r-validation-gate.json, ruleFingerprint d2f77a7e6042f0fc, UNCHANGED by this work",
     "requires": {
@@ -79,9 +73,8 @@
     },
     "SUFFICIENT": "FUNCTIONAL_AGONISM rows >= 190 AND distinct scaffolds >= 20 AND a scaffold-disjoint split can place >= 150 rows in train and >= 40 in test",
     "INSUFFICIENT_FUNCTIONAL_DATA": "any of the above not met",
-    "consequence": "On INSUFFICIENT_FUNCTIONAL_DATA, D-145 ends. No model is trained, no gate is altered, no threshold is relaxed, no row is dropped to make a number work, and no ranking is produced. That verdict is a complete and valid result."
+    "consequence": "On INSUFFICIENT_FUNCTIONAL_DATA, D-151 ends. No model is trained, no gate is altered, no threshold is relaxed, no row is dropped to make a number work, and no ranking is produced. That verdict is a complete and valid result."
   },
-
   "forbidden": [
     "editing glp1r-validation-gate.json or any sealed artefact",
     "changing the split after seeing any result",
@@ -89,9 +82,16 @@
     "re-running the classification with different rules to obtain a different count",
     "treating a docking score, an EC50 or an expression datum as evidence of agonism"
   ],
-
   "outputs": [
-    "packages/backend/src/campaign/glp1r-assay-roles.json — one entry per assayId with role, evidence quote, source and flags",
-    "packages/backend/src/campaign/glp1r-d145-endpoint-role.sealed.json — the counts and the verdict"
-  ]
+    "packages/backend/src/campaign/glp1r-assay-roles.json \u2014 one entry per assayId with role, evidence quote, source and flags",
+    "packages/backend/src/campaign/glp1r-d151-endpoint-role.sealed.json \u2014 the counts and the verdict"
+  ],
+  "renumbering": {
+    "renumberedFrom": "D-145",
+    "renumberedOn": "2026-09-30",
+    "why": "D-145 was already taken on main by an unrelated Human Twin decision (the BodyParts3D body replacing the proxy). The collision was found on 2026-09-30, after this rule had been frozen and run. Only the identifier changed.",
+    "ruleTextUnchanged": "Every rule, regex, role definition, forbidden input and threshold in this file is unchanged from the frozen version. Verify with: git show 292cbc4c:packages/backend/src/campaign/glp1r-d145-endpoint-role-prereg.json",
+    "fingerprintBeforeRenumbering": "28b71b42e9920740",
+    "integrityNote": "Renumbering changes this file's bytes, so its canonicalHash changes with it. The freeze is proven by git history, not by the current hash: these rules were committed before any code that counts anything under them existed."
+  }
 }

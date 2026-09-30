@@ -5,6 +5,8 @@ import { useLocale } from '../core/i18n';
 import type { ExploreHit } from '../core/three/anatomyFocusLayer';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import { EXPLORER_ORGANS } from '../core/scientificWorlds/humanExplorer';
+import { anatomyContextOf, discoveryContextFor, epistemicOf, focusLevel, type Availability } from '../core/three/anatomyContext';
+import type { CutawayState, SectionAxis } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { deleteView, notePlace, readNote, readViews, saveView, writeNote, type SavedView } from '../core/three/anatomyNotebook';
 
@@ -48,6 +50,9 @@ export interface AnatomySelectionHUDProps {
   /** "Zrób zdjęcie": a PNG of the current view, or null when the view cannot be captured. */
   readonly onPhoto: () => string | null;
   readonly onRestore: (view: SavedView) => void;
+  /** The section plane, moved by the slider under the card while the section is on. */
+  readonly section: CutawayState;
+  readonly onSectionMove: (next: CutawayState) => void;
 }
 
 const SURFACES: readonly (readonly [TwinSurfaceMode, 'surfaceSkin' | 'surfaceXray' | 'surfaceGhost'])[] = [['NORMAL', 'surfaceSkin'], ['XRAY', 'surfaceXray'], ['GHOST', 'surfaceGhost']];
@@ -69,7 +74,7 @@ export function microCaption(artifact: BiologyArtifact, genericSample = false): 
   return null;
 }
 
-export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify, onPhoto, onRestore }: AnatomySelectionHUDProps): JSX.Element | null {
+export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify, onPhoto, onRestore, section, onSectionMove }: AnatomySelectionHUDProps): JSX.Element | null {
   useLocale();
   const [panel, setPanel] = useState<'systems' | 'layers' | 'search' | 'save' | null>(null);
   const [query, setQuery] = useState('');
@@ -83,6 +88,12 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   const organ = exploreOrgan(explore.organId);
   const genericSample = EXPLORER_ORGANS.find((o) => o.organId === exploreOrgan(explore.organId)?.explorerOrganId)?.genericSample === true;
   const caption = micro ? microCaption(micro, genericSample) : null;
+  const focus = focusLevel(explore, micro);
+  const epistemic = epistemicOf(focus);
+  const anatomyCtx = anatomyContextOf(explore, micro);
+  const discovery = discoveryContextFor(anatomyCtx);
+  const targets: Availability<string> = anatomyCtx.targetIds.length ? { status: 'AVAILABLE', items: anatomyCtx.targetIds, source: 'anatomy' } : { status: 'NOT_YET_AVAILABLE' };
+  const avail = (a: Availability<string>): string => a.status === 'AVAILABLE' ? a.items.join(', ') : a.status === 'NOT_YET_MEASURED' ? tx('notYetMeasured') : tx('notYetAvailable');
   const blood = micro?.kind === 'histology' ? micro.slide.tissueType === 'BLOOD' : micro?.kind === 'hyperscope' && micro.cell?.tissueType === 'BLOOD';
   const microLevel: LadderLevel | null = !micro ? null : micro.kind === 'histology' ? 'tissue' : micro.kind === 'central-dogma' ? 'molecule' : micro.kind === 'hyperscope' && micro.capture.request.magnification >= 500 ? 'organelle' : 'cell';
   const crumbs = [...crumbsText(explore), ...(caption ? [blood ? tx('blood') : microLevel ? ladderName(microLevel, tx('microscope')) : tx('microscope')] : [])];
@@ -124,7 +135,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   const results = panel === 'search' ? search(query) : [];
   const toggle = (id: 'systems' | 'layers' | 'search' | 'save'): void => setPanel(panel === id ? null : id);
   return (
-    <div className="ax-hud" data-testid="anatomy-hud" data-level={explore.level} data-micro={micro?.kind ?? ''}>
+    <div className="ax-hud" data-testid="anatomy-hud" data-level={explore.level} data-focus={focus} data-micro={micro?.kind ?? ''}>
       {!atBody && <nav className="ax-crumbs" aria-label={tx('whereAmI')}>
         <button type="button" className="ax-back" onClick={onBack} data-testid="anatomy-back" aria-label={tx('backAria')}>{tx('back')}</button>
         <ol>{crumbs.map((c, i) => <li key={`${c}-${i}`} aria-current={i === crumbs.length - 1 ? 'location' : undefined}>{c}</li>)}</ol>
@@ -178,7 +189,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
       </nav>}
       <section className="ax-sheet" aria-live="polite" data-testid="anatomy-sheet">
         <div className="ax-name">
-          <strong data-testid="anatomy-name">{title}</strong>
+          <strong data-testid="anatomy-name">{title}<b className="ax-epi" data-epistemic={epistemic} data-testid="anatomy-epistemic">{tx(`epi${epistemic}`)}</b></strong>
           {subtitle && <em data-testid="anatomy-system">{subtitle}</em>}
           {detail && <span data-testid="anatomy-detail">{detail}</span>}
         </div>
@@ -188,6 +199,21 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
             <button key={id} type="button" className={`ax-act${id === 'microscope' ? ' is-primary' : ''}${isOn(id) ? ' is-on' : ''}`} aria-pressed={isOn(id)} disabled={busy && (id === 'microscope' || id === 'blood' || id === 'isolate')} onClick={() => act(id)} data-testid={`anatomy-${id}`}>{busy && id === 'microscope' ? tx('working') : label}</button>
           ))}
         </div>}
+        {sectionOn && <div className="ax-section" data-testid="anatomy-section">
+          <span className="ax-surfaces" role="group" aria-label={tx('section')}>
+            {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const satisfies readonly SectionAxis[]).map((a) => <button key={a} type="button" className={`ax-surf${section.axis === a ? ' is-on' : ''}`} aria-pressed={section.axis === a} onClick={() => onSectionMove({ ...section, axis: a })} data-testid={`anatomy-axis-${a.toLowerCase()}`}>{tx(`axis${a}`)}</button>)}
+          </span>
+          <label className="ax-slider">{tx('sectionWhere')}
+            <input type="range" min={0.05} max={0.95} step={0.01} value={section.position} onChange={(e) => onSectionMove({ ...section, position: Number(e.target.value) })} data-testid="anatomy-section-slider" />
+          </label>
+        </div>}
+        {(focus !== 'BODY' && focus !== 'REGION') && <details className="ax-discovery" data-testid="anatomy-discovery">
+          <summary>{tx('toDrug')}</summary>
+          <dl>
+            {([['dTargets', targets], ['dCandidates', discovery.candidateIds], ['dPredictions', discovery.predictions], ['dExperiments', discovery.experimentIds], ['dMeasurements', discovery.measurementIds]] as const).map(([k, a]) => <div key={k}><dt>{tx(k)}</dt><dd data-status={a.status}>{avail(a)}</dd></div>)}
+          </dl>
+          <p className="ax-note">{tx('toDrugNote')}</p>
+        </details>}
       </section>
     </div>
   );

@@ -1134,7 +1134,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           onPeel={(id) => applyLayers(onlySystem, peeled.includes(id) ? peeled.filter((p) => p !== id) : [...peeled, id])}
           onPhoto={() => sim.capturePng()} onRestore={(v) => { applyLayers(v.onlySystem, v.peeled); sim.exploreRestore(v.explore); }}
           search={(q) => sim.searchStructures(q)} onFind={(r: StructureResult) => sim.exploreFind(r.name, r.regionId)}
-          onLadder={exploreLadder} onMagnify={exploreMagnify} />
+          onLadder={exploreLadder} onMagnify={exploreMagnify}
+          section={cutaway} onSectionMove={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); }} />
       </>}
       {world !== 'biology' && commandControls}
     </main>

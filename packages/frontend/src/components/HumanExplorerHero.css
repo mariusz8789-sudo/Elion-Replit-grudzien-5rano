@@ -223,3 +223,15 @@ body:has(.ax-hud) .context-guide-launch { display: none; }
   .human-hero.has-hud .human-hero-heading { top: 14px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center; background: none; display: flex; flex-direction: column; gap: 2px; }
   .human-hero.has-hud .human-hero-heading :is(.human-eyebrow, h1, p) { display: none; }
 }
+
+/* Where the view comes from, beside its name: one small tag, never a banner. */
+.ax-epi { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border: 1px solid rgba(125, 211, 252, 0.55); border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #bae6fd; vertical-align: middle; }
+.ax-section { display: grid; gap: 6px; margin-top: 8px; }
+.ax-slider { display: grid; gap: 4px; font-size: 12px; color: rgba(226, 232, 240, 0.8); }
+.ax-slider input { width: 100%; accent-color: #7dd3fc; }
+.ax-discovery { margin-top: 8px; font-size: 12px; color: rgba(226, 232, 240, 0.85); }
+.ax-discovery summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.ax-discovery dl { display: grid; gap: 2px; margin: 4px 0; }
+.ax-discovery dl div { display: flex; justify-content: space-between; gap: 12px; }
+.ax-discovery dt { margin: 0; }
+.ax-discovery dd { margin: 0; color: #fcd34d; text-align: end; }

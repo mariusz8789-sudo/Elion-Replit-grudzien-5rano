@@ -70,6 +70,10 @@ import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
 import { createAgentRun, getAgentRun, listAgentRuns, readResearchState, appendResearchStateEvent } from './agentRun.mjs';
+import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolveContradiction } from './knowledgeRegistry.mjs';
+import { buildCognitiveState } from './cognitiveState.mjs';
+import { buildSelfModel } from './genesisSelfModel.mjs';
+import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
 import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
@@ -583,6 +587,36 @@ export function handleApi(db, ctx) {
     // ---- Genesis Mind research state (ENTITY-0): a run's append-only, hash-chained transition log ----
     // Stored as steps of an existing agent run (agentRun.mjs), never as a second memory. Reads
     // re-verify the chain and report a broken one as it is; writes only extend the current head.
+    // ENTITY-2: the cognitive state is a view rebuilt on every read; the registry is the only new memory.
+    if (seg[2] === 'cognitive-state' && seg.length === 3) {
+      if (method !== 'GET') return err(405, 'method_not_allowed');
+      return (async () => {
+        let selfModel;
+        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db) }); } catch { selfModel = null; }
+        return ok({ cognitiveState: buildCognitiveState(db, projectId, { selfModel }) });
+      })();
+    }
+    if (seg[2] === 'knowledge-registry') {
+      const registryResult = (result, created = false) => {
+        if (result.ok) return ok(result, created && !result.deduped ? 201 : 200);
+        const status = result.error === 'state_integrity_failure' || result.error === 'gap_not_open' || result.error === 'contradiction_not_open' ? 409
+          : result.error === 'not_found' ? 404
+            : result.error.startsWith('invalid_') ? 400 : 422;
+        return { status, body: { error: result.error, reason: result.reason ?? null, unresolved: result.unresolved ?? null, chain: result.chain ?? null } };
+      };
+      if (seg.length === 3) {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        const { chain, gaps, contradictions } = readKnowledgeRegistry(db, projectId);
+        return ok({ chain, gaps, contradictions });
+      }
+      if (method !== 'POST') return err(405, 'method_not_allowed');
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+      if (seg[3] === 'gaps' && seg.length === 4) return registryResult(openGap(db, projectId, body, user.id), true);
+      if (seg[3] === 'gaps' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveGap(db, projectId, seg[4], body, user.id));
+      if (seg[3] === 'contradictions' && seg.length === 4) return registryResult(recordContradiction(db, projectId, body, user.id), true);
+      if (seg[3] === 'contradictions' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveContradiction(db, projectId, seg[4], body, user.id));
+      return err(404, 'not_found');
+    }
     if (seg[2] === 'agent-runs') {
       if (seg.length === 3) {
         if (method === 'GET') return ok({ runs: listAgentRuns(db, projectId) });

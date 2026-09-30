@@ -199,6 +199,12 @@ describe('R1-b research run execution', () => {
     assert.throws(() => executeResearchExperiment(db, project.id, runId, { tools: crashing }), /process killed/);
     const afterCrash = executeResearchExperiment(db, project.id, runId, { tools: { ...DEFAULT_RESEARCH_TOOLS, engineStatus: () => ({ available: false, reason: 'down' }) } });
     assert.equal(afterCrash.status, 'BLOCKED', 'the frozen experiment waits for its own engine');
+    // A worker that times out or dies mid-run is an infrastructure fault, not an INCONCLUSIVE result.
+    const failing = { ...DEFAULT_RESEARCH_TOOLS, executors: { rdkit: { ...DEFAULT_RESEARCH_TOOLS.executors.rdkit, run: () => ({ ok: false, status: 'BLOCKED', reason: 'ENGINE_FAILED: execution_failed' }) } } };
+    const timedOut = executeResearchExperiment(db, project.id, runId, { tools: failing });
+    assert.equal(timedOut.status, 'BLOCKED');
+    assert.match(timedOut.reason, /ENGINE_FAILED/);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM experiment_records WHERE project_id = ? AND kind = 'SESSION'").get(project.id).n, 0, 'nothing sealed');
 
     const counting = { ...DEFAULT_RESEARCH_TOOLS, executors: { rdkit: { ...DEFAULT_RESEARCH_TOOLS.executors.rdkit, run: (input) => { engineRuns += 1; return DEFAULT_RESEARCH_TOOLS.executors.rdkit.run(input); } } } };
     const failedEvidence = executeResearchExperiment(db, project.id, runId, { tools: counting, proposeEvidence: () => ({ ok: false, error: 'ledger_unavailable' }) });

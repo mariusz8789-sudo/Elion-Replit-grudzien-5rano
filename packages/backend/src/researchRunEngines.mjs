@@ -37,7 +37,9 @@ export const RESEARCH_RUN_EXECUTORS = Object.freeze({
       if (r.ok) return { ok: true, output: r.data, engineLabel: r.engine };
       if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
       if (r.error === 'invalid_smiles') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
-      return { ok: false, status: 'ENGINE_FAILED', error: r.error, reason: r.reason ?? null };
+      // A timeout, a killed worker or any other fault says nothing about the hypothesis: it is BLOCKED,
+      // nothing is sealed, and the same frozen experiment runs again once the engine works.
+      return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
     },
   }),
 });

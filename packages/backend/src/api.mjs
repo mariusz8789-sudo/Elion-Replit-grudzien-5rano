@@ -683,7 +683,8 @@ export function handleApi(db, ctx) {
         const hypothesisId = typeof body?.hypothesisId === 'string' && body.hypothesisId.trim() ? body.hypothesisId.trim().slice(0, 200) : null;
         const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
         if (result.ok) return ok(result, result.deduped ? 200 : 201);
-        const status = { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
+        // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
+        const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
         return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
       }
       return err(404, 'not_found');

@@ -136,6 +136,8 @@ function freeze(db, projectId, runId, hypothesis, x, userId) {
     const current = getResearchRun(db, projectId, runId);
     if (!current || !current.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
     if (current.experiments.some((e) => e.experimentId === experimentId)) return { ok: true, deduped: true, experimentId };
+    const open = current.experiments.find((e) => !e.next);
+    if (open) return { ok: false, status: 'EXPERIMENT_IN_PROGRESS', reason: open.experimentId };
     const prereg = preregisterExperiment(db, {
       projectId,
       campaign: { id: preregistrationKey, status: 'created' },

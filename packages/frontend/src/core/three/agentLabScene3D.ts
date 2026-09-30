@@ -91,6 +91,7 @@ interface StationVisual {
 
 const FLOOR_Y = 0;
 const CEILING_Y = 3.6;
+const THREE_MATH_DEG = Math.PI / 180;
 /** createTwinChamber lifts its anchor 0.2 m above the floor; the twin stands on it. */
 const TWIN_ANCHOR_HEIGHT = 0.2;
 
@@ -201,18 +202,34 @@ export class AgentLabScene3D implements Sim3D {
   private touches = new Map<number, { x: number; y: number }>();
   private pinch: { from: number; zoom: number } | null = null;
   private exploreZoom = 1;
-  private focusTween: { pos: THREE_NS.Vector3; look: THREE_NS.Vector3; t0: number } | null = null;
+  private focusTween: { pos: THREE_NS.Vector3; look: THREE_NS.Vector3; t0: number; seconds: number } | null = null;
   private glassStrength: { value: number } | null = null;
   /** The lens: the scene's own field of view, and the narrower one a close explore framing asks for. */
   private baseFov = 50;
   private exploreFov = 50;
   private fovFrom: number | null = null;
   setExploreListener(listener: ((state: ExploreState) => void) | null): void { this.onExplore = listener; }
+  /**
+   * LAB_WIDE: the establishing shot before the descent — the whole glass chamber, the human inside it and
+   * the hall around it, seen from several metres away. A tap on the chamber walks up to it (HUMAN_FOCUS,
+   * the body framing); Back from the whole body walks away again. The camera only moves; nothing else changes.
+   */
+  private labWide = true;
+  private onLabWide: ((on: boolean) => void) | null = null;
+  setLabWideListener(listener: ((on: boolean) => void) | null): void { this.onLabWide = listener; listener?.(this.labWide); }
+  isLabWide(): boolean { return this.labWide; }
+  setLabWide(on: boolean): void {
+    if (on === this.labWide) return;
+    this.labWide = on;
+    if (on && this.explore !== EXPLORE_BODY) { this.explore = EXPLORE_BODY; this.focusLayer?.apply(EXPLORE_BODY); this.onExplore?.(EXPLORE_BODY); }
+    this.startFocusTween(0.85);
+    this.onLabWide?.(on);
+  }
   getExplore(): ExploreState { return this.explore; }
   /** True once the atlas organs stand in the body and taps descend through them. */
   hasExploreAtlas(): boolean { return this.focusLayer !== null; }
   exploreSelect(hit: ExploreHit): void { this.applyExplore(exploreInto(this.explore, hit)); }
-  exploreBack(): void { this.applyExplore(exploreBack(this.explore)); }
+  exploreBack(): void { if (this.explore.level === 'BODY') { this.setLabWide(true); return; } this.applyExplore(exploreBack(this.explore)); }
   exploreReset(): void { this.applyExplore(EXPLORE_BODY); }
   /** Layers taken off the body (muscles, bones, ...): what lies under them can then be tapped. */
   private exploreHidden: readonly string[] = [];
@@ -268,6 +285,8 @@ export class AgentLabScene3D implements Sim3D {
   private applyExplore(state: ExploreState): void {
     const deeper = state.level !== 'BODY';
     if (state === this.explore) return;
+    // Any descent (a tap, a search, a saved view) starts at the chamber, never from across the hall.
+    if (this.labWide) { this.labWide = false; this.onLabWide?.(false); }
     this.explore = state;
     this.focusLayer?.apply(state);
     for (const t of this.twins.slice(0, 1)) { t.setProxiesHidden(deeper); t.setAtlasFade(state.level === 'ORGAN' || state.level === 'STRUCTURE' ? 0.45 : 1); }
@@ -278,8 +297,8 @@ export class AgentLabScene3D implements Sim3D {
     this.startFocusTween();
     this.onExplore?.(state);
   }
-  private startFocusTween(): void {
-    if (this.twinCamPos && this.twinCamLook) this.focusTween = { pos: this.twinCamPos.clone(), look: this.twinCamLook.clone(), t0: this.elapsedWallSeconds };
+  private startFocusTween(seconds = 0.55): void {
+    if (this.twinCamPos && this.twinCamLook) this.focusTween = { pos: this.twinCamPos.clone(), look: this.twinCamLook.clone(), t0: this.elapsedWallSeconds, seconds };
     this.fovFrom = this.pickCamera?.fov ?? null;
   }
   private rebuildFocusLayer(): void {
@@ -319,11 +338,23 @@ export class AgentLabScene3D implements Sim3D {
     this.exploreDrag = null;
     if (!drag || drag.moved) return true;
     const canvas = this.renderer.domElement;
+    if (this.labWide) { if (this.hitsChamber(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2)) this.setLabWide(false); return true; }
     const ray = new this.THREE.Raycaster();
     ray.setFromCamera(new this.THREE.Vector2(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2), this.pickCamera);
     const hit = this.focusLayer.pick(ray.ray);
     if (hit) this.exploreSelect(hit);
     return true;
+  }
+  /** The chamber's pick volume on screen: its full height and width plus a generous finger margin. */
+  private hitsChamber(nx: number, ny: number): boolean {
+    const THREE = this.THREE; const camera = this.pickCamera;
+    if (!THREE || !camera) return false;
+    const { x: cx, z: cz } = TWIN_CHAMBER.position; const r = TWIN_CHAMBER.radius;
+    const pts = [[cx - r, 0, cz], [cx + r, 0, cz], [cx - r, TWIN_CHAMBER.height, cz], [cx + r, TWIN_CHAMBER.height, cz]].map(([x, y, z]) => new THREE.Vector3(x, y, z).project(camera));
+    const minX = Math.min(...pts.map((p) => p.x)); const maxX = Math.max(...pts.map((p) => p.x));
+    const minY = Math.min(...pts.map((p) => p.y)); const maxY = Math.max(...pts.map((p) => p.y));
+    const mx = (maxX - minX) * 0.2; const my = (maxY - minY) * 0.1;
+    return nx >= minX - mx && nx <= maxX + mx && ny >= minY - my && ny <= maxY + my;
   }
   pointer(x: number, y: number, type: 'down' | 'move' | 'up', pointerId = 1): void {
     if (this.pointerCloseUp(x, y, type)) return;
@@ -1210,10 +1241,18 @@ export class AgentLabScene3D implements Sim3D {
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, lookY, TWIN_CHAMBER.position.z);
       this.exploreFov = this.baseFov;
       if (exploring) this.fitExplore(camera, portrait);
+      else if (this.labWide && !macroVisible && !tight) {
+        // LAB_WIDE: the chamber takes about 60% of the frame's height (the human about a third of it), the hall
+        // shows around it; on a narrow phone the chamber's width decides instead (about 60% of the screen, so the hall shows beside it).
+        const tan = Math.tan(THREE_MATH_DEG * this.baseFov / 2);
+        const d = Math.max((TWIN_CHAMBER.height / 0.55) / (2 * tan) + TWIN_CHAMBER.radius, (TWIN_CHAMBER.radius * 2 / 0.62) / (2 * tan * camera.aspect));
+        this.scratchA.set(TWIN_CHAMBER.position.x, 1.7, TWIN_CHAMBER.position.z + d);
+        this.scratchB.set(TWIN_CHAMBER.position.x, TWIN_CHAMBER.height * (portrait ? 0.4 : 0.47), TWIN_CHAMBER.position.z);
+      }
       let fov = this.exploreFov;
       if (this.focusTween) {
-        // One eased flight (0.55 s) from where the camera was to the new framing; no teleport.
-        const k = reducedMotion ? 1 : Math.min(1, (this.elapsedWallSeconds - this.focusTween.t0) / 0.55);
+        // One eased flight (0.55 s, 0.85 s to and from the hall) from where the camera was to the new framing; no teleport.
+        const k = reducedMotion ? 1 : Math.min(1, (this.elapsedWallSeconds - this.focusTween.t0) / this.focusTween.seconds);
         const e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
         this.twinCamPos.copy(this.focusTween.pos).lerp(this.scratchA, e);
         this.twinCamLook.copy(this.focusTween.look).lerp(this.scratchB, e);

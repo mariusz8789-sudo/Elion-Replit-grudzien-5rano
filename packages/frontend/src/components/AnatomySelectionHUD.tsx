@@ -52,6 +52,9 @@ export interface AnatomySelectionHUDProps {
   readonly onRestore: (view: SavedView) => void;
   /** The section plane, moved by the slider under the card while the section is on. */
   readonly section: CutawayState;
+  /** LAB_WIDE: the establishing shot across the hall; only the way in is offered. */
+  readonly labWide: boolean;
+  readonly onApproach: () => void;
   readonly onSectionMove: (next: CutawayState) => void;
 }
 
@@ -74,7 +77,7 @@ export function microCaption(artifact: BiologyArtifact, genericSample = false): 
   return null;
 }
 
-export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify, onPhoto, onRestore, section, onSectionMove }: AnatomySelectionHUDProps): JSX.Element | null {
+export default function AnatomySelectionHUD({ explore, micro, isolated, sectionOn, busy, surface, onSurface, onBack, onAction, onlySystem, onSystem, peeled, onPeel, search, onFind, onLadder, onMagnify, onPhoto, onRestore, section, onSectionMove, labWide, onApproach }: AnatomySelectionHUDProps): JSX.Element | null {
   useLocale();
   const [panel, setPanel] = useState<'systems' | 'layers' | 'search' | 'save' | null>(null);
   const [query, setQuery] = useState('');
@@ -96,7 +99,7 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   const avail = (a: Availability<string>): string => a.status === 'AVAILABLE' ? a.items.join(', ') : a.status === 'NOT_YET_MEASURED' ? tx('notYetMeasured') : tx('notYetAvailable');
   const blood = micro?.kind === 'histology' ? micro.slide.tissueType === 'BLOOD' : micro?.kind === 'hyperscope' && micro.cell?.tissueType === 'BLOOD';
   const microLevel: LadderLevel | null = !micro ? null : micro.kind === 'histology' ? 'tissue' : micro.kind === 'central-dogma' ? 'molecule' : micro.kind === 'hyperscope' && micro.capture.request.magnification >= 500 ? 'organelle' : 'cell';
-  const crumbs = [...crumbsText(explore), ...(caption ? [blood ? tx('blood') : microLevel ? ladderName(microLevel, tx('microscope')) : tx('microscope')] : [])];
+  const crumbs = [...(explore.level === 'BODY' ? [tx('lab')] : []), ...crumbsText(explore), ...(caption ? [blood ? tx('blood') : microLevel ? ladderName(microLevel, tx('microscope')) : tx('microscope')] : [])];
   const structure = explore.structure ? structureText(explore.organId, explore.structure, explore.system) : null;
   const atBody = explore.level === 'BODY';
   const system = BODY_SYSTEMS.find((s) => s.id === onlySystem);
@@ -134,9 +137,20 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   };
   const results = panel === 'search' ? search(query) : [];
   const toggle = (id: 'systems' | 'layers' | 'search' | 'save'): void => setPanel(panel === id ? null : id);
+  if (labWide) return (
+    <div className="ax-hud" data-testid="anatomy-hud" data-level="LAB" data-focus="LAB_WIDE" data-micro="">
+      <section className="ax-sheet" aria-live="polite" data-testid="anatomy-sheet">
+        <div className="ax-name">
+          <strong data-testid="anatomy-name">{tx('labTitle')}</strong>
+          <span data-testid="anatomy-detail">{tx('labHint')}</span>
+        </div>
+        <div className="ax-row"><button type="button" className="ax-act is-primary" onClick={onApproach} data-testid="anatomy-approach">{tx('approach')}</button></div>
+      </section>
+    </div>
+  );
   return (
     <div className="ax-hud" data-testid="anatomy-hud" data-level={explore.level} data-focus={focus} data-micro={micro?.kind ?? ''}>
-      {!atBody && <nav className="ax-crumbs" aria-label={tx('whereAmI')}>
+      {<nav className="ax-crumbs" aria-label={tx('whereAmI')}>
         <button type="button" className="ax-back" onClick={onBack} data-testid="anatomy-back" aria-label={tx('backAria')}>{tx('back')}</button>
         <ol>{crumbs.map((c, i) => <li key={`${c}-${i}`} aria-current={i === crumbs.length - 1 ? 'location' : undefined}>{c}</li>)}</ol>
       </nav>}

@@ -517,6 +517,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     });
     return () => sim.setExploreListener(null);
   }, [sim]);
+  const [labWide, setLabWide] = useState(true);
+  useEffect(() => { sim.setLabWideListener(setLabWide); return () => sim.setLabWideListener(null); }, [sim]);
   const readExploreLabels = useCallback(() => sim.getExploreLabels(), [sim]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
@@ -1135,6 +1137,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           onPhoto={() => sim.capturePng()} onRestore={(v) => { applyLayers(v.onlySystem, v.peeled); sim.exploreRestore(v.explore); }}
           search={(q) => sim.searchStructures(q)} onFind={(r: StructureResult) => sim.exploreFind(r.name, r.regionId)}
           onLadder={exploreLadder} onMagnify={exploreMagnify}
+          labWide={labWide} onApproach={() => sim.setLabWide(false)}
           section={cutaway} onSectionMove={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); }} />
       </>}
       {world !== 'biology' && commandControls}

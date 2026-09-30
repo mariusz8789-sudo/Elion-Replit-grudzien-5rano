@@ -235,3 +235,13 @@ body:has(.ax-hud) .context-guide-launch { display: none; }
 .ax-discovery dl div { display: flex; justify-content: space-between; gap: 12px; }
 .ax-discovery dt { margin: 0; }
 .ax-discovery dd { margin: 0; color: #fcd34d; text-align: end; }
+
+/* LAB_WIDE is the whole hall: no model-info "+" over the tiny figure. Past it, on a phone, the big
+   heading gives the top of the screen to the "Wstecz" path. */
+body:has(.ax-hud) .human-subject-target { display: none; }
+@media (max-width: 899px) {
+  body:has(.ax-hud:not([data-focus="LAB_WIDE"])) .human-hero .human-hero-heading { display: none; }
+}
+@media (max-width: 899px) {
+  body:has(.ax-hud[data-focus="LAB_WIDE"]) .human-hero .human-hero-heading :is(h1, p:first-of-type) { display: none; }
+}

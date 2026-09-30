@@ -1,0 +1,133 @@
+{
+ "kind": "posebusters-unseen-benchmark-preregistration",
+ "frozenAt": "2026-09-28T20:39:24+00:00",
+ "protocolFingerprintSha256": "5ba0e8559eb3a411697b2db46467ac7ba8b8b3635126cebf8eff03aad8c3d47c",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+ "protocol": {
+  "id": "posebusters-unseen-benchmark-prereg",
+  "label": "Unseen benchmark - the frozen post-run-7 Genesis pipeline on the PoseBusters Benchmark set (run 8)",
+  "status": "PREREGISTERED BEFORE ANY DOCKING, SCORING OR RESULT. Frozen; amendments only by append.",
+  "purpose": "To test whether the pipeline that reached 63/85 on Astex generalises to protein-ligand complexes that provably were not in the training data of its scorer. This is the independent validation that no Astex number can be.",
+  "whyThisIsDifferentFromAstex": "Every Astex result to date is post-hoc development: the protocol was developed while looking at those 85 cases, and 76 of the 85 appear in GNINA's own published training id lists. Nothing here is developed on this set. The protocol is frozen before the set is docked, and the set was selected by a membership test against the training lists, not by any performance measurement.",
+  "benchmark": {
+   "name": "PoseBusters Benchmark set",
+   "distribution": "github.com/degrado-lab/PoseBusters-Benchmark, commit 51a7fc3ad100990a13fb23684de4744de420b4bd, cloned locally",
+   "upstreamPaper": "Buttenschoen, Morris, Deane, 'PoseBusters: AI-based docking methods fail to generate physically valid poses or generalise to novel sequences', Chemical Science 15 (2024) 3130-3139, doi 10.1039/D3SC04185A. The paper itself is on a host this container cannot reach; the set is taken from the distribution above, which states it is that paper's benchmark set.",
+   "caseCount": 308,
+   "idListFile": "posebuster_benchmark.txt in that repo, sha256 16eebe372087ab7e91c5d9763b07f60c54c580bbd739dd47a444932cd1c55469",
+   "whyThisSet": [
+    "every entry is a protein-ligand complex with one designated ligand, which is exactly the redocking task runs 1-7 measure",
+    "it is public, standard and already used by other groups, so the number is comparable and checkable by an outside reviewer",
+    "it was assembled for the express purpose of postdating the training data of learned docking methods",
+    "the whole set, including raw mmCIF, is reachable from this container, so the experiment can actually be run here"
+   ]
+  },
+  "contaminationAudit": {
+   "method": "Exact PDB-id membership test against the training id lists published by the GNINA authors themselves, not a date argument and not an assumption.",
+   "sources": {
+    "crossDocked2020": "github.com/gnina/models, data/CrossDocked2020/crossdocked_set_ids.txt (commit 0207e0250ac7066d4d2b137d2735487608ee6e5a); 25752 unique PDB ids",
+    "pdbBind2016": "github.com/gnina/models, the PDBBind2016 / general / refined types files in the same commit; 12670 unique PDB ids",
+    "union": "31452 unique PDB ids",
+    "provenanceStatement": "gnina/models data/README.md states CrossDocked2020 is curated from the Pocketome and PDBBind2016 from PDBbind, and that both were used in the CrossDocked2020 paper that introduced the Default2018 models."
+   },
+   "result": {
+    "posebustersIntersectCrossDocked2020": 0,
+    "posebustersIntersectPdbBind2016": 0,
+    "posebustersIntersectAstex85": 0,
+    "astex85IntersectCrossDocked2020": 63,
+    "astex85IntersectPdbBind2016": 47,
+    "astex85IntersectUnion": 76
+   },
+   "releaseDateCheck": "Independently, the first release date was read out of each entry's own mmCIF revision history: 116 entries first released in 2021, 133 in 2022, 59 in 2023. Zero were released before 2021-01-01. CrossDocked2020 was published in 2020 and PDBbind2016 in 2016, so no entry in this set can have been in either.",
+   "whatIsStillNotProven": "GNINA's weights were fitted by third parties; only the published id lists can be checked, not the actual training run. A structure absent from those lists could in principle still have influenced the weights through a protein homologous to one in training. Sequence-level novelty is NOT claimed here, only structure-level absence from the published training sets.",
+   "measuredOnAstexForComparison": "On the 9 Astex cases absent from both training lists, run 7's GNINA rule scored 7/9; on the 76 present, 56/76. No contamination advantage is visible in that split, but 9 cases cannot settle the question, which is the reason for this benchmark."
+  },
+  "frozenProtocol": {
+   "statement": "Identical to the pipeline as it stands after run 7. Nothing is tuned for this benchmark. The preparation code is executed unchanged, by file hash.",
+   "receptorAndLigandPreparation": "scripts/astex-phase2-redock.py prepare_case with scripts/astex_phase2_prep.py, unchanged, including the run-3 cofactor rule, rule 1 (covalently bonded ligand residues absorbed) and rule 2 (modified amino-acid residues kept rigid). Ligand bond orders come from the wwPDB CCD template as in every earlier run.",
+   "inputConstruction": {
+    "rule": "For each case the receptor input PDB is rebuilt from that entry's raw mmCIF as distributed in the benchmark repo: model 1, first altloc, hydrogens removed, all other atoms as deposited (protein, cofactors, metals, waters). Chain ids longer than one character are remapped, deterministically and globally, to the fixed alphabet A-Z a-z 0-9 in sorted order.",
+    "whyNotTheStrippedFiles": "The repo also ships protein+ligand-only files. 53 of the 308 have a metal ion within 3.5 A of the ligand, so using the stripped files would remove catalytic metals and break those cases for reasons unrelated to the scorer. Using the complete deposited content is also what every Astex run did.",
+    "validation": "Every converted file was checked back: ligand atom count preserved and every ligand coordinate within 0.0015 A of the mmCIF value, total atom count preserved. 308 of 308 passed. Per-case sha256 of both the source mmCIF and the converted PDB are recorded in docs/evidence/posebusters-benchmark-cases.json and are part of this freeze."
+   },
+   "sampling": "multi-seed ensemble exactly as run 6: seeds [42, 1042, 2042, 3042, 4042] (rule seed_i = 42 + 1000*i), identical for all cases, AutoDock Vina 1.2.7, exhaustiveness 32, num_modes 20, energy_range 20.0, box from the crystal ligand by the same frozen rule.",
+   "pooling": "pool across the five seeds, deduplicate at 1.0 A symmetry-aware RMSD, tie-break by (seed index, rank) - identical to runs 6 and 7.",
+   "rescoring": "gnina v1.3, binary sha256 c7e40b0258ff55941b0a0716d28ec9661b2917d809a04bcbab20c20a13b4beb9, model crossdock_default2018_ensemble, --score_only --no_gpu --cpu 1. No minimisation, no refinement, no blend, no second model.",
+   "ranking": "ONE rule: GNINA CNNscore descending, tie-broken by the pooled order (Vina score ascending, then seed index, then rank). CNNaffinity is recorded but not used.",
+   "successCriterion": "symmetry-aware heavy-atom RMSD < 2.0 A to the crystal ligand, no superposition, crystal frame, RDKit CalcRMS - the identical code path used by runs 1-7.",
+   "denominator": "308, always."
+  },
+  "inclusionExclusion": {
+   "included": "all 308 entries of the distributed id list, with no selection of any kind by us",
+   "excluded": "none",
+   "noteOn7D6O": "the distribution states 7D6O was replaced by 8J79 upstream because it was an obsolete duplicate; we take the list as distributed and make no substitution of our own",
+   "alreadyKnownPreparationFailures": "Running the frozen preparation before this freeze, 300 of 308 prepared and 8 did not, all with the same cause: the deposited ligand copy has a different heavy-atom count than its CCD template (6ZAE ACV, 7CNQ G8X, 7JHQ VAJ, 7L00 XCJ, 7NF0 BYN, 7NF3 4LU, 7OP9 06K, 7V3N AKG). These 8 are declared here, in advance, and they STAY IN THE DENOMINATOR as failures. They are not removed, not repaired case by case and not replaced.",
+   "noPerCaseAction": "no per-PDB parameter, box, exception or repair is permitted, before or after seeing any result"
+  },
+  "failureHandling": {
+   "PREPARATION_FAILED": "counted as a top-1 failure inside the denominator of 308, reported by name",
+   "DOCKING_FAILED": "counted as a top-1 failure inside the denominator of 308, reported by name",
+   "UNAVAILABLE": "a case whose input hashes or per-pose identity hashes do not verify is reported UNAVAILABLE, counted as a top-1 failure inside the denominator, never re-docked and never removed",
+   "noRerunOnBadResult": "a case is never re-run because its result was poor; a re-run is permitted only after an infrastructure abort that produced no result, and is logged"
+  },
+  "metrics": [
+   "PRIMARY: top-1 success rate, RMSD < 2.0 A, denominator 308",
+   "top-3, top-5, top-10, top-20 over the GNINA-ordered pooled poses",
+   "the Vina top-1 rate over the SAME pooled poses, as the paired internal baseline",
+   "sampling ceiling: how many cases hold any pose under 2.0 A anywhere in the pool",
+   "ranking failures: a sub-2.0 A pose is in the pool and the rule does not rank it first",
+   "preparation failures and docking failures, by name",
+   "per-seed top-1 for each of the five seeds",
+   "wall clock, and replay plus hash verification"
+  ],
+  "prespecifiedInterpretation": {
+   "principle": "The verdict is decided by the PAIRED comparison GNINA minus Vina on this same benchmark, not by comparing absolute percentages with Astex. Different benchmarks have different difficulty, so absolute rates are reported but carry no verdict.",
+   "referenceEffectOnAstex": "GNINA beat Vina by 13 cases in 85, +15.3 percentage points, on all five seeds individually.",
+   "GENERALISES": "GNINA top-1 minus Vina top-1 >= +8.0 percentage points AND the sign of the advantage holds on each of the five seeds individually",
+   "DOES_NOT_GENERALISE": "the difference is <= +2.0 percentage points, OR the advantage reverses on two or more seeds",
+   "PARTIAL": "anything between, reported as partial generalisation with the number, and no stronger claim",
+   "absoluteNumberRule": "whatever the absolute top-1 is, it is reported exactly as measured and is NEVER compared one-to-one with 46/85 or 63/85 as if the benchmarks were of equal difficulty"
+  },
+  "falsifiablePrediction": {
+   "gninaTop1AbsolutePercent": "55 to 68",
+   "gninaMinusVinaPercentagePoints": "+8 to +16",
+   "verdictPredicted": "GENERALISES",
+   "caveatOnMyOwnPrediction": "my run-7 prediction band (54-62) was wrong; the result was 63. Treat this prediction as a weak prior that is recorded only so it can be scored against reality."
+  },
+  "forbidden": [
+   "looking at any per-case result before this preregistration is committed",
+   "changing any parameter, seed, rule, threshold or denominator after seeing any result",
+   "running the benchmark more than once and reporting the better run",
+   "any per-target or per-PDB tuning, exception, repair or box",
+   "removing, replacing or substituting any case for any reason",
+   "evaluating a second scorer, model or ranking rule and keeping whichever looks better",
+   "any modification of runs 1-7, their evidence or any earlier preregistration",
+   "integrating GNINA into the commercial product; it stays an external benchmark executable until the GPL question and the licence of its training weights are resolved in law"
+  ],
+  "computeCost": {
+   "dockings": "308 cases x 5 seeds = 1540 Vina runs at exhaustiveness 32",
+   "estimatedWallClock": "about 15 to 20 hours of docking on 4 cores, scaled from run 6's measured 425 dockings in about 4 hours, plus roughly 4 to 5 hours of GNINA scoring scaled from run 7's measured 4539 s for 3933 poses",
+   "note": "this estimate is the reason the run is not started without an explicit go-ahead"
+  },
+  "codeIdentity": {
+   "gitHead": "3894ecc73fe0367d0e440a959a890f39aa084f07",
+   "pinnedFileSha256": {
+    "scripts/astex-phase2-redock.py": "1c9c76b516f8b57e42bdedcd7b4e577a84d5f3e8866bc501c90dbc30a333a416",
+    "scripts/astex_phase2_prep.py": "8cf5e3dc2ce92d0ff05808896782efc527e89678548a5873f0c036e5203b8d67",
+    "scripts/astex-multiseed-ensemble.py": "9fa303b0dd252ae2ed92a0455068e9223b312dfcdf5d5b1ae65db53bda911137",
+    "scripts/astex-gnina-rescore.py": "ac6bfa53f3011b6776515661771be4416b5a03d108b22578d276b534ffa5d352",
+    "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e"
+   }
+  },
+  "versions": {
+   "gnina": "1.3",
+   "vina": "1.2.7",
+   "meeko": "0.8.0",
+   "rdkit": "2026.03.6",
+   "biotite": "1.6.0"
+  },
+  "caseListFile": "docs/evidence/posebusters-benchmark-cases.json",
+  "caseListSha256": "d5d832a823e7c78676faf45f22c7b15d1eee5ee6886e3644d1942684157bca76",
+  "amendments": []
+ }
+}

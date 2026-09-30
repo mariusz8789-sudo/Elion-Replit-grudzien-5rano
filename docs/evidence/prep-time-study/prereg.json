@@ -1,0 +1,126 @@
+{
+ "kind": "genesis-prep-time-study-preregistration",
+ "frozenAt": "2026-09-29T01:25:44+00:00",
+ "protocolFingerprintSha256": "4fbb55313f6b127846ccb2028a7bf8868751efe62712180cc0873429493cc275",
+ "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+ "protocol": {
+  "id": "genesis-prep-time-study-prereg",
+  "label": "How long does preparing a protein-ligand complex for docking take, by hand and in Genesis",
+  "status": "PREREGISTERED BEFORE ANY TIMING WAS COLLECTED FROM THE MANUAL ARM. Frozen; amendments only by append.",
+  "question": "For the same ten deposited complexes and the same finish line, how much ACTIVE HUMAN TIME does preparation take by hand, and how much does it take in Genesis?",
+  "whyItExists": "Genesis's own times are measured; no manual baseline exists anywhere, so no percentage saved may be claimed. This study produces that baseline. Until it is filled in, the only permitted wording remains the target '>=50% less active specialist time in the pilot workflow, to be measured'.",
+  "theTask": {
+   "inputs": "the ten deposited mmCIF files in docs/evidence/prep-time-study/inputs, identical for both arms",
+   "deliverablePerComplex": "receptor.pdb (or .pdbqt), ligand.sdf (or .mol) with 3D coordinates and bond orders in the receptor frame, and box.json with center and size in Angstrom",
+   "method": "UNPRESCRIBED. Any tools, any route. Only the result is judged.",
+   "definitionOfDone": "acceptance by scripts/prep-time-study-check.py, the SAME gate for both arms; it never inspects docking results",
+   "cases": [
+    {
+     "pdbId": "5SAK",
+     "ligand": "ZRY",
+     "sourceCifSha256": "4142f5d94c0711598448d7d0f95cf823ef39d7971d45a9d5b2a2123dd8c23d47"
+    },
+    {
+     "pdbId": "6ZC3",
+     "ligand": "JOR",
+     "sourceCifSha256": "49386400635d4d012d840d7e7036dd02442d92a8558e313f680630cbd2d72b2a"
+    },
+    {
+     "pdbId": "7DQL",
+     "ligand": "4CL",
+     "sourceCifSha256": "524ba599e12c64003cc0eb64ae404279fa7b9f1dd686858b3f30aa08ac5444ef"
+    },
+    {
+     "pdbId": "7L7C",
+     "ligand": "XQ1",
+     "sourceCifSha256": "275d902fb012e6224043d10f1e3596c5a9f087987dbc1429fe414b645180466b"
+    },
+    {
+     "pdbId": "7NGW",
+     "ligand": "UAW",
+     "sourceCifSha256": "71da88fb52adf2f8c0ad03bb0f01e73220de8040f601b4792654627c943b26b6"
+    },
+    {
+     "pdbId": "7PL1",
+     "ligand": "SFG",
+     "sourceCifSha256": "609ebabc73d1e424c3a14681b9886be1188907a0cc3cd97f7416f8646f122d58"
+    },
+    {
+     "pdbId": "7RZL",
+     "ligand": "NPO",
+     "sourceCifSha256": "7299bc01cd19afbcc02e6ecde2a049a56364032adcee422801a21e983aac0898"
+    },
+    {
+     "pdbId": "7UQ3",
+     "ligand": "O2U",
+     "sourceCifSha256": "d6dcd30f5d06666b26524614ee6ca2bad39afd166317899d2bfb4ba0758ae13e"
+    },
+    {
+     "pdbId": "7XBV",
+     "ligand": "APC",
+     "sourceCifSha256": "a91849cd262d17b43b8ae6f688bf308e19d357eeeb430ca85501d37f89e1b47c"
+    },
+    {
+     "pdbId": "8B8H",
+     "ligand": "OJQ",
+     "sourceCifSha256": "dd8cdf19da4d3c8878e74c2a7e102a92c56f25aa439a2309cfd0b06b7be649e3"
+    }
+   ],
+   "denominator": 10
+  },
+  "primaryMetric": "median ACTIVE human minutes per complex in the manual arm, against the active human time of the Genesis arm",
+  "secondaryMetrics": [
+   "mean and full spread of active minutes per complex",
+   "the first complex reported separately from the rest, so the learning curve is visible and not hidden",
+   "waiting-on-the-computer time, reported separately and never counted as a saving",
+   "complexes the gate rejects, and complexes abandoned, in both arms"
+  ],
+  "theSplitThatDecidesEverything": "ACTIVE time is time a person's hands and attention are on the task. WAITING time is time a computation runs unattended. Genesis does not make a computer faster: a person running the same tools waits for their own machine too. Only active time may enter any claim about saving a specialist's time, and waiting time is reported beside it so nobody can confuse the two.",
+  "genesisArm": {
+   "howItIsRun": "python3 scripts/prep-time-study-genesis-arm.py, one command",
+   "activeHumanTime": "zero by construction - one command, then the operator is free",
+   "machineTimeMeasurement": "reported as measured; the number that goes in the report is measured on an otherwise IDLE container, because a measurement taken while run 8 occupies all four cores would overstate it",
+   "provisionalMeasurement": "5.30 s total for the ten complexes, mean 0.53 s, taken 2026-09-29 while run 8 was using all four cores. Recorded here as PROVISIONAL and as an upper bound on the machine time; it is replaced by an idle-machine measurement before the report."
+  },
+  "manualArm": {
+   "operator": "one person who is not the author of Genesis, working alone",
+   "instructions": "docs/evidence/prep-time-study/PROTOCOL.md",
+   "timingSheet": "docs/evidence/prep-time-study/timing-sheet.csv",
+   "backgroundForm": "docs/evidence/prep-time-study/about-you.md",
+   "experienceIsRecordedAndReported": "whether the operator has prepared a complex for docking before is recorded BEFORE the run and stated in the report. A first-timer's number measures learning the tooling, an experienced user's number measures the work, and the report says which one it is rather than passing one off as the other.",
+   "aiAssistanceDisclosed": "any AI assistance is recorded on the sheet; an undisclosed one invalidates the arm",
+   "noCoaching": "no help from Genesis, its authors or its output during the timed run"
+  },
+  "prespecifiedInterpretation": {
+   "principle": "The comparison is between ACTIVE human minutes in each arm. Machine time is reported but never enters the claim.",
+   "reportedAs": "'preparation took N minutes of active specialist time by hand and M seconds of unattended machine time in Genesis', with N the median and the full spread beside it",
+   "aPercentageMayBeQuotedOnlyIf": [
+    "the manual arm completed at least 7 of the 10 complexes through the gate",
+    "the operator had prepared a complex for docking before this study",
+    "no undisclosed AI assistance was used"
+   ],
+   "ifThoseAreNotMet": "the numbers are published exactly as measured and labelled as a single operator's times, explicitly NOT a specialist baseline, and the deck wording stays the unmeasured target",
+   "nAndItsLimits": "ten complexes and one operator. This is a first measurement, not a study. The report says so in its own first paragraph, and the number carries the operator's experience level with it wherever it is quoted."
+  },
+  "forbidden": [
+   "computing any percentage before the timing sheet is complete",
+   "re-running the manual arm because the first number was disappointing",
+   "dropping a complex the operator found hard",
+   "counting waiting-on-the-computer time as a saving",
+   "quoting any number from this study without the operator's experience level attached",
+   "the author of Genesis performing the manual arm"
+  ],
+  "codeIdentity": {
+   "gitHead": "36210e07a828752288c93beb9a6d962e1866ad57",
+   "pinnedFileSha256": {
+    "scripts/prep-time-study-check.py": "ff4dc4b2bff3a3c5628ec02b5575dce46872097e6b9ef365a25c4f1d05ab28d0",
+    "scripts/prep-time-study-genesis-arm.py": "af6aaac44e605ca61b121009af4b28e6c35f962e7c88fb0676e854c58dc0bba4",
+    "scripts/astex-phase2-redock.py": "1c9c76b516f8b57e42bdedcd7b4e577a84d5f3e8866bc501c90dbc30a333a416",
+    "scripts/astex_phase2_prep.py": "8cf5e3dc2ce92d0ff05808896782efc527e89678548a5873f0c036e5203b8d67",
+    "docs/evidence/prep-time-study/PROTOCOL.md": "f7c7c67cb4f4c69dfa87b8bcba75aabd4741ddac65f7b2885b95506d2c2bb92e",
+    "docs/evidence/prep-time-study/timing-sheet.csv": "45e07cfd9b5a2d0666c32ff448d0bd4a29c3924ed4bbfa5bdf031a6d5efc832e"
+   }
+  },
+  "amendments": []
+ }
+}

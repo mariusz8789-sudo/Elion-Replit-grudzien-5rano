@@ -84,6 +84,8 @@ Plik po pliku, z rolą zmiany. Nic tu nie zmienia bramki, zapieczętowanych wyni
 | `packages/backend/src/apiLabClosedLoop.test.mjs` | testy 7–11 z punktu 27 |
 
 ### PR-F — Human Explorer Truth Hygiene
+**Właściciel: wątek Human Explorer** (właściciel frontendu i jedyny, który wdraża). Ten wątek go nie koduje; poniższy opis defektu zostaje tu jako dokumentacja.
+
 | Plik | Zmiana |
 |---|---|
 | `packages/frontend/src/core/scientificWorlds/humanExplorer.ts` | koniec mapowania trzustki, nerki, żołądka i jelita na `EPITHELIUM` |
@@ -139,9 +141,9 @@ Kolejność wynika z zależności, nie z wygody:
 3. **PR-C** — dossier kandydata. Zależy od PR-A (wersja modelu jest polem, nawet gdy model jest BLOCKED).
 4. **PR-D** — szlak i ekspresja. Zależy od dostępu do źródeł; kontrakty mogą powstać wcześniej, dane później.
 5. **PR-E** — integralność przekazania do laboratorium. Niezależny od GLP-1R, wartościowy sam w sobie.
-6. **PR-F** — higiena Human Explorera. Całkowicie niezależny, najmniejszy, najszybszy.
+6. **PR-F** — higiena Human Explorera. Całkowicie niezależny, najmniejszy, najszybszy — **ale należy do wątku Human Explorer**, nie do tego.
 
-Gdybym miał zacząć dziś od jednego: **PR-F**, bo naprawia rzecz nieprawdziwą, którą widać na ekranie, i nie wymaga ani sieci, ani compute. Zaraz po nim **PR-A**, bo rozstrzyga, czy reszta planu w ogóle ma sens.
+Z rzeczy będących w zasięgu tego wątku zacząć należy od **PR-A**, bo rozstrzyga, czy reszta planu w ogóle ma sens.
 
 Każdy PR: własne testy, typecheck, lint, build, bez niepowiązanych porządków.
 

@@ -7,6 +7,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AccountScreen } from './components/AccountScreen';
+import { ProfileDashboard } from './components/ProfileDashboard';
+import { useSession } from './core/backend/session';
+import { profileOfUser } from './core/accountProfiles';
+import { isSimplifiedProfile } from './core/profileNavigation';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
@@ -117,7 +121,7 @@ function HeavyRoute({ children }: { children: ReactNode }) {
  */
 
 type Route =
-  | { kind: 'home' }
+  | { kind: 'home'; full?: boolean }
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
   | { kind: 'account' }
@@ -271,6 +275,8 @@ export function parseHash(): Route {
   if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
   if (h === '#/mirror') return { kind: 'mirror' };
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
+  // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
+  if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };
 }
 
@@ -281,6 +287,10 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
+  // Uczeń, student i nauczyciel widzą na Start własny, prostszy pulpit; `#/?full` pokazuje pełny StartHero.
+  const session = useSession();
+  const signedInProfile = profileOfUser(session?.user);
+  const profileDashboard = route.kind === 'home' && !route.full && isSimplifiedProfile(signedInProfile) ? signedInProfile : null;
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // Start is itself the introduction: landing there counts as having seen the tour, so it never
@@ -1198,15 +1208,18 @@ export default function App() {
 
     return (
       <div className="app">
-        <TopBar title="Dashboard" onSearch={() => setSearchOpen(true)} ask={false} />
+        <TopBar title={profileDashboard ? 'Twój pulpit' : 'Dashboard'} onSearch={() => setSearchOpen(true)} ask={false} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
               mounted right here beside the chat. Opening a world no longer
-              unmounts the conversation. */}
-          <HeavyRoute>
-            <StartHero />
-          </HeavyRoute>
+              unmounts the conversation. Uczeń, student i nauczyciel dostają
+              tu własny, prostszy pulpit (ProfileDashboard). */}
+          {profileDashboard ? <ProfileDashboard profile={profileDashboard} /> : (
+            <HeavyRoute>
+              <StartHero />
+            </HeavyRoute>
+          )}
         </main>
         {overlays}
       </div>

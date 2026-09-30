@@ -919,6 +919,22 @@ button:disabled { cursor: default; }
 .honesty-explanation > summary::-webkit-details-marker { display: none; }
 .honesty-explanation > summary::after { content: '  +'; color: var(--cyan); }
 .honesty-explanation[open] > summary::after { content: '  −'; }
+
+/* U0-b: what in this scene is a measurement, theory, reconstruction, claim or fiction. */
+.scene-provenance { width: 100%; display: flex; flex-direction: column; gap: .3rem; }
+.scene-provenance-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.scene-basis, .scene-reliability {
+  font-family: var(--font-mono); font-size: .64rem; letter-spacing: .06em; text-transform: uppercase;
+  padding: .24rem .6rem; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-dim);
+}
+.scene-basis-measured_data { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.scene-basis-computed_model { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); }
+.scene-basis-historical_reconstruction { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.scene-basis-alleged_claim { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.scene-basis-fiction { color: #f472b6; border-color: rgba(244, 114, 182, 0.4); }
+.scene-provenance-body p { margin: 0 0 .4rem; }
+.scene-provenance-body strong { display: block; margin-top: .4rem; color: var(--text); font-weight: 600; }
+.scene-provenance-body ul { margin: .15rem 0 0; padding-left: 1.1rem; }
 .honesty-explanation .honesty-note { margin: .35rem 0 0; padding: .65rem .75rem; border-left: 2px solid color-mix(in srgb, var(--accent, var(--cyan)) 55%, transparent); background: rgba(4, 13, 23, .7); }
 
 /* Investor-facing laboratory views put the scientific world first. The controls and

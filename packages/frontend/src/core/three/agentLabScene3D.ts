@@ -21,7 +21,7 @@ import type { LabArtifact } from '../scientificWorlds/experimentRunners';
 import type { RoomBounds } from './firstPersonController';
 import type { BiologyArtifact } from '../scientificWorlds/biologyRunners';
 import type { ExperimentSession } from '../scientificWorlds/experimentSession';
-import { BIOLOGY_SCENE, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld';
+import { BIOLOGY_SCENE, CHAMBER_CONSOLES, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld';
 import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/anatomyAtlas';
 import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
@@ -927,6 +927,20 @@ export class AgentLabScene3D implements Sim3D {
       scene.add(arm.group); this.arms.push(arm);
     }
     createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 8.4, rim: 2.4 }, color: { key: 0xe9f2ff, rim: 0x68c9ee }, castShadow: false });
+    // The operator ring around the chamber: desks with glowing screens facing the machine and still, faceless
+    // figures at them. Scenery for scale (reference: the Human Digital Twin lab), lit only by its own screens.
+    const screenGlow = createEmissiveInstrumentMaterial(THREE, { color: 0x5cc8f0, intensity: 0.85, baseColor: 0x0b1c2a });
+    const figureMat = new THREE.MeshStandardMaterial({ color: 0x3a4856, roughness: 0.85, metalness: 0.05 });
+    const figureBody = new THREE.CapsuleGeometry(0.17, 1.0, 4, 10); const figureHead = new THREE.SphereGeometry(0.11, 14, 10);
+    for (const c of CHAMBER_CONSOLES) {
+      const g = new THREE.Group(); g.name = 'chamber-console'; g.position.set(c.x, 0, c.z);
+      g.rotation.y = Math.atan2(TWIN_CHAMBER.position.x - c.x, TWIN_CHAMBER.position.z - c.z);
+      g.add(createBench(THREE, { position: [0, 0, 0], width: 1.4, depth: 0.6, height: 0.76, topMaterial: palette.PAINTED_METAL, legMaterial: palette.BRUSHED_METAL }));
+      for (const x of [-0.34, 0.34]) g.add(createMonitor(THREE, { position: [x, 0.76, -0.14], width: 0.6, height: 0.36, standHeight: 0.1, frameMaterial: palette.PAINTED_METAL, screenMaterial: screenGlow }));
+      const body = new THREE.Mesh(figureBody, figureMat); body.position.set(0.1, 0.77, 0.62); g.add(body);
+      const head = new THREE.Mesh(figureHead, figureMat); head.position.set(0.1, 1.55, 0.62); g.add(head);
+      scene.add(g);
+    }
     // Stations (pack ids), their practical lights, and the pack's hanging signs.
     for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
     const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };

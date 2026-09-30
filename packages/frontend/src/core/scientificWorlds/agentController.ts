@@ -127,6 +127,8 @@ export class AgentController {
   private lastProgress = 0;
   /** True while an EXECUTE step waits for an out-of-frame engine (see `engineGate`). */
   private awaitingEngine = false;
+  /** The active plan runs without walking or timed animation (see `startPlan`). */
+  private direct = false;
 
   constructor(private readonly options: AgentControllerOptions) {
     this.position = { ...options.start.position };
@@ -158,10 +160,16 @@ export class AgentController {
       progress: this.lastProgress, timerSeconds: this.timer, remainingWaypoints: this.waypoints.length, blockedReason: this.context.blockedReason, transitionCondition: condition };
   }
 
-  /** Accepts a plan only when idle (or between plans); returns the refusal otherwise. */
-  startPlan(plan: ActionPlan): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
+  /**
+   * Accepts a plan only when idle (or between plans); returns the refusal otherwise.
+   * `direct`: the same steps, state transitions and sealed session, without the body doing the work —
+   * NAVIGATE/ALIGN finish where the agent stands and every timed step completes on its next update.
+   * The Human Explorer uses it: the anatomy must answer a tap, not wait for a walk across the lab.
+   */
+  startPlan(plan: ActionPlan, opts?: { readonly direct?: boolean }): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
     if (this.context.state !== 'IDLE' && this.context.state !== 'BLOCKED' && this.context.state !== 'ARRIVED') return { ok: false, reason: `agent is ${this.context.state}` };
     if (plan.steps.length === 0) return { ok: false, reason: plan.rejected[0]?.reason ?? 'plan has no steps' };
+    this.direct = opts?.direct === true;
     this.context = INITIAL_AGENT_CONTEXT;
     this.plan = plan;
     this.stepIndex = -1;
@@ -268,6 +276,8 @@ export class AgentController {
     this.simulationSeconds += dt;
     this.lastDeltaSeconds = dt;
     const step = this.currentStep();
+    // Direct plans finish each timed step (reach, interact, observe, report) on its next update.
+    const stepDt = this.direct ? Number.POSITIVE_INFINITY : dt;
     let report: AgentReport | null = null;
     let sessionSealed: SessionWithArtifact | null = null;
     let interaction: AgentUpdate['interaction'] = null;
@@ -281,7 +291,11 @@ export class AgentController {
     if (step && this.plan) {
       switch (step.kind) {
         case 'NAVIGATE': {
-          if (s === 'MOVING_TO_TARGET' && this.waypoints.length) {
+          if (this.direct && s === 'MOVING_TO_TARGET') {
+            this.waypoints = []; this.speed = 0;
+            this.apply({ type: 'WAYPOINT_REACHED', remaining: 0 });
+            this.currentStationId = step.stationId; this.advanceStep(); progress = 1;
+          } else if (s === 'MOVING_TO_TARGET' && this.waypoints.length) {
             const w = this.waypoints[0];
             const dx = w.x - this.position.x; const dz = w.z - this.position.z;
             const dist = Math.hypot(dx, dz);
@@ -304,15 +318,16 @@ export class AgentController {
         }
         case 'ALIGN': {
           this.speed = 0;
+          if (this.direct) { this.currentStationId = step.stationId; this.advanceStep(); progress = 1; break; }
           const delta = wrap(this.targetFacing - this.facing);
           this.facing = wrap(this.facing + delta * Math.min(1, dt * this.turnSpeed));
           progress = 1 - Math.min(1, Math.abs(delta) / Math.PI);
           if (Math.abs(delta) < 0.03) { this.facing = this.targetFacing; this.currentStationId = step.stationId; this.advanceStep(); }
           break;
         }
-        case 'REACH': this.timer += dt; progress = Math.min(1, this.timer / this.reachSeconds); if (this.timer >= this.reachSeconds) this.advanceStep(); break;
+        case 'REACH': this.timer += stepDt; progress = Math.min(1, this.timer / this.reachSeconds); if (this.timer >= this.reachSeconds) this.advanceStep(); break;
         case 'INTERACT': {
-          this.timer += dt; progress = Math.min(1, this.timer / this.interactSeconds);
+          this.timer += stepDt; progress = Math.min(1, this.timer / this.interactSeconds);
           if (this.timer >= this.interactSeconds) { interaction = { stationId: step.stationId, parameters: step.parameters ?? {} }; this.advanceStep(); }
           break;
         }
@@ -329,9 +344,9 @@ export class AgentController {
           if (s === 'OBSERVING' || s === 'BLOCKED') this.advanceStep();
           break;
         }
-        case 'OBSERVE': this.timer += dt; progress = Math.min(1, this.timer / this.observeSeconds); if (this.timer >= this.observeSeconds) this.advanceStep(); break;
+        case 'OBSERVE': this.timer += stepDt; progress = Math.min(1, this.timer / this.observeSeconds); if (this.timer >= this.observeSeconds) this.advanceStep(); break;
         case 'REPORT': {
-          this.timer += dt; progress = Math.min(1, this.timer / this.reportSeconds);
+          this.timer += stepDt; progress = Math.min(1, this.timer / this.reportSeconds);
           if (this.timer >= this.reportSeconds) {
             report = { planId: this.plan.planId, session: this.lastSession, includeProvenance: step.includeProvenance, includeResult: step.includeResult, deferred: this.plan.steps.filter((x): x is Extract<ActionStep, { kind: 'DEFER' }> => x.kind === 'DEFER'), rejected: this.plan.rejected };
             if (this.context.state === 'REPORTING') this.apply({ type: 'REPORT_DONE' });

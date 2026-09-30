@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import '../labs/index';
-import { buildSearchIndex, filterSearchIndex } from '../core/search';
+import { buildDestinationIndex, buildSearchIndex, filterSearchIndex } from '../core/search';
 import { getLabs } from '../core/registry';
 
 describe('search index', () => {
@@ -33,5 +33,12 @@ describe('search index', () => {
   it('returns no results for a query matching nothing', () => {
     const index = buildSearchIndex();
     expect(filterSearchIndex(index, 'xyzzy-nonexistent-query')).toEqual([]);
+  });
+
+  it('finds CERN, drugs and the human atlas, which are screens, not plugin labs', () => {
+    const index = buildDestinationIndex();
+    expect(filterSearchIndex(index, 'cern').map((e) => e.hash)).toEqual(['#/cern-complex', '#/physics/cms-z']);
+    expect(filterSearchIndex(index, 'leki').map((e) => e.hash)).toContain('#/drug');
+    expect(filterSearchIndex(index, 'mózg').map((e) => e.hash)).toContain('#/human-biology-lab');
   });
 });

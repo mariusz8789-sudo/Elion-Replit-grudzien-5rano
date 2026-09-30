@@ -1,6 +1,7 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import type { EvidenceLedger } from '../knowledge/EvidenceLedger.js';
 import { sha256hex, stableStringify } from '../knowledge/EvidenceLedger.js';
+import { CODATA_2018, schwarzschildRadius } from '../physics/relativity.js';
 
 /**
  * PHOTON PROPAGATION IN A WEAK GRAVITATIONAL FIELD vs. A FLAT BASELINE
@@ -11,7 +12,7 @@ import { sha256hex, stableStringify } from '../knowledge/EvidenceLedger.js';
  * c = 299 792 458 m/s is the SI-defined constant: nothing here measures it,
  * and the comparison is between two models, never against the world.
  */
-export const C_SI = 299_792_458; export const G_SI = 6.67430e-11;
+export const C_SI = CODATA_2018.c; export const G_SI = CODATA_2018.G;
 export interface SpacetimePhotonInput { readonly massKg: number; readonly impactParameterM: number; readonly emitterDistanceM: number; readonly receiverDistanceM: number; }
 export interface SpacetimePhotonReport {
   readonly inputs: SpacetimePhotonInput; readonly schwarzschildRadiusM: number; readonly flatTravelTimeS: number; readonly shapiroDelayS: number; readonly curvedTravelTimeS: number; readonly deflectionRad: number; readonly deflectionArcsec: number;
@@ -19,7 +20,7 @@ export interface SpacetimePhotonReport {
 }
 export function spacetimePhoton(i: SpacetimePhotonInput): SpacetimePhotonReport {
   if (!(i.massKg >= 0) || !(i.impactParameterM > 0) || !(i.emitterDistanceM > 0) || !(i.receiverDistanceM > 0)) throw new Error('SPACETIME_PHOTON_INVALID_INPUT');
-  const rs = (2 * G_SI * i.massKg) / (C_SI * C_SI);
+  const rs = schwarzschildRadius(i.massKg, CODATA_2018);
   const flat = (i.emitterDistanceM + i.receiverDistanceM) / C_SI;
   const shapiro = i.massKg === 0 ? 0 : ((2 * G_SI * i.massKg) / C_SI ** 3) * Math.log((4 * i.emitterDistanceM * i.receiverDistanceM) / (i.impactParameterM * i.impactParameterM));
   const deflection = i.massKg === 0 ? 0 : (4 * G_SI * i.massKg) / (C_SI * C_SI * i.impactParameterM);

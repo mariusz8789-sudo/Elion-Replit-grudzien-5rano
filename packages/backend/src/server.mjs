@@ -41,9 +41,11 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { createReasoningProvider } from './reasoningProvider.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
+import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,9 +66,17 @@ const startedAt = Date.now();
 let scientificRuntimeCache = null;
 let scientificRuntimeCachedAt = 0;
 const SCIENTIFIC_RUNTIME_CACHE_MS = 15_000;
+async function refreshScientificRuntime() {
+  if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
+    scientificRuntimeCache = await buildScientificRuntimeStatus(db);
+    scientificRuntimeCachedAt = Date.now();
+  }
+}
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
+// ENTITY-3: the one backend adapter to an external reasoning model. The key stays in this process's environment.
+const reasoningProvider = createReasoningProvider(process.env);
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -336,6 +346,10 @@ function handlePersistApi(req, res, url) {
   if (url.pathname === '/api/ingestion/source' && !biotechSourceLimiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
+  // ENTITY-3: each claim proposal is one paid call to the external reasoning model — same budget as /api/ask.
+  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/claim-proposals\/?$/.test(url.pathname) && !limiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
+  }
   const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
@@ -360,7 +374,7 @@ function handlePersistApi(req, res, url) {
       try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
     }
     try {
-      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query });
+      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query, reasoningProvider });
       return json(res, result.status, result.body);
     } catch (err) {
       log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
@@ -400,10 +414,7 @@ const server = http.createServer(async (req, res) => {
     // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
     // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
     const dbState = checkDatabaseState(db);
-    if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
-      scientificRuntimeCache = await buildScientificRuntimeStatus(db);
-      scientificRuntimeCachedAt = Date.now();
-    }
+    await refreshScientificRuntime();
     const effectiveByTool = new Map(scientificRuntimeCache.engines.map((engine) => [engine.id, engine]));
     return json(res, 200, {
       ok: true,
@@ -436,6 +447,23 @@ const server = http.createServer(async (req, res) => {
       }),
       scientificWorkers: scientificRuntimeCache,
     });
+  }
+  if (req.method === 'GET' && req.url === '/api/genesis/self') {
+    // ENTITY-1: the same sources as /api/health, assembled as Genesis's view of itself. Like /api/health
+    // it is unauthenticated, so it carries no project data: lab work awaiting a measurement is a count.
+    const dbState = checkDatabaseState(db);
+    await refreshScientificRuntime();
+    return json(res, 200, buildSelfModel({
+      db,
+      runtime: scientificRuntimeCache,
+      reasoningModel: reasoningProvider.describe(),
+      environment: {
+        version: VERSION, commit: BUILD.commit, commitShort: BUILD.commitShort, commitSource: BUILD.commitSource, builtAt: BUILD.builtAt,
+        uptimeSec: Math.round((Date.now() - startedAt) / 1000), node: process.versions.node, arch: process.arch,
+        db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
+        workers: scientificRuntimeCache.groups,
+      },
+    }));
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);

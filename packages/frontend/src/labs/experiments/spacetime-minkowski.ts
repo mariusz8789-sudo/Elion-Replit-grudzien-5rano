@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { lorentzGamma } from '../../core/physics';
 
 /**
  * Diagram Minkowskiego — stożki świetlne i względność równoczesności.
@@ -14,7 +15,7 @@ const MINKOWSKI_EVENTS = [
 ] as const;
 
 function minkowskiObservables(beta: number) {
-  const gamma = 1 / Math.sqrt(1 - beta * beta);
+  const gamma = lorentzGamma(beta);
   const tA = gamma * (MINKOWSKI_EVENTS[0].ct - beta * MINKOWSKI_EVENTS[0].x);
   const tB = gamma * (MINKOWSKI_EVENTS[1].ct - beta * MINKOWSKI_EVENTS[1].x);
   return {
@@ -141,7 +142,7 @@ class MinkowskiSim implements Sim {
   }
 
   getStats() {
-    const gamma = 1 / Math.sqrt(1 - this.beta * this.beta);
+    const gamma = lorentzGamma(this.beta);
     return { beta: Math.round(this.beta * 100) / 100, gamma: Math.round(gamma * 100) / 100 };
   }
 }

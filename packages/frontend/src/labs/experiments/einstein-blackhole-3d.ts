@@ -6,6 +6,7 @@ import { createStarfield, makeSoftDotTexture, type Starfield } from '../../core/
 import { detectRenderTier, scaleCount, tierAllowsBloom } from '../../core/three/quality';
 import { createFadePass, FULLSCREEN_VERTEX } from '../../core/three/postfx';
 import { getSettings } from '../../core/settings';
+import { lorentzGamma } from '../../core/physics';
 
 /**
  * Czarna dziura Schwarzschilda w 3D — flagowa scena Genesis OS. DOKŁADNIE
@@ -670,7 +671,7 @@ class BlackHole3DSim implements Sim3D {
       const ll = Math.hypot(lx, ly, lz) || 1e-6; lx /= ll; lz /= ll;
       const cosTheta = vdx * lx + vdz * lz; // składowa pionowa prędkości = 0
       const beta = Math.min(0.75, betaIsco * Math.sqrt(rInnerUnits / b.r));
-      const gamma = 1 / Math.sqrt(1 - beta * beta);
+      const gamma = lorentzGamma(beta);
       const delta = 1 / (gamma * (1 - beta * cosTheta)); // czynnik Dopplera δ
       const beaming = brightMul * delta * delta * delta; // strumień ∝ δ³
 

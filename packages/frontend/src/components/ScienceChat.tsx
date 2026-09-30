@@ -39,6 +39,7 @@ import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
 import { UnifiedResearchJourney } from './UnifiedResearchJourney';
+import { CHAT_ENGINES, type ChatEngine } from '../core/scienceChat/engines';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -343,11 +344,11 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
   );
 }
 
-const QUICK_STARTS = [
-  { label: 'Lek', prompt: 'Porównaj właściwości aspiryny w laboratorium.' },
-  { label: 'Chemia', prompt: 'Uruchom miareczkowanie kwasowo-zasadowe NaOH.' },
-  { label: 'Fizyka', prompt: 'Pokaż czarną dziurę 3D i trajektorię światła.' },
-] as const;
+/**
+ * Ask examples. Each prompt is sent exactly as if typed, through the same
+ * router as any other message; each was checked in the browser to land on the
+ * screen its label names.
+ */
 
 function TurnText({ turn }: { turn: ChatTurn }) {
   if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
@@ -371,6 +372,9 @@ function TurnText({ turn }: { turn: ChatTurn }) {
 export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [engineId, setEngineId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickEngine = (engine: ChatEngine): void => { setEngineId(engine.id); setInput(engine.prompt); inputRef.current?.focus(); };
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
@@ -1017,11 +1021,13 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <div className="science-chat-log" ref={scrollRef}>
         {turns.length === 0 && (
-          <section className="science-chat-empty" aria-label="Rozpocznij badanie">
-            <span>ONE CHAT · ONE LAB</span>
-            <h2>Co chcesz zbadać?</h2>
-            <p>Opisz cel. Genesis wybierze właściwe laboratorium i pokaże wynik.</p>
-            <div>{QUICK_STARTS.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+          <section className="science-chat-empty" aria-label="Ask Genesis" lang="en">
+            <span>ASK</span>
+            <h2>Choose an engine</h2>
+            <p>It fills in a task Genesis can run. Nothing starts until you send it.</p>
+            <div className="sc-engine-grid" data-testid="chat-engines">{CHAT_ENGINES.map((e) => (
+              <button key={e.id} type="button" data-testid={`chat-engine-${e.id}`} onClick={() => pickEngine(e)}><b>{e.task}</b><small>{e.engine}</small></button>
+            ))}</div>
           </section>
         )}
         {turns.map((t, i) => (
@@ -1074,13 +1080,21 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
+      {turns.length > 0 && (
+        <div className="sc-engine-row" data-testid="chat-engine-row" aria-label="Engine">
+          {CHAT_ENGINES.map((e) => (
+            <button key={e.id} type="button" className={engineId === e.id ? 'on' : undefined} aria-pressed={engineId === e.id} onClick={() => pickEngine(e)}>{e.engine}</button>
+          ))}
+        </div>
+      )}
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
-          placeholder="Co chcesz zbadać?"
+          ref={inputRef}
+          placeholder="Describe the research task…"
           aria-label="Wiadomość do Science Chat"
         />
         <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>

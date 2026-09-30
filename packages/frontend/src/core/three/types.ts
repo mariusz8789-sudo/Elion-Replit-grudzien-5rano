@@ -131,7 +131,8 @@ export interface Sim3D {
   /** Render loop przekazuje metryki GPU/WebGL bez mieszania ich ze stanem naukowym. */
   onRenderMetrics?(metrics: ThreeRenderMetrics): void;
   reset?(): void;
-  pointer?(x: number, y: number, type: 'down' | 'move' | 'up'): void;
+  /** `id` is the PointerEvent's pointerId, so two fingers can be told apart (pinch). */
+  pointer?(x: number, y: number, type: 'down' | 'move' | 'up', id?: number): void;
   dispose?(): void;
   /**
    * Opcjonalny postprocessing (np. UnrealBloomPass) — patrz

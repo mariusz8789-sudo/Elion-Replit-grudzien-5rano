@@ -5,6 +5,8 @@ import { CANONICAL_ANATOMY_LAYER_SHELL, type CanonicalAnatomyLayerId } from '../
 import { disposeSceneResources } from './graphics/lifecycle';
 import { attachAnatomyLayerShellMetadata, resolveAnatomyLayerShell, type AnatomyLayerPresentation } from './anatomyIntegrationShell';
 import { addPremiumCellMembraneDetail, addPremiumOrganSurfaceDetail } from './premiumMacroMicroDetails';
+import type { FullAtlasOrganMesh } from './bodyParts3dFullAtlas';
+import { brainRegionOf } from './brainParts';
 
 /**
  * V7 — HUMAN MACRO → MICRO VISUAL LAYER.
@@ -23,6 +25,9 @@ export type HumanMacroMicroLevel = 'body' | 'organ_system' | 'organ' | 'tissue' 
 export interface HumanMacroMicroState {
   readonly level: HumanMacroMicroLevel;
   readonly selectedOrganId: string | null;
+  /** Close-up structure the person tapped (atlas name), and the region they chose. */
+  readonly selectedPart?: string | null;
+  readonly selectedRegion?: string | null;
   readonly selectedNodeId: string | null;
   readonly artifactKind: BiologyArtifact['kind'] | null;
   readonly evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION';
@@ -124,6 +129,37 @@ function organColor(id: string): number {
   if (/kidney/i.test(id)) return 0x824b52;
   if (/stomach|intestine|pancreas/i.test(id)) return 0xb77968;
   return 0xa76368;
+}
+
+/** The organ close-up from its own BodyParts3D structures, one mesh per structure so a tap names it. */
+function buildAtlasOrganModel(THREE: typeof THREE_NS, node: AnatomyNode, atlas: FullAtlasOrganMesh): THREE_NS.Group {
+  const root = new THREE.Group(); root.name = `macro-organ:${node.id}`;
+  const rotor = createPresentationStage(THREE, root, 0.7);
+  const box = new THREE.Box3();
+  for (const part of atlas.parts) {
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    box.union(part.geometry.boundingBox!);
+  }
+  const size = box.getSize(new THREE.Vector3()); const centre = box.getCenter(new THREE.Vector3());
+  // The close-up is the subject: the organ fills the stage (was 0.72, a small object on a plinth).
+  const displayScale = 1.05 / Math.max(size.x, size.y, size.z, 1e-6);
+  const organ = new THREE.Group();
+  organ.name = 'organ:bodyparts3d';
+  organ.userData.geometryRole = 'BODYPARTS3D_REFERENCE';
+  organ.userData.structures = atlas.partCount;
+  for (const part of atlas.parts) {
+    const tint = node.id === 'brain' ? brainRegionOf(part.name).color : organColor(node.id);
+    const mesh = new THREE.Mesh(part.geometry, biologicalMaterial(THREE, tint, { emissive: 0x210a0d, roughness: 0.5 }));
+    mesh.name = `organ-part:${part.name}`;
+    mesh.userData.partName = part.name;
+    mesh.userData.baseColor = tint;
+    organ.add(mesh);
+  }
+  organ.scale.setScalar(displayScale);
+  organ.position.copy(centre).multiplyScalar(-displayScale);
+  organ.position.y += 0.1;
+  rotor.add(organ);
+  markModel(root, 'organ'); addShadows(root); return root;
 }
 
 function buildOrganModel(THREE: typeof THREE_NS, node: AnatomyNode): THREE_NS.Group {
@@ -370,6 +406,13 @@ export class HumanMacroMicroLayer {
   private artifact: BiologyArtifact | null = null;
   private time = 0;
   private anatomyLayers: readonly AnatomyLayerPresentation[];
+  private atlasOrgans: ReadonlyMap<string, FullAtlasOrganMesh> | null = null;
+  private selectedPart: string | null = null;
+  private selectedRegion: string | null = null;
+  /** Rotation the person set by dragging; auto-rotation stops once they touch the organ. */
+  private manualYaw: number | null = null;
+  /** The organ on its own plinth: off while the person explores the organ inside the body. */
+  private organStage = true;
 
   constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
     this.group = new THREE.Group(); this.group.name = 'genesis-human-macro-micro-layer'; this.group.visible = false;
@@ -388,6 +431,8 @@ export class HumanMacroMicroLayer {
       level,
       selectedNodeId: this.selectedNodeId,
       selectedOrganId: this.selectedOrganId,
+      selectedPart: this.selectedPart,
+      selectedRegion: this.selectedRegion,
       artifactKind: this.artifact?.kind ?? null,
       evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION',
       anatomyLayers: {
@@ -407,6 +452,17 @@ export class HumanMacroMicroLayer {
     this.artifact = null; this.rebuild();
   }
 
+  /** Organs with real atlas geometry replace their dimension ellipsoid in the close-up. */
+  setAtlasOrgans(organs: ReadonlyMap<string, FullAtlasOrganMesh> | null): void {
+    this.atlasOrgans = organs; if (!this.artifact) this.rebuild();
+  }
+
+  /** Show (or keep away) the separate organ plinth; tissue and microscope views always show. */
+  setOrganStage(on: boolean): void {
+    if (this.organStage === on) return;
+    this.organStage = on; if (!this.artifact) this.rebuild();
+  }
+
   setArtifact(artifact: BiologyArtifact | null): void {
     this.artifact = artifact; this.rebuild();
   }
@@ -420,14 +476,17 @@ export class HumanMacroMicroLayer {
 
   private rebuild(): void {
     this.refreshAnatomyLayers();
+    this.selectedPart = null; this.selectedRegion = null; this.manualYaw = null;
     const artifact = this.artifact;
     if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : buildTissueModel(this.THREE, artifact.cell)); return; }
     if (artifact?.kind === 'hyperscope' && artifact.cell) {
       this.replace(artifact.cell.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
     }
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
+    if (!this.organStage) { this.replace(null); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);
-    this.replace(organ ? buildOrganModel(this.THREE, organ) : null);
+    const atlasOrgan = organ ? this.atlasOrgans?.get(organ.id) : undefined;
+    this.replace(organ ? atlasOrgan ? buildAtlasOrganModel(this.THREE, organ, atlasOrgan) : buildOrganModel(this.THREE, organ) : null);
   }
 
   private refreshAnatomyLayers(): void {
@@ -453,7 +512,50 @@ export class HumanMacroMicroLayer {
     if (!this.content) return;
     // Slow museum-like rotation: presentation only, deterministic for the same elapsed time.
     const rotor = this.content.getObjectByName('macro-rotor');
-    if (rotor) rotor.rotation.y = this.time * 0.22;
+    if (rotor) rotor.rotation.y = this.manualYaw ?? this.time * 0.22;
+  }
+
+  /** Meshes of the current close-up that carry a structure name (empty for ellipsoid organs). */
+  partMeshes(): THREE_NS.Mesh[] {
+    const out: THREE_NS.Mesh[] = [];
+    this.content?.traverse((n) => { const m = n as THREE_NS.Mesh; if (m.isMesh && typeof m.userData.partName === 'string') out.push(m); });
+    return out;
+  }
+
+  /** Drag turns the organ; the first drag freezes the automatic turn where it is. */
+  rotateBy(radians: number): void {
+    if (!this.content) return;
+    this.manualYaw = (this.manualYaw ?? this.time * 0.22) + radians;
+  }
+
+  /** Highlight one structure (null clears). Everything else stays visible. */
+  selectPart(name: string | null): void {
+    this.selectedPart = name; this.selectedRegion = null;
+    if (name !== null && this.manualYaw === null) this.manualYaw = this.time * 0.22;
+    this.applyHighlight();
+  }
+
+  /** Show one region: its structures lit, the rest ghosted so the inner ones can be seen. */
+  selectRegion(regionId: string | null): void {
+    this.selectedRegion = regionId; this.selectedPart = null;
+    this.applyHighlight();
+  }
+
+  getSelection(): { part: string | null; region: string | null } { return { part: this.selectedPart, region: this.selectedRegion }; }
+
+  private applyHighlight(): void {
+    const part = this.selectedPart; const region = this.selectedRegion;
+    for (const mesh of this.partMeshes()) {
+      const mat = mesh.material as THREE_NS.MeshPhysicalMaterial;
+      const name = mesh.userData.partName as string;
+      const lit = part !== null ? name === part : region !== null ? brainRegionOf(name).id === region : false;
+      const ghost = region !== null && !lit;
+      mat.color.setHex(mesh.userData.baseColor as number);
+      mat.emissive.setHex(lit ? 0x2fc7ff : 0x210a0d);
+      mat.emissiveIntensity = lit ? 0.55 : 0.08;
+      mat.transparent = ghost; mat.opacity = ghost ? 0.12 : 1; mat.depthWrite = !ghost;
+      mat.needsUpdate = true;
+    }
   }
 
   dispose(): void {

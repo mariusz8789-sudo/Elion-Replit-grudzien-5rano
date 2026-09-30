@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import './labs/index';
-import { getLab, getLabs } from './core/registry';
+import { getLab } from './core/registry';
 import { LabShell } from './components/LabShell';
-import { ScaleJourney } from './components/ScaleJourney';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
@@ -17,15 +17,11 @@ import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { requestOpenScienceChat } from './core/scienceChatBridge';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
-import { getSettings } from './core/settings';
 import { t } from './core/i18n';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
-import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
-import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
-import { listExperiments } from './core/scienceMemory';
 import { ContextualRouteGuide } from './components/guide/ContextualRouteGuide';
 import type { ContextualGuideSurface } from './core/guide/contextualGuideContent';
 
@@ -74,13 +70,12 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
+const ScientificOsScreen = lazy(() => import('./components/ScientificOsScreen').then((m) => ({ default: m.ScientificOsScreen })));
 const StartHero = lazy(() => import('./components/StartHero').then((m) => ({ default: m.StartHero })));
 const WorldsHubScreen = lazy(() => import('./components/WorldsHubScreen').then((m) => ({ default: m.WorldsHubScreen })));
 const DiscoveryHallScreen = lazy(() => import('./components/visual-simulation/DiscoveryHallScreen').then((m) => ({ default: m.DiscoveryHallScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
-const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
-const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
 // Mythos B2G Matrix HUD (packages/ui): hex/bin GPU rain + live EvidenceLedger / CICADA CEP feeds. Source-only package, same alias rules as @genesis/core.
 const MatrixRoute = lazy(() => import('../../ui/src/matrix/MatrixRoute').then((m) => ({ default: m.MatrixRoute })));
@@ -91,7 +86,6 @@ const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ d
 const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
 const ScientificWorldsScreen = lazy(() => import('./components/ScientificWorldsScreen').then((m) => ({ default: m.ScientificWorldsScreen })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
-const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
 const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard').then((m) => ({ default: m.VirtualLabDashboard })));
 const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
@@ -188,18 +182,21 @@ type Route =
   | { kind: 'world-director' }
   | { kind: 'meta-cognition' }
   | { kind: 'mirror' }
-  | { kind: 'discovery-track' };
+  | { kind: 'discovery-track' }
+  | { kind: 'more' };
 
 export function parseHash(): Route {
   const h = window.location.hash;
   const lab = h.match(/^#\/lab\/([\w-]+)/);
   if (lab) return { kind: 'lab', id: lab[1] };
+  // More · Scientific OS, the whole catalogue; `?group=<id>` opens one group.
+  if (h === '#/more' || h.startsWith('#/more?')) return { kind: 'more' };
   if (h === '#/settings') return { kind: 'settings' };
   if (h === '#/memory') return { kind: 'memory' };
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
-  if (h === '#/reviewer') return { kind: 'reviewer' };
+  if (h === '#/reviewer' || h.startsWith('#/reviewer?')) return { kind: 'reviewer' };
   if (h === '#/dome-world') return { kind: 'dome-world' };
   if (h === '#/protection-priority') return { kind: 'protection-priority' };
   if (h === '#/geodesics') return { kind: 'geodesics' };
@@ -231,7 +228,8 @@ export function parseHash(): Route {
   if (h === '#/city' || (h.startsWith('#/city3d?') && new URLSearchParams(h.split('?')[1]).get('view') === '2d')) return { kind: 'city' };
   if (h === '#/city3d' || h.startsWith('#/city3d?')) return { kind: 'city3d' };
   if (h === '#/scientific-city') return { kind: 'scientific-city' };
-  if (h === '#/concept') return { kind: 'concept' };
+  // `?mode=philosopher` (the Simulation Question cut) is read by the film screen itself.
+  if (h === '#/concept' || h.startsWith('#/concept?')) return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/genesis-world') return { kind: 'genesis-world' };
   // Temporal cinematic (place + year) is a World Director mode (`#/world-director?mode=temporal&place=…&year=…`);
@@ -281,9 +279,14 @@ function isTypingTarget(el: EventTarget | null): boolean {
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [homeMoreOpen, setHomeMoreOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
+  // Start is itself the introduction: landing there counts as having seen the tour, so it never
+  // pops up later in the middle of a first visit. Other first entries still get the tour.
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    if (hasCompletedOnboarding()) return false;
+    if (parseHash().kind === 'home') { markOnboardingComplete(); return false; }
+    return true;
+  });
   const lastLabId = useRef<string | null>(null);
 
   const contextualGuideSurface: ContextualGuideSurface | null = (() => {
@@ -359,8 +362,10 @@ export default function App() {
 
   const overlays = (
     <>
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
-      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      {/* Portaled to <body>: inside `.app` (its own z-index:1 stacking context) the chat panel and the
+          mobile bar, siblings of `.app`, painted over the backdrop and took the taps on phones. */}
+      {searchOpen && createPortal(<SearchOverlay onClose={() => setSearchOpen(false)} />, document.body)}
+      {helpOpen && createPortal(<HelpOverlay onClose={() => setHelpOpen(false)} />, document.body)}
       <ContextualRouteGuide surface={contextualGuideSurface} />
     </>
   );
@@ -476,6 +481,16 @@ export default function App() {
         <div className="app">
           <TopBar title="Reviewer Room" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><ReviewerRoomScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'more') {
+      return (
+        <div className="app">
+          <TopBar title="More · Scientific OS" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><ScientificOsScreen /></HeavyRoute>
           {overlays}
         </div>
       );
@@ -1168,7 +1183,7 @@ export default function App() {
 
     return (
       <div className="app">
-        <TopBar title="Start" onSearch={() => setSearchOpen(true)} />
+        <TopBar title="Dashboard" onSearch={() => setSearchOpen(true)} ask={false} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
@@ -1177,258 +1192,25 @@ export default function App() {
           <HeavyRoute>
             <StartHero />
           </HeavyRoute>
-          {/* D-118: everything Home used to shout (launcher lists, research zone, the 3D command
-              centre, the capability showcase, the scale journey, the labs grid) stays reachable
-              behind ONE disclosure. Nothing was deleted; it stopped competing with the question box. */}
-          <div className="home-more">
-            <button type="button" className="chip-btn home-more-toggle" aria-expanded={homeMoreOpen} onClick={() => setHomeMoreOpen((v) => !v)}>
-              {homeMoreOpen ? 'Zwiń przegląd systemu' : 'Poznaj Genesis od środka — moduły, laboratoria, przegląd systemu'}
-            </button>
-          </div>
-          {homeMoreOpen && (
-          <div className="home-more-body">
-          <HeavyRoute>
-            <WorkspaceStage />
-          </HeavyRoute>
-          <div className="section-label">Zacznij tutaj</div>
-          <div className="home-launcher">
-          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🔭</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Generator symulacji</span>
-              <span className="timeline-cta-sub">Opisz zjawisko jednym zdaniem — Genesis dobierze realny model, uruchomi go i pozwoli zmieniać parametry na żywo. „Zasymuluj dylatację czasu", „zwiększ masę gwiazdy 2×"…</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta timeline-cta-primary matrix-hub-cta" onClick={() => { window.location.hash = '#/matrix'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">◈</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Genesis Matrix — mapa całego systemu</span>
-              <span className="timeline-cta-sub">Jedna, realna mapa wszystkiego, co Genesis zarejestrował: hipotezy, światy, modele, scenariusze, evidence, cyber, replay. Czyta tę samą Pamięć Naukową co reszta aplikacji — nic tu nie jest udawane.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/first-person-lab'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🔬</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Wejdź do laboratorium — pierwsza osoba</span>
-              <span className="timeline-cta-sub">Chodzisz po pokoju, podchodzisz do stanowiska i uruchamiasz realny eksperyment (Scenario Engine: izolacja vs obłożenie szpitala). Zmień dzień wejścia interwencji, uruchom ponownie, porównaj i odtwórz.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/molecule'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🧪</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Molecule Lab — realne atomy i wiązania</span>
-              <span className="timeline-cta-sub">Kofeina, renderowana z realnej geometrii RDKit i realnego kanału wiązań (Phase 8.1): rząd wiązania, aromatyczność, CPK. To druga twarz Genesis — Scientific World Engine, nie tylko symulator miasta.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/cell-lab'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🧫</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Virtual Cell Lab — Control vs Treatment</span>
-              <span className="timeline-cta-sub">Realny solwer G1/S/G2M (RK4): dwie hodowle na żywo, kontrolna i traktowana substancją, plus pełna pętla Question → Hypotheses → Experiment → Observation na tej samej domenie.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/character'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🧍</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Character Lab — humanoid 3D <em>(Etap 1)</em></span>
-              <span className="timeline-cta-sub">Migracja warstwy wizualnej do WebGL: zrigowany człowiek 3D (pełna sylwetka, ubranie, chód/idle/gest, kontakt stóp). Walidacja jakości postaci przed tłumem.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/city3d'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🏙</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Żywa symulacja 3D: epidemia w mieście</span>
-              <span className="timeline-cta-sub">Rzeczywiści agenci modelu epidemii są renderowani jako humanoidy WebGL. Pozycja, ruch, stan, izolacja i hospitalizacja pochodzą bezpośrednio z symulacji; Canvas 2D pozostaje trybem wydajnościowym.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/timeline'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Discovery Timeline</span>
-              <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż z Narratorem AI, bez ekranów ładowania.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          </div>
-          {/* Narzędzia do nauki — produkt edukacyjny (Faza 1). Zawsze widoczne. */}
-          <nav className="home-nav" aria-label="Nawigacja Genesis OS">
-            <button className="matrix-nav-btn" onClick={() => { window.location.hash = '#/matrix'; }}>
-              <span aria-hidden="true">◈</span> Matrix
-            </button>
-            <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
-              <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
-            </button>
-            <button className="qde-nav-btn" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
-              <span aria-hidden="true">🌠</span> {t('nav.decisionExplorer')}
-            </button>
-            <button onClick={() => setSearchOpen(true)}>
-              <span aria-hidden="true">🔍</span> {t('nav.search')}
-            </button>
-            <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
-              <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
-            </button>
-            <button onClick={() => { window.location.hash = '#/memory'; }}>
-              <span aria-hidden="true">🧠</span> Pamięć Naukowa
-            </button>
-            <button onClick={() => { window.location.hash = '#/glossary'; }}>
-              <span aria-hidden="true">📚</span> {t('nav.glossary')}
-            </button>
-            <button onClick={() => { window.location.hash = '#/settings'; }}>
-              <span aria-hidden="true">⚙</span> {t('nav.settings')}
-            </button>
-          </nav>
-
-          {/* FAZA 2: Collaborative Scientific Discovery — cały stos badawczy, ukryty za flagą
-              (Ustawienia → Tryb badawczy). NIC nie usunięte: trasy działają zawsze, także z deep-linku;
-              flaga decyduje wyłącznie o widoczności na stronie głównej. */}
-          {getSettings().researchModeEnabled && (
-            <div className="research-zone">
-              <div className="section-label">🔬 Tryb badawczy · Collaborative Scientific Discovery <em>(Faza 2)</em></div>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/campaign'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">⚡</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Kampania naukowa</span>
-                  <span className="timeline-cta-sub">Wielofidelitowe kampanie na realnych silnikach (RDKit → ADMET → dokowanie → chemia kwantowa) z pełną prowieniencją i weryfikacją odtwarzalności.</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/gov-campaign'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">🏛</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Government Drug Discovery</span>
-                  <span className="timeline-cta-sub">Pełna kampania na realnej, wygenerowanej z mechanizmu puli kandydatów: screening, TOP 10, TOP 2, głęboka falsyfikacja, bramka bezpieczeństwa i werdykt — łącznie z uczciwym brakiem zwycięzcy.</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/drug'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">💊</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Drug Discovery</span>
-                  <span className="timeline-cta-sub">Paszport kandydata, deskryptory RDKit i realne silniki naukowe. Wyniki to MODEL_ESTIMATE — walidacja oprogramowania, nie odkrycie terapeutyczne.</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/cde'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">🧭</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Silnik odkryć <em>(CDE)</em></span>
-                  <span className="timeline-cta-sub">Przepuść kandydata przez wykonywalny Graf Modeli i dostań Paszport: co zmierzyć najpierw (Rynek Pomiarów), które ślepe zaułki już znamy (Biblioteka Porażek).</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/conflict'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">⚖</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Konflikt modeli <em>(MCRE)</em></span>
-                  <span className="timeline-cta-sub">Dwa uznane modele tej samej wielkości. Gdzie i dlaczego się rozjeżdżają, i JAKI POMIAR rozstrzygnie spór. Genesis OS potrafi powiedzieć „nie wiemy".</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/reality'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">🎬</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Reality Navigator <em>(prototyp)</em></span>
-                  <span className="timeline-cta-sub">Zmień masę gwiazdy centralnej i patrz, jak kamera odwiedza rzeczywiste konsekwencje w Scientific Model Graph — nie animację, obliczenia.</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <button className="timeline-cta" onClick={() => { window.location.hash = '#/prebuild'; }}>
-                <span className="timeline-cta-icon" aria-hidden="true">🏭</span>
-                <span className="timeline-cta-text">
-                  <span className="timeline-cta-title">Machine Pre-Build <em>(prototyp)</em></span>
-                  <span className="timeline-cta-sub">Zaprojektuj układ pompa–rurociąg z prowieniencją (obliczone vs empiryczne vs oszacowane), ranking wrażliwości i CO ZMIERZYĆ przed budową. Symulacja koncepcyjna — nie CFD.</span>
-                </span>
-                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-              </button>
-              <nav className="home-nav" aria-label="Nawigacja trybu badawczego">
-                <button onClick={() => { window.location.hash = '#/projects'; }}>
-                  <span aria-hidden="true">☁</span> Projekty
-                </button>
-              </nav>
-            </div>
-          )}
-          <div className="section-label">Czym jest Genesis · przegląd systemu</div>
-          <HeavyRoute>
-            <GenesisCommandCenterHero />
-          </HeavyRoute>
-          <HeavyRoute>
-            <GenesisCapabilityShowcase />
-          </HeavyRoute>
-          <div style={{ position: 'relative' }}>
-            <ScaleJourney />
-            <span className="hud-corner hud-tl" aria-hidden="true" />
-            <span className="hud-corner hud-tr" aria-hidden="true" />
-            <span className="hud-corner hud-bl" aria-hidden="true" />
-            <span className="hud-corner hud-br" aria-hidden="true" />
-          </div>
-          <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
-          <div className="labs-grid">
-            {getLabs().map((l) => (
-              <button
-                key={l.id}
-                className="lab-card"
-                style={{ ['--accent' as string]: l.accent }}
-                onClick={() => { window.location.hash = `#/lab/${l.id}`; }}
-              >
-                <span className="badge" aria-hidden="true">{l.icon}</span>
-                <span className="name">{l.name}</span>
-                <span className="desc">{l.tagline}</span>
-              </button>
-            ))}
-          </div>
-          <p className="footer-note">
-            Genesis OS · Każda symulacja nosi etykietę uczciwości naukowej: hipotezy nigdy nie udają faktów.
-            Naciśnij <kbd>/</kbd>, aby szukać, albo <kbd>?</kbd> po listę skrótów.
-          </p>
-          </div>
-          )}
         </main>
         {overlays}
       </div>
     );
   };
 
-  // Real, honest signals only (see genesisVisualState.ts's own doc): the
-  // record count is a genuine read of Science Memory; the other three
-  // signals are not yet wired to a cheap, honest global source at this
-  // App-level scope (a real-time "is a Campaign running right now" /  "is a
-  // capability blocked" check), so they stay `false` rather than guessed —
-  // `deriveGenesisVisualState` degrades gracefully to IDLE/ACTIVE off the
-  // record count alone when they are. A real follow-up, not a fabrication.
-  const genesisVisualState = deriveGenesisVisualState({
-    runInProgress: false,
-    needsAttention: false,
-    hasOpenInvestigation: false,
-    savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
-  });
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      {route.kind === 'home' && <ErrorBoundary>
-        <LiveMatrixBackground
-          className="matrix-datastream"
-          {...toMatrixConfig(genesisVisualState)}
-          style={{ background: '#020806', opacity: 0.55 }}
-        />
-      </ErrorBoundary>}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —
           so this is a shell around the existing router, not a second one. */}
-      {/* ONE ScienceChat instance, handed to the shell. On Home it lays out as
-          the workspace column (chat IS the primary interface); everywhere else
-          it floats. Same node, same state, one conversation. */}
+      {/* ONE ScienceChat instance, handed to the shell. It is Ask: a separate
+          view opened from the bottom bar or the dashboard's command field, never
+          pasted into the dashboard. Same node, same state, one conversation. */}
       <AppShell
-        chatInline={route.kind === 'home' && !onboardingOpen}
-        chat={!onboardingOpen ? <ErrorBoundary><ScienceChat inline={route.kind === 'home'} /></ErrorBoundary> : null}
+        chat={!onboardingOpen ? <ErrorBoundary><ScienceChat /></ErrorBoundary> : null}
       >
         {renderRoute()}
       </AppShell>
@@ -1454,7 +1236,8 @@ function ViewSwitch({ label, options }: { label: string; options: readonly { lab
   );
 }
 
-function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
+/** `ask={false}` on the dashboard, which carries its own command field: one Ask input per screen. */
+function TopBar({ title, onSearch, ask: showAsk = true }: { title: string; onSearch: () => void; ask?: boolean }) {
   const [ask, setAsk] = useState('');
   const submit = (): void => {
     const text = ask.trim();
@@ -1471,7 +1254,7 @@ function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
       <div className="titles">
         <h1>{cleanRouteTitle(title)}</h1>
       </div>
-      <form className="topbar-ask" onSubmit={(e) => { e.preventDefault(); submit(); }} role="search" aria-label="Zapytaj Genesis">
+      {showAsk && <form className="topbar-ask" onSubmit={(e) => { e.preventDefault(); submit(); }} role="search" aria-label="Zapytaj Genesis">
         <span className="topbar-ask-icon" aria-hidden="true">✦</span>
         <input
           className="topbar-ask-input"
@@ -1481,7 +1264,7 @@ function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
           aria-label="Zapytaj Genesis"
         />
         <button type="submit" className="topbar-ask-send" disabled={!ask.trim()} aria-label="Wyślij pytanie">→</button>
-      </form>
+      </form>}
       <button className="back" aria-label={t('nav.search')} onClick={onSearch}>
         ⌕
       </button>

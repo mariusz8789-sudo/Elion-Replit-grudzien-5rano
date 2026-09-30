@@ -130,15 +130,15 @@ describe('the component is standalone — the dependency arrow points one way', 
       expect(source.includes('matrixEngine'), `${file} reaches past the adapter into matrixEngine directly`).toBe(false);
       expect(source.includes('matrixController'), `${file} reaches past the adapter into matrixController directly`).toBe(false);
     }
-    expect(mountedSomewhere, 'expected at least one app file to mount the background').toBe(true);
+    // Since the owner's Dashboard decision (2026-09-29) no app file mounts it; the rules above still bind any future mount.
+    void mountedSomewhere;
   });
 
   // Product direction: rain is a dashboard wallpaper only. Laboratory scenes
   // keep their own backgrounds and must not run a hidden second animation loop.
-  it('mounts the existing background only on the dashboard route', () => {
+  it('the dashboard no longer mounts the Matrix background (owner decision 2026-09-29)', () => {
     const app = readOrNull(join(FRONTEND_SRC, 'App.tsx'));
     expect(app).not.toBeNull();
-    expect(app!).toMatch(/\{route\.kind === 'home' && <ErrorBoundary>\s*<LiveMatrixBackground[\s\S]*?\/>(?:\s*)<\/ErrorBoundary>\}/);
-    expect([...app!.matchAll(/<LiveMatrixBackground\b/g)]).toHaveLength(1);
+    expect([...app!.matchAll(/<LiveMatrixBackground\b/g)]).toHaveLength(0);
   });
 });

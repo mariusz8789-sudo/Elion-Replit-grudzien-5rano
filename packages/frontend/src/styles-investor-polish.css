@@ -131,8 +131,9 @@
     inset: auto 0.55rem calc(4.25rem + var(--safe-bottom)) !important;
     z-index: 80 !important;
     width: auto !important;
-    height: min(64dvh, 34rem) !important;
-    max-height: calc(100dvh - 6rem - var(--safe-bottom)) !important;
+    /* Sized to its content: a short menu is a short drawer, never a panel of empty space. */
+    height: auto !important;
+    max-height: min(64dvh, calc(100dvh - 6rem - var(--safe-bottom))) !important;
     overflow: hidden !important;
     border: 1px solid rgba(119, 232, 242, 0.28) !important;
     border-radius: 1rem !important;
@@ -143,7 +144,7 @@
   }
 
   .shell-sheet-head {
-    min-height: 3.8rem;
+    min-height: 3.2rem;
     padding: 0.55rem 0.65rem 0.55rem 1rem !important;
     background: rgba(5, 17, 22, 0.98);
   }
@@ -176,7 +177,7 @@
 
   .shell-sheet .shell-nav-section {
     display: grid !important;
-    gap: 0.18rem !important;
+    gap: 0.08rem !important;
     padding: 0.15rem 0 !important;
     position: static !important;
   }
@@ -196,9 +197,9 @@
     align-items: center !important;
     gap: 0.58rem !important;
     width: 100% !important;
-    min-height: 2.8rem !important;
+    min-height: 2.65rem !important;
     margin: 0 !important;
-    padding: 0.48rem 0.65rem !important;
+    padding: 0.4rem 0.65rem !important;
     border: 0 !important;
     border-radius: 0.65rem !important;
     background: transparent !important;
@@ -318,3 +319,126 @@
 .start-proof-facts { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; color: #cad5e2; font-size: 0.92rem; }
 .start-proof-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
 .start-proof-actions .chip-btn { min-height: 2.6rem; padding-inline: 1rem; }
+
+/* ==========================================================================
+   START — reviewer / investor first impression.
+   One accent (cyan), large type, proof above marketing. Reuses the existing
+   tokens (--cyan, --green, --gold, --text*, --border, --font-mono); no new
+   design system. On Home the Science Chat now sits BELOW this page at every
+   width (it used to be a column beside it on desktop), so a first visitor
+   reads what Genesis is before meeting the chat.
+   ========================================================================== */
+.shell-main-split { flex-direction: column; height: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.shell-main-split .shell-route { flex: 0 0 auto; overflow: visible; }
+.shell-main-split .home-dashboard { flex: 0 0 auto; overflow: visible; }
+.shell-main-split .shell-chat {
+  flex: 0 0 auto; min-height: 78dvh; width: 100%;
+  border-left: none; border-top: 1px solid var(--border);
+}
+.shell-main-split .shell-chat { padding-inline: max(0px, calc((100% - 64rem) / 2)); }
+/* The page scrolls under the top bar at every width now, so the bar keeps its own backdrop. */
+.shell-main-split .topbar { top: 0 !important; margin: 0 !important; z-index: 30 !important; background: #03080c !important; box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.9) !important; }
+
+/* The fixed mobile command bar was 70% transparent, so page text showed through it. */
+.shell-mobilebar { background: rgba(3, 8, 12, 0.97) !important; }
+
+/* ---- Start = dashboard (overview only). Dark scientific identity, one accent, few frames. ---- */
+.hp {
+  --hp-accent: var(--cyan);
+  --hp-line: rgba(160, 196, 255, 0.12);
+  --hp-surface: rgba(10, 16, 28, 0.72);
+  display: grid; gap: 18px;
+  max-width: 76rem; margin: 0 auto; padding: 22px clamp(16px, 2.6vw, 32px) 28px;
+  color: var(--text); min-width: 0;
+  background:
+    radial-gradient(60rem 22rem at 12% -6rem, rgba(56, 189, 248, 0.10), transparent 70%),
+    radial-gradient(40rem 18rem at 100% 0, rgba(129, 140, 248, 0.07), transparent 70%);
+}
+.hp * { min-width: 0; }
+.hp a { color: inherit; }
+.hp h2 { margin: 0; letter-spacing: 0; }
+
+/* Header: identity, claim, one command input */
+.hp-head { display: grid; gap: 8px; padding-top: 4px; }
+.hp-eyebrow { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--hp-accent); }
+.hp-health { display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.06em; color: var(--text-faint); }
+.hp-health i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.hp-health-online i { background: var(--green); box-shadow: 0 0 8px rgba(98, 240, 163, 0.6); }
+.hp-health-offline i { background: var(--red); }
+.hp-title { margin: 0; font-size: clamp(1.6rem, 3.4vw, 2.5rem); line-height: 1.08; letter-spacing: -0.025em; font-weight: 700; color: #f7fbff; text-wrap: balance; }
+.hp-sub { margin: 0; max-width: 46rem; font-size: 0.95rem; line-height: 1.45; color: #c6d0df; }
+.hp-command { display: flex; align-items: stretch; margin-top: 6px; max-width: 44rem; border: 1px solid rgba(142, 232, 245, 0.35); border-radius: 12px; background: rgba(4, 10, 18, 0.85); overflow: hidden; }
+.hp-command:focus-within { border-color: var(--hp-accent); box-shadow: 0 0 0 3px rgba(142, 232, 245, 0.12); }
+.hp-command input { flex: 1; min-width: 0; min-height: 48px; padding: 0 14px; border: 0; background: transparent; color: #f3f7fc; font: inherit; font-size: 1rem; outline: none; }
+.hp-command input::placeholder { color: var(--text-faint); }
+.hp-command button { flex: 0 0 52px; border: 0; background: var(--hp-accent); color: #04121a; font-size: 1.2rem; font-weight: 700; cursor: pointer; }
+
+/* Four areas */
+.hp-areas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.hp-area { display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 8px; padding: 16px; border: 1px solid var(--hp-line); border-radius: 14px; background: var(--hp-surface); }
+.hp-area:hover { border-color: rgba(142, 232, 245, 0.35); }
+.hp-area h2 { font-size: 1rem; font-weight: 700; color: #f3f7fc; }
+.hp-area-line { margin: 0; font-size: 0.9rem; line-height: 1.4; color: #d6deea; }
+.hp-area-status { margin: 0; display: flex; align-items: baseline; gap: 7px; font-family: var(--font-mono); font-size: 0.74rem; line-height: 1.35; color: var(--text-dim); }
+.hp-area-status i, .hp-engines-row li i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: currentColor; transform: translateY(-1px); }
+.hp-area-note { margin: 0; font-size: 0.74rem; line-height: 1.4; color: var(--text-faint); }
+.hp-area-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
+.hp-tone-ok { color: var(--green); }
+.hp-tone-warn { color: var(--gold); }
+.hp-tone-muted { color: var(--text-dim); }
+.hp-tone-bad { color: var(--red); }
+
+/* Buttons and links */
+.hp-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0.4rem 0.9rem;
+  border-radius: 10px; border: 1px solid var(--border-strong); background: rgba(10, 16, 28, 0.8);
+  color: var(--text); font: inherit; font-weight: 600; font-size: 0.86rem; text-decoration: none; cursor: pointer; text-align: center;
+}
+.hp .hp-btn-primary { background: rgba(142, 232, 245, 0.12); border-color: rgba(142, 232, 245, 0.45); color: #e9fbff; }
+.hp .hp-btn-primary:hover { background: rgba(142, 232, 245, 0.22); border-color: var(--hp-accent); }
+.hp-btn:focus-visible, .hp-link:focus-visible, .hp-broader a:focus-visible, .hp-recent a:focus-visible { outline: 2px solid var(--hp-accent); outline-offset: 2px; }
+.hp .hp-link { color: var(--hp-accent); font-size: 0.82rem; text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+
+/* Recent research + evidence */
+.hp-duo { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+.hp-card { display: grid; gap: 10px; align-content: start; padding: 14px 16px; border: 1px solid var(--hp-line); border-radius: 14px; background: var(--hp-surface); }
+.hp-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+.hp-card-head h2 { font-size: 0.95rem; font-weight: 700; color: #f3f7fc; }
+.hp-card-head span { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.hp-empty { margin: 0; font-size: 0.86rem; color: var(--text-dim); }
+.hp-recent { margin: 0; padding: 0; list-style: none; display: grid; }
+.hp-recent li + li { border-top: 1px solid var(--hp-line); }
+.hp-recent a { display: grid; gap: 2px; padding: 8px 0; text-decoration: none; }
+.hp-recent strong { font-size: 0.86rem; font-weight: 600; color: #e6ecf5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-recent small { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-faint); overflow-wrap: anywhere; }
+.hp-recent a:hover strong { color: var(--hp-accent); }
+.hp-kv { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; font-size: 0.86rem; color: #d6deea; }
+.hp-kv b { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; overflow-wrap: anywhere; }
+
+/* Engines, one row */
+.hp-engines-row ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.hp-engines-row li { display: inline-flex; align-items: center; gap: 7px; font-size: 0.86rem; font-weight: 600; }
+.hp-engines-row li.hp-tone-muted i { background: transparent; border: 1px solid currentColor; }
+.hp-engines-row li { color: var(--text-dim); }
+.hp-engines-row li.hp-tone-ok { color: #dff7ea; }
+.hp-engines-row li.hp-tone-ok i { background: var(--green); }
+.hp-engines-row li.hp-tone-warn i { background: var(--gold); }
+.hp-engines-row li.hp-tone-bad i { background: var(--red); }
+.hp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Broader Scientific OS: one row of links */
+.hp-broader { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding: 2px 2px 0; font-size: 0.84rem; }
+.hp-broader span { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); }
+.hp-broader a { color: #c6d0df; text-decoration: none; }
+.hp-broader a:hover { color: var(--hp-accent); }
+
+@media (max-width: 1100px) {
+  .hp-areas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .hp { gap: 14px; padding: 14px 16px 20px; }
+  .hp-areas, .hp-duo { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .hp-area { padding: 14px; gap: 6px; }
+  .hp-title { font-size: 1.55rem; }
+  .hp-sub { font-size: 0.88rem; }
+}

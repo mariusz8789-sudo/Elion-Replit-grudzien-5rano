@@ -13,6 +13,7 @@ import {
   hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
   hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
 } from './discoveryQuestions';
+import { buildCapabilityIndex, buildDestinationIndex, buildGoalIndex } from '../search';
 import { matchGenesisCapabilityIntent, type GenesisCapability } from '../capabilities/genesisCapabilityRegistry';
 
 /**
@@ -621,7 +622,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
   const humanRequested = has(norm, 'pokaz czlowieka', 'pokaz czlowieka w laboratorium', 'digital twin', 'human digital twin', 'human explorer', 'pokaz serce', 'pokaz watrobe', 'pokaz pluca', 'pokaz aorte', 'pokaz mozg', 'pokaz nerke', 'pokaz zoladek', 'show human', 'show heart', 'show liver', 'show lungs', 'show aorta', 'show brain', 'show kidney', 'show stomach')
-    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ)\w*\b/.test(norm);
+    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ|robi|dziala|czym|zbuduj|budow|what|how|does)\w*\b/.test(norm);
   if (humanRequested) {
     const focus = /\b(aort)\w*\b/.test(norm) ? 'aorta'
       : /\b(watrob|liver)\w*\b/.test(norm) ? 'liver'
@@ -1009,8 +1010,8 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       return { text: 'Otwieram istniejący Campaign Screen. To nawigacja read-only: kampania nie zostanie utworzona ani uruchomiona bez osobnej akcji i autoryzacji.', tag: 'MODEL', intent: 'OPEN_CAMPAIGN', action: { type: 'openRoute', hash: '#/campaign' } };
     }
     if (has(norm, 'pomoc', 'help', 'co potrafisz', 'co umiesz')) return helpResponse();
-    return {
-      text: 'Nie mam teraz otwartej symulacji. Powiedz np. „pokaż czarną dziurę" albo „zasymuluj dylatację czasu", a potem będę mógł zmieniać parametry, wyjaśniać i tworzyć zadania.',
+    return closestDestination(message) ?? {
+      text: `Na „${message.trim()}" nie mam jeszcze silnika ani otwartej symulacji. Wybierz silnik z listy: każdy od razu wpisze polecenie, które Genesis umie wykonać.`,
       tag: 'SYSTEM',
       intent: 'UNKNOWN',
     };
@@ -1258,4 +1259,25 @@ function round(v: number): number {
   const a = Math.abs(v);
   if (a !== 0 && (a < 0.01 || a >= 1e5)) return Number(v.toPrecision(3)) as number;
   return Math.round(v * 1000) / 1000;
+}
+
+/**
+ * A question no command matched: before giving up, look for the product screen it
+ * names (goals, workflows, catalogue capabilities), word by word. Polish endings
+ * are cut to a 4-letter stem ("mózgu" → "mozg"), so inflected words still match.
+ */
+const FALLBACK_STOPWORDS = new Set(['jest', 'jaki', 'jaka', 'jakie', 'czym', 'moze', 'mozesz', 'prosze', 'chce', 'pokaz', 'zrob', 'what', 'with', 'that', 'this', 'show', 'open', 'about', 'genesis', 'robi', 'dziala', 'teraz', 'tutaj']);
+
+function closestDestination(message: string): ChatResponse | null {
+  const stems = normalize(message).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !FALLBACK_STOPWORDS.has(w)).map((w) => w.slice(0, Math.max(4, w.length - 2)));
+  if (stems.length === 0) return null;
+  let best: { name: string; hash: string; score: number } | null = null;
+  for (const e of [...buildGoalIndex(), ...buildDestinationIndex(), ...buildCapabilityIndex()]) {
+    if (e.hash === undefined) continue;
+    const words = e.keywords.split(/[^a-z0-9]+/);
+    const score = stems.filter((s) => words.some((w) => w.startsWith(s))).length;
+    if (score > 0 && (!best || score > best.score)) best = { name: e.expName, hash: e.hash, score };
+  }
+  if (!best) return null;
+  return { text: `Najbliżej pasuje: ${best.name}. Otwieram.`, tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: best.hash } };
 }

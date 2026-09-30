@@ -1,4 +1,5 @@
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '@genesis/core/knowledge/generatedRecordAdmission.js';
 import { buildHistoricalScene, type HistoricalScene } from '../temporalCinematic/temporalCinematicEngine';
 import type { CameraPath } from '../temporalCinematic/cameraPath';
 import { describeSpacetimeWorld, type SpacetimeWorldDescriptor } from '../temporalCinematic/spacetimeWorldDescriptor';
@@ -91,27 +92,27 @@ export function directGenesisWorld(request: GenesisWorldDirectorRequest): Genesi
 /** Records execution provenance in the existing canonical ledger; no World Director memory exists. */
 export function recordDirectedWorld(ledger: EvidenceLedger, directed: GenesisDirectedWorld): string {
   const { request, proof } = directed;
-  return ledger.addRecord({
+  return proposeGeneratedRecord(ledger, {
     sourceUrl: `genesis://world-director/${proof.worldId}`,
     sourceTimestamp: null,
     claim: `World Director generated canonical model world ${proof.worldId}; preset=${request.preset}; entities=${proof.entityCount}; humans=${proof.humanEntityCount}; rooms=${proof.roomCount}; assetSlots=${proof.assetSlotCount}; weather=${directed.presentation.weather}; navigation=${request.navigation}`,
     claimType: 'model',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director', independentSourceIds: [] },
-  }).record.contentHash;
+  });
 }
 
 /** Records the actually generated prompt world, including its deterministic graph fingerprint. */
 export function recordDirectedPromptWorld(ledger: EvidenceLedger, directed: GenesisDirectedPromptWorld): string {
   const entities = directed.runtime.engine.graph.listEntities();
-  return ledger.addRecord({
+  return proposeGeneratedRecord(ledger, {
     sourceUrl: `genesis://world-director/prompt/${directed.world.generated.worldId}`,
     sourceTimestamp: null,
     claim: `World Director generated and presented canonical prompt world ${directed.world.generated.worldId}; template=${directed.primaryTemplate}; entities=${entities.length}; descriptor=${directed.descriptor.kind}; epistemic=${directed.descriptor.epistemic}; graphFingerprint=${directed.deterministicFingerprint}`,
     claimType: 'model',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director prompt runtime', independentSourceIds: [] },
-  }).record.contentHash;
+  });
 }
 
 export interface DirectedPromptWorldArtifactEvidence {
@@ -132,14 +133,14 @@ export function recordDirectedPromptWorldArtifact(
   if (!/^[a-f0-9]{64}$/i.test(input.artifactSha256)) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_SHA256');
   if (!/^[a-f0-9]{8,}$/i.test(input.semanticFingerprint)) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_FINGERPRINT');
   if (!Number.isFinite(input.seconds) || input.seconds < 0) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_TIME');
-  return ledger.addRecord({
+  return proposeGeneratedRecord(ledger, {
     sourceUrl: `genesis://world-director/capture/${input.worldId}/${encodeURIComponent(input.artifactFile)}`,
     sourceTimestamp: null,
     claim: `Prompt-world capture ${input.artifactFile}; sha256=${input.artifactSha256}; semanticFingerprint=${input.semanticFingerprint}; world=${input.worldId}; template=${input.template}; descriptor=${input.descriptorKind}; time=${input.seconds}`,
     claimType: 'observation',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director Cinematic Capture', independentSourceIds: [] },
-  }).record.contentHash;
+  });
 }
 
 /** Records the real UI INSPECT command against a canonical generated ASSET_SLOT. */
@@ -152,12 +153,12 @@ export function recordDirectedAssetInspection(
   if (entity?.geometry?.kind !== 'ASSET_SLOT' || entity.geometry.slotType !== selection.slotType) {
     throw new Error(`WORLD_DIRECTOR_INVALID_ASSET_SELECTION:${selection.entityId}`);
   }
-  return ledger.addRecord({
+  return proposeGeneratedRecord(ledger, {
     sourceUrl: `genesis://world-director/${directed.proof.worldId}/asset/${encodeURIComponent(selection.entityId)}`,
     sourceTimestamp: null,
     claim: `INSPECT_ENTITY selected canonical ASSET_SLOT ${selection.entityId}; slotType=${selection.slotType}; world=${directed.proof.worldId}; scientificResult=UNBOUND`,
     claimType: 'observation',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director UI', independentSourceIds: [] },
-  }).record.contentHash;
+  });
 }

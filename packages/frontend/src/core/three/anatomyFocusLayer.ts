@@ -1,0 +1,197 @@
+import type * as THREE_NS from 'three';
+import { FULL_ATLAS_SYSTEM_COLOR, type FullAtlasOrganMesh } from './bodyParts3dFullAtlas';
+import { brainRegionOf } from './brainParts';
+import { EXPLORE_ORGANS, organsInRegion, regionOfAtlasPoint, REGION_LABEL, structureLabel, type BodyRegionId, type ExploreState } from './anatomyExplore';
+
+/**
+ * The explored organs drawn IN the body: each organ's atlas structures sit in the twin's own atlas
+ * group (same transform as the body), hidden until their region is in focus. Materials are shared per
+ * organ (brain: per region) and swapped, never mutated per mesh, so hundreds of parts cost a handful of
+ * materials. Picking only ever tests the set that belongs to the current level.
+ */
+
+export type ExploreHit = { kind: 'region'; id: BodyRegionId } | { kind: 'organ'; id: string } | { kind: 'structure'; name: string };
+
+export interface ExploreLabel {
+  readonly key: string;
+  readonly text: string;
+  readonly hit: ExploreHit;
+  readonly world: THREE_NS.Vector3;
+}
+
+/** Region bands in atlas units (fractions of the body height), the camera's framing boxes. */
+const REGION_BOX: Readonly<Record<BodyRegionId, { y: [number, number]; x: number }>> = {
+  head: { y: [0.855, 1.0], x: 0.07 },
+  chest: { y: [0.7, 0.855], x: 0.11 },
+  abdomen: { y: [0.57, 0.7], x: 0.1 },
+  pelvis: { y: [0.47, 0.57], x: 0.1 },
+  arms: { y: [0.44, 0.83], x: 0.2 },
+  legs: { y: [0.0, 0.47], x: 0.09 },
+};
+
+const ORGAN_COLOR: Readonly<Record<string, number>> = {
+  eyes: FULL_ATLAS_SYSTEM_COLOR.sensory ?? 0xb0c8ce, heart: 0xc0564e, airways: 0xd9a3aa, aorta: FULL_ATLAS_SYSTEM_COLOR.arterial ?? 0xc05245,
+  stomach: 0xc99a70, liver: 0x8f4a3c, pancreas: 0xd8b07a, intestine: 0xc8957a, spleen: 0x8a4a5a, kidneys: 0xa0584c, bladder: 0xc9a07f, rectum: 0xb8806a,
+};
+
+export class AnatomyFocusLayer {
+  private readonly groups = new Map<string, THREE_NS.Group>();
+  private readonly mats: THREE_NS.MeshStandardMaterial[] = [];
+  private readonly dim: THREE_NS.MeshStandardMaterial;
+  private readonly picked: THREE_NS.MeshStandardMaterial;
+  private readonly ray: THREE_NS.Raycaster;
+  private state: ExploreState | null = null;
+  /** The body's outline in atlas units (feet at y = 0), measured once from the systems' own bounds. */
+  private readonly bodyBox: THREE_NS.Box3;
+
+  constructor(private readonly THREE: typeof THREE_NS, private readonly atlasGroup: THREE_NS.Group, organs: ReadonlyMap<string, FullAtlasOrganMesh>, private readonly heightMeters: number) {
+    this.ray = new THREE.Raycaster();
+    this.bodyBox = new THREE.Box3();
+    for (const child of atlasGroup.children) {
+      const geometry = (child as THREE_NS.Mesh).geometry;
+      if (!(child as THREE_NS.Mesh).isMesh || !geometry || !child.name.startsWith('atlas:')) continue;
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      this.bodyBox.union(geometry.boundingBox!);
+    }
+    const mat = (color: number, extra: Partial<THREE_NS.MeshStandardMaterialParameters> = {}): THREE_NS.MeshStandardMaterial => {
+      const m = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0, emissive: color, emissiveIntensity: 0.08, ...extra });
+      this.mats.push(m); return m;
+    };
+    this.dim = mat(0x9fb4c0, { transparent: true, opacity: 0.14, depthWrite: false });
+    this.picked = mat(0x7fe3ff, { emissive: 0x2fc7ff, emissiveIntensity: 0.75 });
+    const brainMats = new Map<string, THREE_NS.MeshStandardMaterial>();
+    for (const organ of EXPLORE_ORGANS) {
+      const data = organs.get(organ.id);
+      if (!data) continue;
+      const group = new THREE.Group(); group.name = `explore:${organ.id}`; group.visible = false;
+      const base = organ.id === 'brain' ? null : mat(ORGAN_COLOR[organ.id] ?? 0xc79a8a);
+      for (const part of data.parts) {
+        let m = base;
+        if (!m) {
+          const region = brainRegionOf(part.name);
+          m = brainMats.get(region.id) ?? mat(region.color);
+          brainMats.set(region.id, m);
+        }
+        const mesh = new THREE.Mesh(part.geometry, m);
+        mesh.name = `explore-part:${part.name}`;
+        mesh.userData = { partName: part.name, organId: organ.id, baseMaterial: m };
+        group.add(mesh);
+      }
+      this.groups.set(organ.id, group);
+      atlasGroup.add(group);
+    }
+  }
+
+  /** Organs the atlas actually provides (a region with none still focuses, it just offers no organ). */
+  hasOrgan(id: string): boolean { return this.groups.has(id); }
+
+  apply(state: ExploreState): void {
+    this.state = state;
+    const region = new Set(organsInRegion(state.regionId).map((o) => o.id));
+    for (const [id, group] of this.groups) {
+      group.visible = state.level !== 'BODY' && region.has(id);
+      if (!group.visible) continue;
+      const selected = state.organId === id;
+      const others = state.organId !== null && !selected;
+      for (const child of group.children) {
+        const mesh = child as THREE_NS.Mesh;
+        const base = mesh.userData.baseMaterial as THREE_NS.Material;
+        if (others) { mesh.material = this.dim; continue; }
+        if (!selected) { mesh.material = base; continue; }
+        // The tapped structure glows; the rest of its organ keeps its colours (a hundred dimmed layers would add up to white).
+        if (state.level === 'STRUCTURE') mesh.material = mesh.userData.partName === state.structure ? this.picked : base;
+        else mesh.material = base;
+        // The selected organ glows a little so the eye lands on it; the others keep their own colour.
+        (base as THREE_NS.MeshStandardMaterial).emissiveIntensity = selected ? 0.3 : 0.08;
+      }
+    }
+  }
+
+  /**
+   * What a tap at this ray means at the current level; null when it lands on nothing that level offers.
+   * Organ parts are ray-tested (only the active region's handful); the body itself never is: a tap is
+   * placed on the body's frontal plane and read as a region, so 2.2 M atlas triangles are never walked.
+   */
+  pick(ray: THREE_NS.Ray): ExploreHit | null {
+    const state = this.state; if (!state) return null;
+    this.ray.ray.copy(ray);
+    const partsOf = (ids: readonly string[]): THREE_NS.Object3D[] => ids.flatMap((id) => this.groups.get(id)?.children ?? []);
+    if (state.level === 'ORGAN' || state.level === 'STRUCTURE') {
+      const own = this.ray.intersectObjects(partsOf([state.organId!]), false)[0];
+      if (own) return { kind: 'structure', name: own.object.userData.partName as string };
+    }
+    if (state.level !== 'BODY') {
+      const ids = organsInRegion(state.regionId).map((o) => o.id).filter((id) => id !== state.organId);
+      const other = this.ray.intersectObjects(partsOf(ids), false)[0];
+      if (other) return { kind: 'organ', id: other.object.userData.organId as string };
+    }
+    const local = this.bodyPlanePoint(ray);
+    if (!local) return null;
+    const id = regionOfAtlasPoint(local.x - this.bodyBox.getCenter(new this.THREE.Vector3()).x, local.y, this.heightMeters);
+    return id !== state.regionId ? { kind: 'region', id } : null;
+  }
+
+  /** Where the ray crosses the body's frontal plane, in atlas units; null off the body's outline box. */
+  private bodyPlanePoint(ray: THREE_NS.Ray): THREE_NS.Vector3 | null {
+    const THREE = this.THREE;
+    this.atlasGroup.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(this.atlasGroup.matrixWorld).invert();
+    const local = ray.clone().applyMatrix4(inv);
+    const hit = local.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -this.bodyBox.getCenter(new THREE.Vector3()).z), new THREE.Vector3());
+    if (!hit) return null;
+    const b = this.bodyBox;
+    return hit.x >= b.min.x && hit.x <= b.max.x && hit.y >= b.min.y && hit.y <= b.max.y ? hit : null;
+  }
+
+  /** The world box the camera frames for the current focus. */
+  focusBox(state: ExploreState, out: THREE_NS.Box3): THREE_NS.Box3 | null {
+    const organGroup = state.organId ? this.groups.get(state.organId) : undefined;
+    if (organGroup && (state.level === 'ORGAN' || state.level === 'STRUCTURE')) {
+      organGroup.updateWorldMatrix(true, true);
+      return out.setFromObject(organGroup);
+    }
+    if (!state.regionId) return null;
+    const band = REGION_BOX[state.regionId]; const h = this.heightMeters;
+    const c = this.bodyBox.getCenter(new this.THREE.Vector3());
+    out.min.set(c.x - band.x * h, band.y[0] * h, c.z - 0.12); out.max.set(c.x + band.x * h, band.y[1] * h, c.z + 0.12);
+    this.atlasGroup.updateWorldMatrix(true, false);
+    return out.applyMatrix4(this.atlasGroup.matrixWorld);
+  }
+
+  /** Names next to the anatomy: the region's organs, or the tapped structure. At most six on screen. */
+  labels(state: ExploreState): ExploreLabel[] {
+    this.atlasGroup.updateWorldMatrix(true, false);
+    const at = (o: THREE_NS.Object3D): THREE_NS.Vector3 => this.localCentre(o).clone().applyMatrix4(this.atlasGroup.matrixWorld);
+    if (state.level === 'REGION' || state.level === 'ORGAN') {
+      // The organ in focus keeps its neighbours' names beside it: a tap on one moves to that organ.
+      return organsInRegion(state.regionId).filter((o) => this.groups.has(o.id)).slice(0, 6)
+        .map((o) => ({ key: o.id, text: o.label, hit: { kind: 'organ', id: o.id } as const, world: at(this.groups.get(o.id)!) }));
+    }
+    if (state.level === 'STRUCTURE' && state.structure) {
+      const mesh = this.groups.get(state.organId!)?.children.find((c) => c.userData.partName === state.structure);
+      return mesh ? [{ key: state.structure, text: structureLabel(state.organId, state.structure).label, hit: { kind: 'structure', name: state.structure }, world: at(mesh) }] : [];
+    }
+    return [];
+  }
+
+  /** Centre of an organ or a part in atlas units, measured once (the geometry never moves inside the atlas). */
+  private readonly centres = new Map<THREE_NS.Object3D, THREE_NS.Vector3>();
+  private localCentre(o: THREE_NS.Object3D): THREE_NS.Vector3 {
+    let c = this.centres.get(o);
+    if (!c) {
+      const box = new this.THREE.Box3();
+      o.traverse((node) => { const g = (node as THREE_NS.Mesh).geometry; if (!g) return; if (!g.boundingBox) g.computeBoundingBox(); box.union(g.boundingBox!); });
+      c = box.getCenter(new this.THREE.Vector3());
+      this.centres.set(o, c);
+    }
+    return c;
+  }
+
+  regionLabel(id: BodyRegionId): string { return REGION_LABEL[id]; }
+
+  dispose(): void {
+    for (const g of this.groups.values()) g.removeFromParent();
+    this.groups.clear();
+    for (const m of this.mats) m.dispose();
+  }
+}

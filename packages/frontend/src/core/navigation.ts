@@ -34,8 +34,10 @@ export interface NavItem {
   readonly status?: NavStatus;
   /** Required when status is 'planned': what exists, and what does not yet. */
   readonly plannedNote?: string;
-  /** Shown in the mobile primary bar. Exactly five items carry this. */
+  /** Shown in the mobile bottom bar (with Ask and Menu). */
   readonly primary?: true;
+  /** One-word label for the mobile bottom bar. */
+  readonly shortLabel?: string;
   /** One plain-language line under the label — what a first-time visitor finds there. */
   readonly description?: string;
   /** An alternative screen of the capability with this id: listed folded under it, never at top level. */
@@ -49,28 +51,31 @@ export interface NavSection {
 }
 
 /**
- * The primary product has one conversation and one Laboratory. Genesis is
- * the home entry; every specialist screen remains in the research mode
- * (MORE_ITEMS) behind one disclosure.
- *
- * The previous inventory asked the visitor to understand Genesis before
- * using it. Every former entry remains reachable in `MORE_ITEMS`; it simply
- * stopped competing with the connected journey.
+ * The eight places a reviewer comes to Genesis for, in the order the owner set:
+ * the dashboard, the proofs (drug discovery, Human Explorer, the
+ * Reviewer Room, Evidence & Replay), the Laboratory, the real CERN data and
+ * the Research Console. The menu is navigation only, so Ask (ASK_ITEM) is not in
+ * it. Everything else is under one "Więcej · Scientific OS" disclosure (MORE_ITEMS), grouped and folded so it never becomes a wall.
  */
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'main',
     label: '',
     items: [
-      { id: 'home', label: 'Genesis', icon: '◉', hash: '#/', primary: true, description: 'Jedno pytanie rozpoczyna badanie' },
-      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Jeden dialog prowadzący całe badanie' },
-      { id: 'scientific-worlds', label: 'Laboratorium', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
+      { id: 'home', label: 'Dashboard', shortLabel: 'Home', icon: '◉', hash: '#/', primary: true, description: 'Przegląd: obszary, ostatnie badania, dowody i silniki' },
+      { id: 'science', label: 'Drug Discovery', icon: '💊', hash: '#/drug', description: 'Docking, retrosynteza, Evidence i Replay' },
+      { id: 'human-biology-lab', label: 'Human Explorer', icon: '🧍', hash: '#/human-biology-lab', description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
+      { id: 'reviewer', label: 'Reviewer Room', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
+      { id: 'evidence', label: 'Evidence & Replay', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
+      { id: 'scientific-worlds', label: 'Laboratory', shortLabel: 'Lab', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
+      { id: 'cms-open-data', label: 'CERN / CMS', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
+      { id: 'discover', label: 'Research Console', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
     ],
   },
 ];
 
 /**
- * TRYB BADAWCZY — everything beyond the one conversation and the one Laboratory.
+ * WIĘCEJ · SCIENTIFIC OS — every module beyond the main list.
  *
  * Genesis grew several screens for the same capability (eight drug-discovery
  * workspaces, three Matrix views, three CERN views, three evidence screens…).
@@ -80,14 +85,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  */
 export const MORE_ITEMS: readonly NavItem[] = [
   // — Odkrywanie leków —
-  { id: 'science', label: 'Odkrywanie leków', icon: '🧬', hash: '#/drug', description: 'Kandydaci ze źródeł, porównanie RDKit, Evidence i replay' },
-  { id: 'discover', label: 'Konsola odkryć', icon: '◎', hash: '#/research-console', variantOf: 'science', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
-  { id: 'campaign', label: 'Zaawansowana kampania naukowa', icon: '⚡', hash: '#/campaign', variantOf: 'science', description: 'Techniczny widok kandydatów, planów, Evidence i replay' },
-  { id: 'gov-campaign', label: 'Government Drug Discovery — demo dla sektora publicznego', icon: '🏛', hash: '#/gov-campaign', variantOf: 'science', description: 'Pełna kampania na realnej puli kandydatów: screening, falsyfikacja, bramka bezpieczeństwa, werdykt' },
-  { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde', variantOf: 'science' },
-  { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot', variantOf: 'science' },
-  { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier', variantOf: 'science' },
-  { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis', variantOf: 'science' },
+  { id: 'campaign', label: 'Zaawansowana kampania naukowa', icon: '⚡', hash: '#/campaign', description: 'Techniczny widok kandydatów, planów, Evidence i replay' },
+  { id: 'gov-campaign', label: 'Government Drug Discovery — demo dla sektora publicznego', icon: '🏛', hash: '#/gov-campaign', variantOf: 'campaign', description: 'Pełna kampania na realnej puli kandydatów: screening, falsyfikacja, bramka bezpieczeństwa, werdykt' },
+  { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde', variantOf: 'campaign' },
+  { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot', variantOf: 'campaign' },
+  { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier', variantOf: 'campaign' },
+  { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis', variantOf: 'campaign' },
   // — Chemia —
   { id: 'chemistry', label: 'Chemia — stanowisko miareczkowania', icon: '⚗', hash: '#/scientific-worlds?station=st-titration', description: 'Kanoniczny bilans ładunku w głównym Laboratorium' },
   { id: 'chemistry-classic', label: 'Chemia — laboratorium klasyczne', icon: '⚗', hash: '#/lab/chemistry', variantOf: 'chemistry' },
@@ -97,7 +100,6 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'black-hole', label: 'Czarna dziura — Schwarzschild', icon: '🕳', hash: '#/lab/einstein', description: 'Promień horyzontu i geodezyjne zerowe (RK4) — osobny model od okna obserwacyjnego' },
   { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics', variantOf: 'black-hole' },
   { id: 'universe', label: 'Wszechświat — problem trzech ciał', icon: '🪐', hash: '#/lab/universe', description: 'Deterministyczny integrator trzech ciał' },
-  { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
   // CERN was folded under CMS Open Data as if it were another view of it. It is not: CMS Open Data is
   // an offline analysis of a checksummed event file, the complex is a walk-through world with its own
   // rooms and its own live execution state. Folding the flagship world under a data screen made it
@@ -108,12 +110,10 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement', variantOf: 'lab-fpv' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
   // — Człowiek i biologia —
-  { id: 'human-biology-lab', label: 'Człowiek — eksploracja', icon: '◎', hash: '#/human-biology-lab', description: 'Opcjonalna eksploracja ciała od narządu do komórki' },
-  { id: 'virtual-bio', label: 'Virtual Lab — biologia', icon: '🧫', hash: '#/virtual-bio', variantOf: 'human-biology-lab', description: 'Bezpieczne modele in-silico (komórka, PBPK, receptor, AMR) z uczciwym FAILED_CLOSED' },
-  { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab', variantOf: 'human-biology-lab' },
+  { id: 'virtual-bio', label: 'Virtual Lab — biologia', icon: '🧫', hash: '#/virtual-bio', description: 'Bezpieczne modele in-silico (komórka, PBPK, receptor, AMR) z uczciwym FAILED_CLOSED' },
+  { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab', variantOf: 'virtual-bio' },
   // — Dowody i pamięć —
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
-  { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence', variantOf: 'memory' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log', variantOf: 'memory' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', variantOf: 'memory', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
   // — Światy i symulacje —
@@ -156,19 +156,27 @@ export const MORE_ITEMS: readonly NavItem[] = [
 ];
 
 /** The research-mode label, shared by the desktop sidebar and the mobile sheet. */
-export const RESEARCH_MODE_LABEL = 'Tryb badawczy';
+export const RESEARCH_MODE_LABEL = 'More · Scientific OS';
 
-/** One entry per capability, in purpose groups; `variantOf` entries fold under their capability. */
+/**
+ * The first entry of the More disclosure: the whole catalogue on one page
+ * (`#/more`), every capability with its audit status.
+ */
+export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'All capabilities', icon: '▦', hash: '#/more', description: 'Wszystko w 7 grupach, ze statusem z audytu' };
+
+/**
+ * One entry per capability, in the owner's groups (29 Sep 2026, same as
+ * `core/scientificOs/catalogue.ts`); `variantOf` entries fold under their capability.
+ */
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
-  { id: 'more-drug', label: 'Odkrywanie leków', ids: ['science'] },
-  { id: 'more-chemistry', label: 'Chemia', ids: ['chemistry'] },
-  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'black-hole', 'universe', 'cms-open-data', 'cern-complex', 'lab-fpv', 'myths-theories'] },
-  { id: 'more-human', label: 'Człowiek i biologia', ids: ['human-biology-lab'] },
-  { id: 'more-evidence', label: 'Dowody i pamięć', ids: ['memory'] },
-  { id: 'more-worlds', label: 'Światy i symulacje', ids: ['worlds', 'whatif'] },
-  { id: 'more-learning', label: 'Nauka i eksploracja', ids: ['inquiry', 'dome-world', 'protection-priority', 'decipherment', 'glossary'] },
-  { id: 'more-public', label: 'Administracja i bezpieczeństwo', ids: ['cyber', 'clockwork', 'sovereign'] },
-  { id: 'more-system', label: 'System i projekty', ids: ['investor-demo', 'meta-cognition', 'projects', 'settings'] },
+  { id: 'more-ls', label: 'Life Sciences', ids: ['campaign', 'chemistry', 'virtual-bio'] },
+  { id: 'more-evidence', label: 'Evidence & Verification', ids: ['memory', 'meta-cognition'] },
+  { id: 'more-public', label: 'Government & Public Sector', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
+  { id: 'more-physics', label: 'Physics, Quantum & CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
+  { id: 'more-worlds', label: 'World & Digital Twin', ids: ['worlds', 'whatif'] },
+  { id: 'more-learning', label: 'Education', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
+  { id: 'more-system', label: 'Platform', ids: ['projects', 'settings'] },
+  { id: 'more-showcase', label: 'Showcases (experiments)', ids: ['myths-theories', 'decipherment'] },
 ];
 
 const byId = new Map(MORE_ITEMS.map((item) => [item.id, item] as const));
@@ -185,9 +193,20 @@ export function navVariants(id: string): readonly NavItem[] {
 }
 
 /** Flat view, for lookups and for the mobile primary bar. */
-export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), ...MORE_ITEMS];
+export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), MORE_OVERVIEW_ITEM, ...MORE_ITEMS];
 
-export const PRIMARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.filter((item) => item.primary);
+/**
+ * ASK — the one command input. It is an action, not a destination, so it is
+ * not in the menu (the menu is navigation only); it sits in the mobile bottom
+ * bar between Home and Lab and opens the one global ScienceChat.
+ */
+export const ASK_ITEM: NavItem = { id: 'chat', label: 'Ask', icon: '✦', kind: 'chat', description: 'Opisz zadanie badawcze; Genesis kieruje je do modelu, silnika albo zweryfikowanego ekranu' };
+
+/** Mobile bottom bar, left to right: Home, Ask, Lab (AppShell adds Menu). */
+export const PRIMARY_NAV_ITEMS: readonly NavItem[] = (() => {
+  const [home, ...rest] = NAV_ITEMS.filter((item) => item.primary);
+  return home ? [home, ASK_ITEM, ...rest] : [ASK_ITEM, ...rest];
+})();
 
 /**
  * Which nav item the current hash corresponds to, or null when the route has

@@ -101,6 +101,16 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // --- ENTITY-0 (2026-09-30): the durable store for Genesis Mind's research state, backed by the
+  // backend's agent-run steps. Its first caller is `runResearch({ stateStore })`; no screen starts a
+  // persisted Mind run yet — that belongs to ENTITY-2's cognitive state, not to a UI change here.
+  'core/mind/agentRunResearchStateStore.ts': 'ENTITY-0 durable research-state store; wired to a screen in a later ENTITY phase',
+  // --- ENTITY-2 (2026-09-30): maps observation gaps, knowledge gaps, OPEN_QUESTION items and hunted
+  // contradictions into the backend knowledge registry. No screen reads the cognitive state yet; the
+  // chat and Start that would call it belong to the Human Explorer thread.
+  'core/mind/knowledgeRegistryAdapter.ts': 'ENTITY-2 registry adapter; wired to a screen in a later step',
+  // ENTITY-3: the canonical model router's port to the backend reasoning adapter. No screen asks the model yet.
+  'core/experimentFabric/backendReasoningPort.ts': 'ENTITY-3 router port to the backend adapter; wired to a screen in a later step',
   // --- D-136 real external medical dataset boundary (NIfTI-1/DICOM Part-10), recovered 2026-09-27 from
   // claude/genesis-c1-visual-snapshot (0efeb774), which the 2026-09-25 consolidation skipped. A strict
   // provenance/format/checksum gate built before any UI consumes it; no dataset has been handed to Genesis yet,
@@ -155,6 +165,22 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // entry ("wkrótce") by an explicit product decision recorded in
   // MASTER_PRIORITY_GENESIS.md ("Cyber/GOV pozostaje OFF main"). Wiring it
   // would ship a capability the menu says does not exist yet.
+  'components/GenesisCapabilityShowcase.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/GenesisCommandCenterHero.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/GenesisDashboard.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure (reached only through it); kept for reuse.',
+  'components/ScaleJourney.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'components/TimeTransport.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure (reached only through it); kept for reuse.',
+  'components/WorkspaceStage.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the old system-overview disclosure; kept for reuse, not deleted.',
+  'core/workspaceStage.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting WorkspaceStage, its only consumer.',
+  'core/agent/crossDomainSynthesis.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'core/three/genesisPulseScene.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'core/three/sceneRegistry.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the overview components that were its only consumers.',
+  'components/guide/AskGenesisMic.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the inline Ask panel that held the microphone button; Ask is now the one ScienceChat.',
+  'components/holo/EngineCoreHolo.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the decorative engine hologram ("decoration, not information").',
+  'components/liveMatrix/LiveMatrixBackground.tsx': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background (owner: remove the Matrix background, keep a subtle identity).',
+  'components/liveMatrix/genesisVisualState.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
+  'components/liveMatrix/matrixController.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
+  'components/liveMatrix/matrixEngine.ts': 'Owner\'s Dashboard / Menu / Ask decision (2026-09-29): Start became an overview only and stopped mounting the Matrix background, its only consumer.',
   'core/governance/index.ts': 'Sovereign staged OFF by product decision; menu badges it "wkrótce".',
   'core/governance/approval.ts': 'Same Sovereign staging decision.',
   'core/governance/audit.ts': 'Same Sovereign staging decision.',

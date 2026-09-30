@@ -25,6 +25,8 @@ import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
 import type { GuideLevel } from '../core/guide/narrationModel';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import HumanExplorerPanel from './HumanExplorerPanel';
+import AnatomySelectionHUD, { AnatomyLabels, type ExploreAction } from './AnatomySelectionHUD';
+import { EXPLORE_BODY, exploreOrgan, type ExploreState } from '../core/three/anatomyExplore';
 import { macroMicroLevelForArtifact } from '../core/three/humanMacroMicroLayer';
 import { createScientificWorldsCognitiveCore } from '../core/scientificWorlds/cognitiveBridge';
 import { scienceMemoryPort } from '../core/scientificWorlds/scienceMemoryPort';
@@ -33,7 +35,7 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
-import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands, magnificationCommands } from '../core/scientificWorlds/humanExplorer';
 
 /** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
 const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
@@ -391,10 +393,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     const plan = planActions(parsed.commands, def.catalog, controller.station);
     say('system', describePlan(parsed.commands.length, parsed.unresolved, plan.steps.map((s) => s.kind), plan.rejected));
     if (plan.steps.length === 0) return;
-    const started = controller.startPlan(plan);
+    // Human Explorer: the atlas answers the tap directly; the lab agent is an optional demonstration layer, not a
+    // precondition. Same plan, same sealed session and Evidence, no walk between stations.
+    const started = controller.startPlan(plan, { direct: world === 'biology' });
     if (!started.ok) say('system', `Agent nie może przyjąć planu: ${started.reason}.`);
     else { setBlocked(null); const first = plan.steps.find((s) => 'stationId' in s); sim.setHighlight(first && 'stationId' in first ? first.stationId : null); }
-  }, [controller, def, say, sim]);
+  }, [controller, def, say, sim, world]);
   const submit = useCallback((raw: string) => {
     const t = raw.trim(); if (!t) return;
     say('user', t);
@@ -493,6 +497,23 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     });
     return () => sim.setOrganPickListener(null);
   }, [sim, controller, nextLogicalTime, submitCommands]);
+  const [closeUp, setCloseUp] = useState<{ part: string | null; region: string | null }>({ part: null, region: null });
+  useEffect(() => { sim.setPartPickListener(setCloseUp); return () => sim.setPartPickListener(null); }, [sim]);
+  // Human Explorer descent (body → region → organ → structure), owned by the scene; the screen mirrors it.
+  const [explore, setExplore] = useState<ExploreState>(EXPLORE_BODY);
+  const [exploreIsolated, setExploreIsolated] = useState(false);
+  const autoGhost = useRef(false);
+  const surfaceRef = useRef<TwinSurfaceMode>('NORMAL');
+  useEffect(() => {
+    sim.setExploreListener((next) => {
+      setExplore(next); setExploreIsolated(false);
+      // Going inside, the skin steps back so the organs in their places show; coming back out restores it.
+      if (next.level !== 'BODY' && surfaceRef.current === 'NORMAL') { autoGhost.current = true; surfaceRef.current = 'GHOST'; setSurface('GHOST'); sim.setTwinSurface('GHOST'); }
+      if (next.level === 'BODY' && autoGhost.current) { autoGhost.current = false; if (surfaceRef.current === 'GHOST') { surfaceRef.current = 'NORMAL'; setSurface('NORMAL'); sim.setTwinSurface('NORMAL'); } }
+    });
+    return () => sim.setExploreListener(null);
+  }, [sim]);
+  const readExploreLabels = useCallback(() => sim.getExploreLabels(), [sim]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
   const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
@@ -576,7 +597,37 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   // D-131: the twin camera frames the body instead of the agent; turning it off returns to the observer shot.
   const setTwinCamera = (on: boolean): void => { const next: AgentCameraMode = on ? 'TWIN' : 'SPECTATOR'; setCamera(next); sim.setCameraMode(next); };
   // D-131: the body shell's presentation. Stylised views of a model — no label, session or evidence changes.
-  const applySurface = (mode: TwinSurfaceMode): void => { setSurface(mode); sim.setTwinSurface(mode); };
+  const applySurface = (mode: TwinSurfaceMode): void => { surfaceRef.current = mode; autoGhost.current = false; setSurface(mode); sim.setTwinSurface(mode); };
+  const setSection = (enabled: boolean): void => {
+    const next = { ...cutawayRef.current, enabled };
+    cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, enabled));
+  };
+  const exploreMicro = explore.level !== 'BODY' ? bioArtifact : null;
+  const exploreBack = (): void => {
+    if (exploreMicro) { setBioArtifact(null); setSession(null); sessionRef.current = null; sim.clearMacroArtifact(); return; }
+    if (exploreIsolated) { setExploreIsolated(false); sim.setExploreIsolated(null); return; }
+    sim.exploreBack();
+  };
+  const exploreAction = (action: ExploreAction): void => {
+    const target = exploreOrgan(explore.organId);
+    const organ = EXPLORER_ORGANS.find((o) => o.organId === target?.explorerOrganId);
+    const lt = nextLogicalTime();
+    if (action === 'section') { const on = !cutawayRef.current.enabled; setSection(on); if (on) applySurface('NORMAL'); return; }
+    if (action === 'isolate') { if (!organ) return; const on = !exploreIsolated; setExploreIsolated(on); sim.setExploreIsolated(on ? organ.organId : null); return; }
+    if (action === 'blood') { const label = 'Mikroskop 100× · krew (model referencyjny)'; submitCommands(bloodMagnificationCommands(100, label, lt), label); return; }
+    const micro = exploreMicro;
+    if (action === 'cell' && micro?.kind === 'hyperscope') {
+      const m = 500; const blood = micro.cell?.tissueType === 'BLOOD';
+      const label = blood ? `Mikroskop ${m}× · krew (model referencyjny)` : `Mikroskop ${m}× · ${target?.label ?? ''}`;
+      if (blood) submitCommands(bloodMagnificationCommands(m, label, lt), label);
+      else if (organ) submitCommands(magnificationCommands(organ, m, label, lt), label);
+      return;
+    }
+    if (!organ || !target) return;
+    const level = action === 'cell' ? 'cell' : 'tissue';
+    const label = `${target.label} → ${level === 'cell' ? 'komórka' : 'tkanka'}`;
+    submitCommands(explorerCommands(organ, level, label, lt, { manifest: sim.manifest, selectedNodeId: anatomyRef.current.selectedNodeId, sessions, worldId: BIOLOGY_WORLD_ID, seed: 7 }), label);
+  };
   const openResearchCompanion = (): void => {
     sim.engageResearchCompanion();
     requestOpenScienceChat();
@@ -687,7 +738,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
 
   return (
     <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${detailsOpen ? ' sw-details-open' : ' sw-immersive'}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-details={detailsOpen ? 'open' : 'closed'} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
-      <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
+      <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" onWheel={(event) => { if (world === 'biology' && camera === 'TWIN') sim.zoomExplore(event.deltaY > 0 ? 1.08 : 0.93); }} />
       {world === 'physics' && chemistryOpen && (
         <Suspense fallback={<div className="sw-loading"><LoadingStatus label="Ładowanie chemii" /></div>}>
           <ChemistryLabPanel
@@ -1036,13 +1087,22 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
           twinContext={twinContext}
+          closeUp={closeUp} onCloseUpRegion={(id) => sim.selectCloseUpRegion(id)}
           surface={surface} onSurface={applySurface}
           subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
           researchControls={<>{commandControls}{researchControls}</>}
           onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
           onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
+          exploring={camera === 'TWIN' && explore.level !== 'BODY'}
+          exploreReady={camera === 'TWIN' && sim.hasExploreAtlas()}
         />
       )}
+      {world === 'biology' && explorerOpen && camera === 'TWIN' && explore.level !== 'BODY' && <>
+        <AnatomyLabels read={readExploreLabels} onPick={(hit) => sim.exploreSelect(hit)} />
+        <AnatomySelectionHUD explore={explore} micro={exploreMicro} isolated={exploreIsolated} sectionOn={cutaway.enabled}
+          busy={agentState !== 'IDLE' && agentState !== 'BLOCKED' && agentState !== 'ARRIVED'} surface={surface} onSurface={applySurface}
+          onBack={exploreBack} onAction={exploreAction} />
+      </>}
       {world !== 'biology' && commandControls}
     </main>
   );

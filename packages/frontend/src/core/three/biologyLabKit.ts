@@ -233,6 +233,12 @@ export interface TwinHandle {
   applyFullAtlas(atlas: LoadedFullAtlas | null): void;
   /** Twin-local centre of an organ's CURRENT geometry (ellipsoid or reference mesh) — the camera framing target. */
   getOrganFocus(nodeId: string): { x: number; y: number; z: number } | null;
+  /** The group holding the full atlas (life-size, feet at 0), so explored organs stand in their real place. */
+  getAtlasGroup(): THREE_NS.Group | null;
+  /** While the person explores the atlas body, the ellipsoid organ proxies step out of the way. */
+  setProxiesHidden(hidden: boolean): void;
+  /** Multiplies the see-through atlas opacity (ghost/RTG) so a studied organ reads clearly inside the body. */
+  setAtlasFade(fade: number): void;
   update(t: number): void;
   dispose(): void;
 }
@@ -373,6 +379,9 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     PROXY_LOW: measureLod(body.root),
   };
   let atlasGroup: THREE_NS.Group | null = null;
+  let proxiesHidden = false;
+  /** Extra step-back of a see-through atlas while one organ is studied inside it (1 = none). */
+  let atlasFade = 1;
   const atlasMats = new Map<string, THREE_NS.MeshStandardMaterial>();
   const applyLod = (): void => {
     const full = lodLevel === 'FULL_ASSET' && Boolean(asset);
@@ -390,7 +399,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
             : 0.08;
       const transparent = opacity < 1;
       if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
-      mat.opacity = opacity; mat.depthWrite = !transparent;
+      mat.opacity = transparent ? opacity * atlasFade : opacity; mat.depthWrite = !transparent;
     }
   };
   const blink = asset?.morphs.get('eyeBlinkLeft') ?? null;
@@ -436,6 +445,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     }
     if (cloudMat) cloudMat.opacity = isolated.length || !bodyShown ? 0.1 : cloudMat.opacity;
     if (atlasGroup) applyAtlasSurface(shellMode);
+    if (proxiesHidden) for (const [, m] of organs) m.visible = false;
   };
 
   return {
@@ -493,6 +503,9 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       return { x: c.x, y: c.y, z: c.z };
     },
     setSurface(mode) { surface = mode; applyOrgans(); },
+    getAtlasGroup() { return atlasGroup; },
+    setProxiesHidden(hidden) { proxiesHidden = hidden; applyOrgans(); },
+    setAtlasFade(fade) { atlasFade = fade; applyOrgans(); },
     setCutaway(state) {
       cutawayOn = state.enabled;
       const visibleBody = lodLevel === 'FULL_ASSET' && asset ? asset.root : body.root;
@@ -552,6 +565,17 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   };
 }
 
+/** Edge-lit glass: transparent where it faces the camera, glowing where it turns away (Fresnel). */
+function createChamberRimMaterial(THREE: typeof THREE_NS): THREE_NS.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    name: 'twin:chamber-rim-glass',
+    uniforms: { tint: { value: new THREE.Color(0x8fdcff) }, strength: { value: 1 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.2); gl_FragColor = vec4(tint * (0.02 + f * 0.55) * strength, 1.0); }',
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  });
+}
+
 export interface TwinChamberOptions {
   position: THREE_NS.Vector3Tuple; radius: number; height: number;
   glass: THREE_NS.Material; palette: GenesisMaterialPalette;
@@ -574,7 +598,9 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   // Everything the twin camera opens: the glass shell. Earlier versions added twelve ribs and four
   // pilasters around it; on mobile they read as prison bars and obscured the hero subject.
   const enclosure = new THREE.Group(); enclosure.name = 'twin:chamber-enclosure'; g.add(enclosure);
-  enclosure.add(createGlassChamber(THREE, opts.glass, { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: false, radialSegments: 48 }));
+  // The vitrine reads as glass only at its edges (a Fresnel rim, additive): the owner's reference is a
+  // luminous glass cylinder around the body, and the centre of the glass never veils the subject.
+  enclosure.add(createGlassChamber(THREE, createChamberRimMaterial(THREE), { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: true, radialSegments: 64 }));
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(opts.radius + 0.2, opts.radius + 0.1, 0.18, 48), opts.palette.BRUSHED_METAL); crown.position.y = opts.height + 0.29; g.add(crown);
   const ring = createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 1.4, baseColor: 0x123047 });
   const top = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.02, 0.03, 10, 64), ring); top.rotation.x = Math.PI / 2; top.position.y = opts.height + 0.19; g.add(top);

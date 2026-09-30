@@ -3,10 +3,10 @@
  * Zero zależności od UI. Każda funkcja odpowiada wzorowi z knowledge/.
  */
 
-/** Czynnik Lorentza γ = 1/√(1−β²). */
-export function lorentzGamma(beta: number): number {
-  return 1 / Math.sqrt(1 - beta * beta);
-}
+import { lorentzGamma, ROUNDED_4_SIG, schwarzschildRadius as schwarzschildRadiusWith } from '../../../core/src/physics/relativity.js';
+
+/** Czynnik Lorentza γ = 1/√(1−β²) i 1/γ — jedna definicja w packages/core/src/physics/relativity.ts. */
+export { lorentzGamma, inverseLorentzGamma } from '../../../core/src/physics/relativity.js';
 
 /** Czas zdarzenia w układzie ruchomym: ct' = γ(ct − βx). */
 export function lorentzTime(ct: number, x: number, beta: number): number {
@@ -37,9 +37,7 @@ export function kardashevPower(K: number): number {
 
 /** Promień Schwarzschilda r_s = 2GM/c² [m] dla masy w kg. */
 export function schwarzschildRadius(massKg: number): number {
-  const G = 6.674e-11;
-  const C = 2.998e8;
-  return (2 * G * massKg) / (C * C);
+  return schwarzschildRadiusWith(massKg, ROUNDED_4_SIG);
 }
 
 /**
@@ -513,8 +511,8 @@ export function mondAcceleration(newtonianAccel: number, a0: number = MOND_A0_AS
  * dlatego funkcje poniżej kończą swój zakres na promieniu ISCO i NIE
  * próbują modelować samego połączenia ani "ringdown".
  */
-const G_SI = 6.674e-11; // m³ kg⁻¹ s⁻²
-const C_SI = 2.998e8; // m/s
+const G_SI = ROUNDED_4_SIG.G; // m³ kg⁻¹ s⁻²
+const C_SI = ROUNDED_4_SIG.c; // m/s
 const M_SUN_KG = 1.989e30;
 
 /** Masa ćwierkowa (chirp mass) w masach Słońca: ℳ = (m₁m₂)^⅗/(m₁+m₂)^⅕. */

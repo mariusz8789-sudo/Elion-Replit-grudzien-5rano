@@ -1,5 +1,6 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { stableStringify, sha256hex, type EvidenceLedger, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '../knowledge/generatedRecordAdmission.js';
 import { mulberry32 } from '../determinism.js';
 export { mulberry32 };
 /** PDG-style masses in GeV/c^2 (PDG 2022 rounded). B-field in Tesla (CMS-like). */
@@ -139,6 +140,6 @@ export class QuantumColliderEngine {
   /** Anchor a collision result into the EvidenceLedger as a model-claim with full provenance. */
   commitToLedger(ledger: EvidenceLedger, ev: ColliderEvent): string {
     const input: NewEvidenceInput = { sourceUrl: 'genesis://collider/' + ev.eventId, sourceTimestamp: null, claim: 'pp->' + ev.process + ' @sqrtS=' + this.sqrtS + 'GeV pT=' + ev.hardPT + 'GeV sigma=' + ev.crossSectionPb + 'pb', claimType: 'model', confidence: 1, provenance: { sourceKind: 'dataset', retrievedBy: 'quantum-collider-engine', independentSourceIds: [] } };
-    return ledger.addRecord(input).record.contentHash;
+    return proposeGeneratedRecord(ledger, input);
   }
 }

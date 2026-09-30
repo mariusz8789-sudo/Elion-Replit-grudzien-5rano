@@ -232,7 +232,11 @@ def run_one(case: dict, clone: str, data_dir: str, work: str, results: str,
     scratch = os.path.join(work, pid, "gnina")
     os.makedirs(scratch, exist_ok=True)
     sdf_path = os.path.join(scratch, "%s_poses.sdf" % pid)
-    poses, checks = g7.extract_poses(rec, gate, sdf_path)
+    # extract_poses walks case["seedRuns"] and looks each seed up in the gate, which only holds
+    # the seeds that actually docked. On Astex every seed always docked, so run 7 never hit this;
+    # here 8F4J lost two of five seeds and the lookup raised KeyError. Hand it the docked seeds
+    # only - exactly the set pool_case pooled and the gate verified. Inert when all seeds docked.
+    poses, checks = g7.extract_poses(dict(rec, seedRuns=docked), gate, sdf_path)
     if poses is None or checks:
         rec.update({"status": "UNAVAILABLE", "failedChecks": checks or [], "gninaOrdered": [],
                     "top1Success": False})

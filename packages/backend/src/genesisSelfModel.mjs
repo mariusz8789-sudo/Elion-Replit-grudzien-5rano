@@ -172,6 +172,7 @@ export function buildSelfModel({
       {
         kind: 'REASONING_MODEL',
         status: reasoningModel.configured ? 'CONFIGURED' : 'BLOCKED_BY_PROVIDER_CONFIGURATION',
+        providerId: reasoningModel.configured ? reasoningModel.providerId ?? null : null,
         model: reasoningModel.configured ? reasoningModel.model : null,
         note: 'Konfiguracja to nie dowód: odpowiedź modelu jest propozycją, nigdy wiedzą.',
       },

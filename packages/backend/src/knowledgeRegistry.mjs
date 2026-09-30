@@ -28,7 +28,9 @@ import { LAB_EVENT } from './campaign/labClosedLoop.mjs';
 
 export const KNOWLEDGE_REGISTRY_TOOL = 'entity.knowledgeRegistry';
 export const KNOWLEDGE_REGISTRY_DOMAIN = 'genesis-entity.knowledge-registry';
-export const REGISTRY_EVENT_TYPES = Object.freeze(['GAP_OPENED', 'GAP_RESOLVED', 'CONTRADICTION_RECORDED', 'CONTRADICTION_RESOLVED']);
+// ENTITY-3 adds CLAIM_PROPOSED: a validated proposal from an external reasoning model. There is deliberately no
+// event that promotes a claim: a proposal stays PROPOSED here, and only the canonical evidence paths make anything true.
+export const REGISTRY_EVENT_TYPES = Object.freeze(['GAP_OPENED', 'GAP_RESOLVED', 'CONTRADICTION_RECORDED', 'CONTRADICTION_RESOLVED', 'CLAIM_PROPOSED']);
 export const GAP_SOURCES = Object.freeze(['OBSERVATION_GAP', 'KNOWLEDGE_GAP', 'OPEN_QUESTION', 'SELF_MODEL']);
 export const CONTRADICTION_TYPES = Object.freeze(['NUMERIC_DISAGREEMENT', 'POLARITY_CONFLICT', 'STATUS_CONFLICT', 'MODEL_OBSERVATION_DISAGREEMENT']);
 export const REGISTRY_GENESIS_HEAD = fnv1a(canonicalJson({ genesis: 'knowledge-registry-v1' }));
@@ -62,6 +64,7 @@ export function findRegistryRun(db, projectId) {
 function fold(events) {
   const gaps = new Map();
   const contradictions = new Map();
+  const claims = new Map();
   for (const { type, payload, at } of events) {
     if (type === 'GAP_OPENED') {
       gaps.set(payload.gapId, { ...payload, status: 'OPEN', openedAt: at, resolvedAt: null, resolvedEvidenceRefs: [] });
@@ -74,9 +77,11 @@ function fold(events) {
         ...contradictions.get(payload.contradictionId), status: 'RESOLVED', epistemicState: 'RESOLVED_BY_NEW_EVIDENCE',
         resolution: { statement: payload.statement, evidenceRefs: payload.evidenceRefs, resolvedBy: payload.resolvedBy, at },
       });
+    } else if (type === 'CLAIM_PROPOSED') {
+      claims.set(payload.proposalId, { ...payload, status: 'PROPOSED', proposedAt: at });
     }
   }
-  return { gaps: [...gaps.values()], contradictions: [...contradictions.values()] };
+  return { gaps: [...gaps.values()], contradictions: [...contradictions.values()], claims: [...claims.values()] };
 }
 
 /** The persisted registry of a project: events, re-verified chain, and (only when the chain holds) the folded state. */
@@ -86,7 +91,17 @@ export function readKnowledgeRegistry(db, projectId) {
   const chain = verifyRegistryEvents(events);
   return chain.ok
     ? { runId: run?.id ?? null, events, chain, ...fold(events) }
-    : { runId: run?.id ?? null, events, chain, gaps: null, contradictions: null };
+    : { runId: run?.id ?? null, events, chain, gaps: null, contradictions: null, claims: null };
+}
+
+/** ENTITY-3: stores an already validated claim proposal (claimProposal.mjs). Its status is PROPOSED by construction. */
+export function recordClaimProposal(db, projectId, proposal, userId = null) {
+  const current = readKnowledgeRegistry(db, projectId);
+  if (!current.chain.ok) return { ok: false, error: 'state_integrity_failure', chain: current.chain };
+  const existing = current.claims.find((c) => c.proposalId === proposal.proposalId);
+  if (existing) return { ok: true, deduped: true, proposal: existing };
+  const res = append(db, projectId, 'CLAIM_PROPOSED', { ...proposal, status: 'PROPOSED' }, userId);
+  return res.ok ? { ok: true, deduped: false, proposal: fold(readKnowledgeRegistry(db, projectId).events).claims.find((c) => c.proposalId === proposal.proposalId) } : res;
 }
 
 function append(db, projectId, type, payload, userId) {

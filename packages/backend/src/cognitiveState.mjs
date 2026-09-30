@@ -9,6 +9,7 @@
  *   activeQuestions / proposedNextActions (research)        → ENTITY-0 research state (agent_run_steps)
  *   activeHypotheses                                         → experiment_records (preregistration + sealed sessions)
  *   knowledgeGaps / contradictions                           → knowledgeRegistry.mjs (persisted, append-only)
+ *   proposedClaims (ENTITY-3)                                → knowledgeRegistry.mjs, CLAIM_PROPOSED: external-model proposals, always PROPOSED
  *   awaitingExternalMeasurements                             → campaign_events (lab requests without an observation)
  *   recentEvidenceRefs                                       → experiment_records, science_runs
  *   blockedCapabilities                                      → ENTITY-1 self model
@@ -113,6 +114,10 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     ? registry.contradictions
     : { status: 'UNKNOWN', reason: 'STATE_INTEGRITY_FAILURE', brokenAt: registry.chain.brokenAt };
 
+  const proposedClaims = registry.chain.ok
+    ? registry.claims
+    : { status: 'UNKNOWN', reason: 'STATE_INTEGRITY_FAILURE', brokenAt: registry.chain.brokenAt };
+
   const engineByCapability = new Map((selfModel?.engines ?? []).map((e) => [e.capabilityId, e]));
   const awaitingList = awaiting(db, projectId);
   const proposedNextActions = [
@@ -129,6 +134,9 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     }),
     ...(Array.isArray(contradictions) ? contradictions : []).filter((c) => c.status === 'UNRESOLVED').map((c) => ({
       status: 'PROPOSED', kind: 'SEEK_EVIDENCE_FOR_CONTRADICTION', contradictionId: c.contradictionId, from: 'knowledge-registry',
+    })),
+    ...(Array.isArray(proposedClaims) ? proposedClaims : []).filter((c) => c.experimentProposal).map((c) => ({
+      status: 'PROPOSED', kind: 'REVIEW_EXTERNAL_MODEL_EXPERIMENT', proposalId: c.proposalId, decision: c.experimentProposal.decision, from: 'external-model',
     })),
     ...awaitingList.map((a) => ({ status: 'PROPOSED', kind: 'AWAIT_EXTERNAL_OBSERVATION', campaignId: a.campaignId, candidateId: a.candidateId, from: 'lab-closed-loop' })),
   ];
@@ -157,6 +165,7 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     ],
     knowledgeGaps,
     contradictions,
+    proposedClaims,
     blockedCapabilities: selfModel
       ? [
         ...selfModel.blockedEngines.map((e) => ({ kind: 'ENGINE_RUNTIME', id: e.toolId, blockedBy: e.blockedBy })),

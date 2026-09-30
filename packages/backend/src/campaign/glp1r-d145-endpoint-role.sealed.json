@@ -1,0 +1,119 @@
+{
+  "decisionId": "D-145",
+  "preregFingerprint": "28b71b42e9920740",
+  "gateRuleFingerprint": "d2f77a7e6042f0fc",
+  "gateUnchanged": true,
+  "baseCommit": "d23a89b416560c9531348d09f44f608134180268",
+  "computedAt": "2026-09-30T01:15:23.529Z",
+  "combinedSet": {
+    "rows": 638,
+    "pin": 287,
+    "a1xa2": 351
+  },
+  "assays": {
+    "total": 96,
+    "withDescription": 80,
+    "blockedByDataAccess": [
+      "CHEMBL1246709",
+      "CHEMBL1648248",
+      "CHEMBL1924543",
+      "CHEMBL1925821",
+      "CHEMBL1937452",
+      "CHEMBL829559",
+      "CHEMBL874550",
+      "CHEMBL884187",
+      "CHEMBL911100",
+      "CHEMBL923946",
+      "CHEMBL937687",
+      "CHEMBL972348",
+      "CHEMBL972349",
+      "CHEMBL977343",
+      "CHEMBL991608",
+      "CHEMBL991609"
+    ]
+  },
+  "summary": {
+    "FUNCTIONAL_AGONISM": {
+      "rows": 213,
+      "assays": 37,
+      "distinctCompounds": 157
+    },
+    "OTHER_FUNCTIONAL": {
+      "rows": 107,
+      "assays": 32,
+      "distinctCompounds": 48
+    },
+    "BINDING_AFFINITY": {
+      "rows": 2,
+      "assays": 2,
+      "distinctCompounds": 2
+    },
+    "UNKNOWN": {
+      "rows": 316,
+      "assays": 25,
+      "distinctCompounds": 207
+    }
+  },
+  "scaffolds": {
+    "status": "OK",
+    "method": "Bemis-Murcko via RDKit MurckoScaffold, independent of the production rdkitAdapter",
+    "rdkitVersion": "2026.03.6",
+    "compounds": 157,
+    "parsed": 157,
+    "unparseable": 0,
+    "distinctScaffolds": 61,
+    "largestScaffoldShare": 0.1274,
+    "scaffoldSizeHistogram": [
+      20,
+      19,
+      16,
+      11,
+      10,
+      4,
+      4,
+      4,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1
+    ],
+    "acyclicCompounds": 0
+  },
+  "splitFeasibility": {
+    "status": "OK",
+    "rdkitVersion": "2026.03.6",
+    "method": "production scaffoldSplit() over production rdkitAdapter scaffolds — buckets 0-1 test, 2-3 calibration, 4-9 train",
+    "rowsFingerprinted": 213,
+    "fingerprintFailures": 0,
+    "train": 125,
+    "calibration": 60,
+    "test": 28,
+    "trainMeetsMin": false,
+    "testMeetsMin": false,
+    "distinctScaffolds": 61
+  },
+  "sufficiency": {
+    "requiredRows": 190,
+    "functionalRows": 213,
+    "shortfall": 0,
+    "enoughRows": true,
+    "enoughScaffolds": true,
+    "splitOk": false,
+    "verdict": "INSUFFICIENT_FUNCTIONAL_DATA"
+  },
+  "knownClassifierLimitations": [
+    "CHEMBL5732842 (54 rows) and CHEMBL5732843 (53 rows) are HTRF cAMP agonist assays whose description ALSO recounts how the cell line was characterised by 125I-GLP-1 saturation binding. The frozen rule matches that binding language and files both as UNKNOWN/CONFLICTING_SIGNALS. A human reader would call them FUNCTIONAL_AGONISM. These 107 rows are the single largest effect in this diagnostic and they are NOT reclassified here: changing a rule after seeing the counts is exactly what the preregistration forbids. Correcting it needs its own preregistration (proposed D-146), decided before it is run.",
+    "CHEMBL3620282 and CHEMBL6140092 are CRE-luciferase reporter assays. CRE is cAMP-response-element driven, but the descriptions never say cAMP, and the frozen rule requires the reporter to be explicitly cAMP-driven. Filed UNKNOWN. Conservative by design.",
+    "CHEMBL5130385 (14 rows) measures ERK1/2 phosphorylation — functional but not the Gs/cAMP arm. The frozen rule has no ERK term, so it falls to UNKNOWN rather than OTHER_FUNCTIONAL. The row count for FUNCTIONAL_AGONISM is unaffected either way."
+  ],
+  "boundary": "Row counts only. No model was trained, no gate was read for pass/fail, no candidate was ranked. Every assay in this set is a recombinant heterologous expression system and is not evidence of native human tissue pharmacology.",
+  "artifactHash": "0ef4488e19eccb342b1515d583e785b70d4515551c14413b44a18627a0809b5a"
+}

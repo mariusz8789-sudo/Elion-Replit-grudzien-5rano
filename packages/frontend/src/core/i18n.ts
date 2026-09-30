@@ -105,7 +105,7 @@ export const LOCALE_SHORT: Readonly<Record<Locale, string>> = { pl: 'PL', en: 'E
 
 /** The language chosen earlier in this browser, applied once at start (Polish when none or storage is blocked). */
 export function initLocale(): Locale {
-  let saved: string | null = null;
+  let saved: string | null;
   try { saved = globalThis.localStorage?.getItem(LOCALE_KEY) ?? null; } catch { saved = null; }
   const locale = isLocale(saved) ? saved : 'pl';
   setLocale(locale);

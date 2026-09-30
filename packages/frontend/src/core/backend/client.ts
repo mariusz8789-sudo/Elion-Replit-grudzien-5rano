@@ -1551,3 +1551,70 @@ export interface GenesisSelfModel {
 export async function getGenesisSelfModel(): Promise<ApiResult<GenesisSelfModel>> {
   return request<GenesisSelfModel>('GET', '/genesis/self');
 }
+
+/* ---------------- ENTITY-2: cognitive state (a view) and the knowledge registry (persisted) ---------------- */
+
+/** A section whose source failed verification is reported, never filled in. */
+export interface UnknownSection { status: 'UNKNOWN'; reason: string; brokenAt?: number | null }
+
+export interface RegistryGap {
+  gapId: string;
+  question: string;
+  source: { kind: string; ref: string | null };
+  relatedHypotheses: string[];
+  missingEvidence: string[];
+  requiredCapability: string | null;
+  createdEvidenceRefs: string[];
+  status: 'OPEN' | 'RESOLVED';
+  openedAt: string;
+  resolvedAt: string | null;
+  resolvedEvidenceRefs: string[];
+}
+
+export interface RegistryContradiction {
+  contradictionId: string;
+  type: string;
+  claimA: { recordId: string | null; source: string | null; statement: string | null };
+  claimB: { recordId: string | null; source: string | null; statement: string | null };
+  evidenceRefs: string[];
+  reason: string | null;
+  status: 'UNRESOLVED' | 'RESOLVED';
+  epistemicState: 'CONFLICTING_EVIDENCE' | 'RESOLVED_BY_NEW_EVIDENCE';
+  resolution: { statement: string; evidenceRefs: string[]; resolvedBy: string | null; at: string } | null;
+}
+
+export interface GenesisCognitiveState {
+  schemaVersion: number;
+  projectId: string;
+  generatedAt: string;
+  view: 'MATERIALIZED_VIEW';
+  currentGoals: { kind: string; id: string; goal: string; domain: string; status: string }[];
+  activeQuestions: { kind: string; [key: string]: unknown }[];
+  activeHypotheses: { source: string; status: string; [key: string]: unknown }[];
+  knowledgeGaps: RegistryGap[] | UnknownSection;
+  contradictions: RegistryContradiction[] | UnknownSection;
+  blockedCapabilities: { kind: string; id: string; blockedBy: string | null }[] | UnknownSection;
+  pendingExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  runningExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  awaitingExternalMeasurements: { campaignId: string; candidateId: string | null; requestEventId: string; objective: string | null }[];
+  recentEvidenceRefs: string[];
+  proposedNextActions: { status: 'PROPOSED'; kind: string; [key: string]: unknown }[];
+  integrity: { researchRuns: { runId: string; ok: boolean; [key: string]: unknown }[]; knowledgeRegistry: { ok: boolean; brokenAt: number | null; reason: string | null } };
+}
+
+export async function getCognitiveState(token: string, projectId: string): Promise<ApiResult<GenesisCognitiveState>> {
+  const r = await request<{ cognitiveState: GenesisCognitiveState }>('GET', `/projects/${projectId}/cognitive-state`, { token });
+  return r.ok ? { ok: true, data: r.data.cognitiveState } : r;
+}
+
+export async function openKnowledgeGap(token: string, projectId: string, gap: unknown): Promise<ApiResult<{ gap: RegistryGap; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps`, { token, body: gap });
+}
+
+export async function resolveKnowledgeGap(token: string, projectId: string, gapId: string, evidenceRefs: readonly string[]): Promise<ApiResult<{ gap: RegistryGap }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps/${encodeURIComponent(gapId)}/resolve`, { token, body: { evidenceRefs } });
+}
+
+export async function recordKnowledgeContradiction(token: string, projectId: string, contradiction: unknown): Promise<ApiResult<{ contradiction: RegistryContradiction; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/contradictions`, { token, body: contradiction });
+}

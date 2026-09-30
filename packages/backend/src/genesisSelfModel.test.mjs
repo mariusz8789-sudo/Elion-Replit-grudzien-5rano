@@ -89,7 +89,7 @@ describe('ENTITY-1 GenesisIdentity', () => {
       }
     };
     walk(HERE);
-    assert.deepEqual(importers.sort(), ['genesisSelfModel.mjs', 'server.mjs (self model)']);
+    assert.deepEqual(importers.sort(), ['api.mjs (self model)', 'genesisSelfModel.mjs', 'server.mjs (self model)']);
   });
 });
 

@@ -4,6 +4,7 @@ import { atlasKindName, bodySystemName, crumbsText, ladderName, layerName, organ
 import { useLocale } from '../core/i18n';
 import type { ExploreHit } from '../core/three/anatomyFocusLayer';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
+import { EXPLORER_ORGANS } from '../core/scientificWorlds/humanExplorer';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { deleteView, notePlace, readNote, readViews, saveView, writeNote, type SavedView } from '../core/three/anatomyNotebook';
 
@@ -52,15 +53,17 @@ export interface AnatomySelectionHUDProps {
 const SURFACES: readonly (readonly [TwinSurfaceMode, 'surfaceSkin' | 'surfaceXray' | 'surfaceGhost'])[] = [['NORMAL', 'surfaceSkin'], ['XRAY', 'surfaceXray'], ['GHOST', 'surfaceGhost']];
 
 /** What the microscope view beside the body shows, its scale and its status — always a model. */
-export function microCaption(artifact: BiologyArtifact): { title: string; detail: string } | null {
+export function microCaption(artifact: BiologyArtifact, genericSample = false): { title: string; detail: string } | null {
+  // An organ without its own tissue model shows a generic slide: say so beside it, never silently.
+  const generic = genericSample ? ` · ${tx('genericSample')}` : '';
   if (artifact.kind === 'histology') {
     const tissue = artifact.slide.tissueType;
-    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}` };
+    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}${generic}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}` };
   }
   if (artifact.kind === 'hyperscope' && artifact.cell) {
     const m = artifact.capture.request.magnification;
     const tissue = artifact.cell.tissueType;
-    const what = tissue === 'BLOOD' ? tx('blood') : m >= 500 ? tx('cellInside') : `${tx('cell')}: ${tissueName(tissue)}`;
+    const what = tissue === 'BLOOD' ? tx('blood') : m >= 500 ? `${tx('cellInside')}${generic}` : `${tx('cell')}: ${tissueName(tissue)}${generic}`;
     return { title: `${what} · ${m}×`, detail: `${tx('scale')} ≈ ${m >= 500 ? '1 µm' : '10 µm'} · ${tx('virtualScope')} · ${tx('modelNotPatient')}` };
   }
   return null;
@@ -78,7 +81,8 @@ export default function AnatomySelectionHUD({ explore, micro, isolated, sectionO
   const [saved, setSaved] = useState('');
   useEffect(() => { setNote(readNote(place)); setSaved(''); setShowAbout(false); }, [place]);
   const organ = exploreOrgan(explore.organId);
-  const caption = micro ? microCaption(micro) : null;
+  const genericSample = EXPLORER_ORGANS.find((o) => o.organId === exploreOrgan(explore.organId)?.explorerOrganId)?.genericSample === true;
+  const caption = micro ? microCaption(micro, genericSample) : null;
   const blood = micro?.kind === 'histology' ? micro.slide.tissueType === 'BLOOD' : micro?.kind === 'hyperscope' && micro.cell?.tissueType === 'BLOOD';
   const microLevel: LadderLevel | null = !micro ? null : micro.kind === 'histology' ? 'tissue' : micro.kind === 'central-dogma' ? 'molecule' : micro.kind === 'hyperscope' && micro.capture.request.magnification >= 500 ? 'organelle' : 'cell';
   const crumbs = [...crumbsText(explore), ...(caption ? [blood ? tx('blood') : microLevel ? ladderName(microLevel, tx('microscope')) : tx('microscope')] : [])];

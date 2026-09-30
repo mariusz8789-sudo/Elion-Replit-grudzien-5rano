@@ -69,6 +69,7 @@ const TEXT = {
   slide: ['preparat histologiczny', 'histology slide', 'شريحة نسيجية'],
   virtualScope: ['mikroskop wirtualny', 'virtual microscope', 'مجهر افتراضي'],
   modelNotPatient: ['MODEL, nie zdjęcie pacjenta', 'MODEL, not a patient image', 'نموذج، وليس صورة مريض'],
+  genericSample: ['próbka ogólna, nie z tego narządu', 'generic sample, not from this organ', 'عينة عامة، ليست من هذا العضو'],
   surfaceSkin: ['Skóra', 'Skin', 'الجلد'],
   surfaceXray: ['RTG', 'X-ray', 'أشعة سينية'],
   surfaceGhost: ['Duch', 'Ghost', 'شفاف'],
@@ -120,7 +121,7 @@ export function ladderName(level: string, fallback: string): string { const t = 
 const TISSUE: Readonly<Record<string, Triple>> = {
   CARDIAC: ['mięsień sercowy', 'heart muscle', 'عضلة القلب'], NEURAL: ['tkanka nerwowa', 'nerve tissue', 'نسيج عصبي'],
   LUNG: ['pęcherzyki płucne', 'lung alveoli', 'الحويصلات الرئوية'], LIVER: ['zraziki wątroby', 'liver lobules', 'فصيصات الكبد'],
-  EPITHELIUM: ['nabłonek', 'epithelium', 'ظهارة'], BLOOD: ['krew · rozmaz referencyjny', 'blood · reference smear', 'دم · لطاخة مرجعية'],
+  EPITHELIUM: ['nabłonek', 'epithelium', 'ظهارة'], GENERIC: ['tkanka ogólna', 'generic tissue', 'نسيج عام'], BLOOD: ['krew · rozmaz referencyjny', 'blood · reference smear', 'دم · لطاخة مرجعية'],
 };
 export function tissueName(type: string): string { const t = TISSUE[type]; return t ? pick(t) : type.toLowerCase(); }
 

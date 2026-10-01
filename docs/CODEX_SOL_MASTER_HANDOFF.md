@@ -158,3 +158,30 @@ Validation: 21 pass, 0 fail, 3 engine-dependent skips. The target hash test now 
 Runtime proof here: Vina/Meeko are absent locally, so the canonical run is honestly `BLOCKED_BY_RUNTIME`; worker runtime CI is required before `AVAILABLE_NOW`.
 
 Rollback: revert the S5 commit. This also removes the PDB/SDF EOL protection, so the prior Windows hash failure will return.
+
+## S6 — ADMET ResearchRun execution and commercial admission
+
+Problem: Genesis already had a real ADMET-AI adapter and pinned worker, but ResearchRun lacked a bounded S3 entry and the existing comments did not distinguish the MIT package from the separate licence obligations of its training datasets and bundled weights.
+
+Delivered:
+
+- canonical aspirin request through the existing admet-estimation capability and S3 execution record;
+- explicit MODEL_ESTIMATE / NOT_A_MEASUREMENT classification and scientific limitations;
+- model identity for ADMET-AI 2.0.1, including separate package, weights and training-data licence fields;
+- fail-closed commercial admission: BLOCKED_BY_LICENSE until exact weight identity and dataset-by-dataset commercial rights are documented;
+- bounded TECHNICAL_VALIDATION execution mode that may run the real installed model but never promotes commercial rights or measurement status;
+- corrected adapter/worker comments so MIT is attributed to the code/package, not silently to all training inputs.
+
+Public contract: packages/backend/src/compute/admetResearchRunExecutor.mjs.
+
+Existing components reused unchanged: ADMET-AI adapter/worker, canonical capability contract, local executor, S3 record and existing ScienceRun persistence.
+
+Claude integration: use the default commercial mode in product flows. It intentionally blocks today. Use TECHNICAL_VALIDATION only for the bounded engineering proof. Do not remove the commercial gate until a reviewed manifest pins exact bundled weights and the relevant TDC dataset licences.
+
+Validation: node --test packages/backend/src/engineExecutionContract.test.mjs packages/backend/src/admetResearchRunExecutor.test.mjs packages/backend/src/admetEngine.test.mjs — 12 pass, 0 fail, 5 runtime-dependent skips.
+
+Runtime proof here: ADMET-AI is absent locally, so technical validation records BLOCKED_BY_RUNTIME. The worker stays pinned to admet-ai==2.0.1. Official ADMET-AI documentation confirms TDC-trained models; official TDC documentation states that individual dataset licences must be reviewed separately.
+
+Known blocker: commercial admission remains blocked until the weights and complete training dataset set have reviewed identities, hashes/versions and licence decisions.
+
+Rollback: revert the S6 commit; the underlying ADMET pipeline remains intact.

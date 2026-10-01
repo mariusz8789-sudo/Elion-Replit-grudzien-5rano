@@ -407,7 +407,7 @@ Delivered:
 
 Public API: GET|POST /api/projects/:projectId/research-runs/:runId/literature.
 
-Validation: focused ResearchRun/literature suite 15/15 PASS; full backend 1,464 tests, 1,383 PASS, 0 fail, 81 declared runtime skips; lint 0 errors; production build PASS.
+Validation: focused ResearchRun/literature suite 16/16 PASS, including pause-during-retrieval race rejection; full backend 1,464 tests, 1,383 PASS, 0 fail, 81 declared runtime skips; lint 0 errors; production build PASS.
 
 Claude integration: none required beyond review. ResearchRun remains the sole lifecycle owner. A future reviewed passage extractor may propose links through the existing port, but must not publish Evidence.
 

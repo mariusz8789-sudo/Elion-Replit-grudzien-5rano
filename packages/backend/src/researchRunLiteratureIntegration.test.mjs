@@ -89,4 +89,45 @@ describe('literature in the canonical ResearchRun', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('does not append a snapshot when the run is paused while provider retrieval is pending', async () => {
+    const db = openDatabase();
+    let releaseRetrieval;
+    let started = 0;
+    let signalStarted;
+    const gate = new Promise((resolve) => { releaseRetrieval = resolve; });
+    const bothStarted = new Promise((resolve) => { signalStarted = resolve; });
+    const delayed = async (intent, query) => {
+      started += 1;
+      if (started === 2) signalStarted();
+      await gate;
+      return result(intent, query);
+    };
+    const literaturePort = {
+      findForClaim: async (request) => delayed('CLAIM_CONTEXT', request.query),
+      findContradictionsForClaim: async () => delayed('CONTRADICTION_SEARCH', 'claim AND negative result'),
+    };
+    const call = (method, pathname, body, token) => handleApi(db, { method, pathname, body, token, query: {}, literaturePort });
+    const owner = call('POST', '/api/auth/register', { email: 'literature-race@lab.org', password: 'password123' }).body;
+    const project = call('POST', '/api/projects', { name: 'Literature race' }, owner.token).body.project;
+    const base = `/api/projects/${project.id}`;
+    const startedRun = await call('POST', `${base}/research-runs`, { question: 'Can a paused run accept a late literature result?' }, owner.token);
+    const runId = startedRun.body.researchRun.researchRunId;
+
+    const pending = call('POST', `${base}/research-runs/${runId}/literature`, {}, owner.token);
+    await bothStarted;
+    const paused = call('POST', `${base}/research-runs/${runId}/pause`, { reason: 'Operator paused during retrieval' }, owner.token);
+    assert.equal(paused.status, 200);
+    releaseRetrieval();
+
+    const late = await pending;
+    assert.equal(late.status, 409);
+    assert.equal(late.body.error, 'RUN_NOT_RETRIEVABLE');
+    const recovered = call('GET', `${base}/research-runs/${runId}`, null, owner.token).body.researchRun;
+    assert.equal(recovered.run.status, 'PAUSED');
+    assert.deepEqual(recovered.literatureSnapshots, []);
+    assert.deepEqual(recovered.researchState.events.map((event) => event.type), ['PROBLEM_FORMALIZED', 'RUN_CONTROLLED']);
+    assert.equal(recovered.researchState.chain.ok, true);
+    db.close();
+  });
 });

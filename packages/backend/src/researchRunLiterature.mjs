@@ -73,6 +73,7 @@ export async function retrieveResearchRunLiterature(db, projectId, runId, input 
   return inWriteTransaction(db, () => {
     const current = getResearchRun(db, projectId, runId);
     if (!current || !current.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
+    if (current.run.status !== 'RUNNING') return { ok: false, status: 'RUN_NOT_RETRIEVABLE', reason: current.run.status };
     const duplicate = current.literatureSnapshots.find((snapshot) => snapshot.requestFingerprint === requestFingerprint);
     if (duplicate) return { ok: true, status: duplicate.status, deduped: true, snapshot: duplicate, researchRun: current };
     const appended = appendServerResearchStateEvent(db, runId, 'KNOWLEDGE_SNAPSHOT', payload, dependencies.at);

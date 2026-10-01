@@ -265,3 +265,31 @@ Validation: 46 pass, 0 fail, 10 runtime-dependent skips across S9, the existing 
 Production blockers: shared queue backend, atomic lease/heartbeat, shared concurrency/quota, retry/dead-letter persistence and object-storage credentials/provider. The existing process-local cancellation set is not crash- or replica-safe.
 
 Rollback: revert the S9 commit; existing local jobs and workers remain unchanged.
+
+## S10 — scientific Python sandbox foundation
+
+Problem: Genesis needs a safe path for model-proposed analysis, but the repository does not yet contain an attested container backend. Executing generated code on the host would violate the security boundary.
+
+Delivered:
+
+- a Python-only request contract; Bash, R, caller-selected commands, packages, environment variables and secrets are rejected;
+- immutable container-image digest and deterministic environment fingerprint;
+- deny-all network, read-only root, no host filesystem, no secrets, dropped capabilities and no-new-privileges requirements;
+- bounded CPU, RAM, wall-clock, process, stdout, stderr and artifact output policies;
+- dataset admission only through allowlisted, content-addressed ArtifactRefs whose IDs match their SHA-256 values;
+- an injected backend port that refuses execution unless every isolation control is attested;
+- explicit current product result: BLOCKED_BY_CONFIGURATION / CONTAINER_SANDBOX_BACKEND_NOT_CONFIGURED.
+
+Public contract: packages/backend/src/compute/scientificSandboxContract.mjs.
+
+Existing components reused: canonical provenance hashing and the S9 ArtifactRef identity. No second ResearchRun, Evidence, Replay, queue or storage system was introduced.
+
+Claude integration: none today. Keep the product blocked. A later container adapter may implement attest and execute, but it must pass the frozen plan to a controlled runner protocol and return bounded stdout/stderr plus S9 ArtifactRefs.
+
+Validation: 13 pass, 0 fail across the focused sandbox, speculative-sandbox and S9 contract tests.
+
+Runtime proof here: none claimed. No host process or container was launched. Backend self-attestation is only an admission interface and still requires independent implementation and security review.
+
+Production blockers: isolated container backend, pinned image digest, safe dataset staging, enforced cgroup/process/output limits, artifact collection through object storage, Linux security review and adversarial tests.
+
+Rollback: revert the S10 commit; no current execution path changes.

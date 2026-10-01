@@ -2,6 +2,7 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
+import { _resetValidation, _validationRunCount } from './campaign/toolchain.mjs';
 
 /**
  * Drug Discovery przez router API. Weryfikuje realną cheminformatykę przy
@@ -19,19 +20,19 @@ function setup() {
 }
 
 describe('capabilities manifest (public)', () => {
-  test('lists capabilities and exposes reference-validated runtime status', () => {
+  test('lists passive capability metadata without executing reference cases', () => {
+    _resetValidation();
     const r = call('GET', '/api/compute/capabilities');
     assert.equal(r.status, 200);
     const byId = new Map(r.body.capabilities.map((c) => [c.id, c]));
     assert.equal(byId.get('molecular-weight').status, 'AVAILABLE');
     for (const id of ['docking', 'molecular-dynamics', 'quantum-chemistry', 'admet', 'toxicity']) {
       const capability = byId.get(id);
-      assert.ok(['AVAILABLE', 'BLOCKED_BY_RUNTIME'].includes(capability.status));
-      if (capability.status === 'AVAILABLE') {
-        assert.equal(capability.executionStatus, 'VALIDATED_REFERENCE_CASE');
-        assert.ok(capability.engine);
-      } else assert.ok(capability.requires);
+      assert.equal(capability.status, 'UNVALIDATED');
+      assert.equal(capability.executionStatus, 'NOT_EXECUTED');
+      assert.ok(capability.requires);
     }
+    assert.equal(_validationRunCount(), 0);
   });
 });
 

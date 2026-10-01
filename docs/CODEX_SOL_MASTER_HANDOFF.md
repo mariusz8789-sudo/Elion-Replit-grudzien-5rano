@@ -239,3 +239,29 @@ Runtime proof here: AiZynthFinder data is absent. No route was generated. Commer
 Known blockers: obtain and review the exact policy-model, template-library and stock licences; pin their versions and SHA-256 values; then run the aspirin reference in an isolated worker. Code alone cannot clear those rights.
 
 Rollback: revert the S8 commit to restore the previous runtime-only gate.
+
+## S9 — shared worker and artifact-storage foundation
+
+Problem: Genesis has a useful SQLite-backed in-process job lifecycle and authenticated scientific workers, but it has no atomic distributed claim lease, shared concurrency, retry/dead-letter policy or object storage. Calling the current system multi-replica safe would be false.
+
+Delivered:
+
+- validated scientific job envelope with job/idempotency/ResearchRun/experiment/capability identity, priority, bounded attempts and timeout;
+- provider-neutral queue port requiring enqueue, atomic claim, heartbeat, completion, failure and cancellation operations;
+- explicit current-state admission report: BLOCKED_FOR_MULTI_REPLICA_PRODUCTION;
+- ArtifactRef with provider/key/MIME/size/SHA-256/time/producer/ResearchRun/experiment identity;
+- object-storage port that hashes actual bytes server-side and returns metadata only;
+- traversal-safe keys and no raw artifact bytes in the reference object;
+- no Redis, Kubernetes or cloud provider dependency invented.
+
+Public contract: packages/backend/src/compute/workerInfrastructureContract.mjs.
+
+Existing components reused unchanged: SQLite jobs, local runner, worker authentication, remote scientific worker client/server and ScienceRun artifact reference arrays.
+
+Claude integration: none until a shared backend is selected. A future Redis/Postgres adapter must implement the six queue-port operations atomically. A future S3-compatible adapter supplies putObject; persist only the returned ArtifactRef in ScienceRun.
+
+Validation: 46 pass, 0 fail, 10 runtime-dependent skips across S9, the existing job runner and worker client/server. The focused S9 + jobs rerun is 14 pass, 0 fail.
+
+Production blockers: shared queue backend, atomic lease/heartbeat, shared concurrency/quota, retry/dead-letter persistence and object-storage credentials/provider. The existing process-local cancellation set is not crash- or replica-safe.
+
+Rollback: revert the S9 commit; existing local jobs and workers remain unchanged.

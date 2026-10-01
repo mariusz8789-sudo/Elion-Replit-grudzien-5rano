@@ -115,6 +115,22 @@ export function prepareCandidateLabHandoff(db, { campaignId, candidateId = null,
   const protocol = built.protocol;
 
   if (protocol.finalists.length === 0) {
+    const retainedCandidates = protocol.candidates.filter((row) => row.status !== 'rejected');
+    const dockingBlocker = (protocol.evidence?.blocked ?? [])
+      .find((entry) => entry.stage === 'docking');
+    if (retainedCandidates.length > 0) {
+      const requestedCandidate = candidateId
+        ? retainedCandidates.find((row) => row.candidateId === candidateId)
+        : retainedCandidates[0];
+      return terminalHandoff({
+        outcome: 'BLOCKED',
+        reason: requestedCandidate
+          ? dockingBlocker?.blocker ?? dockingBlocker?.error ?? 'DOCKING_RESULT_MISSING'
+          : 'CANDIDATE_NOT_A_FINALIST',
+        protocol,
+        candidateId: candidateId ?? requestedCandidate?.candidateId ?? retainedCandidates[0].candidateId,
+      });
+    }
     return terminalHandoff({
       outcome: 'NO_WINNER',
       reason: 'NO_FINALIST_WITH_DOCKING_RESULT',

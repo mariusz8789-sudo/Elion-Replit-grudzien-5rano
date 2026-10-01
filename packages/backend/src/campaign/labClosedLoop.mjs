@@ -206,6 +206,12 @@ export function createLabValidationRequest(db, {
   const sanitizedPlan = sanitizeEndpointPlan(endpointPlan);
   if (!sanitizedPlan.ok) return sanitizedPlan;
   const normalizedEndpoints = sanitizedPlan.entries;
+  const normalizedExternalProvider = externalProvider ? {
+    providerId: boundedString(externalProvider.providerId, 160) || null,
+    providerType: PROVIDER_TYPES.has(externalProvider.providerType)
+      ? externalProvider.providerType
+      : 'OTHER_EXTERNAL',
+  } : null;
 
   const requestFingerprint = sha16({
     v: LAB_CLOSED_LOOP_VERSION,
@@ -213,7 +219,7 @@ export function createLabValidationRequest(db, {
     candidateId,
     objective: normalizedObjective,
     endpointPlan: normalizedEndpoints,
-    externalProvider: externalProvider ?? null,
+    externalProvider: normalizedExternalProvider,
     preregistrationRef: preregistrationRef ?? null,
     protocolLink,
   });
@@ -239,10 +245,7 @@ export function createLabValidationRequest(db, {
     objective: normalizedObjective,
     endpointPlan: normalizedEndpoints,
     protocolLink,
-    externalProvider: externalProvider ? {
-      providerId: boundedString(externalProvider.providerId, 160) || null,
-      providerType: PROVIDER_TYPES.has(externalProvider.providerType) ? externalProvider.providerType : 'OTHER_EXTERNAL',
-    } : null,
+    externalProvider: normalizedExternalProvider,
     preregistrationRef: boundedString(preregistrationRef, 500) || null,
     requestedBy: boundedString(requestedBy, 160) || null,
     executionAuthority: 'EXTERNAL_LAB_ONLY',

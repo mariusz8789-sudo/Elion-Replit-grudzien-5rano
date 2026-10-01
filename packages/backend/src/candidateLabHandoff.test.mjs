@@ -238,6 +238,37 @@ describe('canonical candidate -> laboratory handoff E2E', () => {
       0,
     );
 
+    const dockingBlocked = seedCampaign(db, {
+      projectId: project.id,
+      userId: owner.user.id,
+      assessed: true,
+    });
+    db.prepare('DELETE FROM science_runs WHERE campaign_id = ? AND capability = ?')
+      .run(dockingBlocked.campaignId, 'molecular-docking');
+    campaignStore.addEvent(db, {
+      campaignId: dockingBlocked.campaignId,
+      generation: 0,
+      type: 'STAGE_BLOCKED',
+      payload: {
+        stage: 'docking',
+        blocker: 'BLOCKED_BY_RUNTIME',
+        reason: 'AutoDock Vina runtime unavailable.',
+      },
+    });
+    const runtimeBlocked = call(
+      db,
+      'POST',
+      `/api/projects/${project.id}/campaigns/${dockingBlocked.campaignId}/lab-handoff`,
+      { token: owner.token, body: { candidateId: dockingBlocked.candidateId } },
+    );
+    assert.equal(runtimeBlocked.status, 200);
+    assert.equal(runtimeBlocked.body.handoff.outcome, 'BLOCKED');
+    assert.equal(runtimeBlocked.body.handoff.reason, 'BLOCKED_BY_RUNTIME');
+    assert.equal(
+      campaignStore.listEvents(db, dockingBlocked.campaignId).filter((event) => event.type === 'LAB_VALIDATION_REQUESTED').length,
+      0,
+    );
+
     const blocked = seedCampaign(db, {
       projectId: project.id,
       userId: owner.user.id,

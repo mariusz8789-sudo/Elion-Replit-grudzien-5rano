@@ -61,7 +61,6 @@ export function createScientificWorkerRuntime({
         resolve({ workerTimeout: true });
       }, job.timeoutMs);
     });
-    timeout.unref?.();
 
     try {
       const execution = executionPort.execute({

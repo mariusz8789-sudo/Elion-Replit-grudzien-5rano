@@ -85,3 +85,24 @@ Claude integration: instantiate the port once and call `findForClaim({ researchR
 Validation: `node --test packages/backend/src/literatureFoundation.test.mjs packages/backend/src/researchRunLiteraturePort.test.mjs packages/backend/src/researchRun.test.mjs` — 19 pass, 0 fail.
 
 Rollback: revert the S2 commit; ResearchRun core and persistence are untouched.
+
+## S3 — generic engine execution contract
+
+Problem: canonical worker dispatch and `science_runs` already existed, but ResearchRun lacked a small provider-neutral request/record adapter carrying ResearchRun and experiment identity.
+
+Delivered:
+
+- `EngineExecutionRequest` validation that reuses the existing per-capability schemas and fingerprints;
+- `EngineExecutionRecord` with run/experiment/engine/environment/hash/timing/failure/replay fields;
+- admission hook capable of fail-closed `BLOCKED_BY_LICENSE`, `BLOCKED_BY_DATA` and configuration decisions before execution;
+- exact mapping of the existing `DISPATCH_STATE` vocabulary to `SUCCESS`, `BLOCKED_BY_RUNTIME`, `BLOCKED_BY_CONFIGURATION`, `BLOCKED_BY_DATA`, `TIMEOUT`, `FAILED`, `CANCELLED`;
+- output hash recomputed on the main side;
+- no new executor, registry, persistence table, queue or ResearchRun lifecycle.
+
+Public contract: `packages/backend/src/compute/engineExecutionContract.mjs`.
+
+Claude integration: construct `createEngineExecutionPort({ executor, admit })` with the existing local/remote dispatcher. Persist successful output through the existing `saveScienceRun`; do not create another execution store.
+
+Validation: `node --test packages/backend/src/engineExecutionContract.test.mjs packages/backend/src/compute/remoteScientificWorkerClient.test.mjs packages/backend/src/compute/workerServer.test.mjs` — 38 pass, 0 fail, 10 runtime-dependent skips.
+
+Rollback: revert the S3 commit; existing dispatch and `science_runs` are untouched.

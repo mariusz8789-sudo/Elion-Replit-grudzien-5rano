@@ -449,3 +449,25 @@ Validation: 60/60 focused candidate/protocol/laboratory tests PASS; full ESLint 
 Known blocker: physical validation remains BLOCKED_EXTERNAL_WET_LAB. The handoff contains high-level assay/falsification endpoints only; it does not authorise or execute synthesis, dosing or laboratory procedures.
 
 Rollback: revert this integration commit; the existing manual lab-validation API and closed loop remain unchanged.
+
+## Post-S11 integration - customer research delivery and commercial gate
+
+Problem: a complete canonical ResearchRun could be inspected scientifically, and the commercial admission contract existed, but there was no single customer-facing projection proving both boundaries together. Accepting licence decisions from an API caller would also let a customer self-authorise an export.
+
+Delivered:
+
+- one read-only computational report projected from the canonical ResearchRun, literature snapshots, frozen experiments, falsification, Evidence proposals, Replay and DecisionTrace;
+- one exact required commercial manifest for every cited source, executed engine and reasoning model;
+- server-side-only commercial decision provider; request bodies cannot submit or override licence decisions;
+- exact category, immutable identity and Evidence-reference matching before an item can satisfy the manifest;
+- explicit `BLOCKED_SCIENTIFIC_INCOMPLETE`, `BLOCKED_COMMERCIAL_POLICY` and `READY_FOR_AUTHORISED_EXPORT` states;
+- stable report and delivery fingerprints across a real SQLite restart;
+- explicit `delivered=false`, `customerAccepted=false` and `paymentStatus=NOT_INTEGRATED` truth boundaries.
+
+Public API: `POST /api/projects/:projectId/research-runs/:runId/customer-delivery`. Without a configured server-side commercial policy provider it fails closed as `BLOCKED_EXTERNAL_LICENSE_REVIEW`. A configured provider receives the server-derived required manifest and must return reviewed immutable records; client-supplied `items` are ignored.
+
+Validation: 16/16 focused customer, commercial, ResearchRun execution and literature tests PASS; focused ESLint PASS. The golden fixture uses real RDKit and recovers identical report/delivery fingerprints after process/database restart.
+
+Known blockers: no payment, customer acceptance, signed delivery receipt or production licence-decision provider is claimed. Evidence remains proposed until canonical human publication, and the report remains computational rather than clinical or wet-lab evidence.
+
+Rollback: revert this integration commit; canonical ResearchRun, commercial admission and all scientific records remain unchanged.

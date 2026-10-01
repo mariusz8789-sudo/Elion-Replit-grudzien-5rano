@@ -78,6 +78,7 @@ import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { buildCustomerResearchDelivery, requiredCommercialItemsOf } from './customerResearchDelivery.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
@@ -750,6 +751,37 @@ export function handleApi(db, ctx) {
           const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null } };
         })();
+      }
+      if (seg.length === 5 && seg[4] === 'customer-delivery') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const requiredItems = requiredCommercialItemsOf(current);
+        let commercialDecision = { ok: false, status: 'BLOCKED_EXTERNAL_LICENSE_REVIEW', items: [] };
+        if (typeof ctx.commercialAdmissionProvider?.resolve === 'function') {
+          try {
+            commercialDecision = ctx.commercialAdmissionProvider.resolve({
+              projectId,
+              researchRunId: current.researchRunId,
+              releaseId: body?.releaseId ?? null,
+              declaredUse: body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT',
+              requiredItems,
+            });
+          } catch {
+            commercialDecision = { ok: false, status: 'COMMERCIAL_POLICY_PROVIDER_ERROR', items: [] };
+          }
+        }
+        const result = buildCustomerResearchDelivery(db, projectId, current.researchRunId, {
+          releaseId: body?.releaseId ?? null,
+          declaredUse: body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT',
+          items: commercialDecision?.ok && Array.isArray(commercialDecision.items)
+            ? commercialDecision.items
+            : [],
+          commercialDecisionSource: commercialDecision?.ok
+            ? 'SERVER_SIDE_COMMERCIAL_POLICY_PROVIDER'
+            : commercialDecision?.status ?? 'BLOCKED_EXTERNAL_LICENSE_REVIEW',
+        });
+        if (!result.ok) return err(404, result.status);
+        return ok(result);
       }
       if (seg.length === 5 && seg[4] === 'proposals') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

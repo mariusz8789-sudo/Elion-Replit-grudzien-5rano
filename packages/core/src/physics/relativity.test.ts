@@ -98,7 +98,7 @@ describe('U0-a guard', () => {
     const offenders: string[] = [];
     for (const root of SCAN_ROOTS) {
       for (const file of sourceFiles(join(REPO, root))) {
-        const rel = relative(REPO, file);
+        const rel = relative(REPO, file).replaceAll('\\', '/');
         if (ALLOWED.has(rel)) continue;
         const text = readFileSync(file, 'utf8');
         if (GAMMA_COPY.test(text) || RS_COPY.test(text)) offenders.push(rel);

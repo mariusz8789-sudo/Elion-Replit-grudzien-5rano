@@ -262,9 +262,33 @@ Claude integration: none until a shared backend is selected. A future Redis/Post
 
 Validation: 46 pass, 0 fail, 10 runtime-dependent skips across S9, the existing job runner and worker client/server. The focused S9 + jobs rerun is 14 pass, 0 fail.
 
-Production blockers: shared queue backend, atomic lease/heartbeat, shared concurrency/quota, retry/dead-letter persistence and object-storage credentials/provider. The existing process-local cancellation set is not crash- or replica-safe.
+Production blockers: a shared multi-host queue backend, shared concurrency/quota and object-storage credentials/provider. The scientific SQLite path now has durable lease/heartbeat, retry/dead-letter and cancellation state; legacy in-process jobs still use a process-local cancellation set and neither path is multi-replica safe.
 
 Rollback: revert the S9 commit; existing local jobs and workers remain unchanged.
+
+### S9b — durable single-node scientific worker runtime
+
+Problem: the queue could persist and lease work, but no runtime consumed those leases through the
+canonical EngineExecution port. A server restart therefore had queue recovery semantics without a
+tested execution consumer.
+
+Delivered: `scientificWorkerRuntime.mjs` claims one durable job, maintains its lease, applies its
+timeout signal, executes only through `EngineExecutionRecord`, and atomically completes or fails the
+same row. Transient failures are retried within the stored bound; data/licence/configuration blockers
+are dead-lettered immediately; stale workers cannot write after cancellation or lease loss. A second
+runtime instance proves restart recovery by claiming the same queued row and completing attempt two.
+
+Existing components reused: the S9 SQLite queue, S3 execution contract, canonical capability input
+validation and the existing jobs table. No second scheduler, ResearchRun lifecycle or result store.
+
+Validation: `node --test packages/backend/src/scientificWorkerRuntime.test.mjs
+packages/backend/src/workerInfrastructureContract.test.mjs` — 14 pass, 0 fail; focused ESLint and
+`git diff --check` pass.
+
+Production limit remains explicit: this runtime is real for one SQLite deployment. Multi-replica
+admission still fails until a shared queue/concurrency backend and object storage are configured.
+
+Rollback: revert the S9b commit; persisted S9 jobs and existing in-process jobs remain readable.
 
 ## S10 — scientific Python sandbox foundation
 

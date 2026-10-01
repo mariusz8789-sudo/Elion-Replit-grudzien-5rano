@@ -149,7 +149,7 @@ export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now
         const timestamp = now();
         const row = db.prepare(`SELECT * FROM jobs WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`).get(jobId, leaseId, timestamp);
         if (!row) return { ok: false, error: 'LEASE_NOT_ACTIVE' };
-        const terminal = row.attempts >= row.max_attempts;
+        const terminal = failure?.retryable === false || row.attempts >= row.max_attempts;
         db.prepare(`UPDATE jobs SET status = ?, failure_json = ?, worker_id = NULL, lease_id = NULL,
           lease_expires_at = NULL, updated_at = ? WHERE id = ?`).run(terminal ? 'DEAD_LETTER' : 'QUEUED', JSON.stringify(failure ?? {}), timestamp, jobId);
         return { ok: true, retry: !terminal, job: read(jobId) };

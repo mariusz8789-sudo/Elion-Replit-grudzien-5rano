@@ -59,8 +59,20 @@ export function createResearchRunLiteraturePort(dependencies = {}) {
       const sources = Array.isArray(literature.sources) ? literature.sources : [];
       const admittedSourceIds = new Set(sources.map((source) => source.sourceId));
       let links = sources.map((source) => unknownClaimEvidenceLink(input.claimId, source.sourceId)).filter(Boolean);
+      let linkerBlocker = null;
       if (linker && sources.length > 0) {
-        const proposed = await linker({ researchRunId: input.researchRunId, claimId: input.claimId, claim: input.claim, sources }).catch(() => []);
+        let proposed;
+        try {
+          proposed = await linker({ researchRunId: input.researchRunId, claimId: input.claimId, claim: input.claim, sources });
+        } catch {
+          proposed = [];
+          linkerBlocker = {
+            sourceProvider: 'CLAIM_EVIDENCE_LINKER',
+            status: LITERATURE_RETRIEVAL_STATUS.NO_ACCESS,
+            failureCode: 'CLAIM_EVIDENCE_LINKER_FAILURE',
+            message: 'Claim-to-source extraction failed; retrieved sources remain available with UNKNOWN relationships.',
+          };
+        }
         const validatedLinks = (Array.isArray(proposed) ? proposed : [])
           .map((link) => proposeClaimEvidenceLink({ ...link, claimId: input.claimId }, admittedSourceIds))
           .filter(Boolean);
@@ -85,7 +97,10 @@ export function createResearchRunLiteraturePort(dependencies = {}) {
         support,
         contradictions,
         missingEvidence,
-        accessBlockers: accessBlockers({ connectors: Array.isArray(literature.connectors) ? literature.connectors : [] }),
+        accessBlockers: [
+          ...accessBlockers({ connectors: Array.isArray(literature.connectors) ? literature.connectors : [] }),
+          ...(linkerBlocker ? [linkerBlocker] : []),
+        ],
       };
     },
   });

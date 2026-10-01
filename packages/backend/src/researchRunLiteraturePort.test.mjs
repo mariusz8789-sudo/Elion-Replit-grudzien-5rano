@@ -43,6 +43,23 @@ describe('literature -> ResearchRun port', () => {
     assert.equal(result.links[0].relationship, 'UNKNOWN');
   });
 
+  it('surfaces a linker failure explicitly while retaining retrieved sources as UNKNOWN', async () => {
+    const port = createResearchRunLiteraturePort({
+      search: async () => ({ status: 'METADATA_ONLY', sources: [source('epmc:1')], connectors: [] }),
+      linker: async () => { throw new Error('provider unavailable'); },
+    });
+    const result = await port.findForClaim({ researchRunId: 'rr-1', claimId: 'claim-1', claim: 'claim' });
+    assert.equal(result.status, 'METADATA_ONLY');
+    assert.equal(result.sources.length, 1);
+    assert.equal(result.links[0].relationship, 'UNKNOWN');
+    assert.deepEqual(result.accessBlockers, [{
+      sourceProvider: 'CLAIM_EVIDENCE_LINKER',
+      status: 'NO_ACCESS',
+      failureCode: 'CLAIM_EVIDENCE_LINKER_FAILURE',
+      message: 'Claim-to-source extraction failed; retrieved sources remain available with UNKNOWN relationships.',
+    }]);
+  });
+
   it('surfaces access blockers and never creates substitute sources', async () => {
     const port = createResearchRunLiteraturePort({
       search: async () => ({ status: 'BLOCKED_BY_NETWORK', sources: [], connectors: [{ connectorId: 'EUROPE_PMC', status: 'BLOCKED_BY_NETWORK', failureCode: 'RATE_LIMITED' }] }),

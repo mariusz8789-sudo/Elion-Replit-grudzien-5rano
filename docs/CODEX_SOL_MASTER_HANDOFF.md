@@ -318,3 +318,30 @@ Validation: 5 pass, 0 fail in the focused contract suite.
 Known limitation: measured reliability must come from a real calibration protocol and dataset. UNKNOWN must stay UNKNOWN; the contract computes no reliability itself.
 
 Rollback: revert the S11a commit; no existing campaign behavior changes.
+
+## S11b — benchmark promotion and external data custody
+
+Problem: development-set performance must never grant product approval, and externally supplied bytes need server-side hashing, licence admission, schema validation and ArtifactRef custody.
+
+Delivered:
+
+- strict DEVELOPMENT → FROZEN → UNSEEN_EVALUATION → PROMOTION_DECISION state sequence;
+- preregistration hash and frozen pass criteria before unseen evaluation;
+- refusal when development and unseen dataset identities are the same;
+- PRODUCT_APPROVED only after a distinct unseen evaluation passes every frozen criterion and an explicit APPROVE decision is recorded;
+- external artifact ingest requiring source identity, APPROVED or accepted CONDITIONAL licence, raw bytes and schema validator;
+- UNKNOWN/BLOCKED licences fail closed before storage;
+- actual bytes are hashed server-side through the S9 ArtifactStorage port; caller-supplied hashes are not accepted as proof;
+- custody record binds source, licence, retrieval time, schema identity and returned ArtifactRef.
+
+Public contracts: packages/backend/src/compute/benchmarkPromotionGate.mjs and packages/backend/src/compute/externalArtifactIngestion.mjs.
+
+Existing components reused unchanged: benchmark suite, provenance canonical hashing, D-149 allowlisted scientific ingestion and S9 ArtifactRef/object-storage port.
+
+Claude integration: use the promotion record only as an admission artifact for an existing ResearchRun capability. Route bytes fetched by existing connectors through externalArtifactIngestion after a source-specific licence decision and schema validator are available.
+
+Validation: 24 pass, 0 fail across promotion/ingestion, existing scientific ingestion and ArtifactRef/queue tests.
+
+Known blockers: no production object storage is configured; source-specific licences and schema validators remain connector responsibilities; unseen benchmark datasets must be independently selected and licensed.
+
+Rollback: revert the S11b commit; the existing D-149 ingestion remains unchanged.

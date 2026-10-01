@@ -93,9 +93,26 @@ try {
     for (const route of routes) {
       const page = await context.newPage();
       const errors = [];
+      const httpBoundaries = [];
       page.on('pageerror', (error) => errors.push(`pageerror:${error.message}`));
       page.on('console', (message) => {
-        if (message.type() === 'error') errors.push(`console.error:${message.text()}`);
+        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) {
+          errors.push(`console.error:${message.text()}`);
+        }
+      });
+      page.on('requestfailed', (request) => {
+        errors.push(`requestfailed:${request.url()}:${request.failure()?.errorText ?? 'UNKNOWN'}`);
+      });
+      page.on('response', (response) => {
+        const status = response.status();
+        if (status < 400) return;
+        const url = response.url();
+        const resourceType = response.request().resourceType();
+        if (status >= 500 || (!url.includes('/api/') && status === 404)) {
+          errors.push(`http:${status}:${resourceType}:${url}`);
+        } else {
+          httpBoundaries.push({ status, resourceType, url });
+        }
       });
       try {
         const response = await page.goto(`${BASE}/${route}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -120,12 +137,12 @@ try {
           const bytes = await page.screenshot({ path: screenshot, timeout: 60_000 });
           report.screenshotHashes[screenshot.replaceAll('\\', '/')] = sha256(bytes);
         }
-        const record = { ...viewport, route, finalUrl: page.url(), screenshot, ...state, errors };
+        const record = { ...viewport, route, finalUrl: page.url(), screenshot, ...state, httpBoundaries, errors };
         report.cases.push(record);
         for (const error of errors) report.failures.push({ mode: viewport.mode, route, error });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        report.cases.push({ ...viewport, route, errors: [...errors, `exception:${message}`] });
+        report.cases.push({ ...viewport, route, httpBoundaries, errors: [...errors, `exception:${message}`] });
         report.failures.push({ mode: viewport.mode, route, error: `exception:${message}` });
       } finally {
         await page.close();

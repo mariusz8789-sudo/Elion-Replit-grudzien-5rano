@@ -177,3 +177,48 @@
   .human-touch-hint { bottom: calc(172px + env(safe-area-inset-bottom, 0px)); }
 }
 body:has(.ax-hud) .context-guide-launch { display: none; }
+
+
+/* Existing atlas instruments: readable glass panels, touch-sized controls. */
+.human-hero-heading { padding: 14px 18px; left: 3%; max-width: 350px; border-left: 1px solid #9bdded70; border-radius: 0 12px 12px 0; background: linear-gradient(100deg, #03101bea, #03101b30); }
+.human-hero-heading p { color: #d0dfe5; }
+.human-eyebrow, .human-model-label { font-size: 12px; line-height: 1.5; }
+.human-model-label { color: #bdcdd7; }
+.human-hero-tools .sw-chip { min-height: 44px; font-size: 12px; }
+.human-hero-path { border-color: #84cfe55c; box-shadow: 0 16px 44px #0005; }
+.human-hero-path button { min-height: 54px; }
+.human-hero-path button span { font-size: 11px; opacity: .9; }
+.human-hero-path button strong { font-size: 13px; }
+.human-subject-target { width: 44px; height: 44px; }
+.human-context-close { width: 44px; height: 44px; }
+.human-context-action { min-height: 44px; font-size: 14px; }
+.human-inspector { border-color: #84cfe566; background: #07131ef5; }
+.human-inspector :is(.human-twin-tag, .human-twin-source, .human-twin-caveat, .human-depth-ticks) { font-size: 12px; line-height: 1.5; }
+.human-inspector-tabs button { min-height: 44px; font-size: 12px; }
+@media (max-width: 900px) {
+  .human-hero-heading { top: 74px; left: 14px; right: 14px; padding: 8px 12px; max-width: none; }
+  .human-hero-heading h1 { font-size: 28px; margin: 3px 0; }
+  .human-hero-heading p { font-size: 12px; margin-bottom: 3px; }
+  .human-hero-tools { top: 228px; gap: 4px; }
+  .human-hero-tools .sw-chip { padding: 8px; font-size: 12px; }
+  .human-hero-path button strong { font-size: 12px; }
+  .human-hero-path button span { font-size: 11px; }
+  .human-inspector { height: 40dvh; max-height: 40dvh; }
+}
+
+.sw .human-inspector .sw-ex-rungs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sw .human-inspector :is(button, summary) { min-height: 44px; }
+@media (max-width: 900px) {
+  .human-hero-heading { top: 62px; padding-block: 6px; }
+  .human-hero-heading h1 { font-size: 26px; }
+  .human-hero-tools { top: 192px; }
+  .human-touch-hint { bottom: calc(202px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 28px); white-space: normal; text-align: center; }
+}
+
+@media (max-width: 900px) {
+  .human-hero.has-inspector :is(.human-hero-path, .human-hero-action, .human-touch-hint) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .human-hero:has(.human-reference-attribution[data-status]) .human-hero-tools { top: 216px; }
+}

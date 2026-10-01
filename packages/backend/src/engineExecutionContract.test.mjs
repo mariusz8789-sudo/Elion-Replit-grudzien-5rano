@@ -85,4 +85,3 @@ describe('generic engine execution contract', () => {
     assert.equal(out.record.failureCode, 'EXECUTOR_THREW');
   });
 });
-

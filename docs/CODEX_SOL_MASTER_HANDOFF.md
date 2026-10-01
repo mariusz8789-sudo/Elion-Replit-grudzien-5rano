@@ -293,3 +293,28 @@ Runtime proof here: none claimed. No host process or container was launched. Bac
 Production blockers: isolated container backend, pinned image digest, safe dataset staging, enforced cgroup/process/output limits, artifact collection through object storage, Linux security review and adversarial tests.
 
 Rollback: revert the S10 commit; no current execution path changes.
+
+## S11a — resource, agreement, uncertainty and falsification contracts
+
+Problem: engine selection and final reporting need shared metadata, while existing campaign code already owns execution, comparison with observations and falsification. A new scoring or discovery loop would duplicate that architecture.
+
+Delivered:
+
+- ResourceProfile with runtime, cost, risk, availability, data availability and cheaper-prerequisite metadata;
+- transparent lexicographic ordering with no opaque scalar score and no promotion of blocked work;
+- AgreementRecord requiring distinct methods, a named calibration dataset, sample size and measured reliability;
+- UncertaintyBreakdown retaining data, model, measurement, engine disagreement, extrapolation, missing evidence, runtime and literature completeness as separate dimensions;
+- aggregate uncertainty fixed to null: the contract never invents one confidence number;
+- self-falsification check proposals for sensitivity, independent engine comparison, applicability domain, data shift, contradictory sources and replay drift.
+
+Public contract: packages/backend/src/compute/scientificDecisionContracts.mjs.
+
+Existing components reused unchanged: campaign multi-fidelity execution, descriptor/docking conflict detection, lab observation comparison, Replay verification, benchmark statistics and ResearchRun falsification. The new helper proposes metadata/checks only.
+
+Claude integration: ResearchRun may consume ResourceProfiles when ordering experiments and attach AgreementRecord/UncertaintyBreakdown to its existing report. It remains the only owner of experiment planning, execution and verdicts.
+
+Validation: 5 pass, 0 fail in the focused contract suite.
+
+Known limitation: measured reliability must come from a real calibration protocol and dataset. UNKNOWN must stay UNKNOWN; the contract computes no reliability itself.
+
+Rollback: revert the S11a commit; no existing campaign behavior changes.

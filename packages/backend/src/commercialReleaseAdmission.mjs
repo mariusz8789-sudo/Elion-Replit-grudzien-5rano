@@ -106,4 +106,3 @@ export function admitCommercialRelease({ releaseId, researchRunId, declaredUse, 
     exportAllowed: admitted,
   });
 }
-

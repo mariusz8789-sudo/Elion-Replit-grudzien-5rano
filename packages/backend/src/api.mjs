@@ -97,6 +97,7 @@ import {
   linkLabEvidenceProposal,
   reviewExternalLabObservation,
 } from './campaign/labClosedLoop.mjs';
+import { createCanonicalCandidateLabHandoff } from './campaign/candidateLabHandoff.mjs';
 import { buildLabObservationEvidenceInput } from './campaign/labEvidenceBridge.mjs';
 import {
   planVirtualExperiment,
@@ -881,7 +882,25 @@ export function handleApi(db, ctx) {
           void enqueueJob(db, job.id);
           return ok({ jobId: job.id }, 202);
         }
-        // /api/projects/:id/campaigns/:cid/lab-validation?candidate=:candidateId — governed external-lab
+        // /api/projects/:id/campaigns/:cid/lab-handoff - server-derived candidate
+        // -> preclinical protocol -> governed external-lab request.
+        if (seg[4] === 'lab-handoff') {
+          if (method !== 'POST') return err(405, 'method_not_allowed');
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const result = createCanonicalCandidateLabHandoff(db, {
+            campaignId,
+            candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+            requiredWetLabId: typeof body?.requiredWetLabId === 'string' ? body.requiredWetLabId : null,
+            externalProvider: body?.externalProvider ?? null,
+            requestedBy: user.id,
+          });
+          if (!result.ok) return err(400, result.error, result.detail);
+          if (result.handoff?.outcome === 'NO_WINNER' || (result.handoff?.outcome === 'BLOCKED' && !result.eventId)) {
+            return ok({ handoff: result.handoff, deduped: false });
+          }
+          return ok({ handoff: result.handoff, eventId: result.eventId, deduped: result.deduped }, 201);
+        }
+        // /api/projects/:id/campaigns/:cid/lab-validation?candidate=:candidateId - governed external-lab
         // validation request/dossier (editor+ to create, viewer+ to read). See campaign/labClosedLoop.mjs.
         if (seg[4] === 'lab-validation') {
           const labCandidateId = typeof ctx.query?.candidate === 'string' ? ctx.query.candidate : typeof body?.candidateId === 'string' ? body.candidateId : null;

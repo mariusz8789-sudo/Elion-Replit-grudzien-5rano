@@ -431,3 +431,21 @@ Validation: 14/14 focused DecisionTrace, ResearchRun execution/restart and BYT t
 Known limitation: trace quality is bounded by the frozen plan and current capability registry. It is structured decision provenance, not a claim that Genesis exposes private chain-of-thought.
 
 Rollback: revert this integration commit; the prior NEXT_EXPERIMENT proposal remains compatible but loses its attached trace.
+## Post-S11 integration - canonical candidate to laboratory handoff
+
+Problem: the computational candidate protocol, preclinical protocol and external-laboratory closed loop existed, but a client had to assemble and submit the protocol boundary manually.
+
+Delivered:
+
+- one editor-authorized POST /api/projects/:projectId/campaigns/:campaignId/lab-handoff endpoint;
+- server-side projection from persisted candidate and Science Run records into the existing computational and preclinical protocol contracts;
+- one idempotent LAB_VALIDATION_REQUESTED event in the existing campaign log;
+- file-SQLite restart recovery with stable preclinical, request and handoff fingerprints;
+- explicit LAB_HANDOFF_READY, NO_WINNER and BLOCKED outcomes;
+- a hard boundary that the Vina score is not a measurement, the physical assay was not executed, clinical efficacy is UNKNOWN, and execution requires an external laboratory plus human approval.
+
+Validation: 60/60 focused candidate/protocol/laboratory tests PASS; full ESLint PASS.
+
+Known blocker: physical validation remains BLOCKED_EXTERNAL_WET_LAB. The handoff contains high-level assay/falsification endpoints only; it does not authorise or execute synthesis, dosing or laboratory procedures.
+
+Rollback: revert this integration commit; the existing manual lab-validation API and closed loop remain unchanged.

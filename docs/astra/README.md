@@ -1,17 +1,16 @@
-# Astra — product, evidence and commercial track
+# Astra product evidence and commercial track
 
-This documentation defines a product projection around the existing Genesis ResearchRun. It does not create another research runtime, lifecycle store, Evidence Ledger or Replay system.
+This documentation defines an export/customer projection around the existing Genesis ResearchRun. It creates no research runtime, lifecycle store, Evidence Ledger, Replay engine or competing Sol contract.
 
-## Decision
-
-`Evidence Pack v2` is a working name for **consolidation and export**, not permission to build a second evidence system. The stable identity is `agent_runs.id` in domain `genesis.research-run`; its verified lifecycle is the hash-chained sequence in `agent_run_steps`.
-
-Documents:
+Current audit: main `5d064c4e`, PR #54 `fc29ef60`, PR #56 `0a372cdd`, checked on GitHub 2026-10-01. Open-PR implementation is distinct from deployment. The review response records exactly what changed after Claude's blocking review.
 
 1. [Evidence contract decision](./EVIDENCE_CONTRACT_DECISION.md)
 2. [Canonical ResearchRun Evidence Pack](./RESEARCHRUN_EVIDENCE_PACK_SPEC.md)
 3. [Customer workflow](./CUSTOMER_RESEARCH_WORKFLOW.md)
 4. [Commercial licence gate](./COMMERCIAL_LICENSE_GATE.md)
-5. [Kosmos gap and 30-day Definition of Done](./KOSMOS_GAP_AND_30_DAY_DOD.md)
+5. [Capability gaps and approved 30-day sequence](./KOSMOS_GAP_AND_30_DAY_DOD.md)
+6. [Genesis Advantage Track](./GENESIS_ADVANTAGE_PLAN.md)
+7. [Reference-only JSON Schema](./schema.json) and [synthetic example](./example.json)
+8. [Review response and validation](./REVIEW_RESPONSE.md)
 
-This PR is documentation only. Schema and example fixtures belong in an implementation PR after owners approve the mapping. No merge or deployment is implied.
+The schema and example are documentation artifacts, not a new persistence model or working serializer. They index existing records and explicitly distinguish synthetic examples from resolved exports. Source verification, licence decisions, human publication, runtime integration and delivery controls stay with their current owners. No merge or deployment is implied.

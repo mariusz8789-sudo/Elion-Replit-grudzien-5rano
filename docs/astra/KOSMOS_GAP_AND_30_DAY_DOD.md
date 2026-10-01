@@ -1,68 +1,39 @@
-# Edison Kosmos gap analysis and 30-day Definition of Done
+# Research capability gaps and 30 day Definition of Done
 
-This is a functional comparison, not a parity or compatibility claim. “Research world model” means persistent structured research state, not a rendered world.
+This is a functional gap analysis, not a verified parity or superiority claim about Edison Kosmos. Persistent research state is distinct from a rendered world. Baseline checked 2026-10-01: main `5d064c4e`, PR #54 `fc29ef60`, PR #56 `0a372cdd`; PRs remain open.
 
-## Functional matrix
-
-| Capability | Genesis status | Repository evidence | Remaining gap |
-|---|---|---|---|
-| Experiment planning | `GENESIS HAS` | `packages/backend/src/researchRun.mjs` | model proposals still require capability and human gates |
-| Persistent research state | `GENESIS HAS` | `packages/backend/src/agentRun.mjs`, `researchRun.mjs` | customer projection and operational hardening |
-| Preregistration / anti-HARKing | `GENESIS HAS` in PR #54 | `experimentMemory.mjs`, `researchRunExecution.mjs` | merge/review and broader adapters |
-| Falsification | `GENESIS HAS` in PR #54 | `researchRunExecution.mjs` | validate beyond RDKit and keep verdict scope narrow |
-| Claim → source/evidence binding | `PARTIAL` | `claimProposal.mjs`, `knowledgeRegistry.mjs`, evidence references in `researchRun.mjs` | literature-level binding and export completeness |
-| Reproducibility / Replay | `PARTIAL` | existing Replay/Evidence/RO-Crate modules; `research-run-execution@1` | end-to-end positive replay acceptance and environment capture |
-| Scientific tools | `PARTIAL` | `campaign/toolchain.mjs`; `researchRunEngines.mjs` | ResearchRun executes RDKit only today |
-| Sandboxed code execution | `PARTIAL` | worker architecture and bounded engine adapters | hardened untrusted-code sandbox, quotas and egress policy |
-| Autonomous literature research | `MISSING` | proposal prompt consumes existing refs only | allowlisted discovery, retrieval, licence gate, quality/ranking |
-| Data analysis | `PARTIAL` | engine adapters and campaign analyses | general tabular/statistical analysis contracts |
-| Long-running autonomy | `PARTIAL` | persisted ResearchRun and campaigns | scheduler, checkpoint/resume, budgets, failure recovery |
-| Research world model | `PARTIAL` | ResearchRun chain + knowledge registry + Scientific Memory | unified typed graph and cross-run synthesis |
-| Enterprise/customer workflow | `PARTIAL` | projects, authorization, reports and this projection | durable approval UX, tenant policy, delivery controls |
-| Wet-lab execution | `EXTERNAL DEPENDENCY` | handoff concepts only | accredited partner, assay capacity, samples, contracts and data |
-
-## Approved 30-day sequence and Astra track
-
-| Week | Core roadmap owned by Claude/Sol | Parallel Astra deliverable |
+| Capability | Inspected state and repository evidence | Remaining gap |
 |---|---|---|
-| W1 | ResearchRun orchestrator | approve canonical mapping; document customer projection and integrity states |
-| W2 | literature layer | source/licence record contract; Europe PMC and selected dataset gates; claim-to-source acceptance |
-| W3 | capability resolver | product eligibility view: executable adapter + runtime proof + licence status; no capability inflation |
-| W4 | GLP-1R flagship | customer dossier, Evidence export checklist, report language, `NO_WINNER`/handoff gate |
+| Plan and persistent ResearchRun | Main `researchRun.mjs`, `agentRun.mjs`, ENTITY-0..3 | Customer projection and integration of open PRs |
+| Preregistration and falsification | PR54 `experimentMemory.mjs`, `researchRunExecution.mjs` | More admissible protocols; verdict stays within protocol |
+| Replay and chat | PR54 ScienceRun persistence + `campaign/verify.mjs`; `scienceChat/researchRunTurn.ts` | Portable export and independent clean-environment customer acceptance |
+| Literature and claim-source | PR56 `literature/europePmcConnector.mjs`, `researchRunLiteraturePort.mjs`, `claimEvidenceLink.mjs` | Claude orchestration, live access proof, passage extraction/review and rights |
+| Scientific engines | PR54 RDKit registry; PR56 PySCF/Vina/OpenMM bounded ports and ADMET/retrosynthesis admission | Installed Linux reference-case evidence, integration; commercial weights/data gates |
+| Queue and storage | Main jobs/workers; PR56 `workerInfrastructureContract.mjs` | Real shared queue, atomic leases/quotas, retry persistence and object-storage provider |
+| Generated-code sandbox | PR56 `scientificSandboxContract.mjs` | Container backend not configured; enforcement and adversarial review |
+| Agreement and uncertainty | PR56 `scientificDecisionContracts.mjs` | Real independent calibration data; aggregate uncertainty stays null |
+| Unseen evaluation and custody | PR56 `benchmarkPromotionGate.mjs`, `externalArtifactIngestion.mjs` | Licensed unseen datasets and production storage; no retroactive Run 8 promotion |
+| Long-running autonomy | Main persisted runs/jobs; PR56 queue/resource contracts | Scheduler integration, checkpoints, total budgets, durable recovery |
+| Enterprise/observability | Main auth/projects; PR56 `scientificObservabilityContract.mjs`, `docs/CODEX_SOL_INDEPENDENT_AUDIT.md` | Telemetry, secrets, retention, isolation and deployment-specific proof |
+| Wet lab | Main `campaign/labClosedLoop.mjs`, `labEvidenceBridge.mjs` | Frozen physical design, verified custody and qualified partner |
 
-This track does not resequence the approved roadmap and does not assume a named medicinal-chemistry reviewer is already available. Reviewer and wet-lab partner are external dependencies.
+Backend paths are under `packages/backend/src/`; the chat path is under `packages/frontend/src/core/`. Sol's contracts exist in PR #56; they are not production infrastructure. See [Advantage plan](./GENESIS_ADVANTAGE_PLAN.md) for scale, 7/14/30-day acceptance and independent-method limitations.
 
-## Primary Definition of Done — Drug Discovery
+## Approved sequence and parallel Astra track
 
-1. One bounded customer question has one stable ResearchRun ID.
-2. The plan and hypotheses remain proposals until approved.
-3. Every selected experiment is supported by the capability resolver.
-4. Predictions, protocol and criteria are preregistered before execution.
-5. The actual execution record includes pinned engine, environment, inputs and hashes.
-6. Raw outputs, errors and hashes are retained without invented fallback results.
-7. A deterministic, protocol-scoped falsification verdict is recorded.
-8. Evidence is proposed and approved through existing contracts.
-9. Positive Replay passes; drift or failure remains visible.
-10. JSON/RO-Crate report links every material claim to evidence and licence decisions.
-11. Terminal result is an honest candidate dossier, `NO_WINNER` or `BLOCKED`.
-12. Wet-lab handoff occurs only if a partner accepts the dossier; it does not claim laboratory validation.
+| Week | Core owner roadmap | Astra deliverable |
+|---|---|---|
+| W1 | Claude ResearchRun orchestrator and PR54 review | Canonical mapping, reference-only schema/example, customer projection; no second lifecycle |
+| W2 | Sol literature ports, Claude integration | Source/licence records, metadata versus full-text boundaries, claim-source acceptance |
+| W3 | Capability resolver, engine admission and runtime proof | Executability/licence/readiness view and release proof checklist, reusing PR56 contracts |
+| W4 | GLP-1R flagship under frozen gates | Scoped dossier, Evidence/Replay/export acceptance, honest NO_WINNER/BLOCKED and partner handoff |
 
-The first acceptable implementation may be RDKit-bounded. Vina, ADMET or OpenMM enter the DoD only after real ResearchRun adapters, runtime reference cases and licence clearance. A full computational screening claim cannot be made from RDKit descriptors alone.
+This schedule is a target conditional on access/runtime/rights. It does not assume a named medicinal-chemistry reviewer or partner already exists.
 
-## Secondary Definition of Done — quantum chemistry
+## Primary acceptance
 
-Only after the primary path passes: one PySCF experiment uses the same ResearchRun lifecycle and Evidence envelope, with a distinct protocol, executable adapter, reference-case proof and Replay. It proves domain generality without changing the evidence schema.
+One bounded question has one stable ResearchRun ID, proposed plan, immutable preregistration, real admitted execution, exact protocol-scoped falsification, pending then properly approved Evidence, positive Replay, and claim-linked JSON/RO-Crate report with per-item rights and reproduction instructions. Raw errors, negative results and UNKNOWN remain visible. A rejected input with NOT_APPLICABLE Replay does not pass positive Replay acceptance.
 
-## Cannot be closed by code alone
+RDKit descriptors are the current PR54 baseline, not a full screening pipeline. Vina/ADMET/OpenMM do not enter the customer promise merely because PR56 contains ports. GLP-1R D-152 proves functional data sufficiency, not a trained model passing its gate. Preserve D-144 failed validation and all frozen thresholds. An engineering demo may pass with NO_WINNER while candidate readiness fails.
 
-- rights to unknown/private datasets, model weights and commercial APIs;
-- independent scientific validation and medicinal-chemistry review;
-- wet-lab capacity, biosafety, samples and assay quality;
-- organizational signing key/governance required for `VALID_TRUSTED`;
-- evidence that a model generalises beyond its validated domain.
-
-## Executive comparison
-
-| GENESIS DZISIAJ | ZA 30 DNI | KOSMOS | POZOSTAŁA LUKA |
-|---|---|---|---|
-| Persistent ResearchRun, proposed plans, hash-chained state; R1-b adds preregistration, RDKit execution and scoped falsification | One auditable GLP-1R-oriented customer vertical with honest Evidence/Replay/report and `NO_WINNER`; optional PySCF only after primary | Broader autonomous literature/data research and long-running research synthesis | Literature scale, more executable adapters, hardened sandbox, commercial rights, independent reviewer and wet-lab partner |
+Only after the primary acceptance passes, a canonical PySCF H2 or bounded physics case may demonstrate reuse of the same lifecycle/export. Organizational signing, real calibration, private-data rights, independent science review and physical laboratory work cannot be completed by documentation or a schema.

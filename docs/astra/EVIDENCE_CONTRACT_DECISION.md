@@ -1,37 +1,37 @@
-# ADR — canonical Evidence Pack strategy
+# Canonical Evidence Pack decision
 
-## Status
+Status: proposed export contract, updated against GitHub main `5d064c4e`, PR #54 `fc29ef60` and PR #56 `0a372cdd` on 2026-10-01. All three were read; both implementation PRs remain open. This documentation does not claim their changes are deployed.
 
-Proposed consolidation, corrected against current `main` and the open R1-b implementation in PR #54.
+Genesis exposes one read-only ResearchRunEnvelope assembled from existing authoritative records. It is an export projection, not a database, ledger, workflow or execution authority. ENTITY-0 research state, ENTITY-1 self-model/capability decisions, ENTITY-2 knowledge and ENTITY-3 model proposals retain their existing ownership.
 
-## Decision
-
-Genesis should expose one read-only `ResearchRunEnvelope` assembled from existing authoritative records. It is an export projection, not a database, ledger or orchestrator.
-
-| Concern | Existing source of truth | Action |
+| Concern | Existing source of truth | Projection rule |
 |---|---|---|
-| Research identity | `agent_runs.id`, domain `genesis.research-run` in `packages/backend/src/researchRun.mjs` | Reuse unchanged |
-| Research lifecycle | verified hash chain in `agent_run_steps` via `agentRun.mjs` | Reuse unchanged |
-| Question and proposed plan | `PROBLEM_FORMALIZED`, `HYPOTHESES_GENERATED` | Reference from envelope |
-| Frozen predictions and protocol | `PREDICTIONS_FROZEN` plus `experimentMemory.preregisterExperiment` / `experiment_records` in PR #54 | Reference; do not duplicate |
-| Execution identity and results | `research-run-execution@1` in `researchRunExecution.mjs` | Reference execution record |
-| Falsification | `SELF_FALSIFICATION` | Reference scoped verdict |
-| Evidence proposal/update | `EVIDENCE_UPDATE`, existing Evidence Ledger/knowledge contracts | Reference IDs; preserve human approval rules |
-| Next experiment | `NEXT_EXPERIMENT` | Reference event |
-| Fabric/campaign/science runs | existing domain execution records | Link when used; they do not own ResearchRun lifecycle |
-| Replay, reports, RO-Crate | existing projections/generators | Export without replacing |
+| Research identity | `agent_runs.id`, domain `genesis.research-run`; `researchRun.mjs` | Reuse existing ID/project; never mint a second run |
+| Lifecycle | `agent_run_steps`, `toolInvoked = mind.researchState`; `agentRun.mjs` | Reference existing event sequence; reverify chain |
+| Question and proposed plan | `PROBLEM_FORMALIZED`, `HYPOTHESES_GENERATED` | Model items remain PROPOSED / NOT_EVIDENCE |
+| Frozen predictions/protocol | `PREDICTIONS_FROZEN`; `experimentMemory.preregisterExperiment`, `experiment_records` | Existing preregistration before execution; no new protocol store |
+| Execution | `EXPERIMENT_HANDOFF.payload`, `research-run-execution@1`; PR #54 `researchRunExecution.mjs` | Event reference, `protocolId`, preregistration/fingerprint and `scienceRunId` links |
+| Falsification | `SELF_FALSIFICATION` plus sealed SESSION via `sealExperimentSession` | Exact protocol-scoped verdict; no export-side reclassification |
+| Evidence | `EVIDENCE_UPDATE.evidenceProposalId`; `knowledgeApi.mjs` | Proposal is not publication; resolve existing publish/approval record separately |
+| Scientific output | `science_runs.id` saved by PR #54 | The existing canonical output and hashes, not a duplicate run |
+| Replay | `science_run_verifications`; PR #54 uses `campaign/verify.mjs` | Reference every verification ID; first summary lives in NEXT_EXPERIMENT; later replays do not rewrite it |
+| Next experiment | `NEXT_EXPERIMENT` | Reference fixed-rule proposal and its replay summary |
+| Source/engine/artifact metadata | PR #56 literature, execution, S9 ArtifactRef, S11 decision/custody/observability contracts | Reuse ports/refs when integrated; no Astra replacement schemas for them |
+| Reports and customer views | Existing report/ScientificEvidencePack/RO-Crate projections | Read-only views of these records; missing delivery/approval features stay PLANNED |
 
-The customer workflow states are derived from this chain plus existing approval records. They must not be persisted as a competing lifecycle.
+Backend paths above are under `packages/backend/src/`. Fabric/campaign records own their domain execution; they do not own ResearchRun lifecycle. No customer status can authorize execution or create scientific truth.
 
-## Compatibility
+## Compatibility and scope
 
-- Existing v1 Evidence Packs remain readable.
-- Stable record IDs are referenced instead of copied into a new ledger.
-- A run blocked before computation may have no Fabric/science-run pack and must still export its honest ResearchRun state.
-- `schema.json` and `example.json` are intentionally deferred to the implementation PR that binds this approved mapping to real serializers.
+- Existing ScientificEvidencePack v1 remains readable; this schema neither replaces it nor requires rewriting old packs.
+- [schema.json](./schema.json) validates a reference index over existing records; [example.json](./example.json) is explicitly synthetic documentation. Neither is a runtime serializer or proof that any run occurred.
+- Failed intake/execution may have no Scientific Run or Evidence Pack. Empty arrays are honest; a partial export cannot claim successful delivery.
+- The schema has no editable customer state, verdict, approval or ledger payload. Referential integrity and content hashes require the existing resolvers/verifiers, not JSON Schema alone.
+- `VALID_TRUSTED` and organizational signatures remain PLANNED. Current schema permits no trusted-signature claim.
 
-## Rejected options
+## Rejected approaches
 
-1. A new autonomous-scientist Evidence database: duplicates ResearchRun and Evidence/Replay.
-2. Treating `ScientificEvidencePack` as the lifecycle owner: it cannot represent intake or pre-execution blocks.
-3. Letting UI status create scientific truth: presentation is never authoritative.
+1. A second autonomous-scientist ledger, store or scheduler.
+2. ScientificEvidencePack/Fabric as the owner of intake or lifecycle.
+3. A model, UI label or schema-validation pass promoting a hypothesis to evidence.
+4. Reimplementing Sol's completed ports in documentation or a parallel runtime.

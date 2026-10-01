@@ -30,7 +30,7 @@
  * On any provider failure, malformed answer or conflict nothing is written and the run stays as it was.
  */
 import { canonicalJson, fnv1a } from './determinism.mjs';
-import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, getAgentRun, listAgentRuns, readResearchState } from './agentRun.mjs';
+import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, getAgentRun, listAgentRuns, readResearchState, updateAgentRunStatus } from './agentRun.mjs';
 import { buildProposalPrompt, parseProposalText, validateClaimProposal } from './claimProposal.mjs';
 import { recordClaimProposal } from './knowledgeRegistry.mjs';
 import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningProvider.mjs';
@@ -155,6 +155,44 @@ export function listResearchRuns(db, projectId) {
   return listAgentRuns(db, projectId).filter((r) => r.domain === RESEARCH_RUN_DOMAIN).map((run) => {
     const v = view(db, run);
     return { researchRunId: v.researchRunId, question: v.question, status: run.status, nextStep: v.nextStep, events: v.researchState.events.length, createdAt: run.createdAt };
+  });
+}
+
+const CONTROL_TRANSITIONS = Object.freeze({
+  PAUSE: { from: [AGENT_RUN_STATUS.RUNNING], to: AGENT_RUN_STATUS.PAUSED },
+  RESUME: { from: [AGENT_RUN_STATUS.PAUSED], to: AGENT_RUN_STATUS.RUNNING },
+  CANCEL: { from: [AGENT_RUN_STATUS.RUNNING, AGENT_RUN_STATUS.PAUSED], to: AGENT_RUN_STATUS.CANCELLED },
+});
+
+/**
+ * Controls the canonical AgentRun behind a ResearchRun. The transition is recorded in the same
+ * verified research-state chain before the status changes, so pause/resume/cancel survive restart
+ * and remain attributable without a second scheduler or lifecycle store.
+ */
+export function controlResearchRun(db, projectId, runId, action, { userId = null, reason = null } = {}) {
+  const normalized = typeof action === 'string' ? action.trim().toUpperCase() : '';
+  const transition = CONTROL_TRANSITIONS[normalized];
+  if (!transition) return { ok: false, status: 'INVALID_CONTROL_ACTION' };
+  return inWriteTransaction(db, () => {
+    const run = ownRun(db, projectId, runId);
+    if (!run) return { ok: false, status: 'NOT_FOUND' };
+    const state = readResearchState(db, run.id);
+    if (!state.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', chain: state.chain };
+    if (!transition.from.includes(run.status)) {
+      return { ok: false, status: 'INVALID_CONTROL_TRANSITION', from: run.status, action: normalized };
+    }
+    const appended = appendServerResearchStateEvent(db, run.id, 'RUN_CONTROLLED', {
+      contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+      researchRunId: run.id,
+      action: normalized,
+      fromStatus: run.status,
+      toStatus: transition.to,
+      reason: STR(reason, 500),
+      actor: { kind: 'USER', userId },
+    });
+    if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
+    updateAgentRunStatus(db, run.id, transition.to);
+    return { ok: true, status: transition.to, researchRun: getResearchRun(db, projectId, run.id) };
   });
 }
 

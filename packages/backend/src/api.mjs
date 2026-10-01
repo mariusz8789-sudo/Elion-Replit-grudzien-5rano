@@ -75,7 +75,7 @@ import { buildCognitiveState } from './cognitiveState.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
-import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun } from './researchRun.mjs';
+import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun } from './researchRun.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
@@ -717,6 +717,14 @@ export function handleApi(db, ctx) {
       if (seg.length === 4) {
         if (method !== 'GET') return err(405, 'method_not_allowed');
         return ok({ researchRun: current });
+      }
+      if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = controlResearchRun(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
+        if (result.ok) return ok(result);
+        const status = result.status === 'NOT_FOUND' ? 404 : 409;
+        return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
       }
       if (seg.length === 5 && seg[4] === 'proposals') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

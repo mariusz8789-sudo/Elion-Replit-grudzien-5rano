@@ -22,6 +22,8 @@ const P = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 
 export const AGENT_RUN_STATUS = Object.freeze({
   RUNNING: 'RUNNING',
+  PAUSED: 'PAUSED',
+  CANCELLED: 'CANCELLED',
   RESOLVED: 'RESOLVED',
   BLOCKED: 'BLOCKED',
   BUDGET_EXHAUSTED: 'BUDGET_EXHAUSTED',
@@ -126,7 +128,7 @@ export function listAgentSteps(db, agentRunId) {
 export const RESEARCH_STATE_TOOL = 'mind.researchState';
 export const RESEARCH_STATE_EVENT_TYPES = Object.freeze([
   'PROBLEM_FORMALIZED', 'KNOWLEDGE_SNAPSHOT', 'HYPOTHESES_GENERATED', 'PREDICTIONS_FROZEN',
-  'EXPERIMENT_HANDOFF', 'EVIDENCE_UPDATE', 'SELF_FALSIFICATION', 'NEXT_EXPERIMENT', 'TERMINAL',
+  'EXPERIMENT_HANDOFF', 'EVIDENCE_UPDATE', 'SELF_FALSIFICATION', 'NEXT_EXPERIMENT', 'RUN_CONTROLLED', 'TERMINAL',
 ]);
 export const RESEARCH_STATE_GENESIS_HEAD = fnv1a(canonicalJson({ genesis: 'research-state-v1' }));
 

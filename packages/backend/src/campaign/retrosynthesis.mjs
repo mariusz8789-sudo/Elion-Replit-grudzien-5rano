@@ -16,6 +16,7 @@ import { saveScienceRun } from '../store.mjs';
 import { addEvent, getCandidate } from './persistence.mjs';
 import { snapshotEnvironment } from '../provenance.mjs';
 import * as retro from '../compute/retroAdapter.mjs';
+import { RETROSYNTHESIS_USE_PURPOSE, assessRetrosynthesisAdmission } from '../compute/retrosynthesisAdmission.mjs';
 
 export const RETRO_STAGE = 'retrosynthesis';
 
@@ -39,11 +40,32 @@ export function retrosynthesisOutputHash(outputs) {
  * Plans a route for one candidate and persists it. `candidateId` is optional — a bare SMILES can be
  * planned too — but when given, the run is attached to that candidate like every other stage result.
  */
-export function planCandidateRoute(db, { projectId, campaignId, candidateId = null, smiles = null, options = {} }) {
+export function planCandidateRoute(db, { projectId, campaignId, candidateId = null, smiles = null, options = {}, usePurpose = RETROSYNTHESIS_USE_PURPOSE.COMMERCIAL_PRODUCT }) {
   const candidate = candidateId ? getCandidate(db, candidateId) : null;
   if (candidateId && !candidate) return { ok: false, error: 'candidate_not_found' };
   const target = smiles ?? candidate?.canonicalSmiles ?? null;
   if (!target) return { ok: false, error: 'smiles_or_candidate_required' };
+
+  const admission = assessRetrosynthesisAdmission({ purpose: usePurpose });
+  if (!admission.ok) {
+    addEvent(db, {
+      campaignId, generation: candidate?.generation ?? 0, type: 'STAGE_BLOCKED',
+      payload: {
+        stage: RETRO_STAGE,
+        candidateId,
+        blocker: admission.status,
+        reason: admission.failureCode,
+        missingModelFiles: admission.missing ?? null,
+      },
+    });
+    return {
+      ok: false,
+      error: admission.status,
+      reason: admission.failureCode,
+      missingModelFiles: admission.missing ?? null,
+      admission: admission.policy,
+    };
+  }
 
   const result = retro.planRoute(target, options);
   if (!result.ok) {

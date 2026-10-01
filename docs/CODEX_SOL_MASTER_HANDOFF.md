@@ -212,3 +212,30 @@ Runtime proof here: OpenMM is absent locally, so the real canonical run is BLOCK
 Known blocker: a candidate-specific protein-ligand MD vertical still needs a validated topology/preparation protocol, full environment/hardware identity and external scientific review. This bounded reference does not satisfy that future scope.
 
 Rollback: revert the S7 commit; the underlying OpenMM pipeline remains intact.
+
+## S8 — retrosynthesis licence and data admission
+
+Problem: AiZynthFinder code is MIT, but route execution also requires an expansion model, reaction templates and stock data. Their commercial licences were not proven, while the existing product stage could call the adapter directly.
+
+Delivered:
+
+- separate admission identities for engine code, expansion-policy model, templates and stock;
+- code status APPROVED/MIT while all three external artifact licences remain UNKNOWN;
+- commercial product path now fails closed with BLOCKED_BY_LICENSE before invoking the engine;
+- technical validation distinguishes missing package (BLOCKED_BY_RUNTIME), missing/unhashed artifacts (BLOCKED_BY_DATA) and a complete hashed technical fixture;
+- route output remains MODEL_ESTIMATE / ROUTE_PROPOSAL / NOT_A_LABORATORY_PROCEDURE;
+- no model download, synthetic route, conditions, quantities, yield or safety procedure.
+
+Public contract: packages/backend/src/compute/retrosynthesisAdmission.mjs.
+
+Existing components reused: retroAdapter, AiZynthFinder worker, campaign retrosynthesis stage, canonical ScienceRun persistence, Evidence handoff and Replay.
+
+Claude integration: none for the gate. The existing product endpoint now blocks until the model/template/stock licence decisions are reviewed. Technical validation must pass usePurpose TECHNICAL_VALIDATION explicitly and still requires all three artifacts with SHA-256 identities.
+
+Validation: 27 pass, 0 fail, 1 real-model skip across admission, campaign retrosynthesis and handoff tests. The campaign API suite also passed its retrosynthesis route test after the gate was connected.
+
+Runtime proof here: AiZynthFinder data is absent. No route was generated. Commercial execution is BLOCKED_BY_LICENSE independent of runtime availability.
+
+Known blockers: obtain and review the exact policy-model, template-library and stock licences; pin their versions and SHA-256 values; then run the aspirin reference in an isolated worker. Code alone cannot clear those rights.
+
+Rollback: revert the S8 commit to restore the previous runtime-only gate.

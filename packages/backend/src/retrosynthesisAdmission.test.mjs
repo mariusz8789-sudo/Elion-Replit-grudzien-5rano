@@ -57,7 +57,7 @@ describe('retrosynthesis admission', () => {
   });
 
   it('requires hashes for every required technical-validation artifact', () => {
-    const runtime = structuredClone(completeRuntime);
+    const runtime = JSON.parse(JSON.stringify(completeRuntime));
     runtime.models.files[1].sha256 = null;
     const admission = assessRetrosynthesisAdmission({
       purpose: RETROSYNTHESIS_USE_PURPOSE.TECHNICAL_VALIDATION,

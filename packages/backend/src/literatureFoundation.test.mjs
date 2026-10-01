@@ -51,7 +51,7 @@ describe('literature foundation', () => {
   });
 
   it('does not infer commercial rights from open/full-text availability', async () => {
-    const unknownLicence = structuredClone(fixture);
+    const unknownLicence = JSON.parse(JSON.stringify(fixture));
     delete unknownLicence.resultList.result[0].license;
     const result = await queryEuropePmc({ text: 'GLP-1R' }, { now: () => NOW, fetchImpl: async () => response(200, unknownLicence) });
     assert.equal(result.sources[0].fullTextAvailability, 'EUROPE_PMC');

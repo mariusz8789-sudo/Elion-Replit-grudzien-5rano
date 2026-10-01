@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TextEncoder } from 'node:util';
 import { createArtifactStoragePort } from './compute/workerInfrastructureContract.mjs';
 import { createDevelopmentRecord, decidePromotion, freezePromotionProtocol, recordUnseenEvaluation } from './compute/benchmarkPromotionGate.mjs';
 import { ingestExternalArtifact } from './compute/externalArtifactIngestion.mjs';

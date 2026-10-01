@@ -69,10 +69,10 @@ describe('generic engine execution contract', () => {
       assert.equal(out.record.status, expected);
       assert.equal(out.record.outputHash, null);
     }
-    const controller = new AbortController(); controller.abort();
+    const signal = { aborted: true };
     let called = false;
     const cancelled = createEngineExecutionPort({ executor: { execute: async () => { called = true; } }, now: clock('2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z') });
-    const out = await cancelled.execute(REQUEST, { signal: controller.signal });
+    const out = await cancelled.execute(REQUEST, { signal });
     assert.equal(called, false);
     assert.equal(out.record.status, 'CANCELLED');
   });

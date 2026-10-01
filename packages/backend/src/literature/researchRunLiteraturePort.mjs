@@ -60,12 +60,7 @@ export function createResearchRunLiteraturePort(dependencies = {}) {
       const admittedSourceIds = new Set(sources.map((source) => source.sourceId));
       let links = sources.map((source) => unknownClaimEvidenceLink(input.claimId, source.sourceId)).filter(Boolean);
       if (linker && sources.length > 0) {
-        let proposed = [];
-        try {
-          proposed = await linker({ researchRunId: input.researchRunId, claimId: input.claimId, claim: input.claim, sources });
-        } catch {
-          proposed = [];
-        }
+        const proposed = await linker({ researchRunId: input.researchRunId, claimId: input.claimId, claim: input.claim, sources }).catch(() => []);
         const validatedLinks = (Array.isArray(proposed) ? proposed : [])
           .map((link) => proposeClaimEvidenceLink({ ...link, claimId: input.claimId }, admittedSourceIds))
           .filter(Boolean);

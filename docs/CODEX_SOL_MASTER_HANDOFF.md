@@ -133,3 +133,28 @@ Validation: 37 pass, 0 fail, 10 runtime-dependent skips across PySCF ResearchRun
 Runtime proof here: local PySCF is absent, therefore the actual execution record is `BLOCKED_BY_RUNTIME`. The image is pinned and build-checked; `AVAILABLE_NOW` still requires the Linux worker runtime probe/CI to execute the real reference case.
 
 Rollback: revert the S4 commit; the underlying PySCF adapter and worker remain intact.
+
+## S5 — Vina / Meeko ResearchRun execution
+
+Problem: the real Vina/Meeko adapter and protein-docking campaign path existed, but the vetted 1IEP files failed their byte hashes on Windows because Git converted LF to CRLF. ResearchRun also lacked a bounded canonical docking entry.
+
+Delivered:
+
+- `.gitattributes` now marks pinned PDB/SDF files `-text`, preserving manifest bytes across Windows/Linux;
+- canonical ABL1 1IEP + imatinib docking request with fixed box, exhaustiveness, pose count and seed;
+- deterministic target preparation through the existing registry and Meeko adapter;
+- S3 execution record with Vina engine identity, input/output hashes and fixed-seed replay declaration;
+- no path supplied by an API caller and no worker filesystem path returned;
+- packaging assertions for `vina==1.2.7` and `meeko==0.8.0`.
+
+Public contract: `packages/backend/src/compute/vinaResearchRunExecutor.mjs`.
+
+Existing components reused unchanged: target registry, Vina/Meeko adapters, structural worker, campaign `science_runs` and replay.
+
+Claude integration: invoke `runCanonicalDocking({ researchRunId, executionId })`; on `SUCCESS`, persist the existing ScienceRun shape and artifact hashes. A preparation failure returns a blocker and no pose/record.
+
+Validation: 21 pass, 0 fail, 3 engine-dependent skips. The target hash test now passes on Windows and Linux semantics.
+
+Runtime proof here: Vina/Meeko are absent locally, so the canonical run is honestly `BLOCKED_BY_RUNTIME`; worker runtime CI is required before `AVAILABLE_NOW`.
+
+Rollback: revert the S5 commit. This also removes the PDB/SDF EOL protection, so the prior Windows hash failure will return.

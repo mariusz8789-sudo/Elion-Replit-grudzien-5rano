@@ -77,6 +77,7 @@ import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
+import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
@@ -733,6 +734,21 @@ export function handleApi(db, ctx) {
         if (result.ok) return ok(result, 201);
         const status = result.status === 'NOT_FOUND' || result.status === 'HYPOTHESIS_NOT_FOUND' ? 404 : 409;
         return { status, body: { error: result.status, reason: result.reason ?? null } };
+      }
+      if (seg.length === 5 && seg[4] === 'literature') {
+        if (method === 'GET') return ok({ literatureSnapshots: current.literatureSnapshots });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const result = await retrieveResearchRunLiterature(db, projectId, current.researchRunId, body, {
+            port: ctx.literaturePort,
+            options: ctx.literatureOptions,
+            userId: user.id,
+          });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null } };
+        })();
       }
       if (seg.length === 5 && seg[4] === 'proposals') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

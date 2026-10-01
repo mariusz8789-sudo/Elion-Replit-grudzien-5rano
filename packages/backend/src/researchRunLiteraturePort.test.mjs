@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createResearchRunLiteraturePort } from './literature/researchRunLiteraturePort.mjs';
+import { contradictionLiteratureQuery, createResearchRunLiteraturePort } from './literature/researchRunLiteraturePort.mjs';
 
 const source = (id) => ({ sourceId: id, title: id, metadataHash: 'a'.repeat(64), licence: null, licenceStatus: 'UNKNOWN' });
 
@@ -77,5 +77,23 @@ describe('literature -> ResearchRun port', () => {
     const result = await port.findForClaim({ claimId: 'claim-1', claim: 'claim' });
     assert.equal(result.status, 'NO_ACCESS');
     assert.equal(called, false);
+  });
+
+  it('runs a separate contradiction-candidate query without classifying search matches as contradictions', async () => {
+    const queries = [];
+    const port = createResearchRunLiteraturePort({
+      search: async (query) => {
+        queries.push(query);
+        return { status: 'METADATA_ONLY', sources: [source('epmc:negative')], connectors: [] };
+      },
+    });
+    const result = await port.findContradictionsForClaim({ researchRunId: 'rr-1', claimId: 'claim-1', claim: 'GLP-1R agonism improves glucose response' });
+    assert.equal(result.intent, 'CONTRADICTION_SEARCH');
+    assert.equal(result.query, contradictionLiteratureQuery('GLP-1R agonism improves glucose response'));
+    assert.match(queries[0].text, /negative result/);
+    assert.equal(result.sources.length, 1);
+    assert.equal(result.links[0].relationship, 'UNKNOWN');
+    assert.deepEqual(result.contradictions, []);
+    assert.ok(result.missingEvidence.some((message) => message.includes('candidates only')));
   });
 });

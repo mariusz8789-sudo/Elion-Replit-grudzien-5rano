@@ -7,8 +7,8 @@ No merge. No deploy. No force-push.
 | Capability | Before | After | Stage/commit | Tests | Real runtime proof | Production ready? | Blocker | Claude integration |
 |---|---|---|---|---|---|---|---|---|
 | Heavy-compute security | Public/runtime boundary incomplete | Auth, authorization, limits, timeout/output gates; passive health | S0 `d579907c`, `7a983b3f` | Focused security/worker suites | HTTP worker tests | PARTIAL | Shared quota/production secrets | Review and merge |
-| Europe PMC literature | No canonical literature port | Fail-closed structured connector with licence/provenance | S1 `1e6727ce` | Focused connector tests | Fixture proof; live access not claimed | PARTIAL | Network and more connectors | Thin ResearchRun call |
-| Claim to source | No shared ResearchRun port | SUPPORTS/CONTRADICTS/CONTEXT/METHOD/UNKNOWN links | S2 `0b0bc395` | Focused tests | Contract proof | PARTIAL | Extraction review policy | Thin adapter |
+| Europe PMC literature | No canonical literature port | Fail-closed connector plus canonical ResearchRun snapshot and contradiction-candidate search | S1 plus post-S11 integration | Full backend + restart integration | File-SQLite chain/restart fixture; live access not claimed | PARTIAL | Network, full-text review and more connectors | Integrated; no extra lifecycle |
+| Claim to source | No shared ResearchRun port | Links plus idempotent KNOWLEDGE_SNAPSHOT; source ids remain NOT_EVIDENCE until canonical review | S2 plus post-S11 integration | Focused + full backend | Hash-chain and restart proof | PARTIAL | Passage extraction and human review policy | Integrated into canonical ResearchRun |
 | Engine execution | Engine-specific records | One request/admission/runtime/record contract | S3 `1ccd8e75` | Focused engine tests | RDKit existing; others gated | PARTIAL | Per-engine runtime proof | Use shared record |
 | PySCF | Adapter/toolchain present | Canonical H2 ResearchRun entry | S4 `efa88d55` | Targeted pass; runtime skip | BLOCKED locally | NO | Installed Linux runtime | Persist existing record |
 | Vina/Meeko | Adapter/target present | Canonical fixed docking ResearchRun entry | S5 `905916b5` | 21 pass, 3 skips | BLOCKED locally | NO | Installed runtime/CI proof | Persist existing record |
@@ -29,7 +29,7 @@ No merge. No deploy. No force-push.
 
 ## What Claude connects through a thin adapter
 
-- ResearchRun asking the literature port for sources and contradictions.
+- Literature is now integrated into canonical ResearchRun; Claude only reviews the API and event projection.
 - Engine results persisted through the existing ScienceRun/Evidence/Replay path.
 - ResourceProfile and UncertaintyBreakdown projected into the existing final report.
 - Existing source connectors routed through custody ingest once storage, schema and licence decisions exist.

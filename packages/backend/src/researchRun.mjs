@@ -134,12 +134,14 @@ export function nextStepOf(run, researchState) {
 function view(db, run) {
   const researchState = readResearchState(db, run.id);
   const last = (type) => researchState.events.filter((e) => e.type === type).at(-1)?.payload ?? null;
+  const literatureSnapshots = researchState.events.filter((event) => event.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
   return {
     researchRunId: run.id,
     run,
     question: last('PROBLEM_FORMALIZED')?.question ?? run.goal,
     problem: last('PROBLEM_FORMALIZED'),
     plan: last('HYPOTHESES_GENERATED'),
+    literatureSnapshots,
     experiments: experimentsOf(researchState),
     researchState,
     nextStep: nextStepOf(run, researchState),
@@ -336,8 +338,19 @@ export async function proposeResearchPlan(db, projectId, runId, { provider, self
   if (!provider?.configured) return { ok: false, status: 'BLOCKED_BY_PROVIDER_CONFIGURATION', reason: provider?.reason ?? 'NO_PROVIDER' };
 
   const question = before.question;
+  const literature = before.literatureSnapshots.at(-1);
+  const literatureLines = literature ? [
+    '',
+    'Literature metadata available for context only (NOT_EVIDENCE; never copy these ids into evidence reference fields):',
+    ...[...literature.primary.sources, ...literature.contradictionSearch.sources]
+      .filter((source, index, all) => all.findIndex((candidate) => candidate.sourceId === source.sourceId) === index)
+      .slice(0, 20)
+      .map((source) => `- ${source.sourceId}: ${source.title} [licence=${source.licenceStatus}]`),
+    `Contradiction-search candidates: ${literature.contradictionSearch.sources.length}; every relationship remains PROPOSED/UNKNOWN until reviewed.`,
+  ] : [];
   const prompt = [
     buildProposalPrompt({ question, hypothesisId: null, evidenceRefs: evidenceRefsOf(db, projectId), selfModel }),
+    ...literatureLines,
     '',
     `Research run: ${runId}`,
   ].join('\n');

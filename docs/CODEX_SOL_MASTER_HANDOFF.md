@@ -392,3 +392,25 @@ Known blocker: no production telemetry backend, retention policy or deployment-s
 Audit: docs/CODEX_SOL_INDEPENDENT_AUDIT.md. Completion table: docs/CODEX_SOL_COMPLETION_REPORT.md.
 
 Rollback: revert the S11c commit; existing logs and execution paths remain unchanged.
+
+## Post-S11 integration — literature in canonical ResearchRun
+
+Problem: the S1/S2 connector and claim-link port were present, but a real ResearchRun could not retrieve, persist or recover a literature snapshot.
+
+Delivered:
+
+- one editor-authorized ResearchRun API for retrieval; no second run, ledger, store or lifecycle;
+- primary metadata retrieval plus an explicit contradiction-candidate query;
+- one idempotent KNOWLEDGE_SNAPSHOT event in the existing ResearchRun hash chain;
+- file-SQLite restart recovery and duplicate-request protection;
+- planning context marked NOT_EVIDENCE; literature source ids cannot enter Evidence reference fields without canonical admission.
+
+Public API: GET|POST /api/projects/:projectId/research-runs/:runId/literature.
+
+Validation: focused ResearchRun/literature suite 15/15 PASS; full backend 1,464 tests, 1,383 PASS, 0 fail, 81 declared runtime skips; lint 0 errors; production build PASS.
+
+Claude integration: none required beyond review. ResearchRun remains the sole lifecycle owner. A future reviewed passage extractor may propose links through the existing port, but must not publish Evidence.
+
+Known blockers: live provider/network availability, full-text access, passage review and commercial reuse rights remain external or source-specific.
+
+Rollback: revert this integration commit; S1/S2 ports remain available without altering stored ResearchRuns.

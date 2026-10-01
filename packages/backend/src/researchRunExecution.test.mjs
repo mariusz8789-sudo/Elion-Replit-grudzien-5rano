@@ -13,6 +13,7 @@ import { listProposals } from './knowledgeApi.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { executeResearchExperiment, VERDICT_SCOPE } from './researchRunExecution.mjs';
 import { DEFAULT_RESEARCH_TOOLS } from './researchRunEngines.mjs';
+import { createComputeAdmission } from './compute/computeAdmission.mjs';
 
 /**
  * R1-b — one proposed experiment goes plan → frozen prediction → real engine → falsification →
@@ -80,6 +81,28 @@ async function planned(email) {
 const types = (rr) => rr.researchState.events.map((e) => e.type);
 
 describe('R1-b research run execution', () => {
+  test('authenticated ResearchRun execution uses the shared heavy-compute admission before mutating the run', needsRdkit, async () => {
+    const { db, owner, base, runId } = await planned('rb-admission@lab.org');
+    const admission = createComputeAdmission({ limit: 2, maxActive: 1 });
+    const held = admission.acquire('another-principal');
+    assert.equal(held.ok, true);
+
+    const blocked = handleApi(db, {
+      method: 'POST',
+      pathname: `${base}/research-runs/${runId}/experiments`,
+      token: owner.token,
+      body: {},
+      query: {},
+      computeAdmission: admission,
+    });
+    assert.equal(blocked.status, 503);
+    assert.equal(blocked.body.error, 'compute_busy');
+    assert.equal(handleApi(db, {
+      method: 'GET', pathname: `${base}/research-runs/${runId}`, token: owner.token, body: null, query: {},
+    }).body.researchRun.experiments.length, 0);
+    held.release();
+  });
+
   test('plan → frozen prediction → RDKit → falsification → evidence PROPOSED → next experiment, three times', needsRdkit, async () => {
     const { db, call, owner, project, base, runId, plan } = await planned('rb1@lab.org');
     assert.deepEqual(plan.hypotheses.map((h) => h.experimentProposal.decision), ['PROPOSED', 'PROPOSED', 'HUMAN_APPROVAL_REQUIRED', 'PROPOSED']);

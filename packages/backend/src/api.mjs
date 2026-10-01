@@ -61,14 +61,14 @@ import { hashPassword, verifyPassword, generateToken, validateRegistration } fro
 import { createHash } from 'node:crypto';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
-import { listCapabilitiesMetadata } from './compute/capabilities.mjs';
+import { listCapabilities, listCapabilitiesMetadata } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
 import { runJob, requestCancel, enqueueJob } from './compute/jobs.mjs';
 import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
-import { listToolchainMetadata, getToolMetadata } from './campaign/toolchain.mjs';
+import { listToolchain, listToolchainMetadata, getToolMetadata } from './campaign/toolchain.mjs';
 import { createAgentRun, getAgentRun, listAgentRuns, readResearchState, appendResearchStateEvent } from './agentRun.mjs';
 import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolveContradiction } from './knowledgeRegistry.mjs';
 import { buildCognitiveState } from './cognitiveState.mjs';
@@ -79,6 +79,7 @@ import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOM
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
+import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
 import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
@@ -234,6 +235,11 @@ function runHeavyCompute(db, ctx, operation, execute) {
   } finally {
     ticket.release();
   }
+}
+
+function admitCommercialAdmet() {
+  const admission = admitAdmetUse({ purpose: ADMET_USE_PURPOSE.COMMERCIAL_PRODUCT });
+  return admission.ok ? null : err(403, admission.status, admission.failureCode);
 }
 
 export function handleApi(db, ctx) {
@@ -659,7 +665,15 @@ export function handleApi(db, ctx) {
       return (async () => {
         const provider = reasoningProviderOf(ctx);
         let selfModel;
-        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: provider.describe() }); } catch { selfModel = null; }
+        try {
+          selfModel = buildSelfModel({
+            db,
+            runtime: await buildScientificRuntimeStatus(db),
+            reasoningModel: provider.describe(),
+            toolchain: listToolchain(),
+            capabilities: listCapabilities(),
+          });
+        } catch { selfModel = null; }
         const result = await proposeScientificClaim(db, projectId, body, { provider, selfModel, userId: user.id });
         if (result.ok) return ok(result, result.deduped ? 200 : 201);
         const status = { INVALID_REQUEST: 400, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
@@ -710,7 +724,15 @@ export function handleApi(db, ctx) {
         return (async () => {
           const provider = reasoningProviderOf(ctx);
           let selfModel;
-          try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: provider.describe() }); } catch { selfModel = null; }
+          try {
+            selfModel = buildSelfModel({
+              db,
+              runtime: await buildScientificRuntimeStatus(db),
+              reasoningModel: provider.describe(),
+              toolchain: listToolchain(),
+              capabilities: listCapabilities(),
+            });
+          } catch { selfModel = null; }
           const result = await proposeResearchPlan(db, projectId, current.researchRunId, { provider, selfModel, userId: user.id });
           if (result.ok) return ok(result, result.deduped ? 200 : 201);
           const status = { NOT_FOUND: 404, RUN_NOT_PROPOSABLE: 409, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
@@ -723,11 +745,13 @@ export function handleApi(db, ctx) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
         const hypothesisId = typeof body?.hypothesisId === 'string' && body.hypothesisId.trim() ? body.hypothesisId.trim().slice(0, 200) : null;
-        const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
-        if (result.ok) return ok(result, result.deduped ? 200 : 201);
-        // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
-        const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
-        return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
+        return runHeavyCompute(db, ctx, `research-run:${current.researchRunId}`, () => {
+          const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
+          const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
+        });
       }
       // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
       if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {
@@ -816,6 +840,10 @@ export function handleApi(db, ctx) {
         // /api/projects/:id/campaigns/:cid/stage (editor+) — uruchamia etap ciężki (docking/QM)
         if (seg[4] === 'stage' && method === 'POST') {
           if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (body?.admet?.enabled) {
+            const blocked = admitCommercialAdmet();
+            if (blocked) return blocked;
+          }
           if (campaign.status !== 'completed') return err(409, 'campaign_not_completed', 'Etapy multi-fidelity wymagają zakończonej kampanii bazowej.');
           const job = createJob(db, { projectId, type: 'campaign-stage', params: { campaignId, config: sanitizeStageConfig(body) }, createdBy: user.id });
           void enqueueJob(db, job.id);
@@ -1033,6 +1061,11 @@ export function handleApi(db, ctx) {
       }
       if (seg.length === 6 && seg[4] === 'virtual-lab' && seg[5] === 'execute' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const planned = campaignStore.listEvents(db, campaignId).find((event) => event.type === 'VIRTUAL_EXPERIMENT_PLANNED' && event.payload?.executionId === body.executionId);
+        if (planned && ['admet-estimation', 'toxicity-risk-estimation'].includes(planned.payload?.requestedCapability)) {
+          const blocked = admitCommercialAdmet();
+          if (blocked) return blocked;
+        }
         // Asynchronous like /api/knowledge/ingest: a configured private scientific worker may run
         // the engine (server.mjs awaits handleApi's result). Unconfigured capabilities run locally.
         return executeVirtualExperimentDispatched(db, {
@@ -1070,6 +1103,10 @@ export function handleApi(db, ctx) {
         if (seg.length === 7 && seg[6] === 'verify' && method === 'POST') {
           // Editor+: replays the real engine (costs real compute — e.g. an ADMET-AI model reload).
           if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (['admet-estimation', 'toxicity-risk-estimation'].includes(run.capability)) {
+            const blocked = admitCommercialAdmet();
+            if (blocked) return blocked;
+          }
           const v = verifyScienceRun(db, run.id);
           if (!v.ok) return err(404, 'not_found', v.error);
           return ok({ verification: v.verification }, 201);
@@ -1088,6 +1125,8 @@ export function handleApi(db, ctx) {
 }
 
 function runAdmetHandler(body) {
+  const blocked = admitCommercialAdmet();
+  if (blocked) return blocked;
   const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
   const r = predictAdmet(smiles);
   return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);

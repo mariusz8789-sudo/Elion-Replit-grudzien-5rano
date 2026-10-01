@@ -106,10 +106,10 @@ export const SCIENTIFIC_OS: readonly CapabilityGroup[] = [
   {
     id: 'ls', name: 'Life Sciences', icon: 'pill', line: 'Drug discovery, chemistry and human biology',
     items: [
-      { id: 'drug', name: 'Drug Discovery', what: 'Docking campaign: RDKit → Vina → ADMET, with the reasons and a discovery graph', state: 'LIVE', hash: '#/drug', source: 'backend/src/campaign/*, docs/evidence/astex-*' },
+      { id: 'drug', name: 'Drug Discovery', what: 'Docking campaign: RDKit → Vina, with reasons and a discovery graph; commercial ADMET awaits licence review', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/campaign/*, docs/evidence/astex-*' },
       { id: 'falsification', name: 'Self-falsification', what: '13 probes on imatinib in ABL1 with positive and negative controls', state: 'LIVE', hash: '#/reviewer', source: 'docs/evidence/finalist-falsification-2026-09-27.json' },
       { id: 'retrosynthesis', name: 'Retrosynthesis', what: 'How a chemist would make it: AiZynthFinder route for imatinib, Replay MATCH', state: 'LIVE_INCOMPLETE', hash: '#/reviewer', source: 'docs/evidence/imatinib-retrosynthesis-2026-09-27.json' },
-      { id: 'admet', name: 'ADMET / toxicity', what: '52 TDC endpoints on each candidate, inside the drug workflow', state: 'LIVE', hash: '#/drug', source: 'backend/src/compute/admetAdapter.mjs' },
+      { id: 'admet', name: 'ADMET / toxicity', what: '52 TDC endpoint estimates; commercial execution is blocked pending weights and training-data licence review', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/compute/admetResearchRunExecutor.mjs' },
       { id: 'openmm', name: 'Molecular dynamics', what: 'OpenMM on the protein 1VII (AMBER14 + OBC2)', state: 'ASK_ONLY', ask: 'Uruchom OpenMM na białku 1VII', source: 'core/experimentFabric/router.ts (biology-openmm-md-1vii-reference)' },
       { id: 'pyscf', name: 'Quantum chemistry', what: 'PySCF Hartree–Fock for H₂, also computed in CI', state: 'ASK_ONLY', ask: 'Policz PySCF RHF dla H2', source: 'core/experimentFabric/router.ts (quantum-chemistry-pyscf-h2-rhf)' },
       { id: 'biopython', name: 'Antibody structure', what: 'Biopython RMSD of the HIV antibody 10E8 / MPER; PDB files must be supplied', state: 'ASK_ONLY', ask: 'Porównaj RMSD struktur PDB HIV 10E8 5GHW i 4G6F', source: 'core/experimentFabric/router.ts (biology-hiv-10e8-pdb-structural-comparison)' },

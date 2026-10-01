@@ -81,6 +81,13 @@ describe('compute API', () => {
     const authenticated = call('POST', '/api/compute/fabric/run', { token: researcher.token, body: heavy });
     assert.equal(authenticated.status, 400);
     assert.equal(authenticated.body.run.error, 'out_of_range');
+    const admet = call('POST', '/api/compute/admet/predict', {
+      token: researcher.token,
+      body: { smiles: ['CCO'] },
+    });
+    assert.equal(admet.status, 403);
+    assert.equal(admet.body.error, 'BLOCKED_BY_LICENSE');
+    assert.equal(admet.body.message, 'ADMET_WEIGHTS_AND_TRAINING_DATA_LICENSE_UNVERIFIED');
   });
 
   test('heavy execution fails fast when the process is busy or the principal budget is exhausted', () => {

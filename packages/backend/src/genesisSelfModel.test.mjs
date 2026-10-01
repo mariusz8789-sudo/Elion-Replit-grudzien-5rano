@@ -40,8 +40,13 @@ function bootAndReadSelf(dbPath) {
       clearTimeout(timer);
       try {
         const res = await fetch(`http://127.0.0.1:${started.port}/api/genesis/self`);
-        resolve({ status: res.status, body: await res.json() });
-      } catch (err) { reject(err); } finally { proc.kill('SIGKILL'); }
+        const result = { status: res.status, body: await res.json() };
+        proc.once('exit', () => resolve(result));
+        proc.kill('SIGTERM');
+      } catch (err) {
+        proc.once('exit', () => reject(err));
+        proc.kill('SIGTERM');
+      }
     });
   });
 }
@@ -55,7 +60,8 @@ describe('ENTITY-1 GenesisIdentity', () => {
   });
 
   test('constitutionVersion names the constitution actually in the repo (an edit forces a new version)', () => {
-    const sha = createHash('sha256').update(readFileSync(path.join(REPO, 'docs/GENESIS_CONSTITUTION.md'))).digest('hex');
+    const canonicalText = readFileSync(path.join(REPO, 'docs/GENESIS_CONSTITUTION.md'), 'utf8').replace(/\r\n/g, '\n');
+    const sha = createHash('sha256').update(canonicalText).digest('hex');
     assert.equal(GENESIS_IDENTITY.constitutionVersion, `GENESIS_CONSTITUTION@${sha.slice(0, 16)}`);
   });
 

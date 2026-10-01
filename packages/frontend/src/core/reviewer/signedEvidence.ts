@@ -32,7 +32,11 @@ import {
 export { REDOCK_CERTIFICATE_PATH, REDOCK_EVIDENCE_PATH };
 export type { EvidenceVerification };
 
-export const REDOCK_RECORD_TEXT: string = redockRecordText;
+// Git stores the signed evidence with LF bytes. Windows may materialize a
+// CRLF working tree, and Vite's `?raw` import preserves those local endings.
+// Verify the canonical repository payload so the same committed certificate
+// has the same identity on Linux and Windows.
+export const REDOCK_RECORD_TEXT: string = redockRecordText.replace(/\r\n/g, '\n');
 export const REDOCK_RECORD = JSON.parse(REDOCK_RECORD_TEXT) as RedockRecord;
 export const COMMITTED_CERTIFICATE = committedCertificate as unknown as Certificate;
 export const GENESIS_KEY_FILE = genesisKeyFile as unknown as GenesisPublicKeyFile;

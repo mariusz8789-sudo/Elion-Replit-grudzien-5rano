@@ -92,6 +92,13 @@ export default tseslint.config(
         URL: 'readonly',
         Buffer: 'readonly',
         WebSocket: 'readonly',
+        // Playwright/CDP artifact harnesses reference these inside browser
+        // evaluation callbacks even though the harness itself runs in Node.
+        document: 'readonly',
+        localStorage: 'readonly',
+        innerWidth: 'readonly',
+        innerHeight: 'readonly',
+        getComputedStyle: 'readonly',
       },
     },
     rules: {

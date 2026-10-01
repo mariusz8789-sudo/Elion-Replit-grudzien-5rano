@@ -69,4 +69,3 @@ describe('Docker scientific sandbox backend', () => {
     assert.equal(result.failureCode, 'SANDBOX_WALL_CLOCK_EXCEEDED');
   });
 });
-

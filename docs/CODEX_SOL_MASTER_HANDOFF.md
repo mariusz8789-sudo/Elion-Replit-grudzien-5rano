@@ -106,3 +106,30 @@ Claude integration: construct `createEngineExecutionPort({ executor, admit })` w
 Validation: `node --test packages/backend/src/engineExecutionContract.test.mjs packages/backend/src/compute/remoteScientificWorkerClient.test.mjs packages/backend/src/compute/workerServer.test.mjs` — 38 pass, 0 fail, 10 runtime-dependent skips.
 
 Rollback: revert the S3 commit; existing dispatch and `science_runs` are untouched.
+
+## S4 — PySCF ResearchRun execution
+
+Problem: the real PySCF adapter, H₂ reference case and pinned chem-light worker already existed, but there was no direct ResearchRun-shaped entry through the S3 execution record.
+
+Delivered:
+
+- fixed canonical H₂ at 0.74 Å, RHF/STO-3G request bound to ResearchRun and experiment identity;
+- local canonical executor that reuses `executeCapability` and adds a hash of Node/platform/arch/validated engine identity;
+- execution through the S3 port with `DETERMINISTIC_WITH_PINNED_ENGINE_AND_GEOMETRY` replay declaration;
+- packaging assertions for pinned `pyscf==2.14.0`, binary-only install and image import check;
+- honest runtime behaviour: real energy and hashes when PySCF is available, otherwise `BLOCKED_BY_RUNTIME` with no output.
+
+Public contracts:
+
+- `packages/backend/src/compute/localCanonicalScientificExecutor.mjs`
+- `packages/backend/src/compute/pyscfResearchRunExecutor.mjs`
+
+Existing components reused unchanged: `qmAdapter.mjs`, `qm_worker.py`, canonical capability contract, toolchain reference validation, chem-light worker image.
+
+Claude integration: call `createPyScfResearchRunExecutor(...).runCanonicalH2(...)` for the bounded validation experiment or pass the same S3 port a broader already-validated PySCF request. Persist through existing `saveScienceRun` only after `SUCCESS`.
+
+Validation: 37 pass, 0 fail, 10 runtime-dependent skips across PySCF ResearchRun, S3, remote worker and packaging tests.
+
+Runtime proof here: local PySCF is absent, therefore the actual execution record is `BLOCKED_BY_RUNTIME`. The image is pinned and build-checked; `AVAILABLE_NOW` still requires the Linux worker runtime probe/CI to execute the real reference case.
+
+Rollback: revert the S4 commit; the underlying PySCF adapter and worker remain intact.

@@ -345,3 +345,25 @@ Validation: 24 pass, 0 fail across promotion/ingestion, existing scientific inge
 Known blockers: no production object storage is configured; source-specific licences and schema validators remain connector responsibilities; unseen benchmark datasets must be independently selected and licensed.
 
 Rollback: revert the S11b commit; the existing D-149 ingestion remains unchanged.
+
+## S11c — execution observability and independent audit
+
+Delivered:
+
+- correlated scientific execution event with request, ResearchRun, experiment and engine identity;
+- status, timing, bounded resource use, error code and ArtifactRef metadata;
+- recursive rejection of secrets, tokens, authorization, passwords, private/raw datasets and raw stdout/stderr fields;
+- bounded path-redacted error detail;
+- independent enterprise/security readiness audit and full completion report.
+
+Public contract: packages/backend/src/compute/scientificObservabilityContract.mjs.
+
+Validation: 65 pass, 0 fail across observability, worker HTTP, durable audit, supply-chain, secret, integrity, source-independence and egress suites.
+
+Claude integration: emit this event shape from the existing ResearchRun/worker lifecycle into the selected production telemetry backend. Do not log scientific payload bytes or credentials.
+
+Known blocker: no production telemetry backend, retention policy or deployment-specific encryption proof was selected in this track.
+
+Audit: docs/CODEX_SOL_INDEPENDENT_AUDIT.md. Completion table: docs/CODEX_SOL_COMPLETION_REPORT.md.
+
+Rollback: revert the S11c commit; existing logs and execution paths remain unchanged.

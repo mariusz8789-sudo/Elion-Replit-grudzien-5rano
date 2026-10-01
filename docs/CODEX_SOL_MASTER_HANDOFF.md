@@ -273,7 +273,8 @@ canonical EngineExecution port. A server restart therefore had queue recovery se
 tested execution consumer.
 
 Delivered: `scientificWorkerRuntime.mjs` claims one durable job, maintains its lease, applies its
-timeout signal, executes only through `EngineExecutionRecord`, and atomically completes or fails the
+timeout signal, independently enforces the persisted deadline even if an executor ignores abort,
+executes only through `EngineExecutionRecord`, and atomically completes or fails the
 same row. Transient failures are retried within the stored bound; data/licence/configuration blockers
 are dead-lettered immediately; stale workers cannot write after cancellation or lease loss. A second
 runtime instance proves restart recovery by claiming the same queued row and completing attempt two.
@@ -283,7 +284,7 @@ validation and the existing jobs table. No second scheduler, ResearchRun lifecyc
 
 Validation: `node --test packages/backend/src/scientificWorkerRuntime.test.mjs
 packages/backend/src/workerInfrastructureContract.test.mjs` — 14 pass, 0 fail; focused ESLint and
-`git diff --check` pass.
+`git diff --check` pass. The focused runtime/queue rerun is 15 pass, 0 fail.
 
 Production limit remains explicit: this runtime is real for one SQLite deployment. Multi-replica
 admission still fails until a shared queue/concurrency backend and object storage are configured.

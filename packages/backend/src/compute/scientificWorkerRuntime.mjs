@@ -54,11 +54,17 @@ export function createScientificWorkerRuntime({
         .finally(() => { heartbeatRunning = false; });
     }, heartbeatMs);
     heartbeat.unref?.();
-    const timeout = setTimeout(() => controller.abort('JOB_TIMEOUT'), job.timeoutMs);
+    let timeout;
+    const deadline = new Promise((resolve) => {
+      timeout = setTimeout(() => {
+        controller.abort('JOB_TIMEOUT');
+        resolve({ workerTimeout: true });
+      }, job.timeoutMs);
+    });
     timeout.unref?.();
 
     try {
-      const outcome = await executionPort.execute({
+      const execution = executionPort.execute({
         researchRunId: job.researchRunId,
         experimentId: job.experimentId,
         executionId: job.jobId,
@@ -66,7 +72,16 @@ export function createScientificWorkerRuntime({
         input: job.payload.input ?? job.payload,
         replayCapability: job.payload.replayCapability,
       }, { signal: controller.signal });
+      const outcome = await Promise.race([execution, deadline]);
       if (leaseLost) return { ok: false, state: 'LEASE_LOST', jobId: job.jobId };
+      if (outcome?.workerTimeout) {
+        const failed = await queue.fail(job.jobId, job.leaseId, {
+          code: 'JOB_TIMEOUT', status: ENGINE_EXECUTION_STATUS.TIMEOUT, recordHash: null, retryable: true,
+        });
+        return failed?.ok
+          ? { ok: false, state: failed.retry ? 'RETRY_QUEUED' : 'DEAD_LETTER', job: failed.job }
+          : { ok: false, state: 'LEASE_LOST', jobId: job.jobId, error: failed?.error };
+      }
       if (outcome?.record?.status === ENGINE_EXECUTION_STATUS.SUCCESS) {
         const completed = await queue.complete(job.jobId, job.leaseId, { record: outcome.record, result: outcome.result });
         return completed?.ok

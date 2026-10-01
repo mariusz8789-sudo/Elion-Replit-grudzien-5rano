@@ -97,4 +97,15 @@ describe('durable scientific worker runtime', () => {
     assert.equal(cancelled.state, 'CANCELLED');
     assert.equal(cancelled.result, null);
   });
+
+  it('enforces the persisted timeout even when an executor ignores abort', async () => {
+    const executionPort = { execute: async () => new Promise(() => {}) };
+    const { backend, queue } = setup(executionPort);
+    const runtime = createScientificWorkerRuntime({ queue, executionPort, workerId: 'worker-timeout-001', leaseMs: 2_000, heartbeatMs: 500 });
+    await queue.enqueue({ ...JOB, jobId: 'job-runtime-timeout', idempotencyKey: 'idem-runtime-timeout', timeoutMs: 1_000, maxAttempts: 1 });
+    assert.equal((await runtime.runOnce()).state, 'DEAD_LETTER');
+    const timedOut = backend.get('job-runtime-timeout');
+    assert.equal(timedOut.failure.code, 'JOB_TIMEOUT');
+    assert.equal(timedOut.failure.status, ENGINE_EXECUTION_STATUS.TIMEOUT);
+  });
 });

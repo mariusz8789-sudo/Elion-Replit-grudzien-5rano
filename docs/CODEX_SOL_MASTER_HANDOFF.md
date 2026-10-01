@@ -471,3 +471,21 @@ Validation: 16/16 focused customer, commercial, ResearchRun execution and litera
 Known blockers: no payment, customer acceptance, signed delivery receipt or production licence-decision provider is claimed. Evidence remains proposed until canonical human publication, and the report remains computational rather than clinical or wet-lab evidence.
 
 Rollback: revert this integration commit; canonical ResearchRun, commercial admission and all scientific records remain unchanged.
+
+## Post-S11 integration - full-app route proof
+
+Problem: the previous visual QA covered 8 representative surfaces and 60 states, but the matrix called it full-app coverage and its raw artifacts were not bound to the current PR head.
+
+Delivered:
+
+- a repeatable route inventory generated from the canonical navigation model, App router literals and all parameterized laboratories;
+- desktop 1440×900 and mobile 390×844 runtime checks for blank roots, page errors, console errors, ErrorBoundary fallbacks and document overflow;
+- explicit classification of 401/403/429 responses as observed auth/admission boundaries while 5xx, request failures and missing non-API assets remain failures;
+- representative screenshots plus SHA-256 hashes and a hashed raw JSON report;
+- a checked-in evidence summary bound to tested commit `cc9c68b1` and exact App/navigation source hashes.
+
+Validation: production build PASS; 94 routes × 2 viewports = 188/188 PASS, 0 runtime/render/overflow failures, 14 representative screenshot hashes. Evidence: `docs/evidence/full-app-route-proof-cc9c68b1.json`.
+
+Known limitations: headless Edge/Chromium is not physical-device or real-GPU performance proof. Authenticated populated states remain covered by their focused product E2Es rather than this anonymous route inventory.
+
+Rollback: revert the route-proof commits; product routes and UI code remain unchanged.

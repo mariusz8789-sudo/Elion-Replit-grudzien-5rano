@@ -523,6 +523,74 @@ export function runResearchIntake(
   return request<ResearchIntakeResponse>('POST', `/projects/${projectId}/research-intake`, { token, body: input });
 }
 
+/* ---------------- ResearchRun (R1-a..R1-c): question → plan → experiment → verdict → Evidence → Replay → next ---------------- */
+
+/** Scoped to one frozen hypothesis under its protocol; never a statement of scientific truth. */
+export type ResearchRunVerdict = 'SUPPORTED_WITHIN_PROTOCOL' | 'FALSIFIED_WITHIN_PROTOCOL' | 'INCONCLUSIVE';
+export type ResearchRunReplayVerdict = 'MATCH' | 'DRIFT' | 'ENGINE_VERSION_CHANGED' | 'BLOCKED_BY_RUNTIME' | 'REPLAY_UNSUPPORTED' | 'NOT_APPLICABLE';
+export type ResearchRunNextStep =
+  | 'FORMALIZE_PROBLEM' | 'PROPOSE_PLAN' | 'EXECUTE_EXPERIMENT' | 'PROPOSE_EVIDENCE' | 'PROPOSE_NEXT_EXPERIMENT'
+  | 'AWAITING_EXECUTION' | 'AWAITING_HUMAN_REVIEW' | 'STATE_INTEGRITY_FAILURE' | 'NONE';
+
+export interface ResearchRunReplay {
+  verificationId?: string;
+  verdict: ResearchRunReplayVerdict;
+  originalOutputHash?: string | null;
+  replayOutputHash?: string | null;
+  replayEngineVersion?: string | null;
+  verifiedAt?: number;
+  reason?: string;
+}
+
+export interface ResearchRunExperiment {
+  experimentId: string;
+  frozen: { hypothesisId: string; claim: string; engineId: string; input: Record<string, unknown>; inputHash: string; protocolId: string; predictionFingerprint: string; preregistrationFingerprint: string; criteria: Array<Record<string, unknown>> } | null;
+  execution: { status: string; engine: { engineId: string; engineLabel: string | null; version: string | null }; output: Record<string, unknown>; inputHash: string; outputHash: string; scienceRunId: string | null; startedAt: string; finishedAt: string } | null;
+  falsification: { verdict: ResearchRunVerdict; scope: string; criteria: Array<Record<string, unknown>> } | null;
+  evidence: { evidenceProposalId: string; status: 'PROPOSED'; publication: 'REQUIRES_HUMAN_APPROVAL' } | null;
+  next: { replay: ResearchRunReplay | null; proposal: { action: 'EXECUTE_NEXT_HYPOTHESIS' | 'HUMAN_REVIEW'; hypothesisId?: string; engineId?: string; reason: string }; decidedBy: string } | null;
+}
+
+export interface ResearchRunView {
+  researchRunId: string;
+  question: string;
+  plan: { hypotheses: Array<{ hypothesisId: string; claim: string; experimentProposal?: { kind: string; engineId?: string; decision?: string } }> } | null;
+  experiments: ResearchRunExperiment[];
+  nextStep: ResearchRunNextStep;
+  researchState: { chain: { ok: boolean }; events: Array<{ seq: number; type: string }> };
+}
+
+/** One question → one research run (deduplicated by the server). */
+export function startResearchRun(token: string, projectId: string, question: string): Promise<ApiResult<{ deduped: boolean; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs`, { token, body: { question } });
+}
+
+export function getResearchRun(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ researchRun: ResearchRunView }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}`, { token });
+}
+
+/** The model PROPOSES hypotheses and experiments; nothing it says becomes evidence. */
+export function proposeResearchPlan(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ deduped: boolean; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/proposals`, { token });
+}
+
+/**
+ * Freezes the prediction, runs the real engine, falsifies, proposes evidence, replays and proposes the
+ * next experiment. An engine that is not available answers 503 BLOCKED, with nothing substituted.
+ */
+export function executeResearchExperiment(
+  token: string, projectId: string, researchRunId: string, hypothesisId?: string,
+): Promise<ApiResult<{ status: 'EXECUTED' | 'ALREADY_EXECUTED'; deduped: boolean; experimentId: string; experiment?: ResearchRunExperiment; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments`, { token, body: hypothesisId ? { hypothesisId } : {} });
+}
+
+/** Re-runs one executed experiment through the existing Scientific Run verifier; append-only. */
+export function replayResearchExperiment(
+  token: string, projectId: string, researchRunId: string, experimentId: string,
+): Promise<ApiResult<{ experimentId: string; verification: ResearchRunReplay; replays: ResearchRunReplay[] }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/replays`, { token });
+}
+
 export type ComputeValue = string | number | boolean;
 
 export interface ComputeRun {

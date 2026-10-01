@@ -3,6 +3,7 @@ import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/gen
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
 import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
+import { runResearchRunAction } from '../core/scienceChat/researchRunTurn';
 import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
@@ -401,6 +402,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [lastResearchCycle, setLastResearchCycle] = useState<ResearchCycle | null>(null);
   const [drugJourneyRequest, setDrugJourneyRequest] = useState<DrugDiscoveryChatRequest | null>(null);
   const [drugJourneyProject, setDrugJourneyProject] = useState<ActiveKnowledgeProject | null>(null);
+  // R1-c: the backend ResearchRun this chat continues with `/eksperyment` and `/powtórz`.
+  const [researchRunId, setResearchRunId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -542,6 +545,21 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       } finally {
         setBackendConfirmationPending(false);
       }
+      return;
+    }
+    // R1-c RESEARCH RUN — explicit `/badanie`, `/eksperyment`, `/powtórz`, resolved before any other route so a
+    // research question is never swallowed by the drug or Fabric parsers. The backend ResearchRun does the work.
+    const researchCommand = resolveCommand(msg, null);
+    if (researchCommand.action?.type === 'researchRun') {
+      const action = researchCommand.action;
+      setInput('');
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: researchCommand.text, tag: researchCommand.tag, intent: researchCommand.intent }]);
+      const token = getToken();
+      const project = token ? (activeKnowledgeProject ?? await resolveResearchProject(token).then((r) => (r.ok ? r.data : null))) : null;
+      const turn = await runResearchRunAction(action, { token, projectId: project?.id ?? null, researchRunId });
+      if (turn.researchRunId !== researchRunId) setResearchRunId(turn.researchRunId);
+      setTurns((t) => [...t, { role: 'genesis', text: turn.text, tag: turn.tag }]);
+      track('ask_ai_used', { via: 'science-chat-research-run', op: action.op });
       return;
     }
     const drugRequest = drugDiscoveryRequestFromMessage(msg);

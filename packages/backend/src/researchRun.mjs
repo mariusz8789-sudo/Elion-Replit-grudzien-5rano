@@ -196,6 +196,56 @@ export function controlResearchRun(db, projectId, runId, action, { userId = null
   });
 }
 
+export function researchSteeringOf(researchState) {
+  const abandoned = new Set();
+  let focusedHypothesisId = null;
+  const context = [];
+  for (const event of researchState?.events ?? []) {
+    if (event.type !== 'RESEARCH_STEERING') continue;
+    const payload = event.payload ?? {};
+    if (payload.action === 'FOCUS_HYPOTHESIS') focusedHypothesisId = payload.hypothesisId;
+    if (payload.action === 'ABANDON_HYPOTHESIS') {
+      abandoned.add(payload.hypothesisId);
+      if (focusedHypothesisId === payload.hypothesisId) focusedHypothesisId = null;
+    }
+    if (payload.action === 'RESTORE_HYPOTHESIS') abandoned.delete(payload.hypothesisId);
+    if (payload.action === 'ADD_CONTEXT') context.push({ text: payload.text, eventSeq: event.seq });
+  }
+  return { focusedHypothesisId, abandonedHypothesisIds: [...abandoned].sort(), context };
+}
+
+const STEERING_ACTIONS = new Set(['FOCUS_HYPOTHESIS', 'ABANDON_HYPOTHESIS', 'RESTORE_HYPOTHESIS', 'ADD_CONTEXT']);
+
+/** Appends human steering to the canonical ResearchRun chain; it never rewrites the frozen plan. */
+export function steerResearchRun(db, projectId, runId, input, { userId = null } = {}) {
+  const action = typeof input?.action === 'string' ? input.action.trim().toUpperCase() : '';
+  if (!STEERING_ACTIONS.has(action)) return { ok: false, status: 'INVALID_STEERING_ACTION' };
+  return inWriteTransaction(db, () => {
+    const current = getResearchRun(db, projectId, runId);
+    if (!current) return { ok: false, status: 'NOT_FOUND' };
+    if (!current.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
+    if (current.run.status !== AGENT_RUN_STATUS.RUNNING) return { ok: false, status: 'RUN_NOT_STEERABLE', reason: current.run.status };
+    if (!current.plan) return { ok: false, status: 'RUN_NOT_STEERABLE', reason: 'PLAN_NOT_AVAILABLE' };
+    const hypothesisId = STR(input?.hypothesisId, 200);
+    const text = STR(input?.text, 2000);
+    if (action === 'ADD_CONTEXT' ? !text : !hypothesisId) return { ok: false, status: 'INVALID_STEERING_INPUT' };
+    if (hypothesisId && !current.plan.hypotheses.some((hypothesis) => hypothesis.hypothesisId === hypothesisId)) {
+      return { ok: false, status: 'HYPOTHESIS_NOT_FOUND' };
+    }
+    const appended = appendServerResearchStateEvent(db, runId, 'RESEARCH_STEERING', {
+      contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+      researchRunId: runId,
+      action,
+      hypothesisId,
+      text,
+      actor: { kind: 'USER', userId },
+    });
+    if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
+    const researchRun = getResearchRun(db, projectId, runId);
+    return { ok: true, status: 'RECORDED', steering: researchSteeringOf(researchRun.researchState), researchRun };
+  });
+}
+
 /* ---------------- start ---------------- */
 
 /**

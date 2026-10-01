@@ -31,7 +31,7 @@ import { canonicalJson, fnv1a, sha256Hex } from './determinism.mjs';
 import { appendServerResearchStateEvent } from './agentRun.mjs';
 import { deriveVerdict, preregisterExperiment, sealExperimentSession } from './experimentMemory.mjs';
 import { proposeStructuredEvidence } from './knowledgeApi.mjs';
-import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION } from './researchRun.mjs';
+import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION, researchSteeringOf } from './researchRun.mjs';
 import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 import { getScienceRun, listScienceRunVerifications, saveScienceRun } from './store.mjs';
 import { sha256Hex16 } from './provenance.mjs';
@@ -122,12 +122,15 @@ export function judgeCriteria(criteria, execution, executor) {
 
 /* ---------------- the next experiment (a fixed rule, no model) ---------------- */
 
-export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null) {
+export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null, steering = {}) {
   if (replayVerdict && replayVerdict !== REPLAY_VERDICT.MATCH && replayVerdict !== REPLAY_NOT_APPLICABLE) {
     return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
   }
-  for (const h of plan?.hypotheses ?? []) {
+  const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const hypotheses = [...(plan?.hypotheses ?? [])].sort((a, b) => (a.hypothesisId === steering.focusedHypothesisId ? -1 : b.hypothesisId === steering.focusedHypothesisId ? 1 : 0));
+  for (const h of hypotheses) {
     if (doneHypothesisIds.has(h.hypothesisId)) continue;
+    if (abandoned.has(h.hypothesisId)) continue;
     const x = executabilityOf(h, executors);
     if (x.executable) {
       return { action: 'EXECUTE_NEXT_HYPOTHESIS', hypothesisId: h.hypothesisId, engineId: x.engineId, reason: 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN' };
@@ -366,7 +369,7 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
         researchRunId: runId,
         experimentId,
         replay,
-        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict),
+        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, researchSteeringOf(current.researchState)),
         decidedBy: 'GENESIS_FIXED_RULE',
         status: 'PROPOSED',
       });
@@ -397,11 +400,14 @@ export function executeResearchExperiment(db, projectId, runId, {
     experimentId = open.experimentId;
   } else {
     const done = new Set(view.experiments.map((e) => e.frozen.hypothesisId));
+    const steering = researchSteeringOf(view.researchState);
+    const abandoned = new Set(steering.abandonedHypothesisIds);
     let chosen = null;
     const skipped = [];
     if (hypothesisId) {
       const h = view.plan.hypotheses.find((x) => x.hypothesisId === hypothesisId);
       if (!h) return { ok: false, status: 'HYPOTHESIS_NOT_FOUND' };
+      if (abandoned.has(hypothesisId)) return { ok: false, status: 'EXPERIMENT_NOT_EXECUTABLE', reason: 'HYPOTHESIS_ABANDONED' };
       if (done.has(hypothesisId)) {
         return { ok: true, status: 'ALREADY_EXECUTED', deduped: true, experimentId: experimentIdOf(runId, hypothesisId), researchRun: view };
       }
@@ -409,8 +415,10 @@ export function executeResearchExperiment(db, projectId, runId, {
       if (!x.executable) return { ok: false, status: x.blocked ? 'BLOCKED' : 'EXPERIMENT_NOT_EXECUTABLE', engineId: x.engineId ?? null, reason: x.reason };
       chosen = { h, x };
     } else {
-      for (const h of view.plan.hypotheses) {
+      const ordered = [...view.plan.hypotheses].sort((a, b) => (a.hypothesisId === steering.focusedHypothesisId ? -1 : b.hypothesisId === steering.focusedHypothesisId ? 1 : 0));
+      for (const h of ordered) {
         if (done.has(h.hypothesisId)) continue;
+        if (abandoned.has(h.hypothesisId)) { skipped.push({ hypothesisId: h.hypothesisId, reason: 'HYPOTHESIS_ABANDONED' }); continue; }
         const x = executabilityOf(h, tools.executors);
         if (x.executable) { chosen = { h, x }; break; }
         skipped.push({ hypothesisId: h.hypothesisId, reason: x.reason });

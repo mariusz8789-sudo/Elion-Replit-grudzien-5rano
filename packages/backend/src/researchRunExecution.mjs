@@ -28,6 +28,7 @@
  * losing or repeating it.
  */
 import { canonicalJson, fnv1a, sha256Hex } from './determinism.mjs';
+import { buildDecisionTrace } from './decisionTrace.mjs';
 import { appendServerResearchStateEvent } from './agentRun.mjs';
 import { deriveVerdict, preregisterExperiment, sealExperimentSession } from './experimentMemory.mjs';
 import { proposeStructuredEvidence } from './knowledgeApi.mjs';
@@ -332,6 +333,62 @@ function firstReplayOf(db, x) {
   return v.ok ? replaySummary(v.verification) : { verdict: REPLAY_VERDICT.REPLAY_UNSUPPORTED, reason: v.error };
 }
 
+function reasonCode(value) {
+  return String(value ?? 'NOT_SELECTED').toUpperCase().replace(/[^A-Z0-9_:-]/g, '_').slice(0, 160);
+}
+
+function decisionEvidenceRefs(experiment, evidence, replay) {
+  const candidates = [
+    { id: `preregistration:${experiment.frozen.preregistrationRecordId}`, contentHash: experiment.frozen.preregistrationFingerprint },
+    { id: `execution:${experiment.execution.scienceRunId ?? experiment.experimentId}`, contentHash: experiment.execution.outputHash },
+    { id: `falsification:${experiment.falsification.sealRecordId}`, contentHash: experiment.falsification.outputHash },
+    { id: `evidence:${evidence.evidenceProposalId}`, contentHash: evidence.evidenceContentHash },
+    { id: `replay:${replay?.verificationId ?? experiment.experimentId}`, contentHash: replay?.replayOutputHash },
+  ];
+  return candidates.filter((reference, index, all) => (
+    typeof reference.id === 'string'
+    && typeof reference.contentHash === 'string'
+    && reference.contentHash.length > 0
+    && all.findIndex((candidate) => candidate.id === reference.id) === index
+  ));
+}
+
+export function nextExperimentDecisionTrace({
+  researchRunId, experiment, plan, completedHypothesisIds, proposal, executors, replay, evidence, steering = {},
+}) {
+  const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const alternatives = (plan?.hypotheses ?? []).map((hypothesis) => {
+    if (proposal.action === 'EXECUTE_NEXT_HYPOTHESIS' && proposal.hypothesisId === hypothesis.hypothesisId) {
+      return { id: hypothesis.hypothesisId, status: 'SELECTED' };
+    }
+    if (completedHypothesisIds.has(hypothesis.hypothesisId)) {
+      return { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: 'ALREADY_EXECUTED' };
+    }
+    if (abandoned.has(hypothesis.hypothesisId)) {
+      return { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: 'HYPOTHESIS_ABANDONED' };
+    }
+    const executable = executabilityOf(hypothesis, executors);
+    return executable.executable
+      ? { id: hypothesis.hypothesisId, status: 'NOT_EVALUATED' }
+      : { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: reasonCode(executable.reason) };
+  });
+  if (proposal.action === 'HUMAN_REVIEW') alternatives.push({ id: 'HUMAN_REVIEW', status: 'SELECTED' });
+  const replayVerdict = replay?.verdict ?? 'UNAVAILABLE';
+  return buildDecisionTrace({
+    decisionId: `decision:${researchRunId}:${experiment.experimentId}:next`,
+    summary: `NEXT_EXPERIMENT ${proposal.action}; protocol verdict ${experiment.falsification.verdict}; replay ${replayVerdict}.`,
+    evidenceRefs: decisionEvidenceRefs(experiment, evidence, replay),
+    alternatives,
+    selectedCapability: proposal.engineId ?? proposal.action,
+    inputClassification: 'COMPUTATIONAL_RESULT',
+    outputClassification: proposal.action === 'EXECUTE_NEXT_HYPOTHESIS' ? 'PROPOSED' : 'REQUIRES_HUMAN_APPROVAL',
+    solverId: 'GENESIS_FIXED_RULE',
+    solverVersion: 'research-run-next-experiment@1',
+    ...(proposal.action === 'HUMAN_REVIEW' ? { blockedReason: proposal.reason } : {}),
+    suggestedNextExperiment: proposal.hypothesisId ?? proposal.action,
+  });
+}
+
 function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, proposeEvidence) {
   const before = getResearchRun(db, projectId, runId);
   const x = before.experiments.find((e) => e.experimentId === experimentId);
@@ -364,12 +421,32 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
     }
     if (!now.next) {
       const done = new Set(current.experiments.map((e) => e.frozen.hypothesisId));
+      const steering = researchSteeringOf(current.researchState);
+      const proposal = nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, steering);
+      const evidence = now.evidence ?? {
+        evidenceProposalId: proposed.proposalId,
+        evidenceContentHash: proposed.record?.contentHash ?? null,
+        status: 'PROPOSED',
+        publication: 'REQUIRES_HUMAN_APPROVAL',
+      };
+      const decisionTrace = nextExperimentDecisionTrace({
+        researchRunId: runId,
+        experiment: { ...now, evidence },
+        plan: current.plan,
+        completedHypothesisIds: done,
+        proposal,
+        executors: tools.executors,
+        replay,
+        evidence,
+        steering,
+      });
       const next = appendServerResearchStateEvent(db, runId, 'NEXT_EXPERIMENT', {
         contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
         researchRunId: runId,
         experimentId,
         replay,
-        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, researchSteeringOf(current.researchState)),
+        proposal,
+        decisionTrace,
         decidedBy: 'GENESIS_FIXED_RULE',
         status: 'PROPOSED',
       });

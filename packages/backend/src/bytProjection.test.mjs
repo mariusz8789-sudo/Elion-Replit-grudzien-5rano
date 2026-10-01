@@ -22,7 +22,7 @@ describe('BYT canonical projection', () => {
       { seq: 3, type: 'EXPERIMENT_HANDOFF', payload: { experimentId: 'exp-1', status: 'EXECUTED', inputHash: 'in-1', outputHash: 'out-1', engine: { engineId: 'rdkit' } } },
       { seq: 4, type: 'SELF_FALSIFICATION', payload: { experimentId: 'exp-1', verdict: 'FALSIFIED_WITHIN_PROTOCOL', scope: 'this protocol only', criteria: [{ id: 'c0-logp', observable: 'logP', operator: '>', value: 3, observed: 1.2, critical: true, status: 'NOT_MET' }] } },
       { seq: 5, type: 'EVIDENCE_UPDATE', payload: { experimentId: 'exp-1', sealRecordId: 'seal-1', evidenceProposalId: 'ev-1', evidenceContentHash: 'ev-hash', status: 'PROPOSED', publication: 'REQUIRES_HUMAN_APPROVAL' } },
-      { seq: 6, type: 'NEXT_EXPERIMENT', payload: { experimentId: 'exp-1', replay: { verdict: 'MATCH' }, proposal: { action: 'HUMAN_REVIEW' } } },
+      { seq: 6, type: 'NEXT_EXPERIMENT', payload: { experimentId: 'exp-1', replay: { verdict: 'MATCH' }, proposal: { action: 'HUMAN_REVIEW' }, decisionTrace: { traceFingerprint: 'trace-1', selectedCapability: 'HUMAN_REVIEW' } } },
     ];
     const byt = buildBytProjection({
       runs: [run(events)],
@@ -34,6 +34,7 @@ describe('BYT canonical projection', () => {
     assert.equal(byt.predictionLedger.length, 1);
     assert.equal(byt.predictionLedger[0].criteria[0].numericThresholdDelta, -1.8);
     assert.equal(byt.predictionLedger[0].replay.verdict, 'MATCH');
+    assert.equal(byt.predictionLedger[0].decisionTrace.traceFingerprint, 'trace-1');
     assert.equal(byt.calibration.protocolCriteria.notMet, 1);
     assert.equal(byt.calibration.probabilisticCalibration, 'NOT_AVAILABLE');
     assert.equal(byt.necropolis[0].status, 'FALSIFIED_WITHIN_PROTOCOL');

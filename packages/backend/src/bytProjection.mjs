@@ -69,6 +69,7 @@ function predictionEntries(runs) {
         } : null,
         replay: next?.replay ?? null,
         proposedNextExperiment: next?.proposal ?? null,
+        decisionTrace: next?.decisionTrace ?? null,
       });
     }
   }

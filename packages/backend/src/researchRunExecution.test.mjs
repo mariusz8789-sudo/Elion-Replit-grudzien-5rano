@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { openDatabase, getScienceRun, listExperimentRecords, verifyExperimentRecordChain } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
+import { buildDecisionTrace } from './decisionTrace.mjs';
 import { listProposals } from './knowledgeApi.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { executeResearchExperiment, VERDICT_SCOPE } from './researchRunExecution.mjs';
@@ -169,6 +170,15 @@ describe('R1-b research run execution', () => {
     // The next experiment comes from a fixed rule over the plan.
     assert.equal(x.next.decidedBy, 'GENESIS_FIXED_RULE');
     assert.deepEqual([x.next.proposal.action, x.next.proposal.hypothesisId], ['EXECUTE_NEXT_HYPOTHESIS', plan.hypotheses[1].hypothesisId]);
+    const trace = x.next.decisionTrace;
+    assert.equal(trace.contractVersion, '1.0.0');
+    assert.equal(trace.solverId, 'GENESIS_FIXED_RULE');
+    assert.equal(trace.suggestedNextExperiment, plan.hypotheses[1].hypothesisId);
+    assert.equal(trace.alternatives.find((alternative) => alternative.status === 'SELECTED').id, plan.hypotheses[1].hypothesisId);
+    assert.ok(trace.evidenceRefs.some((reference) => reference.id === `execution:${e.scienceRunId}` && reference.contentHash === e.outputHash));
+    assert.ok(trace.evidenceRefs.some((reference) => reference.id === `evidence:${x.evidence.evidenceProposalId}`));
+    const { traceFingerprint, ...traceInput } = trace;
+    assert.equal(buildDecisionTrace(traceInput).traceFingerprint, traceFingerprint);
     assert.equal(rr.nextStep, 'AWAITING_EXECUTION');
 
     // R1-c: the engine output is a canonical Scientific Run, replayed once by the existing verifier before
@@ -203,6 +213,9 @@ describe('R1-b research run execution', () => {
     assert.equal(nothing.body.error, 'NOTHING_TO_REPLAY');
     assert.equal(third.body.experiment.falsification.verdict, 'INCONCLUSIVE');
     assert.equal(third.body.experiment.next.proposal.action, 'HUMAN_REVIEW');
+    assert.equal(third.body.experiment.next.decisionTrace.outputClassification, 'REQUIRES_HUMAN_APPROVAL');
+    assert.equal(third.body.experiment.next.decisionTrace.alternatives.find((alternative) => alternative.status === 'SELECTED').id, 'HUMAN_REVIEW');
+    assert.equal(third.body.experiment.next.decisionTrace.blockedReason, third.body.experiment.next.proposal.reason);
     assert.equal(third.body.researchRun.nextStep, 'AWAITING_HUMAN_REVIEW');
 
     const none = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });

@@ -18,6 +18,7 @@ No merge. No deploy. No force-push.
 | Worker infrastructure | SQLite/local process | Shared queue and ArtifactRef ports; current state labelled unsafe | S9 `2650784e` | 46 pass, 10 skips | Contract/local lifecycle | NO | Shared backend/storage | Provider adapters later |
 | Scientific sandbox | No safe generated-code path | Python-only isolation contract; product blocked | S10 `c25deb66` | 13 pass | No container claimed | NO | Attested backend/review | None until backend exists |
 | Decision metadata | Domain-specific shapes | ResourceProfile, AgreementRecord, eight-part uncertainty, falsification checks | S11a `1cb0bf5b` | 5 pass | Pure contract proof | CONTRACT_READY | Real calibration data | Report/plan projection |
+| DecisionTrace binding | DecisionTrace existed in Experiment Fabric only | One deterministic trace is stored inside canonical NEXT_EXPERIMENT and projected by BYT | post-S11 integration | 14 focused PASS | Real RDKit/SQLite/restart path | PARTIAL | Linux CI and broader method calibration | Integrated; no second store |
 | Promotion and ingest | Benchmark runner plus source-specific ingestion | Unseen-data promotion gate and server-hashed custody ingest | S11b `2fb87c43` | 24 pass | In-memory storage fixture | PARTIAL | Real datasets/storage/licences | Connect existing connectors |
 | Observability | IDs/redaction varied by component | Correlated bounded execution-event contract | S11c (this commit) | 65 pass with security/worker suites | Worker HTTP proof | CONTRACT_READY | Production telemetry backend | Emit from worker/ResearchRun |
 

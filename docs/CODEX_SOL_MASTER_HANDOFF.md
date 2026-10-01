@@ -414,3 +414,20 @@ Claude integration: none required beyond review. ResearchRun remains the sole li
 Known blockers: live provider/network availability, full-text access, passage review and commercial reuse rights remain external or source-specific.
 
 Rollback: revert this integration commit; S1/S2 ports remain available without altering stored ResearchRuns.
+## Post-S11 integration — DecisionTrace in NEXT_EXPERIMENT
+
+Problem: ResearchRun selected the next experiment deterministically, but its canonical NEXT_EXPERIMENT event did not carry the structured D-141 DecisionTrace consumed by BYT and product inspection.
+
+Delivered:
+
+- deterministic DecisionTrace embedded in the existing NEXT_EXPERIMENT event; no table, store, lifecycle or private reasoning log;
+- evidence references bind the preregistration, execution output, falsification seal, Evidence proposal and Replay output;
+- every planned hypothesis is SELECTED, REJECTED with a machine reason code, or NOT_EVALUATED;
+- HUMAN_REVIEW is explicit when Replay or remaining capability prevents autonomous continuation;
+- BYT projects the trace from the verified ResearchRun event chain.
+
+Validation: 14/14 focused DecisionTrace, ResearchRun execution/restart and BYT tests PASS; focused ESLint PASS.
+
+Known limitation: trace quality is bounded by the frozen plan and current capability registry. It is structured decision provenance, not a claim that Genesis exposes private chain-of-thought.
+
+Rollback: revert this integration commit; the prior NEXT_EXPERIMENT proposal remains compatible but loses its attached trace.

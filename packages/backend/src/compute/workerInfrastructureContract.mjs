@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const SCIENTIFIC_JOB_STATE = Object.freeze({
   QUEUED: 'QUEUED',
@@ -10,19 +10,18 @@ export const SCIENTIFIC_JOB_STATE = Object.freeze({
 });
 
 export const CURRENT_WORKER_INFRASTRUCTURE = Object.freeze({
-  queueBackend: 'SQLITE_ROWS_WITH_IN_PROCESS_SETIMMEDIATE',
+  queueBackend: 'SQLITE_ATOMIC_LEASE_SINGLE_NODE',
   queueDurability: 'DATABASE_ROWS',
-  claimLease: 'MISSING',
+  claimLease: 'IMPLEMENTED_SINGLE_NODE',
   sharedConcurrency: false,
   multiReplicaSafe: false,
   cancellation: 'PROCESS_LOCAL_FLAG_PLUS_DATABASE_STATUS',
-  retryPolicy: 'MISSING',
-  deadLetterState: 'MISSING',
+  retryPolicy: 'BOUNDED_ATTEMPTS',
+  deadLetterState: 'IMPLEMENTED',
   objectStorage: 'MISSING',
   admission: 'BLOCKED_FOR_MULTI_REPLICA_PRODUCTION',
   blockers: Object.freeze([
     'SHARED_QUEUE_BACKEND_NOT_CONFIGURED',
-    'ATOMIC_CLAIM_LEASE_NOT_IMPLEMENTED',
     'SHARED_CONCURRENCY_NOT_IMPLEMENTED',
     'OBJECT_STORAGE_NOT_CONFIGURED',
   ]),
@@ -65,6 +64,105 @@ export function createScientificJobQueuePort({ backend } = {}) {
     complete: (jobId, leaseId, result) => backend.complete(jobId, leaseId, result),
     fail: (jobId, leaseId, failure) => backend.fail(jobId, leaseId, failure),
     cancel: (jobId, reason) => backend.cancel(jobId, reason),
+  });
+}
+
+const parse = (value, fallback = null) => { try { return value === null ? fallback : JSON.parse(value); } catch { return fallback; } };
+
+function scientificJob(row) {
+  if (!row) return null;
+  return {
+    jobId: row.id, idempotencyKey: row.idempotency_key, researchRunId: row.research_run_id,
+    experimentId: row.experiment_id, capabilityId: row.capability_id, priority: row.priority,
+    maxAttempts: row.max_attempts, attempts: row.attempts, timeoutMs: row.timeout_ms,
+    payload: parse(row.params_json, {}), state: row.status, workerId: row.worker_id ?? null,
+    leaseId: row.lease_id ?? null, leaseExpiresAt: row.lease_expires_at ?? null,
+    result: parse(row.result_json), failure: parse(row.failure_json), cancelReason: row.cancel_reason ?? null,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Durable atomic queue for one SQLite deployment. `BEGIN IMMEDIATE` serializes claims across local
+ * worker processes sharing this database. It is deliberately not advertised as multi-replica safe:
+ * a network-mounted SQLite file and cross-host shared concurrency remain blocked.
+ */
+export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now(), newLeaseId = () => `lease-${randomUUID()}` } = {}) {
+  if (!db || typeof db.prepare !== 'function') throw new Error('db: required');
+  const read = (jobId) => scientificJob(db.prepare('SELECT * FROM jobs WHERE id = ? AND idempotency_key IS NOT NULL').get(jobId));
+  const transaction = (fn) => {
+    db.exec('BEGIN IMMEDIATE');
+    try { const value = fn(); db.exec('COMMIT'); return value; } catch (error) { db.exec('ROLLBACK'); throw error; }
+  };
+  return Object.freeze({
+    async enqueue(job) {
+      return transaction(() => {
+        const existing = db.prepare('SELECT * FROM jobs WHERE idempotency_key = ?').get(job.idempotencyKey);
+        if (existing) return { ok: true, deduped: true, job: scientificJob(existing) };
+        const timestamp = now();
+        db.prepare(`INSERT INTO jobs
+          (id, project_id, type, status, progress, params_json, result_json, run_ids_json, error, created_by, created_at, updated_at,
+           idempotency_key, research_run_id, experiment_id, capability_id, priority, max_attempts, attempts, timeout_ms)
+          VALUES (?, NULL, ?, 'QUEUED', 0, ?, NULL, '[]', NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`)
+          .run(job.jobId, `scientific:${job.capabilityId}`, JSON.stringify(job.payload), timestamp, timestamp,
+            job.idempotencyKey, job.researchRunId, job.experimentId, job.capabilityId, job.priority, job.maxAttempts, job.timeoutMs);
+        return { ok: true, deduped: false, job: read(job.jobId) };
+      });
+    },
+    async claim(workerId, leaseMs) {
+      requireId(workerId, 'workerId');
+      if (!Number.isInteger(leaseMs) || leaseMs < 1_000 || leaseMs > 3_600_000) return { ok: false, error: 'leaseMs: invalid' };
+      return transaction(() => {
+        const timestamp = now();
+        // A worker that disappeared on the final allowed attempt must not leave a permanently
+        // CLAIMED row. Expiry is the evidence; the queue records it and closes the job fail-closed.
+        db.prepare(`UPDATE jobs SET status = 'DEAD_LETTER', failure_json = ?, worker_id = NULL,
+          lease_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE idempotency_key IS NOT NULL
+          AND status = 'CLAIMED' AND lease_expires_at <= ? AND attempts >= max_attempts`)
+          .run(JSON.stringify({ code: 'LEASE_EXPIRED_AFTER_MAX_ATTEMPTS' }), timestamp, timestamp);
+        const row = db.prepare(`SELECT * FROM jobs WHERE idempotency_key IS NOT NULL
+          AND attempts < max_attempts AND (status = 'QUEUED' OR (status = 'CLAIMED' AND lease_expires_at <= ?))
+          ORDER BY priority DESC, created_at ASC LIMIT 1`).get(timestamp);
+        if (!row) return { ok: true, job: null };
+        const leaseId = newLeaseId();
+        db.prepare(`UPDATE jobs SET status = 'CLAIMED', worker_id = ?, lease_id = ?, lease_expires_at = ?,
+          attempts = attempts + 1, updated_at = ? WHERE id = ?`).run(workerId, leaseId, timestamp + leaseMs, timestamp, row.id);
+        return { ok: true, job: read(row.id) };
+      });
+    },
+    async heartbeat(jobId, leaseId, leaseMs) {
+      const timestamp = now();
+      const changed = db.prepare(`UPDATE jobs SET lease_expires_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`)
+        .run(timestamp + leaseMs, timestamp, jobId, leaseId, timestamp).changes;
+      return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'LEASE_NOT_ACTIVE' };
+    },
+    async complete(jobId, leaseId, result) {
+      const timestamp = now();
+      const changed = db.prepare(`UPDATE jobs SET status = 'SUCCEEDED', progress = 1, result_json = ?, worker_id = NULL,
+        lease_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`)
+        .run(JSON.stringify(result ?? {}), timestamp, jobId, leaseId, timestamp).changes;
+      return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'LEASE_NOT_ACTIVE' };
+    },
+    async fail(jobId, leaseId, failure) {
+      return transaction(() => {
+        const timestamp = now();
+        const row = db.prepare(`SELECT * FROM jobs WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`).get(jobId, leaseId, timestamp);
+        if (!row) return { ok: false, error: 'LEASE_NOT_ACTIVE' };
+        const terminal = row.attempts >= row.max_attempts;
+        db.prepare(`UPDATE jobs SET status = ?, failure_json = ?, worker_id = NULL, lease_id = NULL,
+          lease_expires_at = NULL, updated_at = ? WHERE id = ?`).run(terminal ? 'DEAD_LETTER' : 'QUEUED', JSON.stringify(failure ?? {}), timestamp, jobId);
+        return { ok: true, retry: !terminal, job: read(jobId) };
+      });
+    },
+    async cancel(jobId, reason) {
+      const timestamp = now();
+      const changed = db.prepare(`UPDATE jobs SET status = 'CANCELLED', cancel_reason = ?, worker_id = NULL,
+        lease_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ? AND idempotency_key IS NOT NULL AND status IN ('QUEUED','CLAIMED')`)
+        .run(String(reason ?? 'CANCELLED'), timestamp, jobId).changes;
+      return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'JOB_NOT_CANCELLABLE' };
+    },
+    get: read,
   });
 }
 

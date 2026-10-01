@@ -5,9 +5,11 @@ import {
   admitMultiReplicaWorkerInfrastructure,
   createArtifactStoragePort,
   createScientificJobQueuePort,
+  createSqliteScientificJobQueueBackend,
   validateArtifactRef,
   validateScientificJobEnvelope,
 } from './compute/workerInfrastructureContract.mjs';
+import { openDatabase } from './store.mjs';
 
 const JOB = {
   jobId: 'job-001',
@@ -62,7 +64,71 @@ describe('shared scientific job contract', () => {
     const admission = admitMultiReplicaWorkerInfrastructure();
     assert.equal(admission.ok, false);
     assert.equal(admission.failureCode, 'SHARED_WORKER_INFRASTRUCTURE_INCOMPLETE');
-    assert.ok(admission.blockers.includes('ATOMIC_CLAIM_LEASE_NOT_IMPLEMENTED'));
+    assert.equal(CURRENT_WORKER_INFRASTRUCTURE.claimLease, 'IMPLEMENTED_SINGLE_NODE');
+    assert.ok(admission.blockers.includes('SHARED_CONCURRENCY_NOT_IMPLEMENTED'));
+  });
+
+  it('atomically leases, heartbeats and completes a durable SQLite scientific job', async () => {
+    const db = openDatabase();
+    let time = 1_000_000;
+    let leases = 0;
+    const backend = createSqliteScientificJobQueueBackend({ db, now: () => time, newLeaseId: () => `lease-${++leases}` });
+    const queue = createScientificJobQueuePort({ backend });
+    assert.equal((await queue.enqueue(JOB)).deduped, false);
+    assert.equal((await queue.enqueue(JOB)).deduped, true);
+    const claimed = await queue.claim('worker-001', 30_000);
+    assert.equal(claimed.job.state, 'CLAIMED');
+    assert.equal(claimed.job.attempts, 1);
+    assert.equal((await queue.claim('worker-002', 30_000)).job, null, 'an active lease cannot be claimed twice');
+    time += 10_000;
+    assert.equal((await queue.heartbeat(JOB.jobId, claimed.job.leaseId, 30_000)).ok, true);
+    const completed = await queue.complete(JOB.jobId, claimed.job.leaseId, { outputHash: 'b'.repeat(64) });
+    assert.equal(completed.job.state, 'SUCCEEDED');
+    assert.equal(completed.job.result.outputHash, 'b'.repeat(64));
+    assert.equal((await queue.complete(JOB.jobId, claimed.job.leaseId, {})).error, 'LEASE_NOT_ACTIVE');
+  });
+
+  it('reclaims expired leases, retries within the bound and then dead-letters', async () => {
+    const db = openDatabase();
+    let time = 2_000_000;
+    let leases = 0;
+    const backend = createSqliteScientificJobQueueBackend({ db, now: () => time, newLeaseId: () => `lease-${++leases}` });
+    const queue = createScientificJobQueuePort({ backend });
+    await queue.enqueue({ ...JOB, jobId: 'job-retry', idempotencyKey: 'idem-retry', maxAttempts: 2 });
+    const first = await queue.claim('worker-001', 1_000);
+    time += 1_001;
+    assert.equal((await queue.heartbeat('job-retry', first.job.leaseId, 1_000)).error, 'LEASE_NOT_ACTIVE');
+    const reclaimed = await queue.claim('worker-002', 1_000);
+    assert.equal(reclaimed.job.attempts, 2);
+    const failed = await queue.fail('job-retry', reclaimed.job.leaseId, { code: 'TIMEOUT' });
+    assert.equal(failed.retry, false);
+    assert.equal(failed.job.state, 'DEAD_LETTER');
+    assert.equal((await queue.claim('worker-003', 1_000)).job, null);
+  });
+
+  it('dead-letters an expired final lease even when the worker disappeared without reporting failure', async () => {
+    const db = openDatabase();
+    let time = 3_000_000;
+    const backend = createSqliteScientificJobQueueBackend({ db, now: () => time, newLeaseId: () => 'lease-final' });
+    const queue = createScientificJobQueuePort({ backend });
+    await queue.enqueue({ ...JOB, jobId: 'job-abandoned', idempotencyKey: 'idem-abandoned', maxAttempts: 1 });
+    await queue.claim('worker-001', 1_000);
+    time += 1_001;
+    assert.equal((await queue.claim('worker-002', 1_000)).job, null);
+    const abandoned = backend.get('job-abandoned');
+    assert.equal(abandoned.state, 'DEAD_LETTER');
+    assert.equal(abandoned.failure.code, 'LEASE_EXPIRED_AFTER_MAX_ATTEMPTS');
+  });
+
+  it('cancels queued work durably', async () => {
+    const db = openDatabase();
+    const backend = createSqliteScientificJobQueueBackend({ db });
+    const queue = createScientificJobQueuePort({ backend });
+    await queue.enqueue({ ...JOB, jobId: 'job-cancel', idempotencyKey: 'idem-cancel' });
+    const cancelled = await queue.cancel('job-cancel', 'USER_REQUEST');
+    assert.equal(cancelled.job.state, 'CANCELLED');
+    assert.equal(cancelled.job.cancelReason, 'USER_REQUEST');
+    assert.equal((await queue.claim('worker-001', 1_000)).job, null);
   });
 });
 

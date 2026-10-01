@@ -499,6 +499,16 @@ CREATE TRIGGER IF NOT EXISTS experiment_records_append_only_delete BEFORE DELETE
 BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experiment record cannot be deleted'); END;
 `;
 
+// V15 extends the existing `jobs` table for lease-based scientific workers. Legacy in-process jobs
+// keep all new columns NULL and retain their old lifecycle; only rows carrying idempotency_key are
+// claimed by the scientific queue backend.
+const JOB_LEASE_COLUMNS_V15 = Object.freeze([
+  ['idempotency_key', 'TEXT'], ['research_run_id', 'TEXT'], ['experiment_id', 'TEXT'], ['capability_id', 'TEXT'],
+  ['priority', 'INTEGER NOT NULL DEFAULT 0'], ['max_attempts', 'INTEGER NOT NULL DEFAULT 1'],
+  ['attempts', 'INTEGER NOT NULL DEFAULT 0'], ['timeout_ms', 'INTEGER'], ['worker_id', 'TEXT'],
+  ['lease_id', 'TEXT'], ['lease_expires_at', 'INTEGER'], ['failure_json', 'TEXT'], ['cancel_reason', 'TEXT'],
+]);
+
 /**
  * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
  * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
@@ -509,7 +519,7 @@ BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experimen
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -568,6 +578,17 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
+  if (version < 15) {
+    // SCHEMA_V5 is idempotent and guarantees the table exists for a fresh or very old database.
+    db.exec(SCHEMA_V5);
+    const columns = db.prepare('PRAGMA table_info(jobs)').all();
+    const names = new Set(columns.map((column) => column.name));
+    for (const [name, declaration] of JOB_LEASE_COLUMNS_V15) {
+      if (!names.has(name)) db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${declaration}`);
+    }
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_idempotency ON jobs(idempotency_key) WHERE idempotency_key IS NOT NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_scientific_claim ON jobs(status, priority DESC, created_at ASC) WHERE idempotency_key IS NOT NULL');
+  }
   // R-001 (docs/RISKS.md): hash any PLAINTEXT session token left over from before
   // this migration existed. `looksHashed` makes this idempotent by construction,
   // not just by the `version < 13` gate: a token that is already a 64-hex-char
@@ -590,6 +611,7 @@ function migrate(db) {
   if (version < 12) db.exec('PRAGMA user_version = 12');
   if (version < 13) db.exec('PRAGMA user_version = 13');
   if (version < 14) db.exec('PRAGMA user_version = 14');
+  if (version < 15) db.exec('PRAGMA user_version = 15');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */

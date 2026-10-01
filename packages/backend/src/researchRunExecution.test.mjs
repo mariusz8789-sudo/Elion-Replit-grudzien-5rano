@@ -359,6 +359,12 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       const x = executed.body.experiment;
       assert.equal(x.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
       assert.equal(x.execution.engine.version, RDKIT.version);
+      const bytBeforeRestart = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.equal(bytBeforeRestart.view, 'DERIVED_FROM_CANONICAL_STATE');
+      assert.equal(bytBeforeRestart.predictionLedger.length, 1);
+      assert.equal(bytBeforeRestart.predictionLedger[0].researchRunId, id);
+      assert.equal(bytBeforeRestart.predictionLedger[0].replay.verdict, 'MATCH');
+      assert.equal(bytBeforeRestart.necropolis.length, 0);
 
       // After a restart: the recovered run is identical, event for event, and says what comes next.
       const before = (await server.api('GET', `${base}/research-runs/${id}`, { token: owner.token })).body.researchRun;
@@ -372,6 +378,11 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       assert.equal(after.experiments.length, 1);
       assert.equal(after.experiments[0].execution.outputHash, x.execution.outputHash);
       assert.equal(after.nextStep, 'AWAITING_EXECUTION');
+      const bytAfterRestart = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.deepEqual(bytAfterRestart.predictionLedger, bytBeforeRestart.predictionLedger);
+      assert.deepEqual(bytAfterRestart.calibration, bytBeforeRestart.calibration);
+      assert.deepEqual(bytAfterRestart.necropolis, bytBeforeRestart.necropolis);
+      assert.equal(bytAfterRestart.continuity.brokenRuns, 0);
       const proposals = (await server.api('GET', '/api/knowledge/proposals')).body.proposals;
       assert.equal(proposals.filter((p) => p.proposalId === x.evidence.evidenceProposalId && p.status === 'pending').length, 1);
       // R1-c after the restart: the replay recorded in the chain still stands, a fresh replay of the
@@ -389,6 +400,11 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       const next = await server.api('POST', `${base}/research-runs/${id}/experiments`, { token: owner.token });
       assert.equal(next.status, 201);
       assert.equal(next.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
+      const bytWithFalsification = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.equal(bytWithFalsification.predictionLedger.length, 2);
+      assert.equal(bytWithFalsification.necropolis.length, 1);
+      assert.equal(bytWithFalsification.necropolis[0].hypothesisId, next.body.experiment.frozen.hypothesisId);
+      assert.equal(bytWithFalsification.necropolis[0].reopening, 'REQUIRES_NEW_EVIDENCE_AND_HUMAN_APPROVAL');
     } finally {
       await server?.kill();
       await new Promise((r) => model.close(r));

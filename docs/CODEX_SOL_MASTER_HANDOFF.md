@@ -185,3 +185,30 @@ Runtime proof here: ADMET-AI is absent locally, so technical validation records 
 Known blocker: commercial admission remains blocked until the weights and complete training dataset set have reviewed identities, hashes/versions and licence decisions.
 
 Rollback: revert the S6 commit; the underlying ADMET pipeline remains intact.
+
+## S7 — OpenMM ResearchRun execution
+
+Problem: the real OpenMM adapter, bounded TIP3P reference and canonical ScienceRun builder already existed, but ResearchRun lacked a direct S3 entry with an explicit simulation protocol and runtime limitations.
+
+Delivered:
+
+- canonical 300-step TIP3P water-box NVT request bound to ResearchRun and experiment identity;
+- explicit force field, ensemble, integrator, temperature, timestep, seed, PME cutoff and CPU-platform protocol;
+- MODEL_ESTIMATE classification and SOFTWARE_INTEGRATION_REFERENCE_NOT_CANDIDATE_STABILITY scope;
+- REPLAY_UNSUPPORTED_PLATFORM_NUMERICS declaration, consistent with the existing Replay verifier;
+- runtime metadata for Node/OS/architecture/engine platform plus an honest null hardware identity because the current worker does not report full hardware identity;
+- no candidate-specific MD claim, no silent GPU fallback and no second OpenMM adapter.
+
+Public contract: packages/backend/src/compute/openmmResearchRunExecutor.mjs.
+
+Existing components reused unchanged: mdAdapter, md_worker.py, openmmRuntime, canonical molecular-dynamics capability, structural worker and existing ScienceRun builder.
+
+Claude integration: call runCanonicalTip3p only as the bounded engine-validation experiment. It must not be presented as stability evidence for a docked candidate. Persist successful output through the existing ScienceRun path; Replay remains unsupported for this capability.
+
+Validation: 43 pass, 0 fail, 15 runtime-dependent skips across the S7 adapter, S3, heavy-engine and existing Virtual Lab closed-loop tests.
+
+Runtime proof here: OpenMM is absent locally, so the real canonical run is BLOCKED_BY_RUNTIME with no energy output. The structural image is pinned to OpenMM 8.6.1 and must pass its Linux runtime probe before AVAILABLE_NOW.
+
+Known blocker: a candidate-specific protein-ligand MD vertical still needs a validated topology/preparation protocol, full environment/hardware identity and external scientific review. This bounded reference does not satisfy that future scope.
+
+Rollback: revert the S7 commit; the underlying OpenMM pipeline remains intact.

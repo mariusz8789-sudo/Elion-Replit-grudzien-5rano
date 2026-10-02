@@ -602,3 +602,24 @@ Validation: 17/17 focused tests and changed-file ESLint PASS. On exact code comm
 Truth boundary: this proves live metadata retrieval, custody, failure handling, idempotency and restart recovery. It does not prove full-text access, passage grounding or commercial reuse. Those remain `BLOCKED_EXTERNAL_FULL_TEXT_REVIEW` or item-specific licence decisions. More providers remain future connectors, not claimed capabilities.
 
 Rollback: revert the literature closure commits. Existing smaller literature snapshots remain readable; no table, store, ResearchRun lifecycle or Evidence contract was added.
+
+## Final closure — Science Flight Control / Experiment Firewall
+
+Problem: canonical Virtual Lab execution already produced preregistered plans, real Science Runs, Evidence proposals and Replay verdicts, but there was no one read-only operational view that proved pre-flight admission, attributed failures, compared planned versus observed execution and exposed the same trace to BYT without creating another lifecycle.
+
+Delivered:
+
+- a deterministic `ScienceFlightControl` projection over existing append-only `VIRTUAL_EXPERIMENT_*` campaign events;
+- pre-flight checks for frozen input, capability, research gate and claim boundary;
+- execution deltas for input identity, planned versus selected capability/engine, budget versus runtime and expected versus observed result class;
+- deterministic failure attribution across `PREFLIGHT`, `RESEARCH_GATE`, `CAPABILITY_BINDING`, `RUNTIME`, `WORKER_TRANSPORT`, `ENGINE` and `REPLAY`;
+- references to the existing Evidence proposal and Replay verification only, plus a BYT observation explicitly marked `DERIVED_READ_MODEL_ONLY` with `persistence: NONE`;
+- reconstruction from canonical campaign events after closing and reopening SQLite, with identical flight fingerprints.
+
+Existing architecture reused: Virtual Lab campaign events, ScienceRun records, Evidence proposal, Replay verification, canonical cognitive state and BYT projection. No store, lifecycle, Evidence/Replay ledger or BYT memory was added.
+
+Validation: 53 focused tests yielded 45 PASS, 0 FAIL and 8 honest runtime skips; full local backend yielded 1,411 PASS, 0 FAIL and 84 explicit skips. Linux push run `36989657173` and PR run `36989660751` both succeeded. The exact-source artifact is `science-flight-control-proof-ac9a6d2272d4b84d84695b9567dadf2dcc0cf3bb`, digest `sha256:c1fe7f403989e4b5cbcb43709d30bb6b288da249e318ef4392931073630f8ade`. Independent Astra delta review returned `GO`.
+
+Truth boundary: real RDKit execution remains an in-silico `SIMULATED` observation. An invalid PDB is blocked during pre-flight and creates neither Evidence nor Replay. Flight Control is an inspectable projection, never a second scientific record.
+
+Rollback: revert `ac9a6d2272d4b84d84695b9567dadf2dcc0cf3bb`; canonical Virtual Lab, ScienceRun, Evidence, Replay and BYT records remain intact.

@@ -1,0 +1,35 @@
+{
+  "eventRefs": [
+    {
+      "agentRunId": "example-agent-run-not-a-real-run",
+      "seq": 0,
+      "type": "PROBLEM_FORMALIZED"
+    }
+  ],
+  "experimentRecordRefs": [],
+  "executionRecordRefs": [],
+  "scienceRunRefs": [],
+  "evidenceRefs": [],
+  "replayRefs": [],
+  "sourceArtifactRefs": [],
+  "reportArtifactRefs": [],
+  "licenceDecisionArtifactRefs": [],
+  "contract": "research-run-envelope@1",
+  "researchRunContract": "research-run@1",
+  "recordMode": "SYNTHETIC_EXAMPLE",
+  "domain": "genesis.research-run",
+  "researchRunId": "example-agent-run-not-a-real-run",
+  "projectId": "example-project-not-a-real-project",
+  "producerCommit": "fc29ef609ceefec29c3634bdd21d15dc7fde6f0d",
+  "stateChainRef": "agent_run_steps",
+  "verification": {
+    "referenceResolution": "UNVERIFIED",
+    "integrity": "UNVERIFIED",
+    "completeness": "INCOMPLETE",
+    "delivery": "NOT_EVALUATED",
+    "missing": [
+      "Synthetic documentation only; references do not resolve to a real run.",
+      "No plan, preregistration, execution, Evidence, Replay, report or licence decision is asserted."
+    ]
+  }
+}

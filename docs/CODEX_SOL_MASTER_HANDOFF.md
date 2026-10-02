@@ -503,8 +503,20 @@ Delivered:
 - the challenge reason is recorded in the existing NEXT_EXPERIMENT proposal and fingerprinted DecisionTrace;
 - no new run, store, lifecycle, Evidence record or falsification engine.
 
-Validation: 19/19 focused ResearchRun/steering tests PASS and focused ESLint PASS. The integration fixture executes a first real RDKit experiment, obtains `SUPPORTED_WITHIN_PROTOCOL` and Replay `MATCH`, selects its preregistered null challenge, executes it through the same API, seals `FALSIFIED_WITHIN_PROTOCOL`, replays `MATCH` and verifies the canonical chain. Dedicated negative regressions prove that null Replay, `NOT_APPLICABLE` and `DRIFT` cannot activate challenge priority, malformed/forward challenge references are degraded, and explicit user focus wins. Evidence: `docs/evidence/research-run-self-falsification-2a65c9ec.json`.
+Validation: 19/19 focused ResearchRun/steering tests PASS and focused ESLint PASS. The integration fixture executes a first real RDKit experiment, obtains `SUPPORTED_WITHIN_PROTOCOL` and Replay `MATCH`, selects its preregistered null challenge, executes it through the same API, seals `FALSIFIED_WITHIN_PROTOCOL`, replays `MATCH` and verifies the canonical chain. Dedicated negative regressions prove that null Replay, `NOT_APPLICABLE` and `DRIFT` cannot activate challenge priority, malformed/forward challenge references are degraded, and explicit user focus wins. Evidence: `docs/evidence/research-run-self-falsification-047de5ca.json`.
 
 Known limitation: this proves bounded prioritization and execution of a challenge proposed before the first result. It does not claim that Genesis autonomously invents a new scientifically useful experiment after seeing the result.
 
-Rollback: revert `2a65c9ec`; ordinary next-hypothesis selection remains available, but the explicit challenge relationship and reason disappear.
+Rollback: revert `047de5ca` and `2a65c9ec`; ordinary next-hypothesis selection remains available, but the explicit challenge relationship and reason disappear.
+
+## Post-S11 integration - authenticated ResearchRun UI proof
+
+Problem: route inventory proved that every discovered screen rendered at desktop and mobile sizes, but it did not prove a populated authenticated Science Chat workflow through the canonical backend.
+
+Delivered: `scripts/research-run-ui-proof.mjs` starts the production frontend/backend, creates a real owner and project through HTTP, restores that session in the browser, and drives `/badanie` → `/eksperyment` → `/powtórz`. A deterministic local OpenAI-compatible provider supplies only the frozen plan; both scientific executions use the real local RDKit adapter. No engine/browser mock or direct scientific-state write is used.
+
+Validation: desktop 1440×900 and mobile 390×844 PASS. Each case contains 12 canonical events and two real experiments with `SUPPORTED_WITHIN_PROTOCOL` then `FALSIFIED_WITHIN_PROTOCOL`, Replay `MATCH`/`MATCH`, a verified hash chain and zero runtime or horizontal-overflow errors. Evidence: `docs/evidence/research-run-ui-proof-5301ad52.json`.
+
+Known limitations: this is headless Edge/Chromium rather than physical-device or real-GPU proof. The local plan provider proves the model boundary and UI integration, not external-provider quality or availability. Evidence is displayed as a proposal and remains subject to the existing human publication gate.
+
+Rollback: revert `5301ad52`; product code and canonical ResearchRun data contracts remain unchanged.

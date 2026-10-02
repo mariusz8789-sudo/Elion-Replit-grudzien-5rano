@@ -503,7 +503,7 @@ Delivered:
 - the challenge reason is recorded in the existing NEXT_EXPERIMENT proposal and fingerprinted DecisionTrace;
 - no new run, store, lifecycle, Evidence record or falsification engine.
 
-Validation: 18/18 focused ResearchRun/steering tests PASS and focused ESLint PASS. The integration fixture executes a first real RDKit experiment, obtains `SUPPORTED_WITHIN_PROTOCOL` and Replay `MATCH`, selects its preregistered null challenge, executes it through the same API, seals `FALSIFIED_WITHIN_PROTOCOL`, replays `MATCH` and verifies the canonical chain. Evidence: `docs/evidence/research-run-self-falsification-2a65c9ec.json`.
+Validation: 19/19 focused ResearchRun/steering tests PASS and focused ESLint PASS. The integration fixture executes a first real RDKit experiment, obtains `SUPPORTED_WITHIN_PROTOCOL` and Replay `MATCH`, selects its preregistered null challenge, executes it through the same API, seals `FALSIFIED_WITHIN_PROTOCOL`, replays `MATCH` and verifies the canonical chain. Dedicated negative regressions prove that null Replay, `NOT_APPLICABLE` and `DRIFT` cannot activate challenge priority, malformed/forward challenge references are degraded, and explicit user focus wins. Evidence: `docs/evidence/research-run-self-falsification-2a65c9ec.json`.
 
 Known limitation: this proves bounded prioritization and execution of a challenge proposed before the first result. It does not claim that Genesis autonomously invents a new scientifically useful experiment after seeing the result.
 

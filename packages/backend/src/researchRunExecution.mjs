@@ -128,9 +128,10 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
     return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
   }
   const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const challengeIsAdmissible = lastVerdict === PROTOCOL_VERDICT.SUPPORTED && replayVerdict === REPLAY_VERDICT.MATCH;
   const priority = (hypothesis) => {
     if (hypothesis.hypothesisId === steering.focusedHypothesisId) return 0;
-    if (lastVerdict === PROTOCOL_VERDICT.SUPPORTED && hypothesis.challengesHypothesisId === lastHypothesisId) return 1;
+    if (challengeIsAdmissible && hypothesis.challengesHypothesisId === lastHypothesisId) return 1;
     return 2;
   };
   const hypotheses = [...(plan?.hypotheses ?? [])].sort((a, b) => priority(a) - priority(b));
@@ -140,7 +141,7 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
     const x = executabilityOf(h, executors);
     if (x.executable) {
       const isFocused = h.hypothesisId === steering.focusedHypothesisId;
-      const isChallenge = lastVerdict === PROTOCOL_VERDICT.SUPPORTED && h.challengesHypothesisId === lastHypothesisId;
+      const isChallenge = challengeIsAdmissible && h.challengesHypothesisId === lastHypothesisId;
       return {
         action: 'EXECUTE_NEXT_HYPOTHESIS',
         hypothesisId: h.hypothesisId,

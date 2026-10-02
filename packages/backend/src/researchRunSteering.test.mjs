@@ -48,6 +48,30 @@ describe('ResearchRun mid-run steering', () => {
     assert.equal(abandoned.hypothesisId, 'hyp-a');
   });
 
+  test('a challenge requires Replay MATCH, while explicit user focus remains first', () => {
+    const hypothesis = (hypothesisId, extra = {}) => ({
+      hypothesisId,
+      ...extra,
+      experimentProposal: { decision: 'PROPOSED', engineId: 'rdkit', parameters: { predictions: [{ observable: 'score', operator: '>', value: 0 }] } },
+    });
+    const plan = { hypotheses: [
+      hypothesis('hyp-normal'),
+      hypothesis('hyp-challenge', { challengesHypothesisId: 'hyp-done' }),
+      hypothesis('hyp-focused'),
+    ], nextActions: [] };
+    const executors = { rdkit: { observables: { score: 'number' }, parseInput: () => ({ ok: true, input: {} }) } };
+    const args = [plan, new Set(['hyp-done']), 'SUPPORTED_WITHIN_PROTOCOL', executors];
+
+    const matched = nextExperimentProposal(...args, 'MATCH', {}, 'hyp-done');
+    assert.deepEqual([matched.hypothesisId, matched.reason], ['hyp-challenge', 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN']);
+    assert.equal(nextExperimentProposal(...args, null, {}, 'hyp-done').hypothesisId, 'hyp-normal');
+    assert.equal(nextExperimentProposal(...args, 'NOT_APPLICABLE', {}, 'hyp-done').hypothesisId, 'hyp-normal');
+    assert.equal(nextExperimentProposal(...args, 'DRIFT', {}, 'hyp-done').action, 'HUMAN_REVIEW');
+
+    const focused = nextExperimentProposal(...args, 'MATCH', { focusedHypothesisId: 'hyp-focused' }, 'hyp-done');
+    assert.deepEqual([focused.hypothesisId, focused.reason], ['hyp-focused', 'USER_FOCUSED_HYPOTHESIS']);
+  });
+
   test('invalid or unknown steering fails closed without appending', () => {
     const { db, user, project, run } = fixture();
     assert.equal(steerResearchRun(db, project.id, run.id, { action: 'FOCUS_HYPOTHESIS', hypothesisId: 'missing' }, { userId: user.id }).status, 'HYPOTHESIS_NOT_FOUND');

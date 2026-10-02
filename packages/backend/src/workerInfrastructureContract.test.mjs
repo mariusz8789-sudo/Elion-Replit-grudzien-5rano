@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   CURRENT_WORKER_INFRASTRUCTURE,
@@ -9,6 +12,7 @@ import {
   validateArtifactRef,
   validateScientificJobEnvelope,
 } from './compute/workerInfrastructureContract.mjs';
+import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { openDatabase } from './store.mjs';
 
 const JOB = {
@@ -174,5 +178,98 @@ describe('ArtifactRef and object-storage port', () => {
       /key: invalid/,
     );
     assert.equal(validateArtifactRef({ sha256: 'fake' }).ok, false);
+  });
+});
+
+describe('single-node infrastructure execution proof', () => {
+  it('claims every job exactly once across separate SQLite connections and recovers after restart', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'genesis-queue-connections-'));
+    const databasePath = path.join(directory, 'genesis.db');
+    const databases = Array.from({ length: 4 }, () => openDatabase(databasePath));
+    try {
+      const backends = databases.map((db) => createSqliteScientificJobQueueBackend({ db }));
+      const queues = backends.map((backend) => createScientificJobQueuePort({ backend }));
+      const jobIds = Array.from({ length: 32 }, (_, index) => `job-multi-${String(index).padStart(3, '0')}`);
+      for (let index = 0; index < jobIds.length; index += 1) {
+        const enqueued = await queues[0].enqueue({
+          ...JOB,
+          jobId: jobIds[index],
+          idempotencyKey: `idem-multi-${String(index).padStart(3, '0')}`,
+          experimentId: `experiment-multi-${String(index).padStart(3, '0')}`,
+          priority: index % 10,
+        });
+        assert.equal(enqueued.deduped, false);
+      }
+
+      const claimedIds = new Set();
+      while (claimedIds.size < jobIds.length) {
+        const claims = await Promise.all(queues.map((queue, index) => queue.claim(`worker-multi-${index + 1}`, 10_000)));
+        let progress = false;
+        for (let index = 0; index < claims.length; index += 1) {
+          const claimed = claims[index];
+          if (!claimed.job) continue;
+          progress = true;
+          assert.equal(claimedIds.has(claimed.job.jobId), false, `duplicate claim: ${claimed.job.jobId}`);
+          claimedIds.add(claimed.job.jobId);
+          assert.equal((await queues[index].complete(claimed.job.jobId, claimed.job.leaseId, { ok: true })).ok, true);
+        }
+        assert.equal(progress, true, 'queue became idle before all jobs completed');
+      }
+      assert.equal(claimedIds.size, jobIds.length);
+      assert.ok(backends.every((backend) => jobIds.every((jobId) => backend.get(jobId).state === 'SUCCEEDED')));
+
+      for (const db of databases) db.close();
+      const restarted = openDatabase(databasePath);
+      try {
+        const recovered = createSqliteScientificJobQueueBackend({ db: restarted });
+        assert.ok(jobIds.every((jobId) => recovered.get(jobId).state === 'SUCCEEDED'));
+      } finally {
+        restarted.close();
+      }
+    } finally {
+      for (const db of databases) {
+        try { db.close(); } catch { /* already closed for restart proof */ }
+      }
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('stores content-addressed bytes outside SQLite, survives restart and detects corruption', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'genesis-local-artifacts-'));
+    try {
+      const now = () => new Date('2026-10-02T00:00:00.000Z');
+      const bytes = Buffer.from('durable artifact bytes');
+      const storage = createLocalContentAddressedArtifactStorage({ rootDir: directory, now });
+      const ref = await storage.put({
+        key: 'requested/result.bin',
+        bytes,
+        mimeType: 'application/octet-stream',
+        producer: 'worker-local-001',
+        researchRunId: 'research-run-001',
+        experimentId: 'experiment-001',
+      });
+      assert.equal(ref.storageProvider, 'local-content-addressed-single-node');
+      assert.equal(ref.key.startsWith('sha256/'), true);
+      assert.equal(storage.admission.multiReplicaSafe, false);
+      assert.equal(storage.admission.blocker, 'BLOCKED_EXTERNAL_OBJECT_STORAGE');
+
+      const restarted = createLocalContentAddressedArtifactStorage({ rootDir: directory, now });
+      assert.deepEqual(await restarted.get(ref), bytes);
+      const duplicate = await restarted.put({
+        key: 'another/requested-name.bin',
+        bytes,
+        mimeType: 'application/octet-stream',
+        producer: 'worker-local-002',
+        researchRunId: 'research-run-001',
+        experimentId: 'experiment-001',
+      });
+      assert.equal(duplicate.key, ref.key);
+      assert.equal(duplicate.artifactId, ref.artifactId);
+
+      await writeFile(path.join(directory, ...ref.key.split('/')), Buffer.from('corrupted'));
+      await assert.rejects(() => restarted.get(ref), /ARTIFACT_INTEGRITY_MISMATCH/);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

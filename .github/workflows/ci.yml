@@ -142,6 +142,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+      - name: Worker infrastructure — single-node queue and external artifact custody proof
+        run: |
+          node scripts/worker-infrastructure-proof.mjs \
+            --out artifacts/worker-infrastructure/worker-infrastructure-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload worker infrastructure evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: worker-infrastructure-proof-${{ github.sha }}
+          path: artifacts/worker-infrastructure
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Testy packages/core + packages/ui (source-only pakiety, vitest.core.config.ts)
         run: npm run test:core
 

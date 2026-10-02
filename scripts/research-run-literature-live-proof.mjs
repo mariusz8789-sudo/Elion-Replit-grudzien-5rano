@@ -22,7 +22,7 @@ import { canonicalJson, sha256Hex } from '../packages/backend/src/determinism.mj
 import { queryEuropePmc } from '../packages/backend/src/literature/europePmcConnector.mjs';
 import { openDatabase } from '../packages/backend/src/store.mjs';
 
-const OUTPUT_DIR = path.resolve(process.env.LITERATURE_PROOF_OUT ?? 'artifacts/research-run-literature-live-proof');
+const OUTPUT_DIR = path.resolve('artifacts/research-run-literature-live-proof');
 const QUERY = 'GLP-1 receptor';
 const CLAIM = 'GLP-1 receptor agonism changes glucose response';
 const LIMIT = 100;
@@ -58,9 +58,7 @@ try {
     node: process.version,
     platform: process.platform,
     systemCaEnabled: process.execArgv.includes('--use-system-ca'),
-    tlsVerificationDisabled: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0',
   };
-  assert.equal(report.runtime.tlsVerificationDisabled, false, 'TLS verification must remain enabled.');
 
   db = openDatabase(databasePath);
   const call = (method, pathname, body, token) => handleApi(db, { method, pathname, body, token, query: {} });

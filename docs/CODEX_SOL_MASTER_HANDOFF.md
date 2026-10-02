@@ -291,6 +291,38 @@ admission still fails until a shared queue/concurrency backend and object storag
 
 Rollback: revert the S9b commit; persisted S9 jobs and existing in-process jobs remain readable.
 
+### S9c — real single-node artifact custody and multi-connection proof
+
+Problem: S9 defined the provider boundary, but it did not yet prove that raw artifact bytes can live
+outside SQLite, remain content-addressed across provider restart and fail closed on corruption. The
+durable queue also needed an executed multi-connection claim proof rather than a contract-only claim.
+
+Delivered: `localArtifactStorageBackend.mjs` is a thin provider for the existing Artifact Storage
+Port. It requires an absolute root, stores bytes under `sha256/<2>/<hash>`, verifies SHA-256 before
+write and after read, commits through atomic temp-write/rename, deduplicates identical content and
+rejects path escape. It is explicitly `SINGLE_NODE_ONLY`, `multiReplicaSafe: false` and
+`productionObjectStorage: false`. The executable proof enqueues 64 jobs and uses four independent
+SQLite connections: every job is claimed exactly once, all 64 survive reopen as `SUCCEEDED`, and the
+artifact remains readable with the same hash after provider reconstruction. No second store, queue,
+ResearchRun, Evidence ledger or Replay system was introduced.
+
+Validation: focused local tests 17/17 PASS; full local backend 1,499 tests, 1,415 PASS, 0 FAIL and 84
+explicit runtime-dependent skips. Linux push `#2892` (run `37001657077`) and PR `#2893` (run
+`37001659835`) succeeded. The exact-source push artifact is
+`worker-infrastructure-proof-8e930b4ca1dd862a2354c482b60def078c40a3b4`, digest
+`sha256:7b5eabb69dabedfd328e2f72706b650ee58dc29a0ce4b690453cc616913559b8`; the PR merge-SHA artifact
+digest is `sha256:2702b3435bff075bc3ae18979ec55c5c76925f70f0fe4676c6d5769b82276678`.
+Independent Astra delta review returned GO.
+
+Truth boundary: single-node SQLite queue plus local content-addressed custody is `DONE_IN_REPO`.
+Shared queue, shared concurrency and production object storage remain respectively
+`BLOCKED_EXTERNAL_SHARED_QUEUE`, `BLOCKED_EXTERNAL_SHARED_CONCURRENCY` and
+`BLOCKED_EXTERNAL_OBJECT_STORAGE`; each requires provisioned shared infrastructure and deployment
+credentials rather than another in-repo substitute.
+
+Rollback: revert `8e930b4ca1dd862a2354c482b60def078c40a3b4`; the existing S9/S9b contracts and persisted jobs remain
+readable.
+
 ## S10 — scientific Python sandbox foundation
 
 Problem: Genesis needs a safe path for model-proposed analysis, but the repository does not yet contain an attested container backend. Executing generated code on the host would violate the security boundary.

@@ -4,6 +4,8 @@ Branch: `codex/sol-master-execution`
 Draft PR: #56  
 No merge. No deploy. No force-push.
 
+Latest complete local backend regression: 1,474 tests, 1,393 PASS, 0 FAIL, 0 cancelled and 81 explicit runtime-dependent skips on `88269a25`; see `docs/evidence/backend-full-suite-88269a25.json`. Linux CI remains a separate gate.
+
 | Capability | Before | After | Stage/commit | Tests | Real runtime proof | Production ready? | Blocker | Claude integration |
 |---|---|---|---|---|---|---|---|---|
 | Heavy-compute security | Public/runtime boundary incomplete | Auth, authorization, limits, timeout/output gates; passive health | S0 `d579907c`, `7a983b3f` | Focused security/worker suites | HTTP worker tests | PARTIAL | Shared quota/production secrets | Review and merge |

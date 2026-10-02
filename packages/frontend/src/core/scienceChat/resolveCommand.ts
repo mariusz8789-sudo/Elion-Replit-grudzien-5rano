@@ -91,6 +91,10 @@ export type ChatAction =
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
   | { type: 'ingestUrls'; urls: readonly string[] }
+  /** RESEARCH RUN (R1-c) — `/badanie <pytanie>` starts one backend ResearchRun and carries it through one
+   * experiment; `/eksperyment` runs the next one; `/powtórz` replays the last executed one. The backend
+   * owns every step; `researchRunTurn.ts` only words its answer. */
+  | { type: 'researchRun'; op: 'start' | 'next' | 'replay'; question?: string }
   /** D-128 — EPISTEMIC TRUTH RESPONSE: the LaypersonAssistant over the kernel ledger answers `query`
    * with status + sources, or literally "Nie wiem"; ScienceChat.tsx executes it, the resolver only routes. */
   | { type: 'evidenceAnswer'; query: string }
@@ -421,6 +425,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM', intent: 'HELP' };
   const scientificIntegrationEntry = resolveScientificIntegrationEntry(message, norm);
   if (scientificIntegrationEntry) return scientificIntegrationEntry;
+
+  // --- ResearchRun (R1-c): explicit commands only, so no other route can swallow them or be swallowed.
+  const researchAsk = message.match(/^\s*\/badanie(?=\s|$)\s*([\s\S]*)$/i);
+  if (researchAsk) {
+    const question = researchAsk[1].trim();
+    if (!question) return { text: RESEARCH_RUN_HELP, tag: 'SYSTEM', intent: 'HELP' };
+    return { text: `Zakładam przebieg badawczy dla pytania: „${question}”. Model tylko proponuje hipotezy; przewidywanie zamrażam, zanim uruchomię silnik.`, tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'researchRun', op: 'start', question } };
+  }
+  if (/^\s*\/eksperyment\s*$/i.test(message)) return { text: 'Uruchamiam następny eksperyment z planu tego przebiegu.', tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'researchRun', op: 'next' } };
+  if (/^\s*\/(?:powt[oó]rz|replay)\s*$/i.test(message)) return { text: 'Powtarzam ostatni wykonany eksperyment tym samym silnikiem i porównuję wynik.', tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'researchRun', op: 'replay' } };
 
   // --- Knowledge ingestion: `/ingest <url>` (also "zaingestuj", "pobierz źródło"). URLs come from the RAW
   //     message (normalize() strips punctuation); with no URL the command explains itself instead of guessing.
@@ -1205,6 +1219,7 @@ function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
   };
 }
 
+const RESEARCH_RUN_HELP = 'Napisz pytanie po komendzie: `/badanie <pytanie>`, np. „/badanie Czy aspiryna spełnia regułę Lipinskiego?”. Potem `/eksperyment` uruchamia następny eksperyment z planu, a `/powtórz` powtarza ostatni i porównuje wynik.';
 const QUANTUM_HELP = 'Formy: `/quantum bell-state`, `/quantum ghz 3`, `/quantum superposition 4`, `/quantum run <OpenQASM 3.0>` (obwód w treści wiadomości, może być wieloliniowy; bramki h x y z s t rx ry rz cx cz swap barrier measure, maks. 16 kubitów), opcjonalnie `shots=2048 seed=5` (1–8192 strzałów). Bez klucza QPU w środowisku wynik pochodzi z lokalnego symulatora i jest etykietowany MODEL_ESTIMATE — nigdy jako pomiar.';
 const QUANTUM_MAX_SHOTS = 8192;
 const QUANTUM_MAX_QUBITS = 16;
@@ -1247,7 +1262,7 @@ function helpResponse(): ChatResponse {
       'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), porównać dwa modele ' +
       '(„porównaj SIR R0=1.5 z SIR R0=3"), wyjaśnić stan („co się zmieniło?"), pokazać równania i założenia, ' +
       'zbudować zadanie oraz zaproponować kolejny eksperyment („zaproponuj eksperyment"). ' +
-      'Komendy: `/ingest <url>` (pozyskanie źródła jako propozycji) i `/quantum bell-state` (mostek kwantowy; lokalny symulator = MODEL_ESTIMATE). ' +
+      'Komendy: `/badanie <pytanie>` (przebieg badawczy: hipoteza, eksperyment, werdykt, Evidence, powtórzenie), `/ingest <url>` (pozyskanie źródła jako propozycji) i `/quantum bell-state` (mostek kwantowy; lokalny symulator = MODEL_ESTIMATE). ' +
       'Weryfikacja inwariantami jest dostępna dla wspieranych snapshotów, a SHOW_SOURCE pokazuje internal model provenance; brak niezależnej referencji pozostaje VERIFY_REQUIRED.',
     tag: 'SYSTEM',
     intent: 'HELP',

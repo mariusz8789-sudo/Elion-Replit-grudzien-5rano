@@ -12,7 +12,8 @@
  *   HYPOTHESES_GENERATED  sub-problems, hypotheses, experiment proposals and next actions the model
  *                         PROPOSED; each hypothesis validated and degraded by ENTITY-3's rules, each
  *                         experiment judged by Genesis (decideExperimentProposal), nothing run
- * Execution, falsification, evidence and the next experiment are R1-b.
+ * R1-b (researchRunExecution.mjs) adds the rest of one experiment, in the same chain:
+ *   PREDICTIONS_FROZEN, EXPERIMENT_HANDOFF, SELF_FALSIFICATION, EVIDENCE_UPDATE, NEXT_EXPERIMENT.
  *
  * Guarantees:
  *  - the model can never set FACT / SUPPORTED: every item it returns is status PROPOSED,
@@ -33,6 +34,7 @@ import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, getAg
 import { buildProposalPrompt, parseProposalText, validateClaimProposal } from './claimProposal.mjs';
 import { recordClaimProposal } from './knowledgeRegistry.mjs';
 import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningProvider.mjs';
+import { executorPromptLines, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 
 export const RESEARCH_RUN_DOMAIN = 'genesis.research-run';
 export const RESEARCH_RUN_CONTRACT_VERSION = 'research-run@1';
@@ -68,7 +70,10 @@ Rules:
 3. Propose engines only from the list of engines you are given.
 4. Never propose changing a preregistered threshold, gate or acceptance criterion.
 5. Every falsificationProposal must say what observation would show the hypothesis is wrong.
-6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.`;
+6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.
+7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean }, naming only these engines and observables:
+${executorPromptLines().join('\n')}
+   Predictions are frozen before the engine runs and cannot be changed afterwards.`;
 
 /* ---------------- identity, isolation, dedupe ---------------- */
 
@@ -83,7 +88,7 @@ function ownRun(db, projectId, runId) {
   return run && run.projectId === projectId && run.domain === RESEARCH_RUN_DOMAIN ? run : null;
 }
 
-function inWriteTransaction(db, fn) {
+export function inWriteTransaction(db, fn) {
   db.exec('BEGIN IMMEDIATE');
   try {
     const out = fn();
@@ -97,6 +102,20 @@ function inWriteTransaction(db, fn) {
 
 /* ---------------- read and resume ---------------- */
 
+/** The run's experiments, one entry per experiment id, in the order they were frozen. */
+export function experimentsOf(researchState) {
+  const byId = new Map();
+  const slot = { PREDICTIONS_FROZEN: 'frozen', EXPERIMENT_HANDOFF: 'execution', SELF_FALSIFICATION: 'falsification', EVIDENCE_UPDATE: 'evidence', NEXT_EXPERIMENT: 'next' };
+  for (const e of researchState.events) {
+    const key = slot[e.type];
+    const id = e.payload?.experimentId;
+    if (!key || !id) continue;
+    if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null });
+    byId.get(id)[key] = e.payload;
+  }
+  return [...byId.values()];
+}
+
 /** What the run should do next, derived only from its persisted, verified state. */
 export function nextStepOf(run, researchState) {
   if (!researchState.chain.ok) return 'STATE_INTEGRITY_FAILURE';
@@ -104,7 +123,12 @@ export function nextStepOf(run, researchState) {
   const types = new Set(researchState.events.map((e) => e.type));
   if (!types.has('PROBLEM_FORMALIZED')) return 'FORMALIZE_PROBLEM';
   if (!types.has('HYPOTHESES_GENERATED')) return 'PROPOSE_PLAN';
-  return 'AWAITING_EXECUTION'; // R1-b: engine choice, preregistration, execution
+  const experiments = experimentsOf(researchState);
+  const open = experiments.find((x) => !x.next);
+  if (open) return !open.execution ? 'EXECUTE_EXPERIMENT' : !open.evidence ? 'PROPOSE_EVIDENCE' : 'PROPOSE_NEXT_EXPERIMENT';
+  const last = experiments.at(-1);
+  if (!last) return 'AWAITING_EXECUTION';
+  return last.next.proposal?.action === 'EXECUTE_NEXT_HYPOTHESIS' ? 'AWAITING_EXECUTION' : 'AWAITING_HUMAN_REVIEW';
 }
 
 function view(db, run) {
@@ -116,6 +140,7 @@ function view(db, run) {
     question: last('PROBLEM_FORMALIZED')?.question ?? run.goal,
     problem: last('PROBLEM_FORMALIZED'),
     plan: last('HYPOTHESES_GENERATED'),
+    experiments: experimentsOf(researchState),
     researchState,
     nextStep: nextStepOf(run, researchState),
   };

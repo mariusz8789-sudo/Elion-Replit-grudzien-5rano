@@ -203,7 +203,7 @@ body:has(.ax-hud) .context-guide-launch { display: none; }
   .human-hero-tools .sw-chip { padding: 8px; font-size: 12px; }
   .human-hero-path button strong { font-size: 12px; }
   .human-hero-path button span { font-size: 11px; }
-  .human-inspector { height: 40dvh; max-height: 40dvh; }
+  .human-inspector { height: 30dvh; max-height: 30dvh; }
 }
 
 .sw .human-inspector .sw-ex-rungs { grid-template-columns: repeat(3, minmax(0, 1fr)); }

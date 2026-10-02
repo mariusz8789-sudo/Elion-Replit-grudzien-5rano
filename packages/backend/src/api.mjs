@@ -79,7 +79,7 @@ import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPl
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
-import { buildCustomerResearchDelivery, requiredCommercialItemsOf } from './customerResearchDelivery.mjs';
+import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
@@ -772,6 +772,8 @@ export function handleApi(db, ctx) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
         const requiredItems = requiredCommercialItemsOf(current);
+        const productId = body?.productId ?? null;
+        const declaredUse = resolveCustomerDeclaredUse(productId, body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT');
         let commercialDecision = { ok: false, status: 'BLOCKED_EXTERNAL_LICENSE_REVIEW', items: [] };
         if (typeof ctx.commercialAdmissionProvider?.resolve === 'function') {
           try {
@@ -779,7 +781,7 @@ export function handleApi(db, ctx) {
               projectId,
               researchRunId: current.researchRunId,
               releaseId: body?.releaseId ?? null,
-              declaredUse: body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT',
+              declaredUse,
               requiredItems,
             });
           } catch {
@@ -788,7 +790,9 @@ export function handleApi(db, ctx) {
         }
         const result = buildCustomerResearchDelivery(db, projectId, current.researchRunId, {
           releaseId: body?.releaseId ?? null,
-          declaredUse: body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT',
+          declaredUse,
+          productId,
+          onboarding: body?.onboarding ?? null,
           items: commercialDecision?.ok && Array.isArray(commercialDecision.items)
             ? commercialDecision.items
             : [],
@@ -797,6 +801,9 @@ export function handleApi(db, ctx) {
             : commercialDecision?.status ?? 'BLOCKED_EXTERNAL_LICENSE_REVIEW',
         });
         if (!result.ok) return err(404, result.status);
+        if (body?.includeExportArtifact === true) {
+          return ok({ ...result, exportArtifact: buildAuthorizedCustomerExport(result.delivery) });
+        }
         return ok(result);
       }
       if (seg.length === 5 && seg[4] === 'generated-analyses') {

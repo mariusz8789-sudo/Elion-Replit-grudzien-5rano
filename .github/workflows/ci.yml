@@ -127,6 +127,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+      - name: Customer products — onboarding, real RDKit, Evidence, Replay and authorised exports
+        env:
+          GENESIS_RDKIT_PYTHON: python
+          GENESIS_CUSTOMER_PRODUCTS_PROOF_DIR: artifacts/customer-products
+        run: node scripts/customer-products-proof.mjs
+
+      - name: Upload customer product evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: customer-products-proof-${{ github.sha }}
+          path: artifacts/customer-products
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Testy packages/core + packages/ui (source-only pakiety, vitest.core.config.ts)
         run: npm run test:core
 

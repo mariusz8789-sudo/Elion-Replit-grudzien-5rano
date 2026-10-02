@@ -1,13 +1,14 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { afterEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { handleApi } from './api.mjs';
 import { openDatabase } from './store.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
-import { CUSTOMER_DELIVERY_STATUS } from './customerResearchDelivery.mjs';
+import { buildAuthorizedCustomerExport, CUSTOMER_DELIVERY_STATUS, CUSTOMER_PRODUCT, CUSTOMER_PRODUCT_STATUS } from './customerResearchDelivery.mjs';
 
 const RDKIT = rdkitDetect();
 const needsRdkit = RDKIT.available ? {} : { skip: `RDKit runtime unavailable: ${RDKIT.reason}` };
@@ -136,6 +137,20 @@ function admittedItem(required) {
 }
 
 describe('customer and monetization E2E over canonical ResearchRun', () => {
+  test('authorised export remains output-bounded', () => {
+    const result = buildAuthorizedCustomerExport({
+      exportAllowed: true,
+      researchRunId: 'rr-output-bound',
+      deliveryFingerprint: 'd'.repeat(64),
+      onboarding: { status: 'READY' },
+      productDelivery: { productId: CUSTOMER_PRODUCT.EVIDENCE_PLATFORM },
+      report: { oversized: 'x'.repeat(5 * 1024 * 1024) },
+      commercialAdmission: { status: 'ADMITTED_FOR_DECLARED_USE', declaredUse: 'GENESIS_EVIDENCE_PLATFORM_CUSTOMER_EXPORT', manifestHash: 'm'.repeat(64) },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 'EXPORT_TOO_LARGE');
+    assert.ok(result.byteLength > result.maxBytes);
+  });
   test('question -> literature -> plan -> real RDKit -> Evidence/Replay -> rights gate -> review-ready export survives restart', needsRdkit, async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'genesis-customer-delivery-'));
     tempDirs.push(dir);
@@ -326,6 +341,157 @@ describe('customer and monetization E2E over canonical ResearchRun', () => {
       { token: stranger.token, body: { releaseId: 'leak-attempt' }, commercialAdmissionProvider: unknownProvider },
     );
     assert.equal(leaked.status, 404);
+    db.close();
+  });
+
+  test('all four product offers produce deterministic authorised exports from one canonical ResearchRun', needsRdkit, async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'genesis-customer-products-'));
+    tempDirs.push(dir);
+    const dbPath = path.join(dir, 'genesis.db');
+    let db = openDatabase(dbPath);
+    const productPlan = {
+      ...PLAN,
+      hypotheses: [
+        PLAN.hypotheses[0],
+        {
+          ...PLAN.hypotheses[0],
+          claim: 'Ibuprofen weighs below 250 Da and passes Lipinski.',
+          falsificationProposal: 'RDKit reports molWt at or above 250 or Lipinski failure.',
+          experimentProposal: {
+            ...PLAN.hypotheses[0].experimentProposal,
+            description: 'Second pinned RDKit descriptor case.',
+            parameters: {
+              smiles: 'CC(C)CC1=CC=C(C=C1)C(C)C(=O)O',
+              predictions: [
+                { observable: 'molWt', operator: '<', value: 250, critical: true },
+                { observable: 'lipinskiPass', operator: '==', value: true, critical: true },
+              ],
+            },
+          },
+        },
+      ],
+    };
+    const productReasoningProvider = {
+      ...reasoningProvider,
+      async complete() { return { model: 'customer-fixture-model', text: JSON.stringify(productPlan) }; },
+    };
+    const commercialAdmissionProvider = {
+      resolve: ({ requiredItems, declaredUse }) => ({
+        ok: true,
+        items: requiredItems.map((required) => ({
+          ...admittedItem(required),
+          intendedUses: [declaredUse],
+        })),
+      }),
+    };
+    const call = (method, pathname, { token, body } = {}) => handleApi(db, {
+      method,
+      pathname,
+      token,
+      body,
+      query: {},
+      literaturePort,
+      reasoningProvider: productReasoningProvider,
+      commercialAdmissionProvider,
+    });
+
+    const owner = call('POST', '/api/auth/register', {
+      body: { email: 'customer-products@genesis.test', password: 'password123' },
+    }).body;
+    const project = call('POST', '/api/projects', {
+      token: owner.token,
+      body: { name: 'Customer products E2E' },
+    }).body.project;
+    const base = `/api/projects/${project.id}`;
+    const started = await call('POST', `${base}/research-runs`, {
+      token: owner.token,
+      body: { question: 'Compare two frozen drug-like descriptor cases.' },
+    });
+    const runId = started.body.researchRun.researchRunId;
+    await call('POST', `${base}/research-runs/${runId}/literature`, { token: owner.token, body: { limit: 10 } });
+    await call('POST', `${base}/research-runs/${runId}/proposals`, { token: owner.token });
+    await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+
+    const endpoint = `${base}/research-runs/${runId}/customer-delivery`;
+    const onboarding = {
+      customerReference: 'customer-ref-001',
+      objective: 'Receive a reviewable computational product artifact.',
+      acceptanceCriteria: ['Verified chain', 'Replay MATCH', 'Explicit truth boundaries'],
+      dataClassification: 'CONFIDENTIAL',
+    };
+    const earlyBenchmark = await call('POST', endpoint, {
+      token: owner.token,
+      body: {
+        releaseId: 'benchmark-too-early',
+        productId: CUSTOMER_PRODUCT.BENCHMARK,
+        onboarding,
+        includeExportArtifact: true,
+      },
+    });
+    assert.equal(earlyBenchmark.body.delivery.status, CUSTOMER_DELIVERY_STATUS.PRODUCT_BLOCKED);
+    assert.ok(earlyBenchmark.body.delivery.productDelivery.blockers.includes('MINIMUM_TWO_PREREGISTERED_CASES_REQUIRED'));
+    assert.equal(earlyBenchmark.body.exportArtifact.ok, false);
+
+    await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+
+    const artifacts = [];
+    for (const productId of Object.values(CUSTOMER_PRODUCT)) {
+      const response = await call('POST', endpoint, {
+        token: owner.token,
+        body: {
+          releaseId: `release-${productId.toLowerCase()}`,
+          productId,
+          declaredUse: 'CLIENT_FORGED_USE',
+          onboarding,
+          includeExportArtifact: true,
+        },
+      });
+      assert.equal(response.status, 200);
+      const { delivery, exportArtifact } = response.body;
+      assert.equal(delivery.status, CUSTOMER_DELIVERY_STATUS.READY);
+      assert.equal(delivery.productDelivery.status, CUSTOMER_PRODUCT_STATUS.READY);
+      assert.equal(delivery.productDelivery.productId, productId);
+      assert.notEqual(delivery.commercialAdmission.declaredUse, 'CLIENT_FORGED_USE');
+      assert.equal(delivery.onboarding.status, 'READY');
+      assert.equal(delivery.paymentStatus, 'NOT_INTEGRATED');
+      assert.equal(delivery.agreementStatus, 'NOT_SIGNED');
+      assert.equal(delivery.enterpriseStatus, 'BLOCKED_EXTERNAL_ENTERPRISE_CONTRACT');
+      assert.equal(exportArtifact.ok, true);
+      assert.equal(exportArtifact.artifact.mediaType, 'application/json');
+      assert.equal(createHash('sha256').update(exportArtifact.artifact.content).digest('hex'), exportArtifact.artifact.sha256);
+      const parsed = JSON.parse(exportArtifact.artifact.content);
+      assert.equal(parsed.productId, productId);
+      assert.equal(parsed.deliveryFingerprint, delivery.deliveryFingerprint);
+      assert.equal(parsed.truthBoundary.delivered, false);
+      artifacts.push({ productId, sha256: exportArtifact.artifact.sha256, deliveryFingerprint: delivery.deliveryFingerprint });
+    }
+
+    db.close();
+    db = openDatabase(dbPath);
+    const recovered = await call('POST', endpoint, {
+      token: owner.token,
+      body: {
+        releaseId: 'release-genesis_research_sprint',
+        productId: CUSTOMER_PRODUCT.RESEARCH_SPRINT,
+        onboarding,
+        includeExportArtifact: true,
+      },
+    });
+    const original = artifacts.find((item) => item.productId === CUSTOMER_PRODUCT.RESEARCH_SPRINT);
+    assert.equal(recovered.body.exportArtifact.artifact.sha256, original.sha256);
+    assert.equal(recovered.body.delivery.deliveryFingerprint, original.deliveryFingerprint);
+
+    const missingOnboarding = await call('POST', endpoint, {
+      token: owner.token,
+      body: {
+        releaseId: 'release-missing-onboarding',
+        productId: CUSTOMER_PRODUCT.VERIFY,
+        includeExportArtifact: true,
+      },
+    });
+    assert.equal(missingOnboarding.body.delivery.status, CUSTOMER_DELIVERY_STATUS.PRODUCT_BLOCKED);
+    assert.equal(missingOnboarding.body.exportArtifact.ok, false);
+    assert.ok(missingOnboarding.body.delivery.productDelivery.blockers.includes('CUSTOMER_REFERENCE_REQUIRED'));
     db.close();
   });
 });

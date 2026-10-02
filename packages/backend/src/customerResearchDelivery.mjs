@@ -9,6 +9,7 @@
  * accepted, paid, clinically validated or wet-lab confirmed.
  */
 import { canonicalHash } from './provenance.mjs';
+import { canonicalJson } from './determinism.mjs';
 import { admitCommercialRelease } from './commercialReleaseAdmission.mjs';
 import { getResearchRun } from './researchRun.mjs';
 
@@ -19,9 +20,41 @@ export const CUSTOMER_DELIVERY_STATUS = Object.freeze({
   READY: 'READY_FOR_AUTHORISED_EXPORT',
   SCIENTIFIC_BLOCKED: 'BLOCKED_SCIENTIFIC_INCOMPLETE',
   COMMERCIAL_BLOCKED: 'BLOCKED_COMMERCIAL_POLICY',
+  PRODUCT_BLOCKED: 'BLOCKED_PRODUCT_REQUIREMENTS',
 });
 
 const DECLARED_USE = 'CUSTOMER_REPORT_EXPORT';
+
+export const CUSTOMER_PRODUCT = Object.freeze({
+  VERIFY: 'GENESIS_VERIFY',
+  BENCHMARK: 'GENESIS_BENCHMARK',
+  RESEARCH_SPRINT: 'GENESIS_RESEARCH_SPRINT',
+  EVIDENCE_PLATFORM: 'GENESIS_EVIDENCE_PLATFORM',
+});
+
+export const CUSTOMER_PRODUCT_STATUS = Object.freeze({
+  READY: 'READY_FOR_AUTHORISED_EXPORT',
+  BLOCKED: 'BLOCKED_PRODUCT_REQUIREMENTS',
+  LEGACY: 'LEGACY_COMPUTATIONAL_REPORT',
+});
+
+const PRODUCT_DECLARED_USE = Object.freeze({
+  [CUSTOMER_PRODUCT.VERIFY]: 'GENESIS_VERIFY_CUSTOMER_EXPORT',
+  [CUSTOMER_PRODUCT.BENCHMARK]: 'GENESIS_BENCHMARK_CUSTOMER_EXPORT',
+  [CUSTOMER_PRODUCT.RESEARCH_SPRINT]: 'GENESIS_RESEARCH_SPRINT_CUSTOMER_EXPORT',
+  [CUSTOMER_PRODUCT.EVIDENCE_PLATFORM]: 'GENESIS_EVIDENCE_PLATFORM_CUSTOMER_EXPORT',
+});
+
+const DATA_CLASSIFICATIONS = new Set(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']);
+const MAX_CUSTOMER_EXPORT_BYTES = 5 * 1024 * 1024;
+
+function cleanText(value, max = 500) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim().slice(0, max) : null;
+}
+
+export function resolveCustomerDeclaredUse(productId, supplied = DECLARED_USE) {
+  return PRODUCT_DECLARED_USE[productId] ?? supplied ?? DECLARED_USE;
+}
 
 function uniqueBy(items, keyOf) {
   const seen = new Set();
@@ -121,6 +154,137 @@ function scientificBlockers(run, experiments) {
   return blockers;
 }
 
+function onboardingOf(run, productId, input) {
+  if (!productId) {
+    return Object.freeze({
+      provided: false,
+      status: 'NOT_REQUIRED_LEGACY',
+      blockers: Object.freeze([]),
+      fingerprint: null,
+    });
+  }
+
+  const source = input && typeof input === 'object' ? input : {};
+  const acceptanceCriteria = [...new Set((Array.isArray(source.acceptanceCriteria) ? source.acceptanceCriteria : [])
+    .map((item) => cleanText(item, 300))
+    .filter(Boolean))].slice(0, 20);
+  const normalized = {
+    customerReference: cleanText(source.customerReference, 128),
+    objective: cleanText(source.objective, 1_000),
+    acceptanceCriteria,
+    dataClassification: DATA_CLASSIFICATIONS.has(source.dataClassification) ? source.dataClassification : null,
+    requestedProduct: productId,
+    researchRunId: run.researchRunId,
+  };
+  const blockers = [];
+  if (!normalized.customerReference) blockers.push('CUSTOMER_REFERENCE_REQUIRED');
+  if (!normalized.objective) blockers.push('CUSTOMER_OBJECTIVE_REQUIRED');
+  if (normalized.acceptanceCriteria.length === 0) blockers.push('ACCEPTANCE_CRITERIA_REQUIRED');
+  if (!normalized.dataClassification) blockers.push('DATA_CLASSIFICATION_REQUIRED');
+  const body = { ...normalized, blockers };
+  return Object.freeze({
+    ...body,
+    provided: true,
+    status: blockers.length === 0 ? 'READY' : 'BLOCKED',
+    blockers: Object.freeze(blockers),
+    fingerprint: canonicalHash(body),
+  });
+}
+
+function productDeliveryOf(run, sources, experiments, productId, onboarding) {
+  if (!productId) {
+    return Object.freeze({
+      productId: null,
+      status: CUSTOMER_PRODUCT_STATUS.LEGACY,
+      declaredUse: DECLARED_USE,
+      blockers: Object.freeze([]),
+      deliverable: null,
+      fingerprint: null,
+    });
+  }
+
+  const knownProduct = Object.values(CUSTOMER_PRODUCT).includes(productId);
+  const executed = experiments.filter((experiment) => experiment.execution?.status === 'EXECUTED');
+  const replayMatches = executed.filter((experiment) => experiment.next?.replay?.verdict === 'MATCH');
+  const evidenceProposals = executed.filter((experiment) => typeof experiment.evidence?.evidenceProposalId === 'string');
+  const blockers = [...onboarding.blockers];
+  if (!knownProduct) blockers.push('CUSTOMER_PRODUCT_UNKNOWN');
+
+  const common = {
+    researchRunId: run.researchRunId,
+    sourceCount: sources.length,
+    hypothesisCount: run.plan?.hypotheses?.length ?? 0,
+    completedExperimentCount: experiments.length,
+    realExecutionCount: executed.length,
+    replayMatchCount: replayMatches.length,
+    evidenceProposalCount: evidenceProposals.length,
+    chainOk: run.researchState?.chain?.ok === true,
+  };
+
+  let deliverable = { kind: 'UNKNOWN_PRODUCT', ...common };
+  if (productId === CUSTOMER_PRODUCT.VERIFY) {
+    if (executed.length === 0) blockers.push('VERIFIABLE_EXECUTION_REQUIRED');
+    if (replayMatches.length !== executed.length) blockers.push('REPLAY_MATCH_REQUIRED');
+    deliverable = {
+      kind: 'GENESIS_VERIFY_RESULT',
+      verificationScope: 'CANONICAL_RESEARCHRUN_CHAIN_AND_REPLAY',
+      ...common,
+      experimentIds: executed.map((experiment) => experiment.experimentId),
+      replayVerdicts: executed.map((experiment) => experiment.next.replay.verdict),
+    };
+  } else if (productId === CUSTOMER_PRODUCT.BENCHMARK) {
+    if (executed.length < 2) blockers.push('MINIMUM_TWO_PREREGISTERED_CASES_REQUIRED');
+    if (replayMatches.length !== executed.length) blockers.push('REPLAY_MATCH_REQUIRED');
+    deliverable = {
+      kind: 'GENESIS_BENCHMARK_RESULT',
+      benchmarkScope: 'PREREGISTERED_RESEARCHRUN_CASE_SET',
+      independentMethodAgreement: 'NOT_CLAIMED',
+      ...common,
+      cases: executed.map((experiment) => ({
+        experimentId: experiment.experimentId,
+        engineId: experiment.execution.engine?.engineId ?? null,
+        protocolVerdict: experiment.falsification?.verdict ?? null,
+        replayVerdict: experiment.next?.replay?.verdict ?? null,
+      })),
+    };
+  } else if (productId === CUSTOMER_PRODUCT.RESEARCH_SPRINT) {
+    if (sources.length === 0) blockers.push('SPRINT_LITERATURE_REQUIRED');
+    if (!run.plan) blockers.push('SPRINT_PLAN_REQUIRED');
+    if (executed.length === 0) blockers.push('SPRINT_EXECUTION_REQUIRED');
+    deliverable = {
+      kind: 'GENESIS_RESEARCH_SPRINT_RESULT',
+      sprintScope: 'QUESTION_TO_NEXT_EXPERIMENT',
+      ...common,
+      nextExperiments: experiments.map((experiment) => experiment.next?.proposal ?? null),
+    };
+  } else if (productId === CUSTOMER_PRODUCT.EVIDENCE_PLATFORM) {
+    if (evidenceProposals.length === 0) blockers.push('EVIDENCE_PROPOSAL_REQUIRED');
+    if (replayMatches.length !== executed.length) blockers.push('REPLAY_MATCH_REQUIRED');
+    deliverable = {
+      kind: 'GENESIS_EVIDENCE_PLATFORM_EXPORT',
+      publicationAuthority: 'REQUIRES_HUMAN_APPROVAL',
+      ...common,
+      evidenceProposalIds: evidenceProposals.map((experiment) => experiment.evidence.evidenceProposalId),
+      replayRecordIds: replayMatches.map((experiment) => experiment.next.replay.replayRecordId ?? null),
+    };
+  }
+
+  const body = {
+    productId,
+    declaredUse: resolveCustomerDeclaredUse(productId),
+    onboardingFingerprint: onboarding.fingerprint,
+    blockers: [...new Set(blockers)],
+    deliverable,
+    truthBoundary: 'Product readiness means a bounded computational export is reviewable. It does not mean delivered, paid, signed, clinically validated or physically reproduced.',
+  };
+  return Object.freeze({
+    ...body,
+    status: body.blockers.length === 0 ? CUSTOMER_PRODUCT_STATUS.READY : CUSTOMER_PRODUCT_STATUS.BLOCKED,
+    blockers: Object.freeze(body.blockers),
+    fingerprint: canonicalHash(body),
+  });
+}
+
 function reportOf(run, sources, experiments) {
   const body = {
     kind: 'GENESIS_COMPUTATIONAL_RESEARCH_REPORT',
@@ -131,7 +295,7 @@ function reportOf(run, sources, experiments) {
     researchState: {
       chainOk: run.researchState.chain.ok,
       chainLength: run.researchState.chain.length,
-      headChainHash: run.researchState.chain.headChainHash ?? null,
+      headChainHash: run.researchState.chain.head ?? null,
     },
     literature: {
       snapshotCount: run.literatureSnapshots.length,
@@ -193,6 +357,8 @@ function reportOf(run, sources, experiments) {
 export function buildCustomerResearchDelivery(db, projectId, runId, {
   releaseId = null,
   declaredUse = DECLARED_USE,
+  productId = null,
+  onboarding = null,
   items = [],
   commercialDecisionSource = 'DIRECT_INTERNAL_CALL',
 } = {}) {
@@ -202,6 +368,9 @@ export function buildCustomerResearchDelivery(db, projectId, runId, {
   const sources = literatureSources(run);
   const experiments = completedExperiments(run);
   const report = reportOf(run, sources, experiments);
+  const onboardingRecord = onboardingOf(run, productId, onboarding);
+  const productDelivery = productDeliveryOf(run, sources, experiments, productId, onboardingRecord);
+  const resolvedDeclaredUse = resolveCustomerDeclaredUse(productId, declaredUse);
   const requiredItems = requiredCommercialItemsOf(run);
   const suppliedItems = Array.isArray(items) ? items : [];
   const providedIds = new Set(suppliedItems.map((item) => item?.itemId));
@@ -225,12 +394,13 @@ export function buildCustomerResearchDelivery(db, projectId, runId, {
   const admission = admitCommercialRelease({
     releaseId,
     researchRunId: run.researchRunId,
-    declaredUse,
+    declaredUse: resolvedDeclaredUse,
     items,
   });
 
   let status = CUSTOMER_DELIVERY_STATUS.READY;
   if (scientificBlockers_.length > 0) status = CUSTOMER_DELIVERY_STATUS.SCIENTIFIC_BLOCKED;
+  else if (productDelivery.status === CUSTOMER_PRODUCT_STATUS.BLOCKED) status = CUSTOMER_DELIVERY_STATUS.PRODUCT_BLOCKED;
   else if (
     !admission.exportAllowed
     || missingItemIds.length > 0
@@ -243,6 +413,9 @@ export function buildCustomerResearchDelivery(db, projectId, runId, {
     contractVersion: CUSTOMER_DELIVERY_VERSION,
     researchRunId: run.researchRunId,
     reportFingerprint: report.reportFingerprint,
+    productId: productDelivery.productId,
+    productFingerprint: productDelivery.fingerprint,
+    onboardingFingerprint: onboardingRecord.fingerprint,
     commercialManifestHash: admission.manifestHash,
     requiredItemIds: requiredItems.map((item) => item.itemId),
     missingItemIds,
@@ -258,15 +431,79 @@ export function buildCustomerResearchDelivery(db, projectId, runId, {
     delivery: {
       ...fingerprintBody,
       report,
+      onboarding: onboardingRecord,
+      productDelivery,
       requiredCommercialItems: requiredItems,
       commercialAdmission: admission,
       exportAllowed: status === CUSTOMER_DELIVERY_STATUS.READY,
       delivered: false,
       customerAccepted: false,
       paymentStatus: 'NOT_INTEGRATED',
+      agreementStatus: 'NOT_SIGNED',
+      enterpriseStatus: 'BLOCKED_EXTERNAL_ENTERPRISE_CONTRACT',
       commercialDecisionSource,
-      approvalBoundary: 'READY permits an authorised export step only. Delivery, acceptance, payment and external validation require separate real-world records.',
+      approvalBoundary: 'READY permits an authorised export step only. Delivery, acceptance, payment, contract signature and external validation require separate real-world records.',
       deliveryFingerprint: canonicalHash(fingerprintBody),
     },
   };
+}
+
+/**
+ * Serialize an already-admitted delivery into a deterministic JSON artifact.
+ * This creates bytes only; it does not sign, transmit, accept or bill.
+ */
+export function buildAuthorizedCustomerExport(delivery) {
+  if (!delivery?.exportAllowed) {
+    return Object.freeze({
+      ok: false,
+      status: 'EXPORT_BLOCKED',
+      deliveryStatus: delivery?.status ?? null,
+      scientificBlockers: Object.freeze(delivery?.scientificBlockers ?? []),
+      productBlockers: Object.freeze(delivery?.productDelivery?.blockers ?? []),
+    });
+  }
+
+  const payload = {
+    schemaVersion: 'genesis.customer-product-export@1',
+    productId: delivery.productDelivery?.productId ?? null,
+    researchRunId: delivery.researchRunId,
+    deliveryFingerprint: delivery.deliveryFingerprint,
+    onboarding: delivery.onboarding,
+    productDelivery: delivery.productDelivery,
+    report: delivery.report,
+    commercialAdmission: {
+      status: delivery.commercialAdmission.status,
+      declaredUse: delivery.commercialAdmission.declaredUse,
+      manifestHash: delivery.commercialAdmission.manifestHash,
+    },
+    truthBoundary: {
+      delivered: false,
+      customerAccepted: false,
+      paymentStatus: 'NOT_INTEGRATED',
+      agreementStatus: 'NOT_SIGNED',
+      enterpriseStatus: 'BLOCKED_EXTERNAL_ENTERPRISE_CONTRACT',
+    },
+  };
+  const content = canonicalJson(payload);
+  const byteLength = Buffer.byteLength(content, 'utf8');
+  if (byteLength > MAX_CUSTOMER_EXPORT_BYTES) {
+    return Object.freeze({
+      ok: false,
+      status: 'EXPORT_TOO_LARGE',
+      byteLength,
+      maxBytes: MAX_CUSTOMER_EXPORT_BYTES,
+    });
+  }
+  const slug = (delivery.productDelivery?.productId ?? 'computational-report').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return Object.freeze({
+    ok: true,
+    status: 'AUTHORISED_EXPORT_ARTIFACT_READY',
+    artifact: Object.freeze({
+      fileName: `genesis-${slug}-${delivery.researchRunId}.json`,
+      mediaType: 'application/json',
+      byteLength,
+      sha256: canonicalHash(payload),
+      content,
+    }),
+  });
 }

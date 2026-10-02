@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "genesis-test-evidence@1",
+  "capability": "research-run-preregistered-self-falsification-challenge",
+  "testedCommit": "2a65c9ec",
+  "environment": {
+    "platform": "win32",
+    "runtime": "Node.js 22",
+    "engine": "RDKit isolated Python adapter"
+  },
+  "command": "node --test packages/backend/src/researchRun.test.mjs packages/backend/src/researchRunExecution.test.mjs packages/backend/src/researchRunSteering.test.mjs",
+  "result": {
+    "status": "PASS",
+    "tests": 18,
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 12160.7958
+  },
+  "proof": {
+    "firstVerdict": "SUPPORTED_WITHIN_PROTOCOL",
+    "selectionReason": "SELF_FALSIFICATION_CHALLENGE_IN_PLAN",
+    "challengeVerdict": "FALSIFIED_WITHIN_PROTOCOL",
+    "firstReplay": "MATCH",
+    "challengeReplay": "MATCH",
+    "canonicalChainVerified": true,
+    "newLifecycleOrStore": false
+  },
+  "sourceSha256": {
+    "packages/backend/src/researchRun.mjs": "394090bc474ba9264ae705d7405a592b91a313f16fb428153df1a3fdb9d7e948",
+    "packages/backend/src/researchRunExecution.mjs": "61e4cb242675e8ee5d9a04c11d3d9892d94311a813a9816e519ee5a24cb086b0",
+    "packages/backend/src/researchRun.test.mjs": "d3258a05e1aaafe980c235dc88c0bfe53abeb1afe6292b3bd09c56921998c198",
+    "packages/backend/src/researchRunExecution.test.mjs": "222089503635a218e2a3da49de4958f6dfc61dd3d8a09437fd955a97bc1daf39"
+  },
+  "limitations": [
+    "The challenge must be proposed in the frozen plan before the first result.",
+    "A protocol-scoped verdict is not a statement of scientific truth.",
+    "No autonomous post-result experiment generation is claimed.",
+    "Linux CI for this commit was not observable from the local environment at evidence creation time."
+  ]
+}

@@ -37,9 +37,10 @@ const PLAN = {
     {
       claim: 'The current model gate is too strict.', claimType: 'HYPOTHESIS',
       falsificationProposal: 'Gate passes without the change.',
+      challengesHypothesisIndex: 99,
       experimentProposal: { kind: 'COMPUTATIONAL', engineId: 'rdkit', description: 'Relax the gate', parameterChanges: [{ target: 'maxMae', to: 1.2 }] },
     },
-    { claim: 'Compound X is inactive at GLP-1R (null hypothesis).', claimType: 'HYPOTHESIS', falsificationProposal: 'Any measured agonism.' },
+    { claim: 'Compound X is inactive at GLP-1R (null hypothesis).', claimType: 'HYPOTHESIS', falsificationProposal: 'Any measured agonism.', challengesHypothesisIndex: 0 },
     { claim: 'no falsification given' },
   ],
   nextActions: ['Separate functional from binding assays', ''],
@@ -143,6 +144,8 @@ describe('R1-a research run', () => {
     assert.equal(fact.experimentProposal.decision, 'HUMAN_APPROVAL_REQUIRED');
     assert.equal(fact.experimentProposal.executedByModel, false);
     assert.equal(gate.experimentProposal.decision, 'REJECTED_FROZEN_THRESHOLD');
+    assert.ok(gate.degradations.some((d) => d.reason === 'CHALLENGE_MUST_REFERENCE_AN_ACCEPTED_EARLIER_HYPOTHESIS'));
+    assert.equal(plan.hypotheses[2].challengesHypothesisId, fact.hypothesisId);
     assert.deepEqual(plan.rejected.map((r) => [r.kind, r.index]), [['SUB_PROBLEM', 2], ['HYPOTHESIS', 3]]);
     assert.deepEqual(plan.nextActions.map((a) => a.action), ['Separate functional from binding assays']);
 

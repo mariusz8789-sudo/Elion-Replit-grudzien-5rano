@@ -489,3 +489,22 @@ Validation: production build PASS; 94 routes × 2 viewports = 188/188 PASS, 0 ru
 Known limitations: headless Edge/Chromium is not physical-device or real-GPU performance proof. Authenticated populated states remain covered by their focused product E2Es rather than this anonymous route inventory.
 
 Rollback: revert the route-proof commits; product routes and UI code remain unchanged.
+
+## Post-S11 integration - preregistered self-falsification challenge
+
+Problem: ResearchRun already sealed every experiment against its frozen prediction, but a positive protocol result selected the next executable hypothesis without recording whether it was an explicit attempt to challenge that result.
+
+Delivered:
+
+- optional `challengesHypothesisIndex` in the model plan response, converted by the server to a canonical earlier `challengesHypothesisId`;
+- fail-closed degradation of malformed, forward or rejected-hypothesis references;
+- fixed-rule priority for a surviving executable challenge only after `SUPPORTED_WITHIN_PROTOCOL` and a usable Replay result;
+- user focus remains the higher-priority steering decision;
+- the challenge reason is recorded in the existing NEXT_EXPERIMENT proposal and fingerprinted DecisionTrace;
+- no new run, store, lifecycle, Evidence record or falsification engine.
+
+Validation: 18/18 focused ResearchRun/steering tests PASS and focused ESLint PASS. The integration fixture executes a first real RDKit experiment, obtains `SUPPORTED_WITHIN_PROTOCOL` and Replay `MATCH`, selects its preregistered null challenge, executes it through the same API, seals `FALSIFIED_WITHIN_PROTOCOL`, replays `MATCH` and verifies the canonical chain. Evidence: `docs/evidence/research-run-self-falsification-2a65c9ec.json`.
+
+Known limitation: this proves bounded prioritization and execution of a challenge proposed before the first result. It does not claim that Genesis autonomously invents a new scientifically useful experiment after seeing the result.
+
+Rollback: revert `2a65c9ec`; ordinary next-hypothesis selection remains available, but the explicit challenge relationship and reason disappear.

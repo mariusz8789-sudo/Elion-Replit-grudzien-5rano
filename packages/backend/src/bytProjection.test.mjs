@@ -77,4 +77,17 @@ describe('BYT canonical projection', () => {
     assert.equal(byt.continuity.researchRuns, 0);
     assert.deepEqual(byt.predictionLedger, []);
   });
+
+  test('projects only traceable Flight Control observations and never owns their state', () => {
+    const traceable = {
+      executionId: 'exp-1', status: 'VERIFIED', flightFingerprint: 'flight-fingerprint-1',
+      bytUpdate: { mode: 'DERIVED_READ_MODEL_ONLY', persistence: 'NONE', epistemicState: 'SIMULATED' },
+    };
+    const untraceable = { executionId: 'exp-2', status: 'VERIFIED', bytUpdate: { persistence: 'NEW_STORE' } };
+    const byt = buildBytProjection({ flightControl: [traceable, untraceable] });
+    assert.deepEqual(byt.scienceFlightControl.flights, [traceable]);
+    assert.equal(byt.scienceFlightControl.verified, 1);
+    assert.equal(byt.scienceFlightControl.rejectedUntraceableRecords, 1);
+    assert.match(byt.scienceFlightControl.limitation, /not a second BYT store/i);
+  });
 });

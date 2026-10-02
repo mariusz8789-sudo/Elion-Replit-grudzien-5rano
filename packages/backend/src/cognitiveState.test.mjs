@@ -7,10 +7,11 @@ import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { canonicalJson, fnv1a } from './determinism.mjs';
 import { RESEARCH_STATE_GENESIS_HEAD } from './agentRun.mjs';
-import { createCampaign, getCampaign } from './campaign/persistence.mjs';
+import { addCandidate, createCampaign, getCampaign } from './campaign/persistence.mjs';
 import { preregisterExperiment, hypothesisFingerprint } from './experimentMemory.mjs';
 import { buildCognitiveState } from './cognitiveState.mjs';
 import { KNOWLEDGE_REGISTRY_TOOL, readKnowledgeRegistry } from './knowledgeRegistry.mjs';
+import { planVirtualExperiment } from './campaign/virtualLabClosedLoop.mjs';
 
 /**
  * ENTITY-2 — Genesis rebuilds what it was working on after a restart, keeps what it does not know
@@ -196,5 +197,35 @@ describe('ENTITY-2 cognitive state', () => {
     assert.equal((await ctx.call('GET', `${ctx.base}/cognitive-state`, { token: stranger.token })).status, 404);
     assert.equal(ctx.call('POST', `${ctx.base}/knowledge-registry/gaps`, { token: ctx.owner.token, body: { question: 'q', source: { kind: 'GUESS' } } }).status, 400);
     assert.equal(hypothesisFingerprint(HYPOTHESIS).length > 0, true);
+  });
+
+  test('BYT reconstructs Experiment Firewall state from canonical campaign events after restart', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'genesis-flight-control-'));
+    const file = join(dir, 'genesis.db');
+    try {
+      let db = openDatabase(file);
+      const ctx = setup(db, 'flight-control@lab.org');
+      const campaign = createCampaign(db, { projectId: ctx.project.id, objective: 'Flight Control reconstruction', domain: 'CHEMISTRY', createdBy: ctx.owner.user.id });
+      const candidateId = addCandidate(db, { campaignId: campaign.id, generation: 0, canonicalSmiles: 'CCO', valid: true });
+      const planned = planVirtualExperiment(db, {
+        projectId: ctx.project.id, campaignId: campaign.id, candidateId,
+        hypothesis: 'A deterministic descriptor run should remain reconstructable.',
+        requestedCapability: 'molecular-descriptors', requestedBy: ctx.owner.user.id,
+      });
+      assert.equal(planned.ok, true);
+      const before = buildCognitiveState(db, ctx.project.id);
+      assert.equal(before.byt.scienceFlightControl.flights.length, 1);
+      assert.equal(before.byt.scienceFlightControl.flights[0].status, 'READY_TO_EXECUTE');
+      assert.equal(before.byt.scienceFlightControl.flights[0].bytUpdate.persistence, 'NONE');
+      db.close();
+
+      db = openDatabase(file);
+      const after = buildCognitiveState(db, ctx.project.id);
+      assert.deepEqual(withoutTime(after), withoutTime(before));
+      assert.equal(after.byt.scienceFlightControl.flights[0].preflight.decision, 'CLEARED');
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

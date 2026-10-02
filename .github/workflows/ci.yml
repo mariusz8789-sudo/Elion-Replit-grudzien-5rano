@@ -110,6 +110,23 @@ jobs:
           GENESIS_CERN_OPEN_DATA_DIR: ${{ github.workspace }}/packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
 
+      - name: Science Flight Control — real preflight, execution delta, failure attribution, Evidence, Replay and BYT proof
+        env:
+          GENESIS_RDKIT_PYTHON: python
+        run: |
+          node scripts/science-flight-control-proof.mjs \
+            --out artifacts/science-flight-control/science-flight-control-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload Science Flight Control evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: science-flight-control-proof-${{ github.sha }}
+          path: artifacts/science-flight-control
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Testy packages/core + packages/ui (source-only pakiety, vitest.core.config.ts)
         run: npm run test:core
 

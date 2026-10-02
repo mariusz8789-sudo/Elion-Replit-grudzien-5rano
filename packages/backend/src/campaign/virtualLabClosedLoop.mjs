@@ -62,6 +62,7 @@ import {
   validateCapabilityInput,
 } from '../compute/scientificCapabilityContract.mjs';
 import { createRemoteScientificWorkerClient, resolveWorkerConfig, routeCapability } from '../compute/remoteScientificWorkerClient.mjs';
+import { projectScienceFlightControl } from './scienceFlightControl.mjs';
 
 export const VIRTUAL_LAB_CONTRACT_VERSION = '1.0.0';
 
@@ -1039,7 +1040,8 @@ export function buildVirtualLabDossier(db, campaignId, candidateId) {
   const dispatchFailures = events.filter((e) => e.type === VIRTUAL_EVENT.DISPATCH_FAILED && e.payload?.candidateId === candidateId);
 
   const executionTimeline = projectScientificExecutionTimeline({ plans, results, replays, evidenceLinks, dispatchFailures });
-  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, dispatchFailures, executionTimeline, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
+  const flightControl = projectScienceFlightControl({ plans, results, replays, evidenceLinks, dispatchFailures });
+  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, dispatchFailures, executionTimeline, flightControl, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
   return {
     ok: true,
     dossier: {
@@ -1049,9 +1051,10 @@ export function buildVirtualLabDossier(db, campaignId, candidateId) {
         v: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId,
         executionIds: plans.map((e) => e.payload?.executionId),
         resultStatuses: results.map((e) => e.payload?.status),
-        replayStatuses: replays.map((e) => e.payload?.replayStatus),
-        evidenceProposalIds: evidenceLinks.map((e) => e.payload?.proposalId),
-      }),
+         replayStatuses: replays.map((e) => e.payload?.replayStatus),
+         evidenceProposalIds: evidenceLinks.map((e) => e.payload?.proposalId),
+         flightControlFingerprint: flightControl.controlFingerprint,
+       }),
     },
   };
 }

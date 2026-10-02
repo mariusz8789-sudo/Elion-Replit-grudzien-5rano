@@ -127,7 +127,7 @@ function necropolisOf(entries) {
   }));
 }
 
-export function buildBytProjection({ runs = [], registry = null, selfModel = null } = {}) {
+export function buildBytProjection({ runs = [], registry = null, selfModel = null, flightControl = [] } = {}) {
   const canonicalRuns = runs.filter((item) => item.run?.domain === CANONICAL_RESEARCH_RUN_DOMAIN);
   const predictionLedger = predictionEntries(canonicalRuns);
   const registryValid = registry?.chain?.ok === true;
@@ -138,6 +138,11 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
     ok: item.integrity?.ok === true,
     ...(item.integrity?.ok ? { head: item.integrity.head, events: item.integrity.events } : { reason: item.integrity?.reason ?? 'STATE_INTEGRITY_FAILURE', brokenAt: item.integrity?.brokenAt ?? null }),
   }));
+  const flightRecords = flightControl.filter((flight) => (
+    typeof flight?.flightFingerprint === 'string'
+    && flight?.bytUpdate?.mode === 'DERIVED_READ_MODEL_ONLY'
+    && flight?.bytUpdate?.persistence === 'NONE'
+  ));
   return {
     schemaVersion: BYT_PROJECTION_SCHEMA_VERSION,
     view: 'DERIVED_FROM_CANONICAL_STATE',
@@ -176,6 +181,14 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
         ...surprise,
       }))),
       limitation: 'Only preregistered numeric absolute-error rules are evaluated. A detected surprise is NOT_EVIDENCE and is independent from protocol falsification.',
+    },
+    scienceFlightControl: {
+      status: 'AVAILABLE',
+      flights: flightRecords,
+      verified: flightRecords.filter((flight) => flight.status === 'VERIFIED').length,
+      blocked: flightRecords.filter((flight) => ['BLOCKED', 'BLOCKED_RETRYABLE'].includes(flight.status)).length,
+      rejectedUntraceableRecords: flightControl.length - flightRecords.length,
+      limitation: 'A Flight Control row is a read-only operational projection of canonical campaign events. It is not a second BYT store and never upgrades an in-silico observation into a physical measurement.',
     },
     integrity: { researchRuns: runIntegrity, knowledgeRegistry: registry?.chain ?? { ok: false, reason: 'UNAVAILABLE' } },
   };

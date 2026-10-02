@@ -3,7 +3,8 @@
  *
  * Starts a disposable local reasoning endpoint and the real production backend,
  * registers an owner/project through HTTP, loads the production frontend, then
- * drives /badanie -> /eksperyment -> /powtórz at desktop and mobile widths.
+ * drives /badanie -> /eksperyment -> /powtórz plus the fail-closed /analiza boundary at desktop
+ * and mobile widths.
  * Scientific execution remains the backend's real RDKit path. No browser mocks,
  * direct state writes, fake engine output or second ResearchRun are used.
  */
@@ -56,6 +57,8 @@ const PLAN = {
   nextActions: ['Require human review after the bounded challenge.'],
 };
 
+let reasoningRequestCount = 0;
+
 function listen(server) {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -71,6 +74,7 @@ function startReasoningServer() {
     }
     request.resume();
     request.on('end', () => {
+      reasoningRequestCount += 1;
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ model: 'genesis-ui-proof-model', choices: [{ message: { content: JSON.stringify(PLAN) } }] }));
     });
@@ -206,6 +210,12 @@ try {
     await page.locator('.sc-genesis .sc-text').filter({ hasText: 'Powtórzenie: ZGODNE' }).last().waitFor({ state: 'attached' });
     await send(page, '/eksperyment', 'OBALONA w tym protokole');
     await send(page, '/powtórz', 'Wszystkie powtórzenia tego eksperymentu: MATCH, MATCH');
+    const requestsBeforeBlockedAnalysis = reasoningRequestCount;
+    await send(page, '/analiza Oblicz średnią z ograniczonej próbki [1,2,3,4].', 'BLOCKED_EXTERNAL_SANDBOX');
+    if (reasoningRequestCount !== requestsBeforeBlockedAnalysis) {
+      throw new Error(`${viewport.mode}: generated-code provider was called before sandbox admission.`);
+    }
+    await send(page, '/analiza-powtórz', 'nie ma udanej analizy kodowej do powtórzenia');
 
     const runs = await api(backend.baseUrl, 'GET', `/projects/${project.id}/research-runs`, { token: session.token });
     if (runs.researchRuns.length !== 1) throw new Error(`${viewport.mode}: expected exactly one ResearchRun, got ${runs.researchRuns.length}`);
@@ -218,6 +228,10 @@ try {
     const replays = researchRun.experiments.map((experiment) => experiment.next?.replay?.verdict);
     if (verdicts.join(',') !== 'SUPPORTED_WITHIN_PROTOCOL,FALSIFIED_WITHIN_PROTOCOL' || replays.join(',') !== 'MATCH,MATCH') {
       throw new Error(`${viewport.mode}: unexpected verdict/replay sequence ${verdicts} / ${replays}`);
+    }
+    const generated = await api(backend.baseUrl, 'GET', `/projects/${project.id}/research-runs/${researchRun.researchRunId}/generated-analyses`, { token: session.token });
+    if (generated.generatedAnalyses.length !== 0) {
+      throw new Error(`${viewport.mode}: blocked analysis unexpectedly wrote canonical generated-analysis events.`);
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (overflow > 1) errors.push(`horizontal-overflow:${overflow}`);
@@ -234,6 +248,11 @@ try {
       replays,
       chainVerified: researchRun.researchState.chain.ok,
       decisionReasons: researchRun.experiments.map((experiment) => experiment.next?.proposal?.reason ?? null),
+      generatedAnalysisBoundary: {
+        status: 'BLOCKED_EXTERNAL_SANDBOX',
+        providerCalledAfterBlock: false,
+        persistedGeneratedAnalyses: generated.generatedAnalyses.length,
+      },
       screenshotSha256: screenshotHash,
       errors,
     });

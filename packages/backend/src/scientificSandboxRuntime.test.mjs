@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { handleApi } from './api.mjs';
-import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
+import { createDockerScientificSandboxBackend, sandboxContainerNameOf } from './compute/dockerScientificSandboxBackend.mjs';
 import { createScientificSandboxPort, SCIENTIFIC_SANDBOX_POLICY } from './compute/scientificSandboxContract.mjs';
 import { openDatabase } from './store.mjs';
 
@@ -49,6 +50,16 @@ function provider(source) {
 }
 
 const computeAdmission = { acquire: () => ({ ok: true, release() {} }) };
+
+function assertContainerAbsent(sandboxRunId) {
+  const containerName = sandboxContainerNameOf(sandboxRunId);
+  const listed = spawnSync('docker', [
+    'container', 'ls', '--all', '--filter', `name=^/${containerName}$`, '--format', '{{.Names}}',
+  ], { encoding: 'utf8', windowsHide: true });
+  assert.equal(listed.status, 0, listed.stderr || 'docker container ls failed');
+  assert.equal(listed.stdout.trim(), '', `interrupted sandbox container still exists: ${containerName}`);
+  return { containerName, confirmedAbsent: true };
+}
 
 describe('real Docker scientific sandbox runtime', () => {
   test('enforces network, filesystem, secret, privilege and cgroup isolation', { skip: runtimeSkip }, async () => {
@@ -155,6 +166,8 @@ print(json.dumps({
     const timedOut = await port.execute(request('timeout', 'while True:\n    pass'), { image: IMAGE, policy: shortPolicy });
     assert.equal(timedOut.status, 'TIMEOUT');
     assert.equal(timedOut.failureCode, 'SANDBOX_WALL_CLOCK_EXCEEDED');
+    assert.equal(timedOut.cleanup?.confirmedAbsent, true);
+    const timeoutCleanup = assertContainerAbsent('sandbox-runtime-timeout');
 
     const boundedOutput = await port.execute(request('output', 'print("x" * 100000)'), {
       image: IMAGE,
@@ -162,12 +175,14 @@ print(json.dumps({
     });
     assert.equal(boundedOutput.status, 'FAILED');
     assert.equal(boundedOutput.failureCode, 'SANDBOX_OUTPUT_LIMIT_EXCEEDED');
+    assert.equal(boundedOutput.cleanup?.confirmedAbsent, true);
+    const outputCleanup = assertContainerAbsent('sandbox-runtime-output');
     writeReport('resource-proof.json', {
       schemaVersion: 1,
       commit: process.env.GITHUB_SHA ?? null,
       image: IMAGE,
-      timeout: { status: timedOut.status, failureCode: timedOut.failureCode },
-      output: { status: boundedOutput.status, failureCode: boundedOutput.failureCode },
+      timeout: { status: timedOut.status, failureCode: timedOut.failureCode, cleanup: timedOut.cleanup, runtimeAbsenceProof: timeoutCleanup },
+      output: { status: boundedOutput.status, failureCode: boundedOutput.failureCode, cleanup: boundedOutput.cleanup, runtimeAbsenceProof: outputCleanup },
       status: 'CI_RUNTIME_VERIFIED',
     });
   });

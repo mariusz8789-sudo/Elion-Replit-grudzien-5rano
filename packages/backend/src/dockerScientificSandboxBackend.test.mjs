@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
+import { createDockerScientificSandboxBackend, sandboxContainerNameOf } from './compute/dockerScientificSandboxBackend.mjs';
 import { buildSandboxExecutionPlan, createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
 
 const IMAGE = 'registry.example/genesis-python@sha256:' + 'b'.repeat(64);
@@ -67,6 +67,7 @@ describe('Docker scientific sandbox backend', () => {
       { exitCode: 0, stdout: JSON.stringify([IMAGE]), stderr: '' },
       { exitCode: null, stdout: '', stderr: '', timedOut: true, outputLimitExceeded: false },
       { exitCode: 0, stdout: '', stderr: '' },
+      { exitCode: 0, stdout: '', stderr: '' },
     ];
     const backend = createDockerScientificSandboxBackend({
       processRunner: async (_executable, args) => {
@@ -78,6 +79,27 @@ describe('Docker scientific sandbox backend', () => {
     const result = await port.execute(request(), { image: IMAGE });
     assert.equal(result.status, 'TIMEOUT');
     assert.equal(result.failureCode, 'SANDBOX_WALL_CLOCK_EXCEEDED');
-    assert.deepEqual(calls.at(-1).slice(0, 2), ['rm', '-f']);
+    assert.equal(result.cleanup.confirmedAbsent, true);
+    assert.deepEqual(calls.at(-2).slice(0, 2), ['rm', '-f']);
+    assert.deepEqual(calls.at(-1).slice(0, 3), ['container', 'ls', '--all']);
+  });
+
+  test('fails closed when Docker cannot confirm an interrupted container is absent', async () => {
+    const responses = [
+      { exitCode: 0, stdout: '27.0.0', stderr: '' },
+      { exitCode: 0, stdout: JSON.stringify([IMAGE]), stderr: '' },
+      { exitCode: null, stdout: '', stderr: '', timedOut: true, outputLimitExceeded: false },
+      { exitCode: 1, stdout: '', stderr: 'removal failed' },
+      { exitCode: 0, stdout: sandboxContainerNameOf(request().sandboxRunId) + '\n', stderr: '' },
+    ];
+    const port = createScientificSandboxPort({
+      backend: createDockerScientificSandboxBackend({ processRunner: async () => responses.shift() }),
+    });
+    const result = await port.execute(request(), { image: IMAGE });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 'FAILED');
+    assert.equal(result.failureCode, 'SANDBOX_CLEANUP_NOT_CONFIRMED');
+    assert.equal(result.interruptedBy, 'WALL_CLOCK');
+    assert.equal(result.cleanup.confirmedAbsent, false);
   });
 });

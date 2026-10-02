@@ -536,9 +536,26 @@ Delivered:
 
 Validation: independent backend/security review 33/33 PASS; Science Chat 9/9 PASS; TypeScript, changed-file ESLint and production build PASS. Authenticated production browser proof passes at desktop 1440×900 and mobile 390×844: the same ResearchRun completes two real RDKit experiments and Replay, then `/analiza` reports `BLOCKED_EXTERNAL_SANDBOX` before another provider call and persists zero generated-analysis events. Evidence: `docs/evidence/generated-scientific-analysis-af73553e.json`, `docs/evidence/research-run-code-analysis-ui-proof-382ab489.json`.
 
-Known blocker: no real Docker/container runtime or approved immutable scientific image exists in this environment. The integration and command envelope are proven; real container execution, escape resistance and production runtime remain `BLOCKED_EXTERNAL_SANDBOX`. Generated output is always `NOT_EVIDENCE` and requires separate review.
+Known blocker at that milestone: no real Docker/container runtime or approved immutable scientific image was available in the local Windows environment. The later Linux CI milestone below adds real runtime proof while production deployment and image licence review remain external. Generated output is always `NOT_EVIDENCE` and requires separate review.
 
 Rollback: revert `af73553e` for the chat front door and `236c72da` for the backend adapter. Canonical ResearchRun and the standalone sandbox contract remain intact.
+
+## Final closure - real scientific sandbox CI runtime
+
+Problem: the governed analysis path was proven only against an injected bounded backend. That did not establish that frozen provider-generated Python could execute inside an actual isolated container, survive a database restart and Replay, or that interrupted containers were removed.
+
+Delivered:
+
+- a dedicated Linux CI job pinned to immutable `python@sha256:afc139a0a640942491ec481ad8dda10f2c5b753f5c969393b12480155fe15a63`;
+- real execution through the existing `ScientificSandboxPort`, never a host shell or second toolchain;
+- runtime assertions for no network, read-only root, bounded writable tmp, non-root uid, absent host sentinel and Docker socket, absent provider/cloud secrets, `NoNewPrivs`, zero effective capabilities and cgroup CPU/memory/process bounds;
+- a real NL objective to frozen Python to canonical ResearchRun to provenance to SQLite restart to Replay `MATCH` path;
+- wall-clock and output interruption paths that remove the named container, query Docker for that exact name and fail closed as `SANDBOX_CLEANUP_NOT_CONFIRMED` unless absence is confirmed;
+- CI artifacts containing resource, isolation, provenance/Replay and cleanup evidence.
+
+Validation: full local backend on the cleanup-hardening tree passed 1,400 tests with zero failures and 84 explicit runtime skips. Both complete Linux quality-gate runs `36969408444` and `36969405392` passed on `d0ecebff`, including the real sandbox jobs. The subsequent cleanup hardening requires a fresh Linux run before review approval.
+
+Truth boundary: this proves the Linux CI runtime, not a production deployment. The image and its transitive contents still require commercial licence review; production compute provisioning remains `BLOCKED_EXTERNAL_SANDBOX_DEPLOYMENT`. Generated output remains `NOT_EVIDENCE` and `REQUIRES_SEPARATE_REVIEW`.
 
 ## Current-head local regression
 

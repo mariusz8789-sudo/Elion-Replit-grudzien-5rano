@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 
+export const sandboxContainerNameOf = (sandboxRunId) => `genesis-sandbox-${sha256(sandboxRunId).slice(0, 24)}`;
+
 function defaultProcessRunner(executable, args, { stdin = '', timeoutMs = 10_000, maxOutputBytes = 1_000_000 } = {}) {
   return new Promise((resolve) => {
     const child = spawn(executable, args, { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -54,6 +56,20 @@ const missingAttestation = (reason) => ({
   reason,
 });
 
+async function removeAndVerifyContainer(docker, processRunner, containerName) {
+  const removal = await processRunner(docker, ['rm', '-f', containerName], { timeoutMs: 10_000, maxOutputBytes: 16_384 });
+  const listing = await processRunner(docker, [
+    'container', 'ls', '--all', '--filter', `name=^/${containerName}$`, '--format', '{{.Names}}',
+  ], { timeoutMs: 10_000, maxOutputBytes: 16_384 });
+  const listingUsable = listing.exitCode === 0 && !listing.timedOut && !listing.outputLimitExceeded && !listing.spawnError;
+  return Object.freeze({
+    attempted: true,
+    confirmedAbsent: listingUsable && String(listing.stdout ?? '').trim() === '',
+    removalExitCode: Number.isInteger(removal.exitCode) ? removal.exitCode : null,
+    verificationExitCode: Number.isInteger(listing.exitCode) ? listing.exitCode : null,
+  });
+}
+
 /**
  * Docker implementation for the existing ScientificSandboxPort. It never invokes a shell, never
  * mounts the host, never forwards environment variables and accepts only the immutable image from
@@ -99,7 +115,7 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
       }
 
       const policy = plan.policy;
-      const containerName = `genesis-sandbox-${sha256(plan.sandboxRunId).slice(0, 24)}`;
+      const containerName = sandboxContainerNameOf(plan.sandboxRunId);
       const args = [
         'run', '--rm', '--name', containerName, '--init', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--cpus', String(policy.cpuLimit),
@@ -113,14 +129,24 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
         timeoutMs: policy.wallClockMs,
         maxOutputBytes: Math.max(policy.stdoutBytes, policy.stderrBytes),
       });
+      let cleanup = null;
       if (result.timedOut || result.outputLimitExceeded || result.spawnError) {
         // Killing the local `docker run` client does not guarantee that the container stopped.
-        // Remove the named container explicitly so a timed-out analysis cannot keep consuming
-        // compute after Genesis has already recorded a terminal failure.
-        await processRunner(docker, ['rm', '-f', containerName], { timeoutMs: 10_000, maxOutputBytes: 16_384 });
+        // Remove the named container and then ask Docker for the exact name. A terminal timeout or
+        // output-limit result is never returned unless Docker itself confirms the container absent.
+        cleanup = await removeAndVerifyContainer(docker, processRunner, containerName);
+        if (!cleanup.confirmedAbsent) {
+          return {
+            ok: false,
+            status: 'FAILED',
+            failureCode: 'SANDBOX_CLEANUP_NOT_CONFIRMED',
+            interruptedBy: result.timedOut ? 'WALL_CLOCK' : result.outputLimitExceeded ? 'OUTPUT_LIMIT' : 'RUNTIME_FAILURE',
+            cleanup,
+          };
+        }
       }
-      if (result.timedOut) return { ok: false, status: 'TIMEOUT', failureCode: 'SANDBOX_WALL_CLOCK_EXCEEDED' };
-      if (result.outputLimitExceeded) return { ok: false, status: 'FAILED', failureCode: 'SANDBOX_OUTPUT_LIMIT_EXCEEDED' };
+      if (result.timedOut) return { ok: false, status: 'TIMEOUT', failureCode: 'SANDBOX_WALL_CLOCK_EXCEEDED', cleanup };
+      if (result.outputLimitExceeded) return { ok: false, status: 'FAILED', failureCode: 'SANDBOX_OUTPUT_LIMIT_EXCEEDED', cleanup };
       if (result.exitCode !== 0) {
         return { ok: false, status: 'FAILED', failureCode: result.spawnError ? 'SANDBOX_RUNTIME_UNAVAILABLE' : 'SANDBOX_PROCESS_FAILED', stderrHash: sha256(result.stderr) };
       }

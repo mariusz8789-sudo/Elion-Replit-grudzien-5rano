@@ -545,3 +545,9 @@ Rollback: revert `af73553e` for the chat front door and `236c72da` for the backe
 On `4b333dd8`, the controlled full frontend run passed 703/703 files and 7,555 tests with one explicit skip; backend passed 1,399 tests with zero failures and 81 explicit runtime skips; core passed 344/344; lint reported zero errors and 13 existing script warnings; the production build passed. The initial unconstrained frontend run produced 42 five-second timeouts under worker contention. Every one of the 16 affected files then passed (265/265) in a serial diagnostic run, and the controlled four-worker full rerun passed without a repository timeout change. Evidence: `docs/evidence/full-local-regression-4b333dd8.json`.
 
 This is local Windows evidence. The Linux GitHub quality gate is still required before merge, and explicit runtime skips remain blockers rather than passes for unavailable engines or infrastructure.
+
+## Main synchronization at fc5c88ce
+
+Rollback SHA before sync: `55c3221faf3675494086d801df002b6a981b8440`. PR #56 merged `origin/main@fc5c88ce` normally at `d9afd1a1`, without force-push or conflict. Main contained the merged PR #54, PR #55 and the extracted literature subset; all were already represented in the newer PR #56 tree, so the pre/post source-tree hash remained exactly `dced6090e5ccb1554eb1e3da241ee0fa19b28ad3`.
+
+The full local frontend, backend, core, lint, build and authenticated browser proof passed on the merge commit. Evidence: `docs/evidence/main-sync-regression-d9afd1a1.json`. Required Linux jobs remain a post-push gate; do not merge until they finish.

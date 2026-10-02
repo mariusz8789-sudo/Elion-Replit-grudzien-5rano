@@ -6,6 +6,8 @@ No merge. No deploy. No force-push.
 
 Latest complete local regression on `4b333dd8`: frontend 7,555 PASS / 0 FAIL / 1 skip with a controlled four-worker pool; backend 1,399 PASS / 0 FAIL / 81 explicit runtime-dependent skips; core 344/344 PASS; lint 0 errors; production build PASS. The first unconstrained frontend run hit 42 five-second timeouts, and the exact 16 files then passed 265/265 serially before the controlled full pass. See `docs/evidence/full-local-regression-4b333dd8.json`. Linux CI remains a separate gate.
 
+Main synchronization: `origin/main@fc5c88ce` was merged normally at `d9afd1a1` with zero conflicts and no force-push. The source tree hash remained exactly `dced6090e5ccb1554eb1e3da241ee0fa19b28ad3`, proving no PR #56 content was replaced. Full local gates and the authenticated browser proof passed again; see `docs/evidence/main-sync-regression-d9afd1a1.json`. Linux CI remains pending until the synchronized branch is pushed.
+
 | Capability | Before | After | Stage/commit | Tests | Real runtime proof | Production ready? | Blocker | Claude integration |
 |---|---|---|---|---|---|---|---|---|
 | Heavy-compute security | Public/runtime boundary incomplete | Auth, authorization, limits, timeout/output gates; passive health | S0 `d579907c`, `7a983b3f` | Focused security/worker suites | HTTP worker tests | PARTIAL | Shared quota/production secrets | Review and merge |

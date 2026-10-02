@@ -78,6 +78,7 @@ import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { buildCustomerResearchDelivery, requiredCommercialItemsOf } from './customerResearchDelivery.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
@@ -238,6 +239,21 @@ function runHeavyCompute(db, ctx, operation, execute) {
   } finally {
     ticket.release();
   }
+}
+
+function runHeavyComputeAsync(db, ctx, operation, execute) {
+  const user = getUserByToken(db, ctx.token);
+  if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić kosztowne obliczenie naukowe.');
+  const admission = ctx.computeAdmission ?? heavyComputeAdmission;
+  const ticket = admission.acquire(user.id);
+  if (!ticket.ok) {
+    if (ticket.reason === 'busy') return err(503, 'compute_busy', 'Inne kosztowne obliczenie jest już wykonywane. Spróbuj ponownie później.');
+    if (ticket.reason === 'rate_limited') return err(429, 'compute_rate_limited', 'Limit kosztownych obliczeń dla tego użytkownika został wyczerpany.');
+    return err(403, 'compute_admission_denied');
+  }
+  return Promise.resolve()
+    .then(() => execute(user, operation))
+    .finally(() => ticket.release());
 }
 
 function admitCommercialAdmet() {
@@ -782,6 +798,56 @@ export function handleApi(db, ctx) {
         });
         if (!result.ok) return err(404, result.status);
         return ok(result);
+      }
+      if (seg.length === 5 && seg[4] === 'generated-analyses') {
+        if (method === 'GET') return ok({ generatedAnalyses: generatedAnalysesOf(current.researchState) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return runHeavyComputeAsync(db, ctx, `generated-analysis:${current.researchRunId}`, async () => {
+          const result = await generateAndExecuteScientificAnalysis(db, projectId, current.researchRunId, body, {
+            provider: reasoningProviderOf(ctx),
+            sandboxPort: ctx.scientificSandboxPort,
+            image: ctx.scientificSandboxImage,
+            userId: user.id,
+          });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = {
+            NOT_FOUND: 404,
+            INVALID_REQUEST: 400,
+            REJECTED_MALFORMED_RESPONSE: 422,
+            RUN_NOT_EXECUTABLE: 409,
+            STATE_INTEGRITY_FAILURE: 409,
+            BLOCKED_BY_PROVIDER_CONFIGURATION: 503,
+            BLOCKED_BY_CONFIGURATION: 503,
+            BLOCKED_BY_DATA: 422,
+            PROVIDER_TIMEOUT: 504,
+            PROVIDER_REFUSED: 502,
+            PROVIDER_ERROR: 502,
+            TIMEOUT: 504,
+            FAILED: 422,
+          }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, failureCode: result.failureCode ?? null } };
+        });
+      }
+      if (seg.length === 7 && seg[4] === 'generated-analyses' && seg[6] === 'replay') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return runHeavyComputeAsync(db, ctx, `generated-analysis-replay:${current.researchRunId}:${seg[5]}`, async () => {
+          const result = await replayGeneratedScientificAnalysis(db, projectId, current.researchRunId, seg[5], {
+            sandboxPort: ctx.scientificSandboxPort,
+            image: ctx.scientificSandboxImage,
+          });
+          if (result.ok) return ok(result, 201);
+          const status = {
+            NOT_FOUND: 404,
+            ANALYSIS_NOT_FOUND: 404,
+            ANALYSIS_NOT_REPLAYABLE: 409,
+            RUN_NOT_EXECUTABLE: 409,
+            STATE_INTEGRITY_FAILURE: 409,
+            BLOCKED_BY_CONFIGURATION: 503,
+          }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, failureCode: result.failureCode ?? null } };
+        });
       }
       if (seg.length === 5 && seg[4] === 'proposals') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

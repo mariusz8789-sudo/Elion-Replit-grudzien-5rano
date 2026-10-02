@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveCommand } from '../core/scienceChat/resolveCommand';
 import { runResearchRunAction, type ResearchRunAction, type ResearchRunClient } from '../core/scienceChat/researchRunTurn';
-import type { ApiResult, ResearchRunExperiment, ResearchRunView } from '../core/backend/client';
+import type { ApiResult, GeneratedScientificAnalysis, ResearchRunExperiment, ResearchRunView } from '../core/backend/client';
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -36,6 +36,21 @@ const view = (over: Partial<ResearchRunView> = {}): ResearchRunView => ({
   ...over,
 });
 
+const ANALYSIS: GeneratedScientificAnalysis = {
+  analysisId: 'analysis-1',
+  proposal: {
+    analysisId: 'analysis-1', objective: 'Compute mean.', methodSummary: 'Compute a bounded arithmetic mean.',
+    expectedOutputKeys: ['mean', 'n'], sourceHash: 'd'.repeat(64), environmentFingerprint: 'e'.repeat(64),
+    status: 'PROPOSED', epistemicStatus: 'NOT_EVIDENCE',
+  },
+  execution: {
+    analysisId: 'analysis-1', status: 'SUCCESS', output: { mean: 2.5, n: 4 }, outputHash: 'f'.repeat(64),
+    sourceHash: 'd'.repeat(64), environmentFingerprint: 'e'.repeat(64), stdoutHash: '1'.repeat(64), stderrHash: '2'.repeat(64),
+    epistemicStatus: 'NOT_EVIDENCE', evidenceEligibility: 'REQUIRES_SEPARATE_REVIEW',
+  },
+  replays: [],
+};
+
 function client(overrides: Partial<ResearchRunClient> = {}): ResearchRunClient & { calls: string[] } {
   const calls: string[] = [];
   const base: ResearchRunClient = {
@@ -44,6 +59,9 @@ function client(overrides: Partial<ResearchRunClient> = {}): ResearchRunClient &
     executeResearchExperiment: async () => { calls.push('execute'); return ok({ status: 'EXECUTED' as const, deduped: false, experimentId: 'exp-1', experiment: EXPERIMENT, researchRun: view({ experiments: [EXPERIMENT] }) }); },
     getResearchRun: async () => { calls.push('get'); return ok({ researchRun: view({ experiments: [EXPERIMENT] }) }); },
     replayResearchExperiment: async () => { calls.push('replay'); return ok({ experimentId: 'exp-1', verification: { verdict: 'MATCH' as const, originalOutputHash: 'c'.repeat(16), replayOutputHash: 'c'.repeat(16) }, replays: [{ verdict: 'MATCH' as const }, { verdict: 'MATCH' as const }] }); },
+    listGeneratedScientificAnalyses: async () => { calls.push('list-analysis'); return ok({ generatedAnalyses: [ANALYSIS] }); },
+    generateScientificAnalysis: async () => { calls.push('analyze'); return ok({ deduped: false, execution: ANALYSIS.execution!, researchRun: view() }); },
+    replayGeneratedScientificAnalysis: async () => { calls.push('replay-analysis'); return ok({ status: 'REPLAYED' as const, verdict: 'MATCH' as const, replay: { analysisId: 'analysis-1', verdict: 'MATCH' as const, outputHash: 'f'.repeat(64), sourceHash: 'd'.repeat(64), environmentFingerprint: 'e'.repeat(64), epistemicStatus: 'NOT_EVIDENCE' as const }, researchRun: view() }); },
   };
   return Object.assign({ ...base, ...overrides }, { calls });
 }
@@ -55,6 +73,9 @@ describe('Science Chat `/badanie` → backend ResearchRun', () => {
     expect(actionOf('/badanie Czy aspiryna spełnia regułę Lipinskiego?')).toEqual({ type: 'researchRun', op: 'start', question: 'Czy aspiryna spełnia regułę Lipinskiego?' });
     expect(actionOf('/eksperyment')).toEqual({ type: 'researchRun', op: 'next' });
     expect(actionOf('/powtórz')).toEqual({ type: 'researchRun', op: 'replay' });
+    expect(actionOf('/analiza Oblicz średnią.')).toEqual({ type: 'researchRun', op: 'analyze', objective: 'Oblicz średnią.' });
+    expect(actionOf('/analiza-powtórz')).toEqual({ type: 'researchRun', op: 'replayAnalysis' });
+    expect(resolveCommand('/analiza', null).action).toBeUndefined();
     expect(resolveCommand('/badanie', null).action).toBeUndefined();
     expect(resolveCommand('badanie aspiryny', null).action?.type).not.toBe('researchRun');
   });
@@ -98,6 +119,41 @@ describe('Science Chat `/badanie` → backend ResearchRun', () => {
     const replay = await runResearchRunAction(actionOf('/powtórz'), { ...ctx, researchRunId: 'run-1' }, c);
     expect(replay.text).toMatch(/ZGODNE/);
     expect(replay.text).toMatch(/MATCH, MATCH/);
+  });
+
+  it('/analiza executes only inside the active canonical run and labels the result NOT_EVIDENCE', async () => {
+    const c = client();
+    const missing = await runResearchRunAction(actionOf('/analiza Compute mean.'), ctx, c);
+    expect(missing.text).toMatch(/Najpierw zadaj pytanie/);
+    expect(c.calls).toEqual([]);
+
+    const turn = await runResearchRunAction(actionOf('/analiza Compute mean.'), { ...ctx, researchRunId: 'run-1' }, c);
+    expect(c.calls).toEqual(['analyze', 'list-analysis']);
+    expect(turn.text).toMatch(/SUCCESS · NOT_EVIDENCE · REQUIRES_SEPARATE_REVIEW/);
+    expect(turn.text).toMatch(/Wynik sandboxa: {"mean":2.5,"n":4}/);
+    expect(turn.text).toMatch(/kod d{12} · środowisko e{12} · wynik f{12}/);
+    expect(turn.text).not.toMatch(/Evidence: (?!PROPOZYCJA)/);
+  });
+
+  it('/analiza reports an absent production sandbox before generated code is claimed', async () => {
+    const c = client({
+      generateScientificAnalysis: async () => fail(503, {
+        error: 'BLOCKED_BY_CONFIGURATION', reason: null, failureCode: 'CONTAINER_SANDBOX_BACKEND_NOT_CONFIGURED',
+      }),
+    });
+    const turn = await runResearchRunAction(actionOf('/analiza Compute mean.'), { ...ctx, researchRunId: 'run-1' }, c);
+    expect(turn.text).toMatch(/BLOCKED_EXTERNAL_SANDBOX/);
+    expect(turn.text).toMatch(/Model nie został wywołany i żaden kod nie został uruchomiony/);
+    expect(turn.tag).toBe('SYSTEM');
+  });
+
+  it('/analiza-powtórz replays the latest successful frozen analysis', async () => {
+    const c = client();
+    const turn = await runResearchRunAction(actionOf('/analiza-powtórz'), { ...ctx, researchRunId: 'run-1' }, c);
+    expect(c.calls).toEqual(['list-analysis', 'replay-analysis']);
+    expect(turn.text).toMatch(/Powtórzenie analizy: MATCH/);
+    expect(turn.text).toMatch(/nadal NOT_EVIDENCE/);
+    expect(turn.tag).toBe('WYNIK');
   });
 
   it('ScienceChat routes the command before the drug and Fabric parsers', () => {

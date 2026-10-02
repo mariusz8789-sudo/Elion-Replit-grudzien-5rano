@@ -1,9 +1,10 @@
 import type { ChatAction, EpistemicTag } from './resolveCommand';
 import type {
-  ApiResult, ResearchRunExperiment, ResearchRunReplay, ResearchRunVerdict, ResearchRunView,
+  ApiResult, GeneratedScientificAnalysis, ResearchRunExperiment, ResearchRunReplay, ResearchRunVerdict, ResearchRunView,
 } from '../backend/client';
 import {
-  executeResearchExperiment, getResearchRun, proposeResearchPlan, replayResearchExperiment, startResearchRun,
+  executeResearchExperiment, generateScientificAnalysis, getResearchRun, listGeneratedScientificAnalyses,
+  proposeResearchPlan, replayGeneratedScientificAnalysis, replayResearchExperiment, startResearchRun,
 } from '../backend/client';
 
 /**
@@ -24,9 +25,15 @@ export interface ResearchRunClient {
   proposeResearchPlan: typeof proposeResearchPlan;
   executeResearchExperiment: typeof executeResearchExperiment;
   replayResearchExperiment: typeof replayResearchExperiment;
+  listGeneratedScientificAnalyses: typeof listGeneratedScientificAnalyses;
+  generateScientificAnalysis: typeof generateScientificAnalysis;
+  replayGeneratedScientificAnalysis: typeof replayGeneratedScientificAnalysis;
 }
 
-const DEFAULT_CLIENT: ResearchRunClient = { startResearchRun, getResearchRun, proposeResearchPlan, executeResearchExperiment, replayResearchExperiment };
+const DEFAULT_CLIENT: ResearchRunClient = {
+  startResearchRun, getResearchRun, proposeResearchPlan, executeResearchExperiment, replayResearchExperiment,
+  listGeneratedScientificAnalyses, generateScientificAnalysis, replayGeneratedScientificAnalysis,
+};
 
 export interface ResearchRunTurn {
   readonly text: string;
@@ -55,7 +62,7 @@ const SCOPE_LINE = 'Werdykt dotyczy tylko tej zamrożonej hipotezy w tym protoko
 const short = (hash: string | null | undefined) => (hash ? hash.slice(0, 12) : '—');
 
 function refusal(prefix: string, r: Extract<ApiResult<unknown>, { ok: false }>, researchRunId: string | null): ResearchRunTurn {
-  const body = (r.responseBody ?? {}) as { error?: string; reason?: string | null; engineId?: string | null; skipped?: Array<{ reason: string }> | null };
+  const body = (r.responseBody ?? {}) as { error?: string; reason?: string | null; failureCode?: string | null; engineId?: string | null; skipped?: Array<{ reason: string }> | null };
   const code = body.error ?? r.error;
   if (code === 'BLOCKED') {
     return { text: `${prefix}: BLOCKED — silnik ${body.engineId ?? 'wymagany przez eksperyment'} jest teraz niedostępny (${body.reason ?? r.message}). Nic nie zapisano i niczego nie podmieniono.`, tag: 'SYSTEM', researchRunId };
@@ -67,7 +74,24 @@ function refusal(prefix: string, r: Extract<ApiResult<unknown>, { ok: false }>, 
   if (code === 'BLOCKED_BY_PROVIDER_CONFIGURATION') {
     return { text: `${prefix}: BLOCKED — model, który proponuje hipotezy, nie jest skonfigurowany na serwerze. Przebieg zapisano; plan powstanie, gdy model będzie dostępny.`, tag: 'SYSTEM', researchRunId };
   }
+  if (code === 'BLOCKED_BY_CONFIGURATION' && body.failureCode === 'CONTAINER_SANDBOX_BACKEND_NOT_CONFIGURED') {
+      return { text: `${prefix}: BLOCKED_EXTERNAL_SANDBOX — serwer nie ma zatwierdzonego, izolowanego obrazu wykonawczego. Model nie został wywołany i żaden kod nie został uruchomiony.`, tag: 'SYSTEM', researchRunId };
+  }
   return { text: `${prefix}: ${code}${body.reason ? ` (${body.reason})` : ''}. ${r.message}`, tag: 'SYSTEM', researchRunId };
+}
+
+function formatGeneratedAnalysis(analysis: GeneratedScientificAnalysis): string {
+  const proposal = analysis.proposal;
+  const execution = analysis.execution;
+  if (!proposal || !execution) return 'Analiza kodowa: odpowiedź serwera jest niekompletna.';
+  const output = execution.output ? JSON.stringify(execution.output) : '—';
+  return [
+    `Analiza kodowa: ${execution.status} · NOT_EVIDENCE · ${execution.evidenceEligibility ?? 'NIE KWALIFIKUJE SIĘ JAKO EVIDENCE'}.`,
+    `Metoda proponowana przez model: ${proposal.methodSummary}`,
+    `Wynik sandboxa: ${output}`,
+    `Pochodzenie: kod ${short(execution.sourceHash)} · środowisko ${short(execution.environmentFingerprint)} · wynik ${short(execution.outputHash)}.`,
+    'Kod został zamrożony przed wykonaniem. `/analiza-powtórz` uruchomi dokładnie ten kod ponownie; wynik nadal wymaga osobnej oceny.',
+  ].join('\n');
 }
 
 function replayLine(replay: ResearchRunReplay | null | undefined): string {
@@ -146,6 +170,33 @@ export async function runResearchRunAction(
   }
 
   if (!researchRunId) return { text: 'Najpierw zadaj pytanie: `/badanie <pytanie>`.', tag: 'SYSTEM', researchRunId };
+
+  if (action.op === 'analyze') {
+    const generated = await client.generateScientificAnalysis(token, projectId, researchRunId, action.objective ?? '');
+    if (!generated.ok) return refusal('Analiza nie została wykonana', generated, researchRunId);
+    const listed = await client.listGeneratedScientificAnalyses(token, projectId, researchRunId);
+    const analysis = listed.ok
+      ? listed.data.generatedAnalyses.find((entry) => entry.analysisId === generated.data.execution.analysisId)
+      : null;
+    return {
+      text: formatGeneratedAnalysis(analysis ?? { analysisId: generated.data.execution.analysisId, proposal: null, execution: generated.data.execution, replays: [] }),
+      tag: 'WYNIK', researchRunId,
+    };
+  }
+
+  if (action.op === 'replayAnalysis') {
+    const listed = await client.listGeneratedScientificAnalyses(token, projectId, researchRunId);
+    if (!listed.ok) return refusal('Nie odczytano analiz', listed, researchRunId);
+    const latest = [...listed.data.generatedAnalyses].reverse().find((entry) => entry.execution?.status === 'SUCCESS');
+    if (!latest) return { text: 'Ten przebieg nie ma udanej analizy kodowej do powtórzenia. Użyj `/analiza <cel>`.', tag: 'SYSTEM', researchRunId };
+    const replayed = await client.replayGeneratedScientificAnalysis(token, projectId, researchRunId, latest.analysisId);
+    if (!replayed.ok) return refusal('Powtórzenie analizy nie powiodło się', replayed, researchRunId);
+    return {
+      text: `Powtórzenie analizy: ${replayed.data.verdict}. Kod ${short(replayed.data.replay.sourceHash)} · środowisko ${short(replayed.data.replay.environmentFingerprint)} · wynik ${short(replayed.data.replay.outputHash)}. To kontrola odtwarzalności, nadal NOT_EVIDENCE.`,
+      tag: replayed.data.verdict === 'MATCH' ? 'WYNIK' : 'SYSTEM', researchRunId,
+    };
+  }
+
   const current = await client.getResearchRun(token, projectId, researchRunId);
   if (!current.ok) return refusal('Nie odczytano przebiegu', current, researchRunId);
   const run = current.data.researchRun;

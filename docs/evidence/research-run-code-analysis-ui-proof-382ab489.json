@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "genesis.browser-proof-evidence@1",
+  "capability": "Authenticated Science Chat canonical ResearchRun plus generated-analysis fail-closed boundary",
+  "testedCommit": "382ab4897ef587462dbdd3201194569dc6db6f3a",
+  "testedAt": "2026-10-02T00:55:46.850Z",
+  "command": "RESEARCH_RUN_UI_PROOF_OUT=artifacts/research-run-code-analysis-ui-proof npm run proof:research-run-ui",
+  "environment": {
+    "browser": "Edge/Chromium 154.0.4258.48 headless",
+    "frontend": "production build",
+    "backend": "real local backend and file SQLite",
+    "scientificEngine": "real local RDKit",
+    "reasoningProvider": "deterministic local OpenAI-compatible plan fixture",
+    "scientificSandbox": "not configured"
+  },
+  "result": {
+    "status": "PASS",
+    "cases": 2,
+    "viewports": ["1440x900", "390x844"],
+    "failures": 0,
+    "pageErrors": 0,
+    "horizontalOverflowErrors": 0,
+    "experimentsPerCase": 2,
+    "eventsPerCase": 12,
+    "verdicts": ["SUPPORTED_WITHIN_PROTOCOL", "FALSIFIED_WITHIN_PROTOCOL"],
+    "replays": ["MATCH", "MATCH"],
+    "generatedAnalysisBoundary": {
+      "status": "BLOCKED_EXTERNAL_SANDBOX",
+      "providerCalledAfterBlock": false,
+      "persistedGeneratedAnalyses": 0,
+      "replayWithoutSuccess": "explicitly reports no successful generated analysis"
+    }
+  },
+  "hashes": {
+    "scriptSha256": "100914943a281824cd6ec3026a75fce17266c8e29a02384e21f7de002f05e6db",
+    "rawReportSha256": "8f1dc0da1beefde2a20f72723b733d02d7cef610a6c7c6bc759aea3239a44fa1",
+    "desktopScreenshotSha256": "6a5bdc7278100489f1e64165726730f969f9ac8eee207e6156d9a5ebcfa9d63b",
+    "mobileScreenshotSha256": "b1454f3e4c365f8327471c0d848b531d75598de582e64d6031c5c846a88da753"
+  },
+  "truthBoundary": {
+    "proven": "The real authenticated UI reaches one canonical ResearchRun, performs real RDKit experiments and Replay, then refuses generated code before the model call because no sandbox exists.",
+    "notProven": "No real generated code executed in a container. This is fail-closed product proof, not real-sandbox runtime proof.",
+    "blocker": "BLOCKED_EXTERNAL_SANDBOX"
+  }
+}

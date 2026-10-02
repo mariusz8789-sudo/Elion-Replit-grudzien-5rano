@@ -22,6 +22,14 @@
       "failures": 0
     },
     {
+      "scope": "independent Science Chat/backend generated-analysis reaudit",
+      "result": "GO",
+      "frontendTests": "9/9 PASS",
+      "backendTests": "6/6 PASS",
+      "evidence": "artifacts/astra-pr56-audit/REAUDIT-af73553e-science-chat-generated-analysis.md",
+      "evidenceSha256": "6d9a68c7f4388ec30f4a68e9a52726494e2c02753047d170b998ecb99916998a"
+    },
+    {
       "scope": "frontend TypeScript",
       "command": "npx tsc -b packages/frontend/tsconfig.json --pretty false",
       "result": "PASS"

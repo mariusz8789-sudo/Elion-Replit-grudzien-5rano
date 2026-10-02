@@ -534,7 +534,7 @@ Delivered:
 - Science Chat commands `/analiza <cel>` and `/analiza-powtórz`, which continue the active ResearchRun and display `NOT_EVIDENCE`, method and hash prefixes;
 - fail-before-provider behavior when no sandbox exists, reported as `BLOCKED_EXTERNAL_SANDBOX` without claiming generated or executed code.
 
-Validation: independent backend/security review 33/33 PASS; Science Chat 9/9 PASS; TypeScript, changed-file ESLint and production build PASS. Evidence: `docs/evidence/generated-scientific-analysis-af73553e.json`.
+Validation: independent backend/security review 33/33 PASS; Science Chat 9/9 PASS; TypeScript, changed-file ESLint and production build PASS. Authenticated production browser proof passes at desktop 1440×900 and mobile 390×844: the same ResearchRun completes two real RDKit experiments and Replay, then `/analiza` reports `BLOCKED_EXTERNAL_SANDBOX` before another provider call and persists zero generated-analysis events. Evidence: `docs/evidence/generated-scientific-analysis-af73553e.json`, `docs/evidence/research-run-code-analysis-ui-proof-382ab489.json`.
 
 Known blocker: no real Docker/container runtime or approved immutable scientific image exists in this environment. The integration and command envelope are proven; real container execution, escape resistance and production runtime remain `BLOCKED_EXTERNAL_SANDBOX`. Generated output is always `NOT_EVIDENCE` and requires separate review.
 

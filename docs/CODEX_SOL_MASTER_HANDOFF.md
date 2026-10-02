@@ -584,3 +584,21 @@ This is local Windows evidence. The Linux GitHub quality gate is still required 
 Rollback SHA before sync: `55c3221faf3675494086d801df002b6a981b8440`. PR #56 merged `origin/main@fc5c88ce` normally at `d9afd1a1`, without force-push or conflict. Main contained the merged PR #54, PR #55 and the extracted literature subset; all were already represented in the newer PR #56 tree, so the pre/post source-tree hash remained exactly `dced6090e5ccb1554eb1e3da241ee0fa19b28ad3`.
 
 The full local frontend, backend, core, lint, build and authenticated browser proof passed on the merge commit. Evidence: `docs/evidence/main-sync-regression-d9afd1a1.json`. Required Linux jobs remain a post-push gate; do not merge until they finish.
+
+## Final closure — live literature scale, provenance and failure proof
+
+Problem: the canonical Europe PMC connector and ResearchRun snapshot had deterministic fixture/restart tests, but no current live provider proof, no raw response hash, and the ResearchRun port admitted only 25 records per query. Search matches also needed an explicit boundary preventing them from becoming scientific support or contradiction without passage review.
+
+Delivered:
+
+- the existing Europe PMC connector now binds every returned source to the exact raw response SHA-256 and byte count, in addition to request hash, metadata hash, provider record id and retrieval time;
+- the existing ResearchRun literature limit is bounded at 100 records per primary or contradiction-candidate query;
+- one proof script runs both real queries concurrently through the production port, persists one existing `KNOWLEDGE_SNAPSHOT`, proves idempotent duplicate lookup, closes/reopens SQLite and verifies the exact snapshot hash and ResearchRun chain;
+- deterministic network and HTTP 429 failures prove zero substitute sources;
+- all links remain `UNKNOWN`, `PROPOSED` and `NOT_EVIDENCE`; search hits are never labelled support/contradiction by query wording.
+
+Validation: 17/17 focused tests and changed-file ESLint PASS. On exact code commit `44188bc2`, the official Europe PMC HTTPS API returned 100 primary plus 100 contradiction-candidate rows (195 canonical unique sources) in 2,002 ms, an observed 99.9 rows/s in this one run. Item-level licence statuses were 94 `CONDITIONAL`, 40 `BLOCKED` and 66 `UNKNOWN`; none were bulk-cleared. The evidence artifact is `docs/evidence/literature-live-scale-44188bc2.json` (SHA-256 `570d6beb7fd26f3d73f482a41f223e80edd7e2dce0ca42d6163c68db3d45f88a`).
+
+Truth boundary: this proves live metadata retrieval, custody, failure handling, idempotency and restart recovery. It does not prove full-text access, passage grounding or commercial reuse. Those remain `BLOCKED_EXTERNAL_FULL_TEXT_REVIEW` or item-specific licence decisions. More providers remain future connectors, not claimed capabilities.
+
+Rollback: revert the literature closure commits. Existing smaller literature snapshots remain readable; no table, store, ResearchRun lifecycle or Evidence contract was added.

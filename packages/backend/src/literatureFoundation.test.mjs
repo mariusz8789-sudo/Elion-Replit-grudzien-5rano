@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 import {
   classifyLiteratureLicence,
@@ -45,6 +47,9 @@ describe('literature foundation', () => {
     assert.equal(source.licenceStatus, 'CONDITIONAL');
     assert.equal(source.fullTextAvailability, 'EUROPE_PMC');
     assert.match(source.metadataHash, /^[a-f0-9]{64}$/);
+    const rawFixture = JSON.stringify(fixture);
+    assert.equal(source.provenance.responseHash, createHash('sha256').update(rawFixture).digest('hex'));
+    assert.equal(source.provenance.responseBytes, Buffer.byteLength(rawFixture, 'utf8'));
     assert.equal(source.retrievalTimestamp, NOW.toISOString());
     assert.match(requested.url, /^https:\/\/www\.ebi\.ac\.uk\/europepmc\/webservices\/rest\/search\?/);
     assert.equal(requested.init.redirect, 'manual');
@@ -69,6 +74,8 @@ describe('literature foundation', () => {
     assert.deepEqual([limited.status, limited.failureCode, limited.sources.length], ['BLOCKED_BY_NETWORK', 'EUROPE_PMC_RATE_LIMITED', 0]);
     const invalidJson = await queryEuropePmc({ text: 'GLP-1R' }, { now: () => NOW, fetchImpl: async () => response(200, '{bad') });
     assert.deepEqual([invalidJson.status, invalidJson.failureCode, invalidJson.sources.length], ['NO_ACCESS', 'EUROPE_PMC_INVALID_JSON', 0]);
+    assert.equal(invalidJson.provenance.responseHash, createHash('sha256').update('{bad').digest('hex'));
+    assert.equal(invalidJson.provenance.responseBytes, 4);
     const invalidQuery = await queryEuropePmc({ text: '' }, { now: () => NOW, fetchImpl: async () => { throw new Error('must not fetch'); } });
     assert.deepEqual([invalidQuery.status, invalidQuery.failureCode], ['NO_ACCESS', 'INVALID_QUERY']);
   });
@@ -97,5 +104,27 @@ describe('literature foundation', () => {
     assert.equal(result.status, 'BLOCKED_BY_NETWORK');
     assert.deepEqual(result.sources, []);
     assert.equal(result.connectors[1].failureCode, 'LITERATURE_CONNECTOR_UNHANDLED_FAILURE');
+  });
+
+  it('retains one raw-response identity across a bounded 100-record metadata page', async () => {
+    const hundred = {
+      resultList: {
+        result: Array.from({ length: 100 }, (_, index) => ({
+          id: String(41000000 + index), source: 'MED', pmid: String(41000000 + index),
+          doi: `10.1000/genesis.${index}`, title: `Bounded source ${index}`,
+          authorString: 'Example A', firstPublicationDate: '2026-01-01', license: index % 2 ? 'CC BY 4.0' : undefined,
+        })),
+      },
+    };
+    const raw = JSON.stringify(hundred);
+    const result = await queryEuropePmc({ text: 'bounded scale proof', limit: 100 }, {
+      now: () => NOW,
+      fetchImpl: async () => response(200, raw),
+    });
+    assert.equal(result.status, 'METADATA_ONLY');
+    assert.equal(result.sources.length, 100);
+    assert.equal(new Set(result.sources.map((item) => item.sourceId)).size, 100);
+    assert.deepEqual(new Set(result.sources.map((item) => item.provenance.responseHash)), new Set([createHash('sha256').update(raw).digest('hex')]));
+    assert.ok(result.sources.every((item) => item.provenance.responseBytes === Buffer.byteLength(raw, 'utf8')));
   });
 });

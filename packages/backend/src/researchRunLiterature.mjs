@@ -7,7 +7,7 @@ export const RESEARCH_RUN_LITERATURE_SNAPSHOT_VERSION = 'research-run-literature
 const STR = (value, max) => typeof value === 'string' && value.trim().length > 0 ? value.trim().slice(0, max) : null;
 
 function boundedLimit(value) {
-  return Number.isInteger(value) && value >= 1 && value <= 25 ? value : 10;
+  return Number.isInteger(value) && value >= 1 && value <= 100 ? value : 10;
 }
 
 function snapshotResult(result) {

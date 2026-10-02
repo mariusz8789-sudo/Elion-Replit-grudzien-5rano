@@ -47,9 +47,10 @@ describe('literature in the canonical ResearchRun', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'genesis-literature-run-'));
     const file = path.join(dir, 'genesis.db');
     const captured = [];
+    const literatureRequests = [];
     const literaturePort = {
-      findForClaim: async (request) => result('CLAIM_CONTEXT', request.query),
-      findContradictionsForClaim: async () => result('CONTRADICTION_SEARCH', 'GLP-1R AND negative result', { ...SOURCE, sourceId: 'europe-pmc:MED:456', title: 'Negative functional result', pmid: '456' }),
+      findForClaim: async (request) => { literatureRequests.push(request); return result('CLAIM_CONTEXT', request.query); },
+      findContradictionsForClaim: async (request) => { literatureRequests.push(request); return result('CONTRADICTION_SEARCH', 'GLP-1R AND negative result', { ...SOURCE, sourceId: 'europe-pmc:MED:456', title: 'Negative functional result', pmid: '456' }); },
     };
     try {
       let db = openDatabase(file);
@@ -59,17 +60,19 @@ describe('literature in the canonical ResearchRun', () => {
       const base = `/api/projects/${project.id}`;
       const started = await call('POST', `${base}/research-runs`, { question: 'Does GLP-1R agonism change glucose response?' }, owner.token);
       const runId = started.body.researchRun.researchRunId;
-      const retrieved = await call('POST', `${base}/research-runs/${runId}/literature`, { limit: 5 }, owner.token);
+      const retrieved = await call('POST', `${base}/research-runs/${runId}/literature`, { limit: 100 }, owner.token);
       assert.equal(retrieved.status, 201, JSON.stringify(retrieved.body));
+      assert.deepEqual(literatureRequests.map((request) => request.limit), [100, 100]);
       assert.equal(retrieved.body.snapshot.epistemicStatus, 'NOT_EVIDENCE');
       assert.equal(retrieved.body.snapshot.sourceCount, 2);
       assert.equal(retrieved.body.snapshot.contradictionSearch.contradictions.length, 0);
       assert.deepEqual(retrieved.body.researchRun.researchState.events.map((event) => event.type), ['PROBLEM_FORMALIZED', 'KNOWLEDGE_SNAPSHOT']);
       assert.equal(retrieved.body.researchRun.researchState.chain.ok, true);
 
-      const duplicate = await call('POST', `${base}/research-runs/${runId}/literature`, { limit: 5 }, owner.token);
+      const duplicate = await call('POST', `${base}/research-runs/${runId}/literature`, { limit: 100 }, owner.token);
       assert.equal(duplicate.status, 200);
       assert.equal(duplicate.body.deduped, true);
+      assert.equal(literatureRequests.length, 2);
       db.close();
 
       db = openDatabase(file);

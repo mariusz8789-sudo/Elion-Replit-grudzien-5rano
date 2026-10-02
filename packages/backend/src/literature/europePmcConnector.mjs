@@ -1,5 +1,6 @@
 /* global AbortSignal */
 import { canonicalHash } from '../provenance.mjs';
+import { sha256Hex } from '../determinism.mjs';
 import {
   classifyLiteratureLicence,
   literatureMetadataHash,
@@ -68,6 +69,8 @@ function mapResult(result, context) {
       providerRecordId: String(providerId),
       requestHash: context.requestHash,
       responseStatus: context.responseStatus,
+      responseHash: context.responseHash,
+      responseBytes: context.responseBytes,
       retrievedAt: context.retrievedAt,
     },
   };
@@ -127,18 +130,27 @@ export async function queryEuropePmc(query, options = {}) {
   if (response.status === 401 || response.status === 403) return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_ACCESS_DENIED', 'Europe PMC denied access.', responseProvenance);
   if (response.status === 429 || response.status >= 500) return blocked(LITERATURE_RETRIEVAL_STATUS.BLOCKED_BY_NETWORK, response.status === 429 ? 'EUROPE_PMC_RATE_LIMITED' : 'EUROPE_PMC_UPSTREAM_ERROR', 'Europe PMC is temporarily unavailable.', responseProvenance);
   if (!response.ok) return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_HTTP_ERROR', `Europe PMC returned HTTP ${response.status}.`, responseProvenance);
+  let rawBody;
+  try { rawBody = await response.text(); } catch {
+    return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_RESPONSE_READ_ERROR', 'Europe PMC response could not be read.', responseProvenance);
+  }
+  const bodyProvenance = {
+    ...responseProvenance,
+    responseHash: sha256Hex(rawBody),
+    responseBytes: Buffer.byteLength(rawBody, 'utf8'),
+  };
   let body;
-  try { body = JSON.parse(await response.text()); } catch {
-    return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_INVALID_JSON', 'Europe PMC returned invalid JSON.', responseProvenance);
+  try { body = JSON.parse(rawBody); } catch {
+    return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_INVALID_JSON', 'Europe PMC returned invalid JSON.', bodyProvenance);
   }
   const results = Array.isArray(body?.resultList?.result) ? body.resultList.result : [];
-  const sources = results.map((result) => mapResult(result, responseProvenance)).filter(Boolean);
-  if (sources.length === 0) return blocked(LITERATURE_RETRIEVAL_STATUS.NOT_FOUND, 'EUROPE_PMC_NO_RESULTS', 'No literature records matched the query.', responseProvenance);
+  const sources = results.map((result) => mapResult(result, bodyProvenance)).filter(Boolean);
+  if (sources.length === 0) return blocked(LITERATURE_RETRIEVAL_STATUS.NOT_FOUND, 'EUROPE_PMC_NO_RESULTS', 'No literature records matched the query.', bodyProvenance);
   return {
     status: LITERATURE_RETRIEVAL_STATUS.METADATA_ONLY,
     sources,
     failureCode: null,
     message: null,
-    provenance: { provider: PROVIDER, ...responseProvenance },
+    provenance: { provider: PROVIDER, ...bodyProvenance },
   };
 }

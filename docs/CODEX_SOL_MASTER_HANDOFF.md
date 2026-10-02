@@ -520,3 +520,22 @@ Validation: desktop 1440×900 and mobile 390×844 PASS. Each case contains 12 ca
 Known limitations: this is headless Edge/Chromium rather than physical-device or real-GPU proof. The local plan provider proves the model boundary and UI integration, not external-provider quality or availability. Evidence is displayed as a proposal and remains subject to the existing human publication gate.
 
 Rollback: revert `5301ad52`; product code and canonical ResearchRun data contracts remain unchanged.
+
+## Post-S11 integration - generated scientific analysis inside ResearchRun
+
+Problem: the sandbox contract existed, but Science Chat and canonical ResearchRun had no governed path from a natural-language analysis objective to frozen model-proposed code, execution provenance and replay. Running model code on the host or accepting client-supplied source would violate the existing security and truth boundaries.
+
+Delivered:
+
+- one thin generated-analysis adapter that appends `GENERATED_ANALYSIS_PROPOSED`, `GENERATED_ANALYSIS_EXECUTED` and `GENERATED_ANALYSIS_REPLAYED` to the existing ResearchRun hash chain;
+- a strict provider response containing only Python source, method summary and expected top-level output keys; client source/status/output fields are not accepted;
+- execution exclusively through the existing `ScientificSandboxPort`, with immutable-image admission and recomputed source/environment/stdout/stderr provenance;
+- restart recovery, objective deduplication, Replay `MATCH`/`DRIFT`, pause-race rejection, tenant isolation and editor authorization;
+- Science Chat commands `/analiza <cel>` and `/analiza-powtórz`, which continue the active ResearchRun and display `NOT_EVIDENCE`, method and hash prefixes;
+- fail-before-provider behavior when no sandbox exists, reported as `BLOCKED_EXTERNAL_SANDBOX` without claiming generated or executed code.
+
+Validation: independent backend/security review 33/33 PASS; Science Chat 9/9 PASS; TypeScript, changed-file ESLint and production build PASS. Evidence: `docs/evidence/generated-scientific-analysis-af73553e.json`.
+
+Known blocker: no real Docker/container runtime or approved immutable scientific image exists in this environment. The integration and command envelope are proven; real container execution, escape resistance and production runtime remain `BLOCKED_EXTERNAL_SANDBOX`. Generated output is always `NOT_EVIDENCE` and requires separate review.
+
+Rollback: revert `af73553e` for the chat front door and `236c72da` for the backend adapter. Canonical ResearchRun and the standalone sandbox contract remain intact.

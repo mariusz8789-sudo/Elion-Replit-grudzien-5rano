@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "genesis.test-evidence@1",
+  "capability": "Natural-language objective to frozen generated Python to ScientificSandboxPort to provenance and Replay inside canonical ResearchRun",
+  "testedHead": "af73553ebe80359a567d578248285635602c33f4",
+  "backendImplementationCommit": "236c72da",
+  "scienceChatCommit": "af73553e",
+  "recordedAt": "2026-10-02T00:53:08.4067918Z",
+  "results": [
+    {
+      "scope": "backend contract, API, restart, deduplication, Replay, pause race and adversarial boundaries",
+      "result": "PASS",
+      "tests": 33,
+      "failures": 0,
+      "evidence": "artifacts/astra-pr56-audit/REAUDIT-236c72da-generated-scientific-analysis.md",
+      "evidenceSha256": "71b9301190bb9a8ffad5b815b311860445e39a41db67b44a1bbfe07bade2ea8f"
+    },
+    {
+      "scope": "Science Chat /analiza and /analiza-powtórz routing, honest blocker and NOT_EVIDENCE presentation",
+      "command": "npm run test --workspace=packages/frontend -- src/__tests__/scienceChatResearchRun.test.ts",
+      "result": "PASS",
+      "tests": 9,
+      "failures": 0
+    },
+    {
+      "scope": "frontend TypeScript",
+      "command": "npx tsc -b packages/frontend/tsconfig.json --pretty false",
+      "result": "PASS"
+    },
+    {
+      "scope": "changed-file ESLint",
+      "command": "npx eslint packages/frontend/src/core/scienceChat/resolveCommand.ts packages/frontend/src/core/scienceChat/researchRunTurn.ts packages/frontend/src/core/backend/client.ts packages/frontend/src/__tests__/scienceChatResearchRun.test.ts",
+      "result": "PASS"
+    },
+    {
+      "scope": "production frontend build",
+      "command": "npm run build",
+      "result": "PASS",
+      "warnings": "Existing browser externalization, mixed dynamic/static import and large chunk warnings remain; no build error."
+    }
+  ],
+  "sourceHashes": {
+    "packages/backend/src/generatedScientificAnalysis.mjs": "c3c4b8423df221e02237c4e25db3ca7e0f4e61dd2622fb521f3a83ebf1c0202d",
+    "packages/backend/src/generatedScientificAnalysis.test.mjs": "5d9cbeafdf9b51708af9836a433ecad5494a0aef764e0528c8c5fbf4276a9d6c",
+    "packages/frontend/src/core/scienceChat/researchRunTurn.ts": "f8b6fe6e6a1af2b2f2fcc172712abf37303f45f58f5d6befbe76f58b8c8f750c",
+    "packages/frontend/src/core/scienceChat/resolveCommand.ts": "923c5edc231a1824d2219ec52af05b34c45c54f8af6afb075c20d0f0d9370001",
+    "packages/frontend/src/__tests__/scienceChatResearchRun.test.ts": "3b5d729b71decf8f43480e147e5fa7d39f487e237a29e1b598f1781b73d357db"
+  },
+  "truthBoundary": {
+    "proven": [
+      "One canonical ResearchRun hash chain stores proposal, execution and replay events.",
+      "The client cannot submit source or execution status; the provider only proposes source and a bounded output schema.",
+      "ScientificSandboxPort is the only executor; source/environment/stdout/stderr hashes are recomputed or checked server-side.",
+      "Restart, deduplication, Replay MATCH/DRIFT, pause race, RBAC and tenant boundaries fail closed.",
+      "Science Chat exposes the governed path and labels every output NOT_EVIDENCE."
+    ],
+    "notProven": [
+      "No real Docker/container execution occurred in this environment.",
+      "No approved immutable production sandbox image is configured.",
+      "No adversarial container escape test against a deployed runtime occurred.",
+      "Generated output is not Evidence and requires separate scientific review."
+    ],
+    "status": "PARTIAL",
+    "blocker": "BLOCKED_EXTERNAL_SANDBOX"
+  }
+}

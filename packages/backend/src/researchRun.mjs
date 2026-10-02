@@ -59,6 +59,7 @@ Answer with exactly one JSON object and nothing else:
     "missingEvidence": string[],
     "uncertainty": { "level": "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN", "statement": string },
     "falsificationProposal": string,
+    "challengesHypothesisIndex": integer | null,
     "experimentProposal": null | { "engineId": string | null, "kind": "COMPUTATIONAL" | "BIOLOGICAL" | "WET_LAB" | "CLINICAL", "description": string, "parameters": object, "parameterChanges": [{ "target": string, "to": any }] }
   }],
   "nextActions": string[]
@@ -73,7 +74,8 @@ Rules:
 6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.
 7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean }, naming only these engines and observables:
 ${executorPromptLines().join('\n')}
-   Predictions are frozen before the engine runs and cannot be changed afterwards.`;
+   Predictions are frozen before the engine runs and cannot be changed afterwards.
+8. challengesHypothesisIndex is null unless this hypothesis is an explicit attempt to falsify an earlier hypothesis in this same array. It may reference only a lower array index. The relationship is a proposal, never evidence.`;
 
 /* ---------------- identity, isolation, dedupe ---------------- */
 
@@ -300,12 +302,34 @@ export function validateResearchPlan(value, { db, projectId, selfModel, question
   }
 
   const hypotheses = [];
+  const hypothesesByInputIndex = new Map();
   for (const [index, h] of (Array.isArray(value.hypotheses) ? value.hypotheses : []).entries()) {
     if (hypotheses.length >= MAX_HYPOTHESES) { rejected.push({ kind: 'HYPOTHESIS', index, reason: 'over_limit' }); continue; }
     const hypothesisId = `hyp-${fnv1a(canonicalJson({ researchRunId, index, claim: STR(h?.claim) }))}`;
     const v = validateClaimProposal(h, { db, projectId, selfModel, question, hypothesisId });
     if (!v.ok) { rejected.push({ kind: 'HYPOTHESIS', index, reason: v.reason }); continue; }
-    hypotheses.push(v.proposal);
+    let proposal = v.proposal;
+    const challengeIndex = h?.challengesHypothesisIndex;
+    if (challengeIndex !== undefined && challengeIndex !== null) {
+      const challenged = Number.isInteger(challengeIndex) && challengeIndex >= 0 && challengeIndex < index
+        ? hypothesesByInputIndex.get(challengeIndex)
+        : null;
+      if (challenged) {
+        proposal = { ...proposal, challengesHypothesisId: challenged.hypothesisId };
+      } else {
+        proposal = {
+          ...proposal,
+          degradations: [...proposal.degradations, {
+            field: 'challengesHypothesisIndex',
+            from: challengeIndex,
+            to: null,
+            reason: 'CHALLENGE_MUST_REFERENCE_AN_ACCEPTED_EARLIER_HYPOTHESIS',
+          }],
+        };
+      }
+    }
+    hypotheses.push(proposal);
+    hypothesesByInputIndex.set(index, proposal);
   }
 
   const nextActions = (Array.isArray(value.nextActions) ? value.nextActions : [])

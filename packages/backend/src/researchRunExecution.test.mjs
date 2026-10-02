@@ -67,9 +67,9 @@ function fakeProvider(answer) {
   };
 }
 
-async function planned(email) {
+async function planned(email, plan = PLAN) {
   const db = openDatabase();
-  const call = (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {}, reasoningProvider: fakeProvider(PLAN) });
+  const call = (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {}, reasoningProvider: fakeProvider(plan) });
   const owner = call('POST', '/api/auth/register', { body: { email, password: 'password123' } }).body;
   const project = call('POST', '/api/projects', { token: owner.token, body: { name: email } }).body.project;
   const base = `/api/projects/${project.id}`;
@@ -82,6 +82,49 @@ async function planned(email) {
 const types = (rr) => rr.researchState.events.map((e) => e.type);
 
 describe('R1-b research run execution', () => {
+  test('a supported result prioritizes and executes its preregistered self-falsification challenge', needsRdkit, async () => {
+    const challengePlan = {
+      subProblems: [{ question: 'Can the bounded descriptor claim survive its null challenge?' }],
+      hypotheses: [
+        {
+          claim: 'Aspirin has molecular weight below 200 Da.',
+          claimType: 'PREDICTION',
+          falsificationProposal: 'RDKit molecular weight is at least 200 Da.',
+          experimentProposal: rdkitExperiment(ASPIRIN, [{ observable: 'molWt', operator: '<', value: 200, critical: true }]),
+        },
+        {
+          claim: 'Null challenge: aspirin has molecular weight at least 200 Da.',
+          claimType: 'PREDICTION',
+          falsificationProposal: 'RDKit molecular weight is below 200 Da.',
+          challengesHypothesisIndex: 0,
+          experimentProposal: rdkitExperiment(ASPIRIN, [{ observable: 'molWt', operator: '>=', value: 200, critical: true }]),
+        },
+      ],
+      nextActions: ['Require human review after the challenge.'],
+    };
+    const { call, owner, base, runId, plan } = await planned('rb-self-falsification@lab.org', challengePlan);
+    const first = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.equal(first.body.experiment.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
+    assert.equal(plan.hypotheses[1].challengesHypothesisId, plan.hypotheses[0].hypothesisId);
+    assert.deepEqual(first.body.experiment.next.proposal, {
+      action: 'EXECUTE_NEXT_HYPOTHESIS',
+      hypothesisId: plan.hypotheses[1].hypothesisId,
+      engineId: 'rdkit',
+      reason: 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN',
+      challengesHypothesisId: plan.hypotheses[0].hypothesisId,
+    });
+    assert.match(first.body.experiment.next.decisionTrace.summary, /SELF_FALSIFICATION_CHALLENGE_IN_PLAN/);
+    assert.ok(first.body.experiment.next.decisionTrace.evidenceRefs.some((ref) => ref.id.startsWith('execution:')));
+
+    const challenge = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+    assert.equal(challenge.status, 201, JSON.stringify(challenge.body));
+    assert.equal(challenge.body.experiment.frozen.hypothesisId, plan.hypotheses[1].hypothesisId);
+    assert.equal(challenge.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
+    assert.equal(challenge.body.experiment.next.replay.verdict, 'MATCH');
+    assert.equal(challenge.body.researchRun.researchState.chain.ok, true);
+  });
+
   test('authenticated ResearchRun execution uses the shared heavy-compute admission before mutating the run', needsRdkit, async () => {
     const { db, owner, base, runId } = await planned('rb-admission@lab.org');
     const admission = createComputeAdmission({ limit: 2, maxActive: 1 });

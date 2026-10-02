@@ -123,18 +123,31 @@ export function judgeCriteria(criteria, execution, executor) {
 
 /* ---------------- the next experiment (a fixed rule, no model) ---------------- */
 
-export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null, steering = {}) {
+export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null, steering = {}, lastHypothesisId = null) {
   if (replayVerdict && replayVerdict !== REPLAY_VERDICT.MATCH && replayVerdict !== REPLAY_NOT_APPLICABLE) {
     return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
   }
   const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
-  const hypotheses = [...(plan?.hypotheses ?? [])].sort((a, b) => (a.hypothesisId === steering.focusedHypothesisId ? -1 : b.hypothesisId === steering.focusedHypothesisId ? 1 : 0));
+  const priority = (hypothesis) => {
+    if (hypothesis.hypothesisId === steering.focusedHypothesisId) return 0;
+    if (lastVerdict === PROTOCOL_VERDICT.SUPPORTED && hypothesis.challengesHypothesisId === lastHypothesisId) return 1;
+    return 2;
+  };
+  const hypotheses = [...(plan?.hypotheses ?? [])].sort((a, b) => priority(a) - priority(b));
   for (const h of hypotheses) {
     if (doneHypothesisIds.has(h.hypothesisId)) continue;
     if (abandoned.has(h.hypothesisId)) continue;
     const x = executabilityOf(h, executors);
     if (x.executable) {
-      return { action: 'EXECUTE_NEXT_HYPOTHESIS', hypothesisId: h.hypothesisId, engineId: x.engineId, reason: 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN' };
+      const isFocused = h.hypothesisId === steering.focusedHypothesisId;
+      const isChallenge = lastVerdict === PROTOCOL_VERDICT.SUPPORTED && h.challengesHypothesisId === lastHypothesisId;
+      return {
+        action: 'EXECUTE_NEXT_HYPOTHESIS',
+        hypothesisId: h.hypothesisId,
+        engineId: x.engineId,
+        reason: isFocused ? 'USER_FOCUSED_HYPOTHESIS' : isChallenge ? 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN' : 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN',
+        ...(isChallenge ? { challengesHypothesisId: lastHypothesisId } : {}),
+      };
     }
   }
   return {
@@ -376,7 +389,7 @@ export function nextExperimentDecisionTrace({
   const replayVerdict = replay?.verdict ?? 'UNAVAILABLE';
   return buildDecisionTrace({
     decisionId: `decision:${researchRunId}:${experiment.experimentId}:next`,
-    summary: `NEXT_EXPERIMENT ${proposal.action}; protocol verdict ${experiment.falsification.verdict}; replay ${replayVerdict}.`,
+    summary: `NEXT_EXPERIMENT ${proposal.action}; protocol verdict ${experiment.falsification.verdict}; replay ${replayVerdict}; selection ${proposal.reason}.`,
     evidenceRefs: decisionEvidenceRefs(experiment, evidence, replay),
     alternatives,
     selectedCapability: proposal.engineId ?? proposal.action,
@@ -422,7 +435,7 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
     if (!now.next) {
       const done = new Set(current.experiments.map((e) => e.frozen.hypothesisId));
       const steering = researchSteeringOf(current.researchState);
-      const proposal = nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, steering);
+      const proposal = nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, steering, now.frozen.hypothesisId);
       const evidence = now.evidence ?? {
         evidenceProposalId: proposed.proposalId,
         evidenceContentHash: proposed.record?.contentHash ?? null,

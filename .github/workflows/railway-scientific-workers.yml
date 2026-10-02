@@ -52,7 +52,7 @@ jobs:
             -e GENESIS_SCIENTIFIC_WORKER_TOKEN \
             "genesis-worker-${{ matrix.group }}:ci"
 
-      - name: Verify health, allowlist and every real reference case
+      - name: Wait for passive health
         run: |
           set -euo pipefail
           trap 'docker logs "genesis-worker-${{ matrix.group }}" || true' ERR
@@ -65,21 +65,56 @@ jobs:
           done
 
           node -e "const h=require('/tmp/worker-health.json'); if(!h.ok || h.workerGroup !== '${{ matrix.group }}') throw new Error('invalid health: '+JSON.stringify(h));"
-          curl --fail --silent \
-            -H "authorization: Bearer $GENESIS_SCIENTIFIC_WORKER_TOKEN" \
-            http://127.0.0.1:8090/engines > /tmp/worker-engines.json
 
-          for engine in ${{ matrix.engines }}; do
-            curl --fail --silent --show-error \
-              -X POST "http://127.0.0.1:8090/engines/$engine/reference-case" \
-              -H "authorization: Bearer $GENESIS_SCIENTIFIC_WORKER_TOKEN" \
-              -H 'content-type: application/json' \
-              -d '{}' > "/tmp/$engine.json"
-            ENGINE="$engine" node -e "const r=require('/tmp/'+process.env.ENGINE+'.json'); if(!r.ok || r.toolId !== process.env.ENGINE || r.status !== 'AVAILABLE' || !r.outputHash) throw new Error('reference case not AVAILABLE: '+JSON.stringify(r));"
-          done
+      - name: Execute the full authenticated container probe
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/engine-runtime
+          node scripts/verify-scientific-worker-runtime.mjs \
+            --url http://127.0.0.1:8090 \
+            --group "${{ matrix.group }}" \
+            --level LOCAL_CONTAINER_VERIFIED \
+            --out "artifacts/engine-runtime/worker-runtime-${{ matrix.group }}.json"
+
+      - name: Upload per-worker runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scientific-worker-runtime-${{ matrix.group }}-${{ github.sha }}
+          path: artifacts/engine-runtime
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Show bounded diagnostics and remove the worker
         if: always()
         run: |
           docker logs "genesis-worker-${{ matrix.group }}" 2>&1 | tail -n 200 || true
           docker rm -f "genesis-worker-${{ matrix.group }}" || true
+
+  engine-runtime-product-proof:
+    name: Consolidate runtime truth and commercial blockers
+    if: always()
+    needs: worker-container
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: scientific-worker-runtime-*-${{ github.sha }}
+          path: artifacts/engine-runtime-workers
+          merge-multiple: true
+      - name: Build the canonical engine proof receipt
+        run: |
+          node scripts/engine-runtime-product-proof.mjs \
+            --reports artifacts/engine-runtime-workers \
+            --out artifacts/engine-runtime-status/engine-runtime-product-proof.json \
+            --commit "${{ github.sha }}"
+      - name: Upload consolidated runtime and product-admission evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: engine-runtime-product-proof-${{ github.sha }}
+          path: artifacts/engine-runtime-status
+          if-no-files-found: warn
+          retention-days: 90

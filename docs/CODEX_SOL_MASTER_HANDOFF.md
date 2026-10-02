@@ -539,3 +539,9 @@ Validation: independent backend/security review 33/33 PASS; Science Chat 9/9 PAS
 Known blocker: no real Docker/container runtime or approved immutable scientific image exists in this environment. The integration and command envelope are proven; real container execution, escape resistance and production runtime remain `BLOCKED_EXTERNAL_SANDBOX`. Generated output is always `NOT_EVIDENCE` and requires separate review.
 
 Rollback: revert `af73553e` for the chat front door and `236c72da` for the backend adapter. Canonical ResearchRun and the standalone sandbox contract remain intact.
+
+## Current-head local regression
+
+On `4b333dd8`, the controlled full frontend run passed 703/703 files and 7,555 tests with one explicit skip; backend passed 1,399 tests with zero failures and 81 explicit runtime skips; core passed 344/344; lint reported zero errors and 13 existing script warnings; the production build passed. The initial unconstrained frontend run produced 42 five-second timeouts under worker contention. Every one of the 16 affected files then passed (265/265) in a serial diagnostic run, and the controlled four-worker full rerun passed without a repository timeout change. Evidence: `docs/evidence/full-local-regression-4b333dd8.json`.
+
+This is local Windows evidence. The Linux GitHub quality gate is still required before merge, and explicit runtime skips remain blockers rather than passes for unavailable engines or infrastructure.

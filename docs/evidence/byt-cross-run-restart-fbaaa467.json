@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "capability": "canonical-byt-cross-run-self-model",
+  "testedBaseCommit": "fbaaa46714c328371849b0eac120c51400a9e89c",
+  "environment": {
+    "platform": "win32",
+    "runtime": "Node.js 22",
+    "database": "file SQLite",
+    "engine": "real local RDKit"
+  },
+  "command": "node --test packages/backend/src/bytProjection.test.mjs packages/backend/src/bytProjectionRestart.test.mjs packages/backend/src/researchRunExecution.test.mjs",
+  "result": {
+    "tests": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 11638.3674
+  },
+  "broaderRegression": {
+    "command": "npm run test --workspace=packages/backend",
+    "tests": 1486,
+    "passed": 1402,
+    "failed": 0,
+    "skipped": 84,
+    "suites": 329,
+    "durationMs": 318088.3478,
+    "lint": "PASS_WITH_13_PRE_EXISTING_WARNINGS"
+  },
+  "proof": {
+    "researchRuns": 2,
+    "verifiedChains": 2,
+    "realEngineExecutions": 2,
+    "replayMatch": 2,
+    "preregisteredSurpriseRules": 1,
+    "surpriseEvents": 1,
+    "necropolisEntries": 1,
+    "decisionTraces": 2,
+    "databaseRestart": true,
+    "projectionIdenticalAfterRestart": true,
+    "newPersistenceStore": false,
+    "probabilisticCalibrationClaimed": false,
+    "surpriseEpistemicStatus": "NOT_EVIDENCE"
+  },
+  "sourceSha256": {
+    "packages/backend/src/agentRun.mjs": "2f82fb99cd00c4c72f91d2e8662ab9dd8f25b036392faecdc0bde99f2b8c677f",
+    "packages/backend/src/researchRun.mjs": "356d839e39213d90bda49c4054584d7898606741ae2c2735f191e530032d9ed6",
+    "packages/backend/src/researchRunExecution.mjs": "8ea0ef55b75b56e7b87105c02fde1ef031fdb21981976534727346c77789318d",
+    "packages/backend/src/bytProjection.mjs": "6a4d6592e9b86bb5ba8ffea08b96267aeb1d1e65948d70b7c3496cd88f68ce60",
+    "packages/backend/src/bytProjection.test.mjs": "a52771420a49b90ab87fcf04e777e95111f86c7038b38f48ce74cfaa02f30f43",
+    "packages/backend/src/bytProjectionRestart.test.mjs": "67e0762abc86ee94f8bb6cd56a41f11051acffeeb6b4377c27bf93607bb47a52",
+    "packages/backend/src/researchRunExecution.test.mjs": "1094ba629d7379a27faf788c8fcecbd047504f1a61a7d5e6c7efcbd1008f42e1"
+  },
+  "limitations": [
+    "The surprise rule is a deterministic absolute-error gate, not a confidence interval or uncertainty model.",
+    "SURPRISE_DETECTED is a computational anomaly marked NOT_EVIDENCE.",
+    "Probabilistic calibration remains NOT_AVAILABLE.",
+    "A falsified hypothesis can be reopened only with new evidence and human approval."
+  ]
+}

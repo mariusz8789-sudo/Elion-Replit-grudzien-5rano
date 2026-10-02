@@ -1,6 +1,6 @@
 # BYT — canonical consolidation over Genesis
 
-**Status:** architecture decision and implementation audit  
+**Status:** canonical read model implemented; bounded surprise and cross-run restart proof complete
 **Product meaning:** a persistent, self-modeling scientific entity; never a consciousness claim  
 **Rule:** BYT owns no second memory, ResearchRun, Evidence ledger, Replay, world, hypothesis lifecycle, or toolchain.
 
@@ -34,7 +34,7 @@ The state update is a **materialized projection of verified canonical records**.
 |---|---|---|---|
 | Stable identity and current capability awareness | `packages/backend/src/genesisIdentity.mjs`, `genesisSelfModel.mjs` | `/api/genesis/self`; engine availability requires a reference case or persisted real remote run | HAS |
 | Durable current research state | `packages/backend/src/agentRun.mjs`, `researchRun.mjs` | append-only hash chain in `agent_run_steps`; restart and integrity tests | HAS |
-| Project-level cognitive projection | `packages/backend/src/cognitiveState.mjs` | rebuilt from runs, campaigns, jobs, experiment records, knowledge registry and Self Model | HAS |
+| Project-level cognitive projection | `packages/backend/src/cognitiveState.mjs`, `bytProjection.mjs` | rebuilt from runs, campaigns, jobs, experiment records, knowledge registry and Self Model | HAS |
 | Eight epistemic labels | `packages/frontend/src/core/metaCognition/metaCognitionRuntime.ts` | `KNOWN`, `SUPPORTED`, `INFERRED`, `SIMULATED`, `ASSUMED`, `UNKNOWN`, `CONTRADICTED`, `UNVERIFIED` | HAS, frontend projection |
 | Unknowns and contradictions across restarts | `packages/backend/src/knowledgeRegistry.mjs` | append-only, hash-chained gap and contradiction events | HAS |
 | Prediction freezing before execution | `researchRunExecution.mjs`, `experimentMemory.mjs` | `PREDICTIONS_FROZEN` precedes engine execution and sealed verdict | HAS |
@@ -42,7 +42,7 @@ The state update is a **materialized projection of verified canonical records**.
 | Self-falsification | `researchRunExecution.mjs`; Experiment Fabric scientific integration | server-derived protocol verdict; no model-authored verdict | HAS |
 | Falsified-model memory | `packages/frontend/src/core/agent/falsifiedModelRegistry.ts` | append-only integrity-checked registry with explicit override based on new evidence | HAS, device-local/domain-limited |
 | Curiosity loop | `packages/frontend/src/core/scientificWorlds/curiosityCycle.ts` | gap → hypotheses → discriminating experiment → observation → memory record | HAS, Scientific Worlds scope |
-| Structured decision explanation | `packages/frontend/src/core/metaCognition/decisionTrace.ts` | fingerprinted evidence refs, alternatives and reason codes; no hidden reasoning | HAS |
+| Structured decision explanation | `decisionTrace.mjs`, canonical `NEXT_EXPERIMENT` | fingerprinted evidence refs, alternatives and reason codes projected by BYT; no hidden reasoning | HAS |
 | Scientific Memory connection | `scienceMemoryPort.ts`, canonical experiment and run records | only typed replayable artefacts are accepted | PARTIAL across product surfaces |
 
 This means BYT must be **consolidated**, not invented again.
@@ -103,7 +103,7 @@ The existing frontend falsified-model registry already implements the correct re
 
 ## Surprise and curiosity
 
-Surprise is not merely a failed criterion. A production `SURPRISE_DETECTED` item needs a declared expectation, observation, uncertainty/tolerance and a reproducible divergence rule. Experiment Fabric already computes prediction-error and surprise metrics, while Scientific Worlds already runs a bounded curiosity cycle. The missing work is to bind those results to the same backend ResearchRun and canonical evidence references.
+Surprise is not merely a failed criterion. The backend now accepts an optional numeric point expectation and positive tolerance together with a machine-checkable prediction. Both are frozen before execution. After a real engine result, the server appends `SURPRISE_DETECTED` only when `abs(observed - expectedValue) > tolerance`, binding the event to the preregistration and prediction fingerprints, sealed session, Scientific Run and output hash. The anomaly remains `NOT_EVIDENCE` and is independent from the falsification verdict.
 
 Genesis must never create an anomaly because a model wrote “this is surprising”. The system derives it from frozen expectations and observations, then proposes a lower-level scientific goal:
 
@@ -140,25 +140,26 @@ Classification is derived from canonical records. BYT does not promote its own s
 
 | Gap | Honest status | Minimal closure |
 |---|---|---|
-| One backend BYT read model | MISSING | extend the existing Cognitive State projection; no table |
-| Cross-run Prediction Ledger view | PARTIAL | join existing verified ResearchRun events and Replay records |
+| One backend BYT read model | HAS | `bytProjection.mjs` extends Cognitive State without owning persistence |
+| Cross-run Prediction Ledger view | HAS | verified by two real RDKit ResearchRuns across a file-SQLite restart |
 | Probabilistic/interval calibration over time | MISSING | freeze uncertainty/confidence before observation, then score by declared protocol |
-| Backend-wide Necropolis | PARTIAL | project verified falsifications; add canonical append-only reopen decision only when needed |
+| Backend-wide Necropolis | HAS for immutable falsification history | reopening remains `REQUIRES_NEW_EVIDENCE_AND_HUMAN_APPROVAL` |
 | Curiosity bound to backend ResearchRun | PARTIAL | adapter from current curiosity proposal into the existing ResearchRun API |
-| Surprise persisted with evidence references | PARTIAL | reuse Experiment Fabric metric and append a typed ResearchRun/Scientific Memory artefact |
+| Surprise persisted with canonical references | HAS for bounded numeric rules | anomaly remains `NOT_EVIDENCE`; broader uncertainty models are not inferred |
 | Mission hierarchy and approval boundary | PARTIAL | formalize parent mission and approved scope on canonical ResearchRun |
 | Long-term identity across tenants/devices | PARTIAL | server-side project records exist; device-local registries must not be treated as global |
 | Product UI and voice narrative | MISSING | render the backend projection in Mission Control after contracts are stable |
 
 ## Implementation order
 
-1. **Read model first:** add a tested BYT projection to the existing Cognitive State endpoint. It owns no persistence.
-2. **Prediction history and Necropolis:** derive them from verified ResearchRun chains; report integrity failures and protocol scope.
-3. **Calibration contract:** extend frozen predictions only after defining numeric interval/confidence semantics and scoring rules.
-4. **Curiosity adapter:** create a ResearchRun proposal from current anomaly/gap outputs, subject to human mission and admission gates.
-5. **DecisionTrace binding:** attach structured decision references to next-experiment selection.
-6. **Mission Control UI:** show what Genesis knows, does not know, falsified, is running and proposes next.
-7. **Long-horizon validation:** restart/recovery, multi-run history, reopening a falsified hypothesis with new evidence and calibration drift tests.
+1. **Read model — complete:** tested BYT projection exists in the Cognitive State endpoint and owns no persistence.
+2. **Prediction history and Necropolis — complete for current protocol:** both derive from verified ResearchRun chains and preserve protocol scope.
+3. **Bounded surprise — complete:** deterministic numeric expectation/tolerance is preregistered and server-derived; it is not probability calibration.
+4. **Calibration contract — remaining:** define and preregister probability/interval semantics before scoring them.
+5. **Curiosity adapter:** create a ResearchRun proposal from current anomaly/gap outputs, subject to human mission and admission gates.
+6. **DecisionTrace binding — complete:** structured decision references are stored in canonical `NEXT_EXPERIMENT`.
+7. **Mission Control UI:** show what Genesis knows, does not know, falsified, is running and proposes next.
+8. **Long-horizon validation — partial:** multi-run restart continuity is proven; reopening and calibration-drift protocols remain.
 
 ## Definition of Done for the first BYT demonstrator
 

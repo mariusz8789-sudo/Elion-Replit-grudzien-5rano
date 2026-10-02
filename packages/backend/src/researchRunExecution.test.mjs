@@ -12,7 +12,7 @@ import { canonicalJson, sha256Hex } from './determinism.mjs';
 import { buildDecisionTrace } from './decisionTrace.mjs';
 import { listProposals } from './knowledgeApi.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
-import { executeResearchExperiment, VERDICT_SCOPE } from './researchRunExecution.mjs';
+import { deriveSurpriseItems, executeResearchExperiment, parsePredictions, VERDICT_SCOPE } from './researchRunExecution.mjs';
 import { DEFAULT_RESEARCH_TOOLS } from './researchRunEngines.mjs';
 import { createComputeAdmission } from './compute/computeAdmission.mjs';
 
@@ -82,6 +82,28 @@ async function planned(email, plan = PLAN) {
 const types = (rr) => rr.researchState.events.map((e) => e.type);
 
 describe('R1-b research run execution', () => {
+  test('surprise rules are numeric, complete and frozen independently from falsification criteria', () => {
+    const executor = { observables: { value: 'number', flag: 'boolean' } };
+    const parsed = parsePredictions([
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10, surpriseTolerance: 2, critical: true },
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10 },
+      { observable: 'flag', operator: '==', value: true, expectedValue: 1, surpriseTolerance: 1 },
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10, surpriseTolerance: 0 },
+    ], executor);
+    assert.equal(parsed.criteria.length, 1);
+    assert.deepEqual(parsed.criteria[0].surpriseRule, { kind: 'ABSOLUTE_ERROR_EXCEEDS', expectedValue: 10, tolerance: 2 });
+    assert.deepEqual(parsed.rejected.map((item) => item.reason), [
+      'surprise_rule_requires_expected_value_and_tolerance',
+      'surprise_rule_requires_numeric_observable',
+      'surprise_tolerance_invalid',
+    ]);
+    assert.deepEqual(deriveSurpriseItems([{ ...parsed.criteria[0], observed: 12 }]), []);
+    assert.deepEqual(deriveSurpriseItems([{ ...parsed.criteria[0], observed: 12.01 }]), [{
+      criterionId: 'c0-value', observable: 'value', rule: parsed.criteria[0].surpriseRule,
+      observedValue: 12.01, absoluteError: 2.01,
+    }]);
+  });
+
   test('a supported result prioritizes and executes its preregistered self-falsification challenge', needsRdkit, async () => {
     const challengePlan = {
       subProblems: [{ question: 'Can the bounded descriptor claim survive its null challenge?' }],

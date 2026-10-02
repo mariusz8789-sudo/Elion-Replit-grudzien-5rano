@@ -70,6 +70,12 @@ export function parsePredictions(raw, executor) {
     if (!PREDICTION_OPERATORS.includes(p.operator)) { reject('operator_invalid'); continue; }
     if (type === 'number' && !(typeof p.value === 'number' && Number.isFinite(p.value))) { reject('value_not_a_number'); continue; }
     if (type === 'boolean' && (typeof p.value !== 'boolean' || !['==', '!='].includes(p.operator))) { reject('boolean_needs_==_or_!='); continue; }
+    const hasExpected = p.expectedValue !== undefined;
+    const hasTolerance = p.surpriseTolerance !== undefined;
+    if (hasExpected !== hasTolerance) { reject('surprise_rule_requires_expected_value_and_tolerance'); continue; }
+    if (hasExpected && type !== 'number') { reject('surprise_rule_requires_numeric_observable'); continue; }
+    if (hasExpected && !(typeof p.expectedValue === 'number' && Number.isFinite(p.expectedValue))) { reject('surprise_expected_value_invalid'); continue; }
+    if (hasTolerance && !(typeof p.surpriseTolerance === 'number' && Number.isFinite(p.surpriseTolerance) && p.surpriseTolerance > 0)) { reject('surprise_tolerance_invalid'); continue; }
     if (criteria.length >= MAX_PREDICTIONS) { reject('over_limit'); continue; }
     criteria.push({
       id: `c${criteria.length}-${observable}`,
@@ -80,6 +86,13 @@ export function parsePredictions(raw, executor) {
       critical: p.critical !== false,
       threshold: typeof p.value === 'number' ? p.value : null,
       evidence: 'MODEL_ESTIMATE',
+      ...(hasExpected ? {
+        surpriseRule: {
+          kind: 'ABSOLUTE_ERROR_EXCEEDS',
+          expectedValue: p.expectedValue,
+          tolerance: p.surpriseTolerance,
+        },
+      } : {}),
     });
   }
   return { criteria, rejected };
@@ -117,7 +130,29 @@ export function judgeCriteria(criteria, execution, executor) {
     const observed = execution.status === 'EXECUTED' ? execution.output?.[c.observable] : undefined;
     const typed = observed !== undefined && typeof observed === executor.observables[c.observable];
     const met = typed ? compare(observed, c.operator, c.value) : null;
-    return { id: c.id, label: c.label, observable: c.observable, operator: c.operator, value: c.value, critical: c.critical, observed: typed ? observed : null, status: met === null ? 'UNRESOLVED' : met ? 'MET' : 'NOT_MET' };
+    return {
+      id: c.id, label: c.label, observable: c.observable, operator: c.operator, value: c.value,
+      critical: c.critical, observed: typed ? observed : null,
+      status: met === null ? 'UNRESOLVED' : met ? 'MET' : 'NOT_MET',
+      ...(c.surpriseRule ? { surpriseRule: c.surpriseRule } : {}),
+    };
+  });
+}
+
+/** A deterministic anomaly derived only from a frozen numeric expectation and a real observation. */
+export function deriveSurpriseItems(criteria) {
+  return criteria.flatMap((criterion) => {
+    const rule = criterion.surpriseRule;
+    if (rule?.kind !== 'ABSOLUTE_ERROR_EXCEEDS' || typeof criterion.observed !== 'number') return [];
+    const absoluteError = Math.abs(criterion.observed - rule.expectedValue);
+    if (!(absoluteError > rule.tolerance)) return [];
+    return [{
+      criterionId: criterion.id,
+      observable: criterion.observable,
+      rule,
+      observedValue: criterion.observed,
+      absoluteError,
+    }];
   });
 }
 
@@ -309,6 +344,26 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
       scope: VERDICT_SCOPE,
     });
     if (!falsified.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: falsified.error };
+    const surpriseItems = execution.status === 'EXECUTED' ? deriveSurpriseItems(results) : [];
+    if (surpriseItems.length) {
+      const surprised = appendServerResearchStateEvent(db, runId, 'SURPRISE_DETECTED', {
+        contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+        researchRunId: runId,
+        experimentId: frozen.experimentId,
+        hypothesisId: frozen.hypothesisId,
+        protocolId: frozen.protocolId,
+        predictionFingerprint: frozen.predictionFingerprint,
+        preregistrationFingerprint: frozen.preregistrationFingerprint,
+        sealRecordId: sealed.record.id,
+        scienceRunId,
+        outputHash: execution.outputHash,
+        status: 'DETECTED',
+        epistemicStatus: 'NOT_EVIDENCE',
+        items: surpriseItems,
+        scope: 'Deterministic computational anomaly under the frozen expectation and tolerance. It is not scientific evidence or a statement of truth.',
+      });
+      if (!surprised.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: surprised.error };
+    }
     return { ok: true, deduped: false };
   });
 }

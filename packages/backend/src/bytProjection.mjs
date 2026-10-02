@@ -32,6 +32,7 @@ function predictionEntries(runs) {
       const falsification = lastByExperiment(events, 'SELF_FALSIFICATION', frozen.experimentId);
       const evidence = lastByExperiment(events, 'EVIDENCE_UPDATE', frozen.experimentId);
       const next = lastByExperiment(events, 'NEXT_EXPERIMENT', frozen.experimentId);
+      const surprise = lastByExperiment(events, 'SURPRISE_DETECTED', frozen.experimentId);
       const criteria = (falsification?.criteria ?? frozen.criteria ?? []).map((criterion) => ({
         criterionId: criterion.id,
         observable: criterion.observable ?? null,
@@ -43,6 +44,7 @@ function predictionEntries(runs) {
         numericThresholdDelta: typeof criterion.observed === 'number' && typeof (criterion.value ?? criterion.threshold) === 'number'
           ? criterion.observed - (criterion.value ?? criterion.threshold)
           : null,
+        surpriseRule: criterion.surpriseRule ?? null,
       }));
       out.push({
         researchRunId: frozen.researchRunId ?? item.run.id,
@@ -70,6 +72,15 @@ function predictionEntries(runs) {
         replay: next?.replay ?? null,
         proposedNextExperiment: next?.proposal ?? null,
         decisionTrace: next?.decisionTrace ?? null,
+        surprises: (surprise?.items ?? []).map((entry) => ({
+          ...entry,
+          status: surprise.status,
+          epistemicStatus: surprise.epistemicStatus,
+          scope: surprise.scope,
+          sealRecordRef: surprise.sealRecordId ? `experiment_record:${surprise.sealRecordId}` : null,
+          scienceRunRef: surprise.scienceRunId ? `science_run:${surprise.scienceRunId}` : null,
+          outputHash: surprise.outputHash ?? null,
+        })),
       });
     }
   }
@@ -110,6 +121,8 @@ function necropolisOf(entries) {
     predictionFingerprint: entry.predictionFingerprint,
     outputHash: entry.outputHash,
     evidence: entry.evidence,
+    replay: entry.replay,
+    decisionTrace: entry.decisionTrace,
     reopening: 'REQUIRES_NEW_EVIDENCE_AND_HUMAN_APPROVAL',
   }));
 }
@@ -148,10 +161,21 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
     predictionLedger,
     calibration: calibrationOf(predictionLedger),
     necropolis: necropolisOf(predictionLedger),
+    decisionTraces: predictionLedger.filter((entry) => entry.decisionTrace).map((entry) => ({
+      researchRunId: entry.researchRunId,
+      experimentId: entry.experimentId,
+      trace: entry.decisionTrace,
+    })),
     surprise: {
-      status: 'PARTIAL',
-      detected: [],
-      limitation: 'No canonical backend SURPRISE_DETECTED event is persisted yet; falsification alone is not relabelled as surprise.',
+      status: 'AVAILABLE',
+      evaluatedRules: predictionLedger.flatMap((entry) => entry.criteria).filter((criterion) => criterion.surpriseRule).length,
+      detected: predictionLedger.flatMap((entry) => entry.surprises.map((surprise) => ({
+        researchRunId: entry.researchRunId,
+        experimentId: entry.experimentId,
+        hypothesisId: entry.hypothesisId,
+        ...surprise,
+      }))),
+      limitation: 'Only preregistered numeric absolute-error rules are evaluated. A detected surprise is NOT_EVIDENCE and is independent from protocol falsification.',
     },
     integrity: { researchRuns: runIntegrity, knowledgeRegistry: registry?.chain ?? { ok: false, reason: 'UNAVAILABLE' } },
   };

@@ -553,9 +553,25 @@ Delivered:
 - wall-clock and output interruption paths that remove the named container, query Docker for that exact name and fail closed as `SANDBOX_CLEANUP_NOT_CONFIRMED` unless absence is confirmed;
 - CI artifacts containing resource, isolation, provenance/Replay and cleanup evidence.
 
-Validation: full local backend on the cleanup-hardening tree passed 1,400 tests with zero failures and 84 explicit runtime skips. Both complete Linux quality-gate runs `36969408444` and `36969405392` passed on `d0ecebff`, including the real sandbox jobs. The subsequent cleanup hardening requires a fresh Linux run before review approval.
+Validation: full local backend on the cleanup-hardening tree passed 1,400 tests with zero failures and 84 explicit runtime skips. Both Linux quality gates `36972184449` and `36972188419` passed on `fbaaa467`, including the real sandbox jobs and interrupted-container absence proof.
 
 Truth boundary: this proves the Linux CI runtime, not a production deployment. The image and its transitive contents still require commercial licence review; production compute provisioning remains `BLOCKED_EXTERNAL_SANDBOX_DEPLOYMENT`. Generated output remains `NOT_EVIDENCE` and `REQUIRES_SEPARATE_REVIEW`.
+
+## Final closure — canonical BYT cross-run self-model
+
+Problem: the backend BYT projection already reused canonical state, but it could not persist a reproducible surprise event and its cross-run Prediction Ledger/Necropolis/DecisionTrace continuity had no dedicated real restart proof.
+
+Delivered:
+
+- optional numeric `expectedValue` + positive `surpriseTolerance` are validated and frozen inside the existing preregistered prediction;
+- the server derives `SURPRISE_DETECTED` only after real execution when `abs(observed - expectedValue) > tolerance`;
+- the event is explicitly `NOT_EVIDENCE`, independent from protocol falsification, and carries the frozen fingerprints, seal/science-run references and output hash;
+- BYT projects this event together with Evidence, Replay, Necropolis and DecisionTrace from verified ResearchRun chains;
+- a dedicated file-SQLite restart test executes two separate ResearchRuns with real RDKit and proves the entire cross-run projection is identical after restart.
+
+Validation: 14/14 focused tests PASS, including two real engine executions and two Replay MATCH results; broader backend regression 1,402 PASS / 0 FAIL / 84 explicit skips; lint 0 errors. Evidence: `docs/evidence/byt-cross-run-restart-fbaaa467.json`.
+
+Truth boundary: the deterministic surprise tolerance is not a confidence interval. Probabilistic calibration remains `NOT_AVAILABLE`; detected anomalies remain `NOT_EVIDENCE`; reopening Necropolis requires new evidence and human approval. No table, store, ledger or alternate lifecycle was added.
 
 ## Current-head local regression
 

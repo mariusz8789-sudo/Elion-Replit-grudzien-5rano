@@ -11,7 +11,7 @@ const frozen = {
   seq: 2, type: 'PREDICTIONS_FROZEN', payload: {
     researchRunId: 'run-1', experimentId: 'exp-1', hypothesisId: 'h-1', claim: 'logP > 3', engineId: 'rdkit',
     predictionFingerprint: 'pred-1', preregistrationFingerprint: 'prereg-1', preregistrationRecordId: 'record-1', inputHash: 'in-1',
-    criteria: [{ id: 'c0-logp', observable: 'logP', operator: '>', value: 3, critical: true }],
+    criteria: [{ id: 'c0-logp', observable: 'logP', operator: '>', value: 3, critical: true, surpriseRule: { kind: 'ABSOLUTE_ERROR_EXCEEDS', expectedValue: 4, tolerance: 1 } }],
   },
 };
 
@@ -20,9 +20,10 @@ describe('BYT canonical projection', () => {
     const events = [
       frozen,
       { seq: 3, type: 'EXPERIMENT_HANDOFF', payload: { experimentId: 'exp-1', status: 'EXECUTED', inputHash: 'in-1', outputHash: 'out-1', engine: { engineId: 'rdkit' } } },
-      { seq: 4, type: 'SELF_FALSIFICATION', payload: { experimentId: 'exp-1', verdict: 'FALSIFIED_WITHIN_PROTOCOL', scope: 'this protocol only', criteria: [{ id: 'c0-logp', observable: 'logP', operator: '>', value: 3, observed: 1.2, critical: true, status: 'NOT_MET' }] } },
-      { seq: 5, type: 'EVIDENCE_UPDATE', payload: { experimentId: 'exp-1', sealRecordId: 'seal-1', evidenceProposalId: 'ev-1', evidenceContentHash: 'ev-hash', status: 'PROPOSED', publication: 'REQUIRES_HUMAN_APPROVAL' } },
-      { seq: 6, type: 'NEXT_EXPERIMENT', payload: { experimentId: 'exp-1', replay: { verdict: 'MATCH' }, proposal: { action: 'HUMAN_REVIEW' }, decisionTrace: { traceFingerprint: 'trace-1', selectedCapability: 'HUMAN_REVIEW' } } },
+      { seq: 4, type: 'SELF_FALSIFICATION', payload: { experimentId: 'exp-1', verdict: 'FALSIFIED_WITHIN_PROTOCOL', scope: 'this protocol only', criteria: [{ id: 'c0-logp', observable: 'logP', operator: '>', value: 3, observed: 1.2, critical: true, status: 'NOT_MET', surpriseRule: { kind: 'ABSOLUTE_ERROR_EXCEEDS', expectedValue: 4, tolerance: 1 } }] } },
+      { seq: 5, type: 'SURPRISE_DETECTED', payload: { experimentId: 'exp-1', hypothesisId: 'h-1', sealRecordId: 'seal-1', scienceRunId: 'science-1', outputHash: 'out-1', status: 'DETECTED', epistemicStatus: 'NOT_EVIDENCE', scope: 'frozen anomaly only', items: [{ criterionId: 'c0-logp', observable: 'logP', rule: { kind: 'ABSOLUTE_ERROR_EXCEEDS', expectedValue: 4, tolerance: 1 }, observedValue: 1.2, absoluteError: 2.8 }] } },
+      { seq: 6, type: 'EVIDENCE_UPDATE', payload: { experimentId: 'exp-1', sealRecordId: 'seal-1', evidenceProposalId: 'ev-1', evidenceContentHash: 'ev-hash', status: 'PROPOSED', publication: 'REQUIRES_HUMAN_APPROVAL' } },
+      { seq: 7, type: 'NEXT_EXPERIMENT', payload: { experimentId: 'exp-1', replay: { verdict: 'MATCH' }, proposal: { action: 'HUMAN_REVIEW' }, decisionTrace: { traceFingerprint: 'trace-1', selectedCapability: 'HUMAN_REVIEW' } } },
     ];
     const byt = buildBytProjection({
       runs: [run(events)],
@@ -39,6 +40,14 @@ describe('BYT canonical projection', () => {
     assert.equal(byt.calibration.probabilisticCalibration, 'NOT_AVAILABLE');
     assert.equal(byt.necropolis[0].status, 'FALSIFIED_WITHIN_PROTOCOL');
     assert.deepEqual(byt.necropolis[0].failedCriteria, ['c0-logp']);
+    assert.equal(byt.necropolis[0].replay.verdict, 'MATCH');
+    assert.equal(byt.necropolis[0].decisionTrace.traceFingerprint, 'trace-1');
+    assert.equal(byt.decisionTraces[0].trace.traceFingerprint, 'trace-1');
+    assert.equal(byt.surprise.status, 'AVAILABLE');
+    assert.equal(byt.surprise.evaluatedRules, 1);
+    assert.equal(byt.surprise.detected.length, 1);
+    assert.equal(byt.surprise.detected[0].epistemicStatus, 'NOT_EVIDENCE');
+    assert.equal(byt.surprise.detected[0].scienceRunRef, 'science_run:science-1');
     assert.equal(byt.knowledgeState.openGaps, 1);
     assert.equal(byt.capabilities.availableNow[0], 'rdkit');
   });
@@ -58,6 +67,7 @@ describe('BYT canonical projection', () => {
     const byt = buildBytProjection({ registry: { chain: { ok: false, reason: 'digest_mismatch' } } });
     assert.deepEqual(byt.knowledgeState, { status: 'UNKNOWN', reason: 'STATE_INTEGRITY_FAILURE' });
     assert.deepEqual(byt.capabilities, { status: 'UNKNOWN', reason: 'SELF_MODEL_UNAVAILABLE' });
+    assert.equal(byt.surprise.status, 'AVAILABLE');
     assert.equal(byt.surprise.detected.length, 0);
   });
 

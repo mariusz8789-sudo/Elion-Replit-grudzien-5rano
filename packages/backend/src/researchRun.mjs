@@ -72,9 +72,9 @@ Rules:
 4. Never propose changing a preregistered threshold, gate or acceptance criterion.
 5. Every falsificationProposal must say what observation would show the hypothesis is wrong.
 6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.
-7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean }, naming only these engines and observables:
+7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean, "expectedValue"?: number, "surpriseTolerance"?: positive number }, naming only these engines and observables:
 ${executorPromptLines().join('\n')}
-   Predictions are frozen before the engine runs and cannot be changed afterwards.
+   Predictions are frozen before the engine runs and cannot be changed afterwards. expectedValue and surpriseTolerance are optional, must be supplied together for numeric observables, and define only the deterministic anomaly rule abs(observed - expectedValue) > surpriseTolerance. They are not confidence or uncertainty intervals.
 8. challengesHypothesisIndex is null unless this hypothesis is an explicit attempt to falsify an earlier hypothesis in this same array. It may reference only a lower array index. The relationship is a proposal, never evidence.`;
 
 /* ---------------- identity, isolation, dedupe ---------------- */

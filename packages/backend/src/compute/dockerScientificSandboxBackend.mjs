@@ -99,11 +99,13 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
       }
 
       const policy = plan.policy;
+      const containerName = `genesis-sandbox-${sha256(plan.sandboxRunId).slice(0, 24)}`;
       const args = [
-        'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+        'run', '--rm', '--name', containerName, '--init', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--cpus', String(policy.cpuLimit),
-        '--memory', `${policy.memoryMb}m`, '--pids-limit', String(policy.processLimit),
-        '--user', '65534:65534', '--tmpfs', '/tmp:rw,noexec,nosuid,size=16m',
+        '--memory', `${policy.memoryMb}m`, '--memory-swap', `${policy.memoryMb}m`,
+        '--pids-limit', String(policy.processLimit), '--user', '65534:65534',
+        '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=16m',
         '-i', plan.image, 'python', '-I', '-',
       ];
       const result = await processRunner(docker, args, {
@@ -111,6 +113,12 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
         timeoutMs: policy.wallClockMs,
         maxOutputBytes: Math.max(policy.stdoutBytes, policy.stderrBytes),
       });
+      if (result.timedOut || result.outputLimitExceeded || result.spawnError) {
+        // Killing the local `docker run` client does not guarantee that the container stopped.
+        // Remove the named container explicitly so a timed-out analysis cannot keep consuming
+        // compute after Genesis has already recorded a terminal failure.
+        await processRunner(docker, ['rm', '-f', containerName], { timeoutMs: 10_000, maxOutputBytes: 16_384 });
+      }
       if (result.timedOut) return { ok: false, status: 'TIMEOUT', failureCode: 'SANDBOX_WALL_CLOCK_EXCEEDED' };
       if (result.outputLimitExceeded) return { ok: false, status: 'FAILED', failureCode: 'SANDBOX_OUTPUT_LIMIT_EXCEEDED' };
       if (result.exitCode !== 0) {

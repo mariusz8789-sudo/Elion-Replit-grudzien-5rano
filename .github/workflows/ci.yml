@@ -9,6 +9,39 @@ permissions:
   contents: read
 
 jobs:
+  scientific-sandbox-runtime:
+    name: Real scientific sandbox — isolation, limits and generated-analysis Replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Docker Official Image `python:3.12.3-slim-bookworm`, resolved and frozen by
+      # manifest-list digest. This is a CI security/runtime candidate, not an assertion
+      # that every transitive component has passed commercial licence approval.
+      GENESIS_SCIENTIFIC_SANDBOX_IMAGE: python@sha256:afc139a0a640942491ec481ad8dda10f2c5b753f5c969393b12480155fe15a63
+      GENESIS_SANDBOX_RUNTIME_REPORT_DIR: artifacts/scientific-sandbox-runtime
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Pull the exact immutable sandbox image
+        run: |
+          docker pull "$GENESIS_SCIENTIFIC_SANDBOX_IMAGE"
+          docker image inspect "$GENESIS_SCIENTIFIC_SANDBOX_IMAGE" --format '{{json .RepoDigests}}'
+      - name: Execute real isolation, resource and canonical Replay proofs
+        run: node --test packages/backend/src/scientificSandboxRuntime.test.mjs
+      - name: Upload sandbox runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scientific-sandbox-runtime-${{ github.sha }}
+          path: artifacts/scientific-sandbox-runtime
+          if-no-files-found: warn
+          retention-days: 30
+
   verify:
     runs-on: ubuntu-latest
     # Frontend tests alone take ~8 min on a single worker; with the RDKit install,

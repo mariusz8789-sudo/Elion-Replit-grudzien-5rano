@@ -28,9 +28,13 @@ describe('Docker scientific sandbox backend', () => {
     assert.equal(result.stdout, '4\n');
     assert.match(result.stdoutHash, /^[a-f0-9]{64}$/);
     const run = calls.find((call) => call.args[0] === 'run');
-    for (const required of ['--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '--user', '65534:65534']) {
+    for (const required of [
+      '--name', '--init', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+      '--security-opt', 'no-new-privileges', '--memory-swap', '--pids-limit', '--user', '65534:65534',
+    ]) {
       assert.ok(run.args.includes(required), `missing Docker isolation argument: ${required}`);
     }
+    assert.ok(run.args.includes('/tmp:rw,noexec,nosuid,nodev,size=16m'));
     assert.equal(run.args.at(-3), 'python');
     assert.deepEqual(run.args.slice(-2), ['-I', '-']);
     assert.equal(run.options.stdin, 'print(2 + 2)');
@@ -57,15 +61,23 @@ describe('Docker scientific sandbox backend', () => {
   });
 
   test('maps wall-clock and output enforcement to explicit failure codes', async () => {
+    const calls = [];
     const responses = [
       { exitCode: 0, stdout: '27.0.0', stderr: '' },
       { exitCode: 0, stdout: JSON.stringify([IMAGE]), stderr: '' },
       { exitCode: null, stdout: '', stderr: '', timedOut: true, outputLimitExceeded: false },
+      { exitCode: 0, stdout: '', stderr: '' },
     ];
-    const backend = createDockerScientificSandboxBackend({ processRunner: async () => responses.shift() });
+    const backend = createDockerScientificSandboxBackend({
+      processRunner: async (_executable, args) => {
+        calls.push(args);
+        return responses.shift();
+      },
+    });
     const port = createScientificSandboxPort({ backend });
     const result = await port.execute(request(), { image: IMAGE });
     assert.equal(result.status, 'TIMEOUT');
     assert.equal(result.failureCode, 'SANDBOX_WALL_CLOCK_EXCEEDED');
+    assert.deepEqual(calls.at(-1).slice(0, 2), ['rm', '-f']);
   });
 });

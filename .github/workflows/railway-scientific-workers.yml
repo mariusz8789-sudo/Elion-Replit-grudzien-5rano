@@ -76,6 +76,35 @@ jobs:
             --level LOCAL_CONTAINER_VERIFIED \
             --out "artifacts/engine-runtime/worker-runtime-${{ matrix.group }}.json"
 
+      - name: Use Node.js 22 for the candidate handoff proof
+        if: matrix.group == 'structural'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install the main-service dependencies for the candidate handoff proof
+        if: matrix.group == 'structural'
+        run: npm ci
+
+      - name: Prove real candidate to Evidence, Replay and governed laboratory handoff
+        if: matrix.group == 'structural'
+        env:
+          GENESIS_STRUCTURAL_WORKER_URL: http://127.0.0.1:8090
+        run: |
+          node scripts/candidate-lab-handoff-proof.mjs \
+            --out artifacts/candidate-lab-handoff/candidate-lab-handoff-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload candidate handoff evidence
+        if: always() && matrix.group == 'structural'
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-lab-handoff-proof-${{ github.sha }}
+          path: artifacts/candidate-lab-handoff
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Upload per-worker runtime evidence
         if: always()
         uses: actions/upload-artifact@v7

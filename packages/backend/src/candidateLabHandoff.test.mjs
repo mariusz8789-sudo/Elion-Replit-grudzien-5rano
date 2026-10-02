@@ -5,8 +5,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { handleApi } from './api.mjs';
-import { openDatabase, saveScienceRun } from './store.mjs';
+import { openDatabase, saveScienceRun, saveScienceRunVerification } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
+import { proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { preregisterExperiment } from './experimentMemory.mjs';
 import { prepareCandidateLabHandoff } from './campaign/candidateLabHandoff.mjs';
 import { protocolInvariantHolds } from './campaign/preclinicalProtocol.mjs';
@@ -31,6 +32,47 @@ function makeProject(db, token, name = 'Candidate lab handoff') {
     token,
     body: { name },
   }).body.project;
+}
+
+function seedEvidenceReplay(db, { campaignId, candidateId, run }) {
+  const executionId = `fixture-${run.id}`;
+  const proposed = proposeStructuredEvidence({
+    sourceUrl: `genesis://virtual-lab/science-run/${run.id}`,
+    sourceTimestamp: new Date().toISOString(),
+    claim: `Fixture-backed computational result for ${run.capability}; no physical or clinical claim.`,
+    claimType: 'model',
+    confidence: 0.5,
+    provenance: {
+      sourceKind: 'dataset',
+      retrievedBy: 'candidate-lab-handoff-test',
+      independentSourceIds: [`science-run:${run.id}`],
+    },
+  });
+  assert.equal(proposed.ok, true);
+  campaignStore.addEvent(db, {
+    campaignId, generation: 0, type: 'VIRTUAL_EXPERIMENT_RESULT',
+    payload: { executionId, candidateId, scienceRunId: run.id, status: 'EXECUTED_COMPUTATIONAL_EXPERIMENT' },
+  });
+  campaignStore.addEvent(db, {
+    campaignId, generation: 0, type: 'VIRTUAL_EXPERIMENT_EVIDENCE_PROPOSED',
+    payload: {
+      executionId, candidateId, proposalId: proposed.proposalId,
+      evidenceContentHash: proposed.record.contentHash, mode: 'PROPOSE_ONLY', status: 'PENDING_HUMAN_PUBLICATION',
+    },
+  });
+  const verification = saveScienceRunVerification(db, {
+    scienceRunId: run.id, verdict: 'MATCH',
+    originalOutputHash: run.outputHash, replayOutputHash: run.outputHash,
+    originalEngineVersion: run.engineVersion, replayEngineVersion: run.engineVersion,
+  });
+  campaignStore.addEvent(db, {
+    campaignId, generation: 0, type: 'VIRTUAL_EXPERIMENT_REPLAY',
+    payload: {
+      executionId, candidateId, scienceRunId: run.id, verificationId: verification.id,
+      underlyingVerdict: 'MATCH', replayStatus: 'REPLAY_MATCH',
+    },
+  });
+  return { proposed, verification };
 }
 
 function seedCampaign(db, { projectId, userId, assessed = true, withCandidate = true } = {}) {
@@ -80,7 +122,7 @@ function seedCampaign(db, { projectId, userId, assessed = true, withCandidate = 
     },
   });
   if (assessed) {
-    saveScienceRun(db, {
+    const admetRun = saveScienceRun(db, {
       projectId,
       campaignId: campaign.id,
       candidateId,
@@ -99,7 +141,9 @@ function seedCampaign(db, { projectId, userId, assessed = true, withCandidate = 
       environmentHash: 'admet-env-sha',
       durationMs: 20,
     });
-  }  saveScienceRun(db, {
+    seedEvidenceReplay(db, { campaignId: campaign.id, candidateId, run: admetRun });
+  }
+  const dockRun = saveScienceRun(db, {
     projectId,
     campaignId: campaign.id,
     candidateId,
@@ -130,6 +174,7 @@ function seedCampaign(db, { projectId, userId, assessed = true, withCandidate = 
     environmentHash: 'dock-env-sha',
     durationMs: 100,
   });
+  seedEvidenceReplay(db, { campaignId: campaign.id, candidateId, run: dockRun });
   return { campaignId: campaign.id, candidateId };
 }
 
@@ -162,6 +207,9 @@ describe('canonical candidate -> laboratory handoff E2E', () => {
     assert.equal(first.body.handoff.scientificTruth.scoreIsMeasurement, false);
     assert.equal(first.body.handoff.scientificTruth.physicalAssayExecuted, false);
     assert.equal(first.body.handoff.scientificTruth.clinicalEfficacy, 'UNKNOWN');
+    assert.equal(first.body.handoff.evidenceReplayGate.status, 'READY');
+    assert.equal(first.body.handoff.evidenceReplayGate.scienceRuns.length, 2);
+    assert.ok(first.body.handoff.evidenceReplayGate.scienceRuns.every((run) => run.replayVerdict === 'MATCH'));
     assert.match(first.body.handoff.claimBoundary, /COMPUTATIONAL HANDOFF ONLY/);
 
     const preclinical = first.body.handoff.preclinicalProtocol;
@@ -181,6 +229,8 @@ describe('canonical candidate -> laboratory handoff E2E', () => {
     assert.equal(request.endpointPlan[0].comparisonOutputKey, null, 'an IC50 assay must not be compared directly with a Vina score');
     assert.equal(request.endpointPlan[0].tolerance, null);
     assert.equal(request.externalProvider.providerId, 'independent-cro');
+    assert.equal(request.computationalEvidence.status, 'READY');
+    assert.equal(request.computationalEvidence.scienceRuns.length, 2);
 
     const repeated = call(db, 'POST', endpoint, { token: owner.token, body });
     assert.equal(repeated.status, 201);
@@ -233,6 +283,7 @@ describe('canonical candidate -> laboratory handoff E2E', () => {
     assert.equal(noWinner.body.handoff.outcome, 'NO_WINNER');
     assert.equal(noWinner.body.handoff.reason, 'NO_FINALIST_WITH_DOCKING_RESULT');
     assert.equal(noWinner.body.handoff.requiresHumanApproval, true);
+    assert.equal(noWinner.body.handoff.evidenceReplayGate.status, 'NOT_APPLICABLE');
     assert.equal(
       campaignStore.listEvents(db, empty.campaignId).filter((event) => event.type === 'LAB_VALIDATION_REQUESTED').length,
       0,
@@ -292,6 +343,35 @@ describe('canonical candidate -> laboratory handoff E2E', () => {
     assert.equal(prepared.ok, true);
     assert.equal(prepared.handoff.outcome, 'BLOCKED');
     assert.equal(prepared.handoff.reason, 'CANDIDATE_NOT_A_FINALIST');
+    db.close();
+  });
+
+  test('a finalist without canonical Evidence and Replay is blocked before any laboratory request', () => {
+    const db = openDatabase(':memory:');
+    const owner = register(db, 'candidate-handoff-evidence-gate@genesis.test');
+    const project = makeProject(db, owner.token, 'Evidence gate');
+    const { campaignId, candidateId } = seedCampaign(db, {
+      projectId: project.id,
+      userId: owner.user.id,
+      assessed: true,
+    });
+    db.prepare('DELETE FROM science_run_verifications WHERE science_run_id IN (SELECT id FROM science_runs WHERE campaign_id = ?)').run(campaignId);
+
+    const blocked = call(
+      db,
+      'POST',
+      `/api/projects/${project.id}/campaigns/${campaignId}/lab-handoff`,
+      { token: owner.token, body: { candidateId } },
+    );
+    assert.equal(blocked.status, 200);
+    assert.equal(blocked.body.handoff.outcome, 'BLOCKED');
+    assert.equal(blocked.body.handoff.reason, 'REPLAY_VERIFICATION_MISSING');
+    assert.ok(blocked.body.handoff.evidenceReplayGate.scienceRuns.every((run) => run.evidenceProposalId));
+    assert.ok(blocked.body.handoff.evidenceReplayGate.scienceRuns.every((run) => run.replayVerificationId === null));
+    assert.equal(
+      campaignStore.listEvents(db, campaignId).filter((event) => event.type === 'LAB_VALIDATION_REQUESTED').length,
+      0,
+    );
     db.close();
   });
 });

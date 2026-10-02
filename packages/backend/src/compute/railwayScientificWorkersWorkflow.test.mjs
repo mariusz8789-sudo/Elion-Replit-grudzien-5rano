@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const workflow = readFileSync(path.resolve(HERE, '../../../../.github/workflows/railway-scientific-workers.yml'), 'utf8');
 const probeScript = readFileSync(path.resolve(HERE, '../../../../scripts/verify-scientific-worker-runtime.mjs'), 'utf8');
+const handoffProof = readFileSync(path.resolve(HERE, '../../../../scripts/candidate-lab-handoff-proof.mjs'), 'utf8');
 
 test('Railway worker CI uses a masked ephemeral service token for protected engine routes', () => {
   assert.match(workflow, /openssl rand -hex 32/);
@@ -20,4 +21,17 @@ test('Railway worker CI uses a masked ephemeral service token for protected engi
   assert.match(probeScript, /const token = process\.env\.GENESIS_SCIENTIFIC_WORKER_TOKEN/);
   assert.match(probeScript, /probeWorker\(\{/);
   assert.match(probeScript, /token, workerGroup: args\.group, level: args\.level/);
+});
+
+test('the structural container gate executes and retains the candidate Evidence/Replay/handoff proof', () => {
+  assert.match(workflow, /if: matrix\.group == 'structural'/);
+  assert.match(workflow, /node scripts\/candidate-lab-handoff-proof\.mjs/);
+  assert.match(workflow, /candidate-lab-handoff-proof-\$\{\{ github\.sha \}\}/);
+  assert.match(handoffProof, /\/virtual-lab\/execute/);
+  assert.match(handoffProof, /\/virtual-lab\/\$\{executionId\}\/replay/);
+  assert.match(handoffProof, /\/lab-handoff/);
+  assert.match(handoffProof, /evidenceReplayGate\?\.status === 'READY'/);
+  assert.match(handoffProof, /outcome === 'BLOCKED'/);
+  assert.match(handoffProof, /reason === 'SAFETY_UNASSESSED'/);
+  assert.match(handoffProof, /outcome === 'NO_WINNER'/);
 });

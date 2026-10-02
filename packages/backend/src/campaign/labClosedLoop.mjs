@@ -170,6 +170,26 @@ function resolveProtocolLink({ preclinicalProtocol, requiredWetLabId, governedMa
   return { ok: false, error: 'preclinical_protocol_or_governed_manual_request_required' };
 }
 
+function sanitizeComputationalEvidence(raw) {
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (raw?.status !== 'READY' || !Array.isArray(raw.scienceRuns) || raw.scienceRuns.length === 0) {
+    return { ok: false, error: 'computational_evidence_not_ready' };
+  }
+  const scienceRuns = raw.scienceRuns.map((entry) => ({
+    scienceRunId: boundedString(entry?.scienceRunId, 200),
+    capability: boundedString(entry?.capability, 200) || null,
+    outputHash: boundedString(entry?.outputHash, 200) || null,
+    evidenceProposalId: boundedString(entry?.evidenceProposalId, 200),
+    evidenceContentHash: boundedString(entry?.evidenceContentHash, 200) || null,
+    replayVerificationId: boundedString(entry?.replayVerificationId, 200),
+    replayVerdict: boundedString(entry?.replayVerdict, 80),
+  }));
+  if (scienceRuns.some((entry) => !entry.scienceRunId || !entry.evidenceProposalId || !entry.replayVerificationId || entry.replayVerdict !== 'MATCH')) {
+    return { ok: false, error: 'computational_evidence_not_ready' };
+  }
+  return { ok: true, value: { status: 'READY', scienceRuns } };
+}
+
 /**
  * Creates a governed external-validation request.
  *
@@ -189,6 +209,7 @@ export function createLabValidationRequest(db, {
   preclinicalProtocol = null,
   requiredWetLabId = null,
   governedManualRequest = null,
+  computationalEvidence = null,
 } = {}) {
   const linked = requireCampaignCandidate(db, campaignId, candidateId);
   if (!linked.ok) return linked;
@@ -206,6 +227,8 @@ export function createLabValidationRequest(db, {
   const sanitizedPlan = sanitizeEndpointPlan(endpointPlan);
   if (!sanitizedPlan.ok) return sanitizedPlan;
   const normalizedEndpoints = sanitizedPlan.entries;
+  const normalizedComputationalEvidence = sanitizeComputationalEvidence(computationalEvidence);
+  if (!normalizedComputationalEvidence.ok) return normalizedComputationalEvidence;
   const normalizedExternalProvider = externalProvider ? {
     providerId: boundedString(externalProvider.providerId, 160) || null,
     providerType: PROVIDER_TYPES.has(externalProvider.providerType)
@@ -222,6 +245,7 @@ export function createLabValidationRequest(db, {
     externalProvider: normalizedExternalProvider,
     preregistrationRef: preregistrationRef ?? null,
     protocolLink,
+    computationalEvidence: normalizedComputationalEvidence.value,
   });
   const requestId = `LABREQ-${requestFingerprint}`;
 
@@ -245,6 +269,7 @@ export function createLabValidationRequest(db, {
     objective: normalizedObjective,
     endpointPlan: normalizedEndpoints,
     protocolLink,
+    computationalEvidence: normalizedComputationalEvidence.value,
     externalProvider: normalizedExternalProvider,
     preregistrationRef: boundedString(preregistrationRef, 500) || null,
     requestedBy: boundedString(requestedBy, 160) || null,

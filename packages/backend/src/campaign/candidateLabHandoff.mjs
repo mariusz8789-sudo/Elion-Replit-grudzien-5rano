@@ -13,7 +13,7 @@ import { buildPreclinicalProtocol } from './preclinicalProtocol.mjs';
 import { createLabValidationRequest } from './labClosedLoop.mjs';
 
 export const CANDIDATE_LAB_HANDOFF_KIND = 'GENESIS_CANDIDATE_LAB_HANDOFF';
-export const CANDIDATE_LAB_HANDOFF_VERSION = '1.0.0';
+export const CANDIDATE_LAB_HANDOFF_VERSION = '1.1.0';
 
 const CLAIM_BOUNDARY =
   'COMPUTATIONAL HANDOFF ONLY. Genesis has not synthesised the candidate, run the requested assay, established clinical efficacy or authorised laboratory execution. An external laboratory and accountable human must review and execute any physical work.';
@@ -85,7 +85,7 @@ function provenanceRefs(protocol, candidateId) {
   return refs.sort();
 }
 
-function terminalHandoff({ outcome, reason, protocol, candidateId = null }) {
+function terminalHandoff({ outcome, reason, protocol, candidateId = null, evidenceReplayGate = null }) {
   const body = {
     kind: CANDIDATE_LAB_HANDOFF_KIND,
     contractVersion: CANDIDATE_LAB_HANDOFF_VERSION,
@@ -97,11 +97,73 @@ function terminalHandoff({ outcome, reason, protocol, candidateId = null }) {
       kind: protocol.kind,
       fingerprint: protocol.protocolFingerprint,
     },
+    evidenceReplayGate: evidenceReplayGate ?? {
+      status: 'NOT_APPLICABLE',
+      reason: outcome === 'NO_WINNER' ? 'NO_COMPUTATIONAL_FINALIST' : reason,
+      scienceRuns: [],
+    },
     requiresHumanApproval: true,
     executionAuthority: 'EXTERNAL_LAB_ONLY',
     claimBoundary: CLAIM_BOUNDARY,
   };
   return { ok: true, handoff: { ...body, handoffFingerprint: canonicalHash(body) } };
+}
+
+function candidateScienceRunIds(candidate) {
+  return [
+    candidate?.stages?.docking?.runId,
+    ...(candidate?.stages?.admet?.runIds ?? []),
+    candidate?.stages?.quantum?.runId,
+  ].filter(Boolean);
+}
+
+/**
+ * A physical-lab request may reference a computational axis only after that
+ * exact Science Run has both a proposal on the canonical Evidence seam and an
+ * append-only MATCH verification from the canonical Replay engine.
+ */
+function buildEvidenceReplayGate(protocol, candidate) {
+  const scienceRunIds = candidateScienceRunIds(candidate);
+  const evidenceByRun = new Map((protocol.evidence?.proposalLinks ?? []).map((link) => [link.runId, link]));
+  const verificationByRun = new Map();
+  for (const verification of protocol.replay?.engineVerifications ?? []) {
+    verificationByRun.set(verification.runId, verification);
+  }
+  const scienceRunById = new Map((protocol.evidence?.scienceRuns ?? []).map((run) => [run.id, run]));
+  const rows = scienceRunIds.map((runId) => {
+    const run = scienceRunById.get(runId) ?? null;
+    const evidence = evidenceByRun.get(runId) ?? null;
+    const replay = verificationByRun.get(runId) ?? null;
+    let status = 'READY';
+    let blocker = null;
+    if (!evidence) {
+      status = 'BLOCKED';
+      blocker = 'EVIDENCE_PROPOSAL_MISSING';
+    } else if (!replay) {
+      status = 'BLOCKED';
+      blocker = 'REPLAY_VERIFICATION_MISSING';
+    } else if (replay.verdict !== 'MATCH') {
+      status = 'BLOCKED';
+      blocker = 'REPLAY_NOT_MATCHED';
+    }
+    return {
+      scienceRunId: runId,
+      capability: run?.capability ?? null,
+      outputHash: run?.outputHash ?? null,
+      evidenceProposalId: evidence?.proposalId ?? null,
+      evidenceContentHash: evidence?.evidenceContentHash ?? null,
+      replayVerificationId: replay?.verificationId ?? null,
+      replayVerdict: replay?.verdict ?? null,
+      status,
+      blocker,
+    };
+  });
+  const blocked = rows.find((row) => row.status !== 'READY');
+  return {
+    status: scienceRunIds.length > 0 && !blocked ? 'READY' : 'BLOCKED',
+    reason: scienceRunIds.length === 0 ? 'NO_COMPUTATIONAL_SCIENCE_RUN' : blocked?.blocker ?? null,
+    scienceRuns: rows,
+  };
 }
 
 /**
@@ -164,6 +226,17 @@ export function prepareCandidateLabHandoff(db, { campaignId, candidateId = null,
     });
   }
 
+  const evidenceReplayGate = buildEvidenceReplayGate(protocol, candidate);
+  if (evidenceReplayGate.status !== 'READY') {
+    return terminalHandoff({
+      outcome: 'BLOCKED',
+      reason: evidenceReplayGate.reason,
+      protocol,
+      candidateId: finalist.candidateId,
+      evidenceReplayGate,
+    });
+  }
+
   const wetLab = wetLabRequests(protocol);
   if (wetLab.length === 0) {
     return terminalHandoff({
@@ -212,6 +285,7 @@ export function prepareCandidateLabHandoff(db, { campaignId, candidateId = null,
       candidate,
       preclinicalProtocol: preclinical.protocol,
       selectedWetLab: selected,
+      evidenceReplayGate,
     },
   };
 }
@@ -236,6 +310,7 @@ export function createCanonicalCandidateLabHandoff(db, {
     finalist,
     preclinicalProtocol,
     selectedWetLab,
+    evidenceReplayGate,
   } = prepared.prepared;
 
   const requested = createLabValidationRequest(db, {
@@ -251,6 +326,7 @@ export function createCanonicalCandidateLabHandoff(db, {
     preregistrationRef: protocol.hypothesis?.preregistrationId ?? null,
     preclinicalProtocol,
     requiredWetLabId: selectedWetLab.id,
+    computationalEvidence: evidenceReplayGate,
   });
   if (!requested.ok) return requested;
 
@@ -284,6 +360,7 @@ export function createCanonicalCandidateLabHandoff(db, {
       },
       preclinicalProtocol,
       validationRequest: requested.request,
+      evidenceReplayGate,
       requiresHumanApproval: true,
       executionAuthority: 'EXTERNAL_LAB_ONLY',
       scientificTruth: {

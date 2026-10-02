@@ -623,3 +623,23 @@ Validation: 53 focused tests yielded 45 PASS, 0 FAIL and 8 honest runtime skips;
 Truth boundary: real RDKit execution remains an in-silico `SIMULATED` observation. An invalid PDB is blocked during pre-flight and creates neither Evidence nor Replay. Flight Control is an inspectable projection, never a second scientific record.
 
 Rollback: revert `ac9a6d2272d4b84d84695b9567dadf2dcc0cf3bb`; canonical Virtual Lab, ScienceRun, Evidence, Replay and BYT records remain intact.
+
+## Final closure — four customer product offers
+
+Problem: the canonical customer-delivery projection proved one review-ready computational report, but Genesis did not yet expose bounded, separately named customer deliverables with validated onboarding, product-specific gates and a deterministic export artifact.
+
+Delivered:
+
+- `GENESIS_VERIFY`, `GENESIS_BENCHMARK`, `GENESIS_RESEARCH_SPRINT` and `GENESIS_EVIDENCE_PLATFORM` as read-only projections of the same canonical ResearchRun;
+- server-owned declared-use identities for known products, so a client cannot self-authorise a different commercial purpose;
+- validated onboarding identity, objective, acceptance criteria and data classification;
+- product-specific fail-closed requirements, including at least two preregistered executed cases for Benchmark and Replay `MATCH` for verifiable outputs;
+- Benchmark explicitly records `independentMethodAgreement: NOT_CLAIMED`;
+- deterministic JSON export capped at 5 MiB, with SHA-256 checked against the bytes actually persisted by the proof;
+- no new lifecycle, store, ledger, ResearchRun, Evidence or Replay implementation.
+
+Validation: focused product/admission tests are 9/9 PASS. The full local backend is 1,413 PASS, 0 FAIL and 84 explicit runtime skips. Linux push run `36997246375` (`#2888`) and PR run `36997249674` (`#2889`) both succeeded, including frontend 7,565/7,565, core 344/344, backend, lint, typecheck, production build and the new product proof. The exact-source artifact is `customer-products-proof-d7e2fd4d244d36d8a6b73d095dc505ccb0f328c0`, digest `sha256:44d73fbe54eec0d1d0bf053a8ea33f67363ebe90f9a7a9bcc7c7717493447f79`. Independent Astra delta review returned `GO`.
+
+Truth boundary: the CI admission provider is explicitly `TEST_FIXTURE_APPROVER_NOT_PRODUCTION_RIGHTS`. Every export keeps `delivered:false`, `customerAccepted:false`, `paymentStatus:NOT_INTEGRATED`, `agreementStatus:NOT_SIGNED` and `enterpriseStatus:BLOCKED_EXTERNAL_ENTERPRISE_CONTRACT`. No clinical, physical, signed or paid outcome is claimed.
+
+Rollback: revert `d7e2fd4d244d36d8a6b73d095dc505ccb0f328c0` and `b70d32621576c3441086bf80b35ce1142b98ca51`; the legacy canonical customer report path and all ResearchRun records remain intact.

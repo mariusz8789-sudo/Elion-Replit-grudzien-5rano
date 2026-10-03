@@ -22,3 +22,5 @@
 /docs/reference/codex-handoff/** -whitespace
 /docs/unreviewed-external/** -whitespace
 /packages/frontend/public/assets/bodyparts3d/full/** -text
+# Raw downloaded source data (sha256 in DOWNLOAD.json / SOURCES.json): byte-for-byte, never reformatted.
+/docs/evidence/source-data/** -text -whitespace

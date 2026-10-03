@@ -16,5 +16,5 @@ Proof for the ResearchRun columns: `researchRunEngines.real.test.mjs` runs each 
 
 Limits that stay true:
 - The queue and the artifact store are single-node (SQLite and local content-addressed files). Multi-replica and shared object storage are not proven and are labelled BLOCKED_EXTERNAL_OBJECT_STORAGE.
-- Artifact custody covers the asynchronous path. The synchronous POST route does not store an artifact.
+- Artifact custody covers both the asynchronous path and the synchronous POST route (a storage failure is reported as artifactCustody FAILED and is recoverable).
 - A passing engine test proves the engine ran under the frozen protocol; it does not turn a model estimate into a measurement.

@@ -552,6 +552,7 @@ export function executeResearchExperiment(db, projectId, runId, {
   const view = getResearchRun(db, projectId, runId);
   if (!view) return { ok: false, status: 'NOT_FOUND' };
   if (!view.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', chain: view.researchState.chain };
+  if (view.experiments.some((x) => x.conflicts?.length)) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: 'STEP_RECORDED_TWICE' };
   if (!view.plan || view.run.status !== 'RUNNING') return { ok: false, status: 'RUN_NOT_EXECUTABLE', reason: view.nextStep };
 
   let experimentId;

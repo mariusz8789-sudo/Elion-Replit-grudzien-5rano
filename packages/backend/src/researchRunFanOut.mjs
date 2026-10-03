@@ -241,3 +241,5 @@ export function createFanOutAwareWorker(db, options = {}) {
     },
   });
 }
+
+export const hasFanOutChildren = (db, projectId, parentId) => childrenOf(db, projectId, parentId).length > 0;

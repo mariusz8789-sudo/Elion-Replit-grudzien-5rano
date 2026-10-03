@@ -81,7 +81,7 @@ import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPl
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
-import { cancelFanOut, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
+import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -817,8 +817,8 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        // Cancelling a parent reaches its children too (a no-op for a run without any).
-        if (seg[4] === 'cancel') {
+        // Cancelling a parent reaches its children too; a run without children keeps the plain synchronous path.
+        if (seg[4] === 'cancel' && hasFanOutChildren(db, projectId, current.researchRunId)) {
           return (async () => {
             const cancelled = await cancelFanOut(db, projectId, current.researchRunId, { userId: user.id, reason: body?.reason ?? 'USER_REQUEST' });
             if (cancelled.ok) return ok(cancelled);

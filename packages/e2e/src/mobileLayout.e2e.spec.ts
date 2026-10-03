@@ -23,7 +23,7 @@ function primaryContent(page: Page, route: typeof ROUTES[number]) {
   switch (route) {
     case '#/research-console': return page.getByLabel('Pytanie badawcze');
     case '#/virtual-bio': return page.getByRole('heading', { name: 'Virtual Bio Lab' });
-    case '#/campaign': return page.getByRole('heading', { name: 'Silnik Przyspieszenia Naukowego' });
+    case '#/campaign': return page.getByRole('heading', { name: 'Zaawansowana kampania naukowa' }); // the top bar follows the menu name
     case '#/human-biology-lab': return page.getByTestId('scientific-worlds');
     case '#/cern-complex': return page.getByTestId('cern-complex');
     case '#/world-director': return page.getByTestId('world-director');

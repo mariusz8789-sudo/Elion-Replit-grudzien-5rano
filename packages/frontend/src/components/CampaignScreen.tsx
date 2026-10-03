@@ -15,6 +15,10 @@ import { ScientificResultInspector } from './ScientificResultInspector';
 import { VirtualLabPanel } from './VirtualLabPanel';
 import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
 import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
+import { capabilityLabel, plEn, type CapabilityKey } from '../core/capabilityNames';
+import { useLocale } from '../core/i18n';
+import { HOME_ENGINES } from './home/HomeEngines';
+import { TechnicalDetails, engineRowsFor } from './TechnicalDetails';
 
 /**
  * Scientific Acceleration UI (P12) — jeden warsztat Kampanii Naukowej. Każdy
@@ -25,29 +29,95 @@ import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
 
 const DEFAULT_SEEDS = 'c1ccccc1, Oc1ccccc1, Nc1ccccc1, Cc1ccccc1';
 
+/** The campaign pipeline in capability words, in the order the stages run. */
+const PIPELINE: readonly CapabilityKey[] = ['molecular-analysis', 'property-safety', 'interaction-modeling', 'quantum-chemistry'];
+
+export function pipelineText(): string {
+  return PIPELINE.map((key) => capabilityLabel(key).toLowerCase()).join(' → ');
+}
+
 export function CampaignScreen() {
+  useLocale();
   const session = useSession();
+  const title = plEn('Kampania naukowa', 'Scientific campaign');
   if (!session) {
     return (
       <LockedScreen
         icon="⚡"
-        title="Kampania naukowa"
-        lede="Prowadź kampanie odkrywcze na realnych silnikach (RDKit → ADMET → dokowanie → chemia kwantowa), z pełną prowieniencją i weryfikacją odtwarzalności."
+        title={title}
+        lede={plEn(
+          `Prowadź kampanie odkrywcze na realnych obliczeniach (${pipelineText()}), z pełnym pochodzeniem danych i sprawdzeniem powtarzalności.`,
+          `Run discovery campaigns on real computations (${pipelineText()}), with full provenance and a reproducibility check.`,
+        )}
         capabilities={[
-          'Silnik przyspieszenia wybiera następny eksperyment z utrwalonych danych',
-          'Każdą decyzję da się wyjaśnić dowodem (WHY)',
-          'Wielofidelitowe przebiegi z zachowaną prowieniencją',
-          'Weryfikacja odtwarzalności każdego kroku kampanii',
+          plEn('Silnik przyspieszenia wybiera następny eksperyment z utrwalonych danych', 'The acceleration engine picks the next experiment from saved data'),
+          plEn('Każdą decyzję da się wyjaśnić dowodem (WHY)', 'Every decision can be explained with evidence (WHY)'),
+          plEn('Przebiegi o kilku poziomach dokładności z zachowanym pochodzeniem', 'Runs at several levels of accuracy, provenance kept'),
+          plEn('Sprawdzenie powtarzalności każdego kroku kampanii', 'A reproducibility check for every campaign step'),
         ]}
-        note="To walidacja oprogramowania, nie odkrycie terapeutyczne — silnik nie zmyśla wyników i nie deklaruje „leku”."
+        note={plEn('To walidacja oprogramowania, nie odkrycie terapeutyczne — silnik nie zmyśla wyników i nie deklaruje „leku”.', 'This is software validation, not a therapeutic discovery: nothing is made up and nothing is called a medicine.')}
       />
     );
   }
   const profile = profileOfUser(session.user)!;
   if (!canUseCapability(profile, CAPABILITIES.DRUG_DISCOVERY)) {
-    return <ProfileLockedScreen icon="⚡" title="Kampania naukowa" profile={profile} capability={CAPABILITIES.DRUG_DISCOVERY} />;
+    return <ProfileLockedScreen icon="⚡" title={title} profile={profile} capability={CAPABILITIES.DRUG_DISCOVERY} />;
   }
   return <CampaignWorkspace />;
+}
+
+/**
+ * COMPUTE READINESS — which capabilities the server can run now, in capability
+ * words. The engine registry itself (name, version, licence, reference cases)
+ * sits under technical details.
+ */
+export function ComputeReadiness({ toolchain }: { readonly toolchain: readonly ToolchainEntry[] }): JSX.Element {
+  const rdkit = toolchain.find((t) => t.toolId === 'rdkit');
+  const capabilityOf = (toolId: string): CapabilityKey | undefined => HOME_ENGINES.find((e) => e.toolId === toolId)?.capability;
+  return (
+    <div className="settings-subsection" data-testid="campaign-compute-readiness">
+      <h3>{plEn('Gotowość obliczeń', 'Compute readiness')}</h3>
+      {toolchain.length === 0 && <p className="settings-hint">{plEn('Ładowanie stanu obliczeń…', 'Loading compute status…')}</p>}
+      <ul className="plain-list">
+        {toolchain.map((t) => {
+          const capability = capabilityOf(t.toolId);
+          return (
+            <li key={t.toolId}>
+              <strong>{capability ? capabilityLabel(capability) : plEn('Inne obliczenie', 'Other computation')}</strong> — <StatusPill status={t.status} />
+            </li>
+          );
+        })}
+      </ul>
+      {toolchain.length > 0 && (
+        <TechnicalDetails rows={[]} testId="campaign-toolchain-tech">
+          <ul className="plain-list">
+            {toolchain.map((t) => (
+              <li key={t.toolId}>
+                <strong>{t.engineName}</strong> — {t.status}{' '}
+                {t.version ? <span className="muted">v{t.version}</span> : null}{' '}
+                <span className="muted">({t.license})</span>
+                {t.validation && (
+                  <span className="muted"> · {plEn('przypadki referencyjne', 'reference cases')}: {t.validation.filter((v) => v.pass).length}/{t.validation.length} PASS</span>
+                )}
+                {t.status !== 'AVAILABLE' && t.reason ? <div className="muted small">{plEn('luka', 'gap')}: {t.reason}</div> : null}
+              </li>
+            ))}
+          </ul>
+        </TechnicalDetails>
+      )}
+      {rdkit && rdkit.status !== 'AVAILABLE' && (
+        <div className="warn-banner" data-testid="campaign-molecular-blocked">
+          <p>
+            {plEn(
+              `${capabilityLabel('molecular-analysis')} ma stan ${rdkit.status}. Kampanie molekularne jej wymagają. To uczciwy stan — nie będą zwracane zmyślone wyniki.`,
+              `${capabilityLabel('molecular-analysis')} is ${rdkit.status}. Molecular campaigns need it. This is the honest state: no made-up results will be returned.`,
+            )}
+          </p>
+          <TechnicalDetails rows={[{ label: plEn('Wymagany silnik', 'Required engine'), value: `${rdkit.engineName} (pip install rdkit)` }]} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 const STATUS_MSG: Record<Campaign['status'], string> = {
@@ -246,7 +316,6 @@ function CampaignWorkspace() {
     if (r.ok) setWhy({ label, a: r.data });
   }
 
-  const rdkit = toolchain.find((t) => t.toolId === 'rdkit');
   const s = selected?.stats;
   const paretoCandidates = candidates.filter((c) => c.pareto);
 
@@ -260,31 +329,7 @@ function CampaignWorkspace() {
           autonomii, bez deklaracji terapeutycznych.
         </p>
 
-        {/* Zweryfikowane silniki (Toolchain) */}
-        <div className="settings-subsection">
-          <h3>Zweryfikowane silniki</h3>
-          {toolchain.length === 0 && <p className="settings-hint">Ładowanie rejestru silników…</p>}
-          <ul className="plain-list">
-            {toolchain.map((t) => (
-              <li key={t.toolId}>
-                <strong>{t.engineName}</strong> — <StatusPill status={t.status} />{' '}
-                {t.version ? <span className="muted">v{t.version}</span> : null}{' '}
-                <span className="muted">({t.license})</span>
-                {t.validation && (
-                  <span className="muted"> · przypadki referencyjne: {t.validation.filter((v) => v.pass).length}/{t.validation.length} PASS</span>
-                )}
-                {t.status !== 'AVAILABLE' && t.reason ? <div className="muted small">luka: {t.reason}</div> : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {rdkit && rdkit.status !== 'AVAILABLE' && (
-          <p className="warn-banner">
-            Silnik molekularny jest {rdkit.status}. Kampanie molekularne wymagają RDKit (pip install rdkit). To uczciwy
-            stan zdolności — nie będą zwracane zmyślone wyniki.
-          </p>
-        )}
+        <ComputeReadiness toolchain={toolchain} />
       </section>
 
       {/* Tworzenie kampanii ze zdania celu */}
@@ -446,15 +491,17 @@ function CampaignWorkspace() {
           {/* Etapy multi-fidelity (ciężkie silniki) */}
           {selected.status === 'completed' && (
             <div className="settings-subsection">
-              <h4>Etapy multi-fidelity (ciężkie silniki)</h4>
-              <p className="muted small">
-                RDKit (tanie) → ADMET/toksyczność ({admetEndpointCount ?? '…'} endpointów, wszyscy zachowani kandydaci) → dokowanie (średnie,
-                Pareto-wyselekcjonowani) → chemia kwantowa (drogie, budżetowana). Wyniki to MODEL_ESTIMATE — bez
-                deklaracji powinowactwa/bezpieczeństwa/terapii.
+              <h4>{plEn('Etapy o rosnącej dokładności', 'Stages of increasing accuracy')}</h4>
+              <p className="muted small" data-testid="campaign-stages-line">
+                {plEn(
+                  `${capabilityLabel('molecular-analysis')} (tanie) → ${capabilityLabel('property-safety').toLowerCase()} (${admetEndpointCount ?? '…'} endpointów, wszyscy zachowani kandydaci) → ${capabilityLabel('interaction-modeling').toLowerCase()} (średnie, kandydaci z frontu Pareto) → ${capabilityLabel('quantum-chemistry').toLowerCase()} (drogie, z budżetem). Wyniki to MODEL_ESTIMATE — bez deklaracji powinowactwa, bezpieczeństwa ani terapii.`,
+                  `${capabilityLabel('molecular-analysis')} (cheap) → ${capabilityLabel('property-safety').toLowerCase()} (${admetEndpointCount ?? '…'} endpoints, every retained candidate) → ${capabilityLabel('interaction-modeling').toLowerCase()} (medium, Pareto-front candidates) → ${capabilityLabel('quantum-chemistry').toLowerCase()} (expensive, budgeted). Results are MODEL_ESTIMATE: no affinity, safety or therapy claim.`,
+                )}
               </p>
               <button className="primary-btn" disabled={busy} onClick={() => void onRunStage(selected)}>
-                ▶ Uruchom ADMET + toksyczność + dokowanie + chemię kwantową
+                ▶ {plEn('Uruchom właściwości i bezpieczeństwo, modelowanie oddziaływań i chemię kwantową', 'Run property & safety, interaction modeling and quantum chemistry')}
               </button>
+              <TechnicalDetails rows={engineRowsFor(PIPELINE)} testId="campaign-stages-tech" />
             </div>
           )}
 

@@ -4,6 +4,7 @@ import type { DockingTarget, LiveCandidate } from './drugRunState';
 import type { LiveDrugRun } from './liveDrugRun';
 import { zoneOf } from './drugBenchLayout';
 import { targetAnatomy, type TargetAnatomy } from './targetAnatomy';
+import { capabilityLabel } from '../capabilityNames';
 
 /**
  * DRUG CANDIDATE ↔ HUMAN DIGITAL TWIN — the one link from a finalist on the bench to the
@@ -145,7 +146,7 @@ export function twinContextLines(context: ResolvedTwinContext): readonly TwinCon
   });
   if (c?.stages.docking) {
     const d = c.stages.docking;
-    lines.push({ label: 'Docking (Vina)', value: d.value != null ? kcal(d.value) : d.status, tag: 'MODEL_PREDICTION', source: d.runId ? `science run ${d.runId}` : d.reason });
+    lines.push({ label: capabilityLabel('interaction-modeling', 'pl'), value: d.value != null ? kcal(d.value) : d.status, tag: 'MODEL_PREDICTION', source: d.runId ? `science run ${d.runId}` : d.reason });
   }
   if (c?.pose) lines.push({ label: 'Poza w kieszeni', value: `${c.pose.atoms.length} atomów · reszty ${c.pose.pocketResidues.slice(0, 5).join(', ')}${c.pose.pocketResidues.length > 5 ? '…' : ''}`, tag: 'MODEL_PREDICTION', source: `${c.pose.engine}; poza sha256 ${c.pose.poseSha256.slice(0, 12)}…` });
   if (c?.stages.admet) {
@@ -153,7 +154,7 @@ export function twinContextLines(context: ResolvedTwinContext): readonly TwinCon
     const endpoints = a.endpoints ? Object.entries(a.endpoints).slice(0, 4).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · ') : null;
     lines.push({ label: 'ADMET', value: endpoints ? `${a.status} · ${endpoints}` : a.status, tag: 'MODEL_PREDICTION', source: a.runId ? `science run ${a.runId}` : a.reason });
   }
-  if (c?.stages.quantum?.value != null) lines.push({ label: 'QM (PySCF)', value: `${c.stages.quantum.value.toFixed(2)} eV`, tag: 'MODEL_PREDICTION', source: c.stages.quantum.runId ?? c.stages.quantum.reason });
+  if (c?.stages.quantum?.value != null) lines.push({ label: capabilityLabel('quantum-chemistry', 'pl'), value: `${c.stages.quantum.value.toFixed(2)} eV`, tag: 'MODEL_PREDICTION', source: c.stages.quantum.runId ?? c.stages.quantum.reason });
   if (context.sealed) lines.push({ label: 'Replay / zapieczętowany rekord', value: `${context.sealed.recordId ?? 'brak id'} · łańcuch ${context.sealed.chainHash?.slice(0, 12) ?? '—'}… · sprawdzenie ${context.sealed.check ?? '—'}`, tag: 'PROVENANCE', source: 'pamięć naukowa serwera' });
   if (context.stateHash) lines.push({ label: 'Odcisk stanu kampanii', value: context.stateHash, tag: 'PROVENANCE', source: 'fnv1a kanonicznego stanu' });
   lines.push({ label: 'Efekt leku w tym narządzie', value: 'nie policzony — Genesis nie twierdzi, że lek tu działa', tag: 'NOT_VALIDATED' });

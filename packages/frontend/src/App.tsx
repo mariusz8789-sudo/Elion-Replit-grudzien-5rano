@@ -23,7 +23,9 @@ import { requestOpenScienceChat } from './core/scienceChatBridge';
 import { OPEN_SEARCH_EVENT } from './core/navigation';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
-import { getLocale, t } from './core/i18n';
+import { getLocale, t, useLocale } from './core/i18n';
+import { screenTitle } from './core/navigationText';
+import { plEn } from './core/capabilityNames';
 import { fcText } from './components/flightControl/flightControlText';
 import { vText } from './components/verify/verifyText';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
@@ -284,7 +286,7 @@ export function parseHash(): Route {
   if (h === '#/mirror') return { kind: 'mirror' };
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
   if (h === '#/flight-control') return { kind: 'flight-control' };
-  if (h === '#/verify') return { kind: 'verify' };
+  if (h === '#/verify' || h.startsWith('#/verify?')) return { kind: 'verify' };
   // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
   if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };
@@ -1247,7 +1249,7 @@ export default function App() {
 
     return (
       <div className="app">
-        <TopBar title={profileDashboard ? 'Twój pulpit' : 'Start'} onSearch={() => setSearchOpen(true)} ask={false} />
+        <TopBar title={profileDashboard ? plEn('Twój pulpit', 'Your dashboard') : 'Start'} derive={!profileDashboard} onSearch={() => setSearchOpen(true)} ask={false} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
@@ -1304,7 +1306,15 @@ function ViewSwitch({ label, options }: { label: string; options: readonly { lab
 }
 
 /** `ask={false}` on the dashboard, which carries its own command field: one Ask input per screen. */
-function TopBar({ title, onSearch, ask: showAsk = true }: { title: string; onSearch: () => void; ask?: boolean }) {
+/**
+ * The title follows the navigation entry of the current route (`screenTitle`) and the language
+ * switch; `title` is only the fallback for routes without a menu entry. `derive={false}` keeps
+ * `title` as given (the simplified profile dashboard, which is not a menu place).
+ */
+function TopBar({ title, onSearch, ask: showAsk = true, derive = true }: { title: string; onSearch: () => void; ask?: boolean; derive?: boolean }) {
+  const locale = useLocale();
+  const hash = typeof window === 'undefined' ? '' : window.location.hash;
+  const shown = derive ? screenTitle(hash, cleanRouteTitle(title), locale) : cleanRouteTitle(title);
   const [ask, setAsk] = useState('');
   const submit = (): void => {
     const text = ask.trim();
@@ -1319,7 +1329,7 @@ function TopBar({ title, onSearch, ask: showAsk = true }: { title: string; onSea
         <GenesisWordmark size={26} tagline={false} />
       </button>
       <div className="titles">
-        <h1>{cleanRouteTitle(title)}</h1>
+        <h1 data-testid="topbar-title">{shown}</h1>
       </div>
       {showAsk && <form className="topbar-ask" onSubmit={(e) => { e.preventDefault(); submit(); }} role="search" aria-label="Zapytaj Genesis">
         <span className="topbar-ask-icon" aria-hidden="true">✦</span>

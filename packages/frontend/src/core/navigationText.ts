@@ -1,5 +1,5 @@
 import { getLocale, type Locale } from './i18n';
-import type { NavItem, NavSection } from './navigation';
+import { NAV_ITEMS, activeNavId, type NavItem, type NavSection } from './navigation';
 
 /**
  * Menu words in English and Arabic. Polish lives in navigation.ts itself (the source); an entry
@@ -144,3 +144,15 @@ export function navGroupLabel(section: NavSection, locale: Locale = getLocale())
 
 /** Every id with an English label: a test keeps the English menu complete. */
 export const TRANSLATED_NAV_IDS: readonly string[] = Object.keys(ITEMS);
+
+/**
+ * The title a screen's top bar shows: the navigation name of the place the hash
+ * belongs to, in the chosen language (Arabic falls back to English), so the
+ * title always matches the menu. A route with no menu entry (a deep link) keeps
+ * the title its screen passed.
+ */
+export function screenTitle(hash: string, fallback: string, locale: Locale = getLocale()): string {
+  const id = activeNavId(hash);
+  const item = id === null ? undefined : NAV_ITEMS.find((entry) => entry.id === id);
+  return item ? navLabel(item, locale) : fallback;
+}

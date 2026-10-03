@@ -8,6 +8,7 @@ import { HOME_ENGINES, liveLabel, useLiveToolchain } from './home/HomeEngines';
 import { Icon } from './home/Icon';
 import { startDay, startName, startText, type StartTextKey } from './home/startText';
 import { useLocale, type Locale } from '../core/i18n';
+import { capabilityLabel } from '../core/capabilityNames';
 import '../styles-command-center.css';
 
 /**
@@ -219,10 +220,20 @@ function Compute({ locale }: { readonly locale: Locale }): React.ReactElement {
       <span className="cc-dots" aria-hidden="true">{labels.map((x) => <i key={x.e.name} className={x.s.tone === 'ok' ? 'cc-dot-ok' : undefined} />)}</span>
       <details className="cc-engines">
         <summary>{T('showEngines')}</summary>
+        {/* Capabilities, not engines: the engine behind each one is under Technical details. */}
         <ul>
           {labels.map(({ e, s }) => (
-            <li key={e.name} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}><b>{e.name}</b><span className={`cc-tone-${s.tone}`} title={s.detail}>{s.text}</span></li>
+            <li key={e.name} data-testid={`home-engine-${e.toolId}`}><b>{capabilityLabel(e.capability, locale)}</b><span className={`cc-tone-${s.tone}`}>{s.text}</span></li>
           ))}
+        </ul>
+      </details>
+      <details className="cc-engines cc-tech" data-technical-details>
+        <summary>{T('technicalDetails')}</summary>
+        <ul>
+          {HOME_ENGINES.map((e) => {
+            const s = e.toolId === null ? null : labels.find((x) => x.e === e)?.s;
+            return <li key={e.name} title={s?.detail}><b>{e.name}</b><span>{capabilityLabel(e.capability, locale)}{e.toolId === null ? ` · ${e.note ?? ''}` : ''}</span></li>;
+          })}
         </ul>
       </details>
     </article>
@@ -305,6 +316,15 @@ export function StartHero(): React.ReactElement {
               </div>
             </div>
             <p className="cc-caveat">{ASTEX_TRAINING_OVERLAP.inTrainingLists} {T('overlapOf')} {ASTEX_TRAINING_OVERLAP.of} {T('overlapRest')}</p>
+            <details className="cc-engines cc-tech" data-technical-details data-testid="home-drug-tech">
+              <summary>{T('technicalDetails')}</summary>
+              <ul>
+                <li><span>{T('techBaseline')}: {ASTEX.vinaPreregisteredTop1}/{ASTEX.denominator}</span></li>
+                <li><span>{T('techRescore')}: {ASTEX.gninaTop1}/{ASTEX.denominator}</span></li>
+                <li><span>{ASTEX_TRAINING_OVERLAP.inTrainingLists} {T('overlapOf')} {ASTEX_TRAINING_OVERLAP.of} {T('techOverlap')}</span></li>
+                <li><span>{T('techMolecule')}</span></li>
+              </ul>
+            </details>
             <p className="cc-r8"><i className="cc-dot" /><span><b>{startName(RUN8.title, locale)}</b> · {RUN8.complexes} {T('unseenComplexes')}{locale === 'pl' ? '' : ` ${T('complexes')}`} · {running ? T('running') : startName(RUN8.status, locale).toLowerCase()}</span></p>
             <p className="cc-actions">
               <a className="cc-cta" href="#/drug">{T('openDrug')} <Icon name="arrow" /></a>
@@ -313,7 +333,7 @@ export function StartHero(): React.ReactElement {
           </div>
           <a className="cc-dvis" href="#/molecule" aria-label={T('openMolecule')}>
             <img src={MOLECULE_IMG} alt="" />
-            <span>Molecule World · RDKit 3D</span>
+            <span>Molecule World · 3D</span>
           </a>
         </article>
 

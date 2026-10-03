@@ -31,9 +31,10 @@ function Row({ cap }: { readonly cap: Capability }): React.ReactElement {
       <div className="os-row-main">
         <b>{cap.name}</b>
         <small>{cap.what}</small>
-        <details className="os-tech">
+        <details className="os-tech" data-technical-details>
           <summary>Technical details</summary>
           <p><span>Evidence level</span>{levelOf(cap)}</p>
+          {cap.engine !== undefined && <p><span>Engine</span>{cap.engine}</p>}
           <p><span>Source</span><code>{cap.source}</code></p>
         </details>
       </div>

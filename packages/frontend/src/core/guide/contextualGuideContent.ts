@@ -137,8 +137,8 @@ const GUIDES: Readonly<Record<ContextualGuideSurface, readonly ContextualGuideSt
     },
     {
       key: 'campaign-boundary',
-      pl: 'Wynik RDKit, dockingu, ADMET, OpenMM lub PySCF pozostaje wynikiem in silico. Zewnętrzna obserwacja laboratoryjna trafia osobną ścieżką i wymaga niezależnego przeglądu.',
-      en: 'An RDKit, docking, ADMET, OpenMM or PySCF result remains in silico. An external laboratory observation uses a separate path and requires independent review.',
+      pl: 'Wynik analizy molekularnej, dokowania, analizy właściwości i bezpieczeństwa, dynamiki molekularnej lub chemii kwantowej pozostaje wynikiem in silico. Zewnętrzna obserwacja laboratoryjna trafia osobną ścieżką i wymaga niezależnego przeglądu.',
+      en: 'A molecular analysis, docking, property & safety, molecular dynamics or quantum chemistry result remains in silico. An external laboratory observation uses a separate path and requires independent review.',
       plainPl: 'Obliczenie komputerowe i wynik prawdziwego laboratorium są zawsze rozdzielone.',
       plainEn: 'A computer result and a real laboratory result are always kept separate.',
     },

@@ -40,7 +40,7 @@ import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
 import { UnifiedResearchJourney } from './UnifiedResearchJourney';
-import { CHAT_ENGINES, type ChatEngine } from '../core/scienceChat/engines';
+import { CHAT_ENGINES, chatEngineLine, type ChatEngine } from '../core/scienceChat/engines';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -1042,10 +1042,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         {turns.length === 0 && (
           <section className="science-chat-empty" aria-label="Ask Genesis" lang="en">
             <span>ASK</span>
-            <h2>Choose an engine</h2>
+            <h2>Choose a capability</h2>
             <p>It fills in a task Genesis can run. Nothing starts until you send it.</p>
             <div className="sc-engine-grid" data-testid="chat-engines">{CHAT_ENGINES.map((e) => (
-              <button key={e.id} type="button" data-testid={`chat-engine-${e.id}`} onClick={() => pickEngine(e)}><b>{e.task}</b><small>{e.engine}</small></button>
+              <button key={e.id} type="button" data-testid={`chat-engine-${e.id}`} onClick={() => pickEngine(e)}><b>{e.task}</b><small>{chatEngineLine(e)}</small></button>
             ))}</div>
           </section>
         )}
@@ -1100,9 +1100,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       )}
 
       {turns.length > 0 && (
-        <div className="sc-engine-row" data-testid="chat-engine-row" aria-label="Engine">
+        <div className="sc-engine-row" data-testid="chat-engine-row" aria-label="Capability">
           {CHAT_ENGINES.map((e) => (
-            <button key={e.id} type="button" className={engineId === e.id ? 'on' : undefined} aria-pressed={engineId === e.id} onClick={() => pickEngine(e)}>{e.engine}</button>
+            <button key={e.id} type="button" className={engineId === e.id ? 'on' : undefined} aria-pressed={engineId === e.id} onClick={() => pickEngine(e)} title={chatEngineLine(e)}>{e.task}</button>
           ))}
         </div>
       )}

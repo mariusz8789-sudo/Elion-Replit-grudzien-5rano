@@ -52,7 +52,7 @@ export const WORLDS: readonly WorldEntry[] = [
   {
     id: 'molecule', preview: 'molecule', hash: '#/molecule', glyph: '⬡', title: 'Molecule World', domain: 'Molecular World', featured: true,
     purpose: 'Cząsteczka jako obiekt badawczy: geometria, wiązania, właściwości, porównanie z referencją.',
-    real: 'Geometria i wiązania z RDKit (MODEL_ESTIMATE), deskryptory z realnych silników.',
+    real: 'Geometria i wiązania z analizy molekularnej (szacunek modelu), deskryptory z realnych obliczeń.',
     visual: 'Atomy i wiązania 3D z poświatą — model obliczeniowy, nie pomiar.',
   },
   {

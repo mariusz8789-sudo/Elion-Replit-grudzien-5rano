@@ -43,9 +43,10 @@ describe('StartHero dashboard', () => {
     expect(pl).toContain('placeholder="Co chcesz zbadać?"');
     expect(pl).toContain('Biologia człowieka');
     expect(pl).not.toContain('Verifiable');
-    // Engine names, hashes and protocol tokens stay as they are.
+    // Hashes and protocol tokens stay as they are; engine names only under Technical details.
     expect(pl).toContain('REPLAY MATCH');
-    expect(pl).toContain('RDKit');
+    expect(pl).toContain('Szczegóły techniczne');
+    expect(pl).toContain('Analiza molekularna');
     const ar = await render('ar');
     expect(ar).toContain('<em>Verifiable</em> computational drug discovery.');
     expect(ar).toContain('lang="en"');
@@ -96,9 +97,14 @@ describe('StartHero dashboard', () => {
     const drug = html.slice(html.indexOf('data-testid="home-area-drug"'), html.indexOf('data-testid="home-area-biology"'));
     expect(drug).toContain(`${run3.summary.successes}<small>/85</small>`);
     expect(drug).toContain(`${run7.topK.top1}<small>/85</small>`);
-    expect(drug).toContain('Vina baseline · pre-registered');
-    expect(drug).toContain('GNINA rescoring · development');
-    expect(drug).toContain('76 of these 85 complexes are in GNINA&#x27;s training data. This is development, not independent validation.');
+    // Capabilities on the card; the exact engines (owner's Astex wording) under Technical details.
+    expect(drug).toContain('Docking baseline · pre-registered');
+    expect(drug).toContain('Pose rescoring · development');
+    expect(drug).toContain('76 of these 85 complexes are in the rescoring model&#x27;s training data. This is development, not independent validation.');
+    const tech = drug.slice(drug.indexOf('data-testid="home-drug-tech"'), drug.indexOf('</details>', drug.indexOf('data-testid="home-drug-tech"')));
+    expect(tech).toContain(`Vina baseline: AutoDock Vina, pre-registered: ${run3.summary.successes}/85`);
+    expect(tech).toContain(`GNINA rescoring (CNN) of the run 6 poses: ${run7.topK.top1}/85`);
+    expect(tech).toContain('76 of these 85 complexes are in GNINA&#x27;s training data.');
     expect(html).not.toMatch(/independently validated|validated drug|clinically proven|government-ready/i);
   });
 

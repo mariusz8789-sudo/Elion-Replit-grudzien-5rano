@@ -57,7 +57,8 @@ export function buildCapabilityIndex(): SearchEntry[] {
       labId: `cap:${c.id}`, expId: 'capability', icon: '▦', labName: group.name, expName: c.name,
       tagline: `${labelOf(c.state)} · ${c.what}`,
       ...(c.hash !== undefined ? { hash: c.hash } : { ask: c.ask }),
-      keywords: normalize(`${c.name} ${c.what} ${group.name} ${c.source}`),
+      // The engine is a search word (people type "openmm"), never a shown line.
+      keywords: normalize(`${c.name} ${c.what} ${group.name} ${c.source} ${c.engine ?? ''}`),
     })));
 }
 

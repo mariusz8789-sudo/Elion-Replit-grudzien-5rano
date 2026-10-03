@@ -33,6 +33,16 @@ describe('StartHero dashboard', () => {
     expect(html).not.toContain('undefined');
   });
 
+  it('keeps molecules out of the centre: Molecule World is reached only from the Drug Discovery card', async () => {
+    const html = await render();
+    const live = html.slice(html.indexOf('data-testid="home-live-view"'));
+    expect(live.slice(0, live.indexOf('</div></div>') + 12)).not.toContain('#/molecule');
+    expect(html).toContain('data-view="anatomy"');
+    const drug = html.slice(html.indexOf('data-testid="home-area-drug"'), html.indexOf('data-testid="home-area-biology"'));
+    expect(drug).toContain('href="#/molecule"');
+    expect(html.split('href="#/molecule"').length - 1).toBe(1);
+  });
+
   it('is the approved command centre: hero with Running now and Latest verified, bento, and the More strip', async () => {
     const html = await render();
     for (const id of ['home-running', 'home-latest', 'home-live-view', 'home-area-drug', 'home-area-biology', 'home-area-evidence', 'home-area-physics', 'home-recent', 'home-engines', 'home-more']) {

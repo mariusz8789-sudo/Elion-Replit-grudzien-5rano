@@ -22,10 +22,21 @@ const OUT = process.env.FULL_APP_PROOF_OUT ?? 'artifacts/full-app-route-proof';
 const NAVIGATION_PATH = 'packages/frontend/src/core/navigation.ts';
 const APP_PATH = 'packages/frontend/src/App.tsx';
 const LABS = ['universe', 'spacetime', 'einstein', 'quantum', 'atom', 'nuclear', 'particle', 'chemistry', 'multiverse', 'civilization', 'biology', 'mathematics', 'discovery'];
-const VIEWPORTS = [
+const DEFAULT_VIEWPORTS = [
   { mode: 'desktop', width: 1440, height: 900 },
   { mode: 'mobile', width: 390, height: 844 },
 ];
+// FULL_APP_PROOF_VIEWPORTS=all: the owner's full visual-QA gate (3 Oct 2026),
+// three desktop and three phone sizes.
+const ALL_VIEWPORTS = [
+  { mode: 'desktop', width: 1920, height: 1080 },
+  { mode: 'desktop', width: 1440, height: 900 },
+  { mode: 'desktop', width: 1366, height: 768 },
+  { mode: 'mobile', width: 412, height: 915 },
+  { mode: 'mobile', width: 390, height: 844 },
+  { mode: 'mobile', width: 360, height: 780 },
+];
+const VIEWPORTS = process.env.FULL_APP_PROOF_VIEWPORTS === 'all' ? ALL_VIEWPORTS : DEFAULT_VIEWPORTS;
 const SCREENSHOT_ROUTES = new Set(['#/', '#/drug', '#/human-biology-lab', '#/scientific-worlds', '#/research-console', '#/evidence', '#/more']);
 const executablePath = process.env.CHROMIUM_PATH
   ?? ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/chromium'].find(existsSync);
@@ -133,7 +144,7 @@ try {
 
         let screenshot = null;
         if (SCREENSHOT_ROUTES.has(route)) {
-          screenshot = path.join(OUT, `${viewport.mode}-${stableRouteName(route)}.png`);
+          screenshot = path.join(OUT, `${viewport.mode}-${VIEWPORTS === ALL_VIEWPORTS ? `${viewport.width}-` : ''}${stableRouteName(route)}.png`);
           const bytes = await page.screenshot({ path: screenshot, timeout: 60_000 });
           report.screenshotHashes[screenshot.replaceAll('\\', '/')] = sha256(bytes);
         }

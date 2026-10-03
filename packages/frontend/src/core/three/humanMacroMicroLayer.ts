@@ -283,6 +283,87 @@ function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Gro
   markModel(root, 'tissue'); addShadows(root); return root;
 }
 
+/**
+ * Pancreas tissue, as a pathologist would recognise it under H&E: exocrine acini (rings of pyramidal cells
+ * with basal nuclei and apical zymogen granules round a tiny lumen, drained by an intercalated duct) and one
+ * pale islet of Langerhans threaded by capillaries. The islet's endocrine cells are intermixed, as in human
+ * islets; the beta/alpha/delta shares are textbook proportions used for layout only, not a measurement.
+ * Beta cells carry GLP-1R, which is why this organ needs its own tissue rather than a generic sample.
+ */
+function buildPancreasTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
+  const root = new THREE.Group(); root.name = 'macro-tissue:PANCREAS';
+  const rotor = createPresentationStage(THREE, root, 0.82);
+  // A section is read face-on: the tile leans towards the viewer and turns in its own plane, so the acini and
+  // the islet stay legible on a phone instead of being seen edge-on.
+  const lean = new THREE.Group(); lean.name = 'pancreas:section-lean'; lean.rotation.x = 0.62; lean.position.y = -0.04;
+  root.add(lean); lean.add(rotor); rotor.scale.setScalar(1.12);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.1, 0.92, 8, 2, 6), biologicalMaterial(THREE, 0xc98aa4, { emissive: 0x2a0f1a, roughness: 0.7 }));
+  slab.name = 'tissue:stroma'; rotor.add(slab);
+  const acinarApex = biologicalMaterial(THREE, 0xd5577a, { emissive: 0x3a0c1c, roughness: 0.5 });
+  const acinarNucleus = biologicalMaterial(THREE, 0x3e2a78, { emissive: 0x120a2a, roughness: 0.45 });
+  const zymogen = biologicalMaterial(THREE, 0xf08a4b, { emissive: 0x4a1a06, roughness: 0.4 });
+  const lumenMat = new THREE.MeshStandardMaterial({ color: 0xf6e7ee, roughness: 0.9 });
+  const ductMat = new THREE.MeshPhysicalMaterial({ color: 0xeac7d4, roughness: 0.5, clearcoat: 0.2 });
+  // Acini sit round the islet; each one drains through its intercalated duct towards the tile's main duct.
+  const acini: Array<[number, number]> = [[-0.48, -0.24], [-0.5, 0.2], [-0.18, 0.31], [0.47, -0.25], [0.5, 0.18], [0.2, 0.32], [-0.14, -0.3], [0.18, -0.32]];
+  const CELLS_PER_ACINUS = 8;
+  for (const [a, [x, z]] of acini.entries()) {
+    const acinus = new THREE.Group(); acinus.name = `pancreas:acinus:${a}`; acinus.position.set(x, 0.09, z); rotor.add(acinus);
+    const lumen = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), lumenMat); lumen.name = `pancreas:acinus:${a}:lumen`; acinus.add(lumen);
+    for (let c = 0; c < CELLS_PER_ACINUS; c += 1) {
+      const t = (c / CELLS_PER_ACINUS) * Math.PI * 2 + a * 0.37;
+      const dir = new THREE.Vector3(Math.cos(t), 0, Math.sin(t));
+      // A pyramidal acinar cell: apex at the lumen, broad base outward.
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.085, 7), acinarApex);
+      body.name = `pancreas:acinar-cell:${a}:${c}`;
+      body.position.copy(dir.clone().multiplyScalar(0.058));
+      body.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+      acinus.add(body);
+      const nucleus = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), acinarNucleus);
+      nucleus.name = `pancreas:acinar-nucleus:${a}:${c}`; nucleus.position.copy(dir.clone().multiplyScalar(0.088)); acinus.add(nucleus);
+      for (let g = 0; g < 2; g += 1) {
+        const granule = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 5), zymogen);
+        granule.name = `pancreas:zymogen-granule:${a}:${c}:${g}`;
+        granule.position.copy(dir.clone().multiplyScalar(0.03 + g * 0.009)).add(new THREE.Vector3(0, 0.012 * (g ? 1 : -1), 0)); acinus.add(granule);
+      }
+    }
+    const towards = new THREE.Vector3(Math.sign(x) * 0.66, 0.06, z * 0.4);
+    const duct = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(x, 0.09, z), new THREE.Vector3((x + towards.x) / 2, 0.075, (z + towards.z) / 2), towards]), 12, 0.009, 6, false), ductMat);
+    duct.name = `pancreas:intercalated-duct:${a}`; rotor.add(duct);
+  }
+  // The islet of Langerhans: a pale, rounded cluster of small endocrine cells in the middle of the acini.
+  const islet = new THREE.Group(); islet.name = 'pancreas:islet-of-langerhans'; islet.position.set(0, 0.1, 0); rotor.add(islet);
+  const isletHalo = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 20), new THREE.MeshPhysicalMaterial({ color: 0xf3dde6, roughness: 0.6, transparent: true, opacity: 0.35, depthWrite: false }));
+  isletHalo.name = 'pancreas:islet:capsule'; isletHalo.scale.set(1, 0.42, 1); islet.add(isletHalo);
+  const kinds = [
+    { kind: 'beta', share: 0.55, color: 0xe9c3a0 },
+    { kind: 'alpha', share: 0.35, color: 0xd99aac },
+    { kind: 'delta', share: 0.1, color: 0xb9a6d8 },
+  ] as const;
+  const ENDOCRINE_CELLS = 40;
+  const counts = kinds.map((k) => Math.round(k.share * ENDOCRINE_CELLS));
+  const pool: Array<(typeof kinds)[number]['kind']> = kinds.flatMap((k, i) => Array.from({ length: counts[i] }, () => k.kind));
+  const rnd = (n: number): number => { const v = Math.sin((n + 1) * 12.9898 + cell.cellId.length * 78.233) * 43758.5453; return v - Math.floor(v); };
+  for (let i = pool.length - 1; i > 0; i -= 1) { const j = Math.floor(rnd(i) * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const materials = new Map<string, THREE_NS.Material>(kinds.map((k) => [k.kind, biologicalMaterial(THREE, k.color, { emissive: 0x1d1210, roughness: 0.55 })]));
+  pool.forEach((kind, i) => {
+    const r = 0.165 * Math.sqrt((i + 0.5) / pool.length); const t = i * 2.399963229728653;
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.022, 1), materials.get(kind));
+    c.name = `pancreas:islet:${kind}-cell:${i}`; c.position.set(Math.cos(t) * r, (rnd(i + 99) - 0.5) * 0.05, Math.sin(t) * r); islet.add(c);
+  });
+  // Islets are richly vascularised: fenestrated capillaries run straight through the cluster.
+  for (const [index, angle] of [[0, 0.3], [1, 1.9]] as const) {
+    const d = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+    const curve = new THREE.CatmullRomCurve3([d.clone().multiplyScalar(-0.32).setY(0.06), new THREE.Vector3(0, 0.11, 0), d.clone().multiplyScalar(0.32).setY(0.07)]);
+    const vessel = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.012, 8, false), new THREE.MeshPhysicalMaterial({ color: 0xbe3048, emissive: 0xbe3048, emissiveIntensity: 0.09, roughness: 0.34 }));
+    vessel.name = `pancreas:islet-capillary:${index}`; rotor.add(vessel);
+  }
+  root.userData.modeledComponents = ['ACINI', 'ACINAR_CELLS_BASAL_NUCLEI', 'ZYMOGEN_GRANULES', 'INTERCALATED_DUCTS', 'ISLET_OF_LANGERHANS', 'BETA_CELLS', 'ALPHA_CELLS', 'DELTA_CELLS', 'ISLET_CAPILLARIES'];
+  root.userData.isletCellShares = 'TEXTBOOK_LAYOUT_NOT_MEASURED';
+  root.userData.endocrineCellCounts = Object.fromEntries(kinds.map((k, i) => [k.kind, counts[i]]));
+  markModel(root, 'tissue'); addShadows(root); return root;
+}
+
 function buildBloodModel(THREE: typeof THREE_NS): THREE_NS.Group {
   const root = new THREE.Group(); root.name = 'macro-tissue:BLOOD';
   const rotor = createPresentationStage(THREE, root, 0.82);
@@ -478,7 +559,7 @@ export class HumanMacroMicroLayer {
     this.refreshAnatomyLayers();
     this.selectedPart = null; this.selectedRegion = null; this.manualYaw = null;
     const artifact = this.artifact;
-    if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : buildTissueModel(this.THREE, artifact.cell)); return; }
+    if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.slide.tissueType === 'PANCREAS' ? buildPancreasTissueModel(this.THREE, artifact.cell) : buildTissueModel(this.THREE, artifact.cell)); return; }
     if (artifact?.kind === 'hyperscope' && artifact.cell) {
       this.replace(artifact.cell.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
     }

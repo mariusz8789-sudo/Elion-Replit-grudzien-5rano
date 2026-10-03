@@ -1,5 +1,6 @@
 import type { EpistemicStatus } from '../generator/recipe';
 import type { SceneBasis, SceneManifest } from './sceneBasis';
+import { CERN_SCENE_MANIFESTS } from './cernSceneManifests';
 
 /**
  * U0-b — one manifest per laboratory scene: what on screen is a measurement,
@@ -466,7 +467,8 @@ const MANIFESTS: readonly SceneManifest[] = [
   }),
 ];
 
-const BY_ID: ReadonlyMap<string, SceneManifest> = new Map(MANIFESTS.map((m) => [m.sceneId, m]));
+// The CERN world's scenes are looked up here too; allLabSceneManifests() stays lab-only.
+const BY_ID: ReadonlyMap<string, SceneManifest> = new Map([...MANIFESTS, ...CERN_SCENE_MANIFESTS].map((m) => [m.sceneId, m]));
 
 export function allLabSceneManifests(): readonly SceneManifest[] {
   return MANIFESTS;

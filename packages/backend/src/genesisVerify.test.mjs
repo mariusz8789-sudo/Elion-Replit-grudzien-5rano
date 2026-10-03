@@ -99,6 +99,12 @@ test('Genesis Verify: valid, tampered and missing-provenance ResearchRun records
     for (const s of ['MATCH', 'What was checked', 'Hashes', 'What was NOT checked', 'UNSIGNED', ref.sha256]) assert.ok(html.includes(s), s);
     assert.doesNotMatch(html, /<script|https?:\/\//, 'self-contained page, no scripts or external resources');
 
+    // A licence or compute gate stops the replay honestly: BLOCKED with its reason, never a MATCH.
+    const gated = verifySubmittedRecord(bytes, { declaredSha256: ref.sha256, db, projectId: project.id, admitCapability: () => ({ reason: 'BLOCKED_BY_LICENSE', detail: 'not licensed for this use' }) });
+    assert.equal(gated.verdict, 'BLOCKED');
+    assert.ok(gated.reasons.includes('BLOCKED_BY_LICENSE'));
+    assert.equal(checkOf(gated, 'replay').status, 'NOT_RUN');
+
     // 2. TAMPERED: one number changed in the file, hashes left as they were.
     const record = JSON.parse(bytes.toString('utf8'));
     const edited = { ...record, output: { ...record.output, molWt: 150.0 } };

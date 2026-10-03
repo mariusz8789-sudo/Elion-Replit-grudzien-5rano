@@ -803,8 +803,17 @@ export function handleApi(db, ctx) {
       if (method !== 'POST') return err(405, 'method_not_allowed');
       if (!atLeast(role, 'editor')) return err(403, 'forbidden');
       if (body?.record === undefined || body?.record === null) return err(400, 'record_required');
-      const report = verifySubmittedRecord(body.record, { declaredSha256: body?.declaredSha256 ?? null, db, projectId });
-      return ok({ report, ...(body?.format === 'html' ? { html: renderVerifyReportHtml(report) } : {}) });
+      // Same admission as every other real-engine replay: one heavy run at a time, per-user rate limit,
+      // and the commercial ADMET licence gate for ADMET capabilities.
+      const admitCapability = (capability) => {
+        if (!['admet-estimation', 'toxicity-risk-estimation'].includes(capability)) return null;
+        const blocked = admitCommercialAdmet();
+        return blocked ? { reason: 'BLOCKED_BY_LICENSE', detail: `The ADMET engine is not licensed for this use (${blocked.body?.error ?? 'licence gate'}).` } : null;
+      };
+      return runHeavyCompute(db, ctx, `genesis-verify:${projectId}`, () => {
+        const report = verifySubmittedRecord(body.record, { declaredSha256: body?.declaredSha256 ?? null, db, projectId, admitCapability });
+        return ok({ report, ...(body?.format === 'html' ? { html: renderVerifyReportHtml(report) } : {}) });
+      });
     }
     // ---- R1-a Research Run: one question → one run id → the model PROPOSES a plan (researchRun.mjs) ----
     // A research run is an agent run of RESEARCH_RUN_DOMAIN; only the server writes its research state.

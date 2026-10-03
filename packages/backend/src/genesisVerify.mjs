@@ -114,7 +114,7 @@ function anchorAgainstLedger(db, projectId, record) {
   return { status: PASS, anchored: true, ledgerHeadChainHash: view.researchState.chain.head ?? null, detail: `Identical to the experiment recorded in the hash-chained research state (chain length ${view.researchState.chain.length}).` };
 }
 
-function replayRecord(record) {
+function replayRecord(record, admitCapability) {
   const engineId = record.engine.engineId;
   const executor = RESEARCH_RUN_EXECUTORS[engineId];
   if (!executor) return { status: NOT_RUN, blocked: true, reason: 'UNKNOWN_ENGINE', detail: `Genesis has no ResearchRun adapter for engine '${engineId}'.` };
@@ -124,6 +124,9 @@ function replayRecord(record) {
     return { status: NOT_RUN, blocked: true, reason: 'INPUT_NOT_ACCEPTED', detail: `The recorded input is not one the ${engineId} adapter accepts as-is (${parsed.ok ? 'shape differs' : parsed.reason}).` };
   }
   const capability = executor.scienceCapability;
+  // A licence or compute gate the caller enforces (e.g. commercial ADMET use) stops the replay honestly.
+  const denial = admitCapability ? admitCapability(capability) : null;
+  if (denial) return { status: NOT_RUN, blocked: true, reason: denial.reason, capability, detail: denial.detail };
   const replay = replayCapabilityInputs(capability, record.input);
   if (!replay.ok) {
     const runtime = replay.error === 'BLOCKED_BY_RUNTIME';
@@ -145,7 +148,7 @@ function replayRecord(record) {
  * Verifies one submitted record. Pure with respect to the database: reads the research state when
  * { db, projectId } are given, writes nothing. Returns the report object; never throws on bad input.
  */
-export function verifySubmittedRecord(submission, { declaredSha256 = null, db = null, projectId = null, now = () => new Date().toISOString() } = {}) {
+export function verifySubmittedRecord(submission, { declaredSha256 = null, db = null, projectId = null, admitCapability = null, now = () => new Date().toISOString() } = {}) {
   const checks = [];
   const reasons = [];
   let tampered = false;
@@ -212,7 +215,7 @@ export function verifySubmittedRecord(submission, { declaredSha256 = null, db = 
       blocked = true; reasons.push('NOT_AN_EXECUTED_EXPERIMENT');
       replay = { status: NOT_RUN, detail: `The engine outcome is ${record.status}; there is no engine output to re-run.` };
     } else {
-      replay = replayRecord(record);
+      replay = replayRecord(record, admitCapability);
       if (replay.blocked) { blocked = true; reasons.push(replay.reason); }
       if (replay.drift) { drift = true; reasons.push(replay.reason); }
     }

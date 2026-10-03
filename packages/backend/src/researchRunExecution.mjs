@@ -288,10 +288,12 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
     status: res.ok ? 'EXECUTED' : res.status,
     output,
     outputHash: sha256Hex(canonicalJson(output)),
-    environment: { node: process.versions.node, platform: process.platform, arch: process.arch, toolchain: engine.environment ?? null },
-    startedAt,
-    finishedAt: now(),
-    durationMs: Date.now() - t0,
+    // A remote worker reports where it really ran; otherwise this is the server's own process.
+    environment: tools.executionContext?.environment ?? { node: process.versions.node, platform: process.platform, arch: process.arch, toolchain: engine.environment ?? null },
+    ...(tools.executionContext?.executedOn ? { executedOn: tools.executionContext.executedOn } : {}),
+    startedAt: tools.executionContext?.startedAt ?? startedAt,
+    finishedAt: tools.executionContext?.finishedAt ?? now(),
+    durationMs: tools.executionContext?.durationMs ?? Date.now() - t0,
     scienceRunId,
   };
   if (execution.inputHash !== frozen.inputHash) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: 'input_hash_drift' };
@@ -549,7 +551,7 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
  */
 export function executeResearchExperiment(db, projectId, runId, {
   hypothesisId = null, userId = null, tools = DEFAULT_RESEARCH_TOOLS, proposeEvidence = proposeStructuredEvidence,
-  now = () => new Date().toISOString(),
+  now = () => new Date().toISOString(), stopAfterFreeze = false,
 } = {}) {
   const view = getResearchRun(db, projectId, runId);
   if (!view) return { ok: false, status: 'NOT_FOUND' };
@@ -597,6 +599,8 @@ export function executeResearchExperiment(db, projectId, runId, {
   }
 
   const current = getResearchRun(db, projectId, runId).experiments.find((e) => e.experimentId === experimentId);
+  // A remote worker takes the frozen experiment from here: the server froze it, the worker will run the engine.
+  if (stopAfterFreeze && !current.execution) return { ok: true, status: 'FROZEN', deduped: false, experimentId, frozen: current.frozen };
   let executedNow = false;
   if (!current.execution) {
     const r = executeAndFalsify(db, projectId, runId, current.frozen, tools, now);

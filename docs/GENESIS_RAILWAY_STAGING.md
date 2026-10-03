@@ -109,6 +109,25 @@ horizontally scale the write service against one SQLite file. A real Postgres
 migration is future software work and must be implemented/tested before a
 `DATABASE_URL` is added.
 
+## Remote ResearchRun worker (software exists, not deployed)
+
+A ResearchRun experiment can be queued for a separate worker process:
+`POST .../experiments` with `{"async": true, "remote": true}`. The worker
+(`node packages/backend/src/remoteWorkerMain.mjs`) has no database and no shared
+file; it needs only `GENESIS_SERVER_URL` and `GENESIS_WORKER_TOKEN`. It claims the
+job through `/api/worker/v1/claim` (lease), keeps it with `/heartbeat`, runs the
+engine in a killable child, uploads the outcome to content-addressed storage and
+completes through `/complete`. The server freezes the prediction before the
+engine runs, builds the record from the stored outcome artifact, and replays it
+on its own engine. A worker that dies loses its lease; the job (up to 3
+attempts) goes to another worker and the same frozen experiment is resumed.
+The surface is off (503) until `GENESIS_WORKER_TOKEN` is set on the server.
+Limits: one shared token authenticates workers, so the worker-reported engine
+status and environment are only as trustworthy as that token and host; the server
+needs the engine to replay; artifact storage is still the server's single-node
+content-addressed directory; advance/fan-out jobs are not remote yet. Proof:
+`remoteWorker.e2e.test.mjs`. Nothing here changes the Railway services.
+
 ## Exact staging variables
 
 Required non-secret values:

@@ -79,6 +79,7 @@ import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
+import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -957,6 +958,14 @@ export function handleApi(db, ctx) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
         const hypothesisId = typeof body?.hypothesisId === 'string' && body.hypothesisId.trim() ? body.hypothesisId.trim().slice(0, 200) : null;
+        if (body?.async === true) {
+          // Same execution path as below, started by a queue worker instead of this request.
+          return (async () => {
+            const queued = await enqueueResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
+            if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
+            return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
+          })();
+        }
         return runHeavyCompute(db, ctx, `research-run:${current.researchRunId}`, () => {
           const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
           if (result.ok) return ok(result, result.deduped ? 200 : 201);
@@ -964,6 +973,20 @@ export function handleApi(db, ctx) {
           const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
         });
+      }
+      if (seg[4] === 'experiment-jobs' && (seg.length === 6 || (seg.length === 7 && seg[6] === 'cancel'))) {
+        const job = readResearchJob(db, current.researchRunId, seg[5]);
+        if (!job || job.payload?.projectId !== projectId) return err(404, 'not_found');
+        if (seg.length === 6) {
+          if (method !== 'GET') return err(405, 'method_not_allowed');
+          return ok({ job });
+        }
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const cancelled = await queueFor(db).cancel(job.jobId, 'USER_REQUEST');
+          return cancelled.ok ? ok({ job: cancelled.job }) : { status: 409, body: { error: cancelled.error } };
+        })();
       }
       // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
       if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {

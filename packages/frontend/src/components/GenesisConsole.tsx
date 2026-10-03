@@ -65,6 +65,13 @@ function guideModeFromHash(hash: string): GuideMode | null {
   return null;
 }
 
+// Plain words for a layperson; the domain id and its decision ids stay in the button's title.
+const DOMAIN_PLAIN: Readonly<Record<GenesisDomainId, string>> = {
+  LOWER_HARM: 'Zamiennik o mniejszej szkodliwości (GLP-1R, GIPR, GCGR)',
+  E2E01: 'Wygenerowani kandydaci osi inkretyn (ChEMBL)',
+  MIND: 'Pętla hipotez w przestrzeni modelu',
+};
+
 export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | null } = {}): React.ReactElement {
   const initialGuide = autoplay !== undefined ? autoplay : (typeof window === 'undefined' ? null : guideModeFromHash(window.location.hash));
   const [guideMode, setGuideMode] = useState<GuideMode | null>(initialGuide);
@@ -250,8 +257,8 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
                   has its own real, working entry point: the MindPanel section rendered further
                   down this console. */}
               {GENESIS_DOMAINS.filter((d) => d.domainId !== 'MIND').map((d) => (
-                <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label}>
-                  {d.domainId}
+                <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label} data-testid={`console-domain-${d.domainId}`}>
+                  {DOMAIN_PLAIN[d.domainId]}
                 </button>
               ))}
             </div>

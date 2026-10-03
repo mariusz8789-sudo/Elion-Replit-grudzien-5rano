@@ -5,6 +5,7 @@ import { FingerprintChip } from './genesis-ui/FingerprintChip';
 import { SceneProvenanceBadge } from './SceneProvenanceBadge';
 import { renderLowerHarmLabel, isRtl, SUPPORTED_LOCALES } from '../core/agent/lowerHarmLabels';
 import type { SupportedLocale } from '../core/agent/phaseELabels';
+import { getLocale } from '../core/i18n';
 
 /**
  * /physics/cms-z — CMS Open Data record 5208 (Z→μμ, 2011), read-only.
@@ -64,7 +65,8 @@ type FetchState =
 const EXPECTED_SHA256 = '7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1';
 
 export function PhysicsCmsZScreen(): React.ReactElement {
-  const [locale, setLocale] = useState<SupportedLocale>('en');
+  // Opens in the app's chosen language (PL, EN or Arabic); the switch above still changes it for this screen.
+  const [locale, setLocale] = useState<SupportedLocale>(() => { const l = getLocale(); return l === 'pl' || l === 'ar' ? l : 'en'; });
   const [state, setState] = useState<FetchState>({ phase: 'loading' });
 
   useEffect(() => {

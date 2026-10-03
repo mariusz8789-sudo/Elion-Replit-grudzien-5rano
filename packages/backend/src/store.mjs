@@ -25,6 +25,8 @@ import { ensureAccessSchema } from './access.mjs';
 import { hashSecret, looksHashed } from './secrets.mjs';
 import { ACCOUNT_PROFILES, DEFAULT_ACCOUNT_PROFILE, normalizeAccountProfile } from './accountProfiles.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
+import { snapshotDatabase } from './dbDurability.mjs';
+import path from 'node:path';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -673,7 +675,7 @@ function ensureAccountProfileColumn(db) {
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
-export function openDatabase(filename = ':memory:') {
+export function openDatabase(filename = ':memory:', { backupDir = null } = {}) {
   const db = new DatabaseSync(filename);
   try {
     db.exec('PRAGMA foreign_keys = ON;');
@@ -681,6 +683,15 @@ export function openDatabase(filename = ':memory:') {
       db.exec('PRAGMA journal_mode = WAL;');
       // A heavy job writes from a worker thread on its own connection; wait for the lock instead of failing.
       db.exec('PRAGMA busy_timeout = 5000;');
+    }
+    const { user_version: before } = db.prepare('PRAGMA user_version').get();
+    // An older release refuses a database whose schema is newer than it knows, so a code-only rollback cannot
+    // reopen a migrated database. The pre-migration snapshot is what a rollback restores.
+    const preMigrationSnapshot = filename !== ':memory:' && before > 0 && before < CURRENT_SCHEMA_VERSION
+      ? snapshotDatabase({ dbPath: filename, dir: backupDir ?? process.env.GENESIS_BACKUP_DIR ?? path.join(path.dirname(filename), 'backups'), keep: Number.MAX_SAFE_INTEGER })
+      : null;
+    if (preMigrationSnapshot) {
+      console.log(JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'db_pre_migration_snapshot', fromSchema: before, toSchema: CURRENT_SCHEMA_VERSION, file: preMigrationSnapshot.file, bytes: preMigrationSnapshot.bytes }));
     }
     db.exec(SCHEMA);
     migrate(db);

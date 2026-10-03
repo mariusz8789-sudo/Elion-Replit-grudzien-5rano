@@ -7,6 +7,9 @@ import { handleApi } from './api.mjs';
 import { openDatabase } from './store.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { detect as pyscfDetect } from './compute/qmAdapter.mjs';
+import { detect as dockingDetect } from './compute/dockingAdapter.mjs';
+import { detect as mdDetect } from './compute/mdAdapter.mjs';
+import { detect as admetDetect } from './compute/admetAdapter.mjs';
 import { engineUnavailable } from './engineTestGate.mjs';
 import { createResearchRunWorker } from './researchRunJobs.mjs';
 
@@ -22,6 +25,30 @@ const CASES = [
     supported: { observable: 'energyHartree', operator: '<', value: -39, critical: true },
     refuted: { observable: 'energyHartree', operator: '>', value: -39, critical: true },
     scienceCapability: 'quantum-chemistry',
+  },
+  {
+    engineId: 'vina',
+    skip: engineUnavailable('vina', dockingDetect()),
+    parameters: { ligandSmiles: 'CC(=O)Oc1ccccc1C(=O)O', exhaustiveness: 8, nPoses: 3, seed: 42 },
+    supported: { observable: 'bestAffinityKcalMol', operator: '<', value: -5, critical: true },
+    refuted: { observable: 'bestAffinityKcalMol', operator: '>', value: -5, critical: true },
+    scienceCapability: 'molecular-docking',
+  },
+  {
+    engineId: 'openmm',
+    skip: engineUnavailable('openmm', mdDetect()),
+    parameters: { steps: 300 },
+    supported: { observable: 'potentialEnergyMinimizedKjmol', operator: '<', value: 0, critical: true },
+    refuted: { observable: 'potentialEnergyMinimizedKjmol', operator: '>', value: 0, critical: true },
+    expectedReplay: 'NOT_APPLICABLE',
+  },
+  {
+    engineId: 'admet',
+    skip: engineUnavailable('admet', admetDetect()),
+    parameters: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+    supported: { observable: 'logP', operator: '<', value: 3, critical: true },
+    refuted: { observable: 'logP', operator: '>', value: 3, critical: true },
+    scienceCapability: 'admet-estimation',
   },
 ];
 
@@ -71,7 +98,7 @@ for (const c of CASES) {
         assert.equal(x.execution.engine.engineId, c.engineId);
         assert.match(x.execution.engine.engineLabel ?? '', /\d/, 'engine version is recorded');
         assert.equal(x.falsification.verdict, expected);
-        assert.equal(x.next.replay.verdict, 'MATCH', 'the existing verifier re-runs the real engine and matches');
+        assert.equal(x.next.replay.verdict, c.expectedReplay ?? 'MATCH', 'replay is MATCH where a bit-exact replayer exists, NOT_APPLICABLE where none is wired');
         assert.equal(run.researchState.chain.ok, true);
         outcomes.push({ runId, experimentId: x.experimentId, outputHash: x.execution.outputHash, inputHash: x.execution.inputHash });
       }
@@ -88,3 +115,15 @@ for (const c of CASES) {
     } finally { try { db.close(); } catch { /* closed */ } rmSync(dir, { recursive: true, force: true }); }
   });
 }
+
+test('admet: a COMMERCIAL_PRODUCT use purpose is BLOCKED at execution time with no prediction made', async () => {
+  const { RESEARCH_RUN_EXECUTORS } = await import('./researchRunEngines.mjs');
+  const before = process.env.GENESIS_ENGINE_USE_PURPOSE;
+  process.env.GENESIS_ENGINE_USE_PURPOSE = 'COMMERCIAL_PRODUCT';
+  try {
+    const out = await RESEARCH_RUN_EXECUTORS.admet.run({ smiles: 'CC(=O)Oc1ccccc1C(=O)O' });
+    assert.equal(out.ok, false);
+    assert.equal(out.status, 'BLOCKED');
+    assert.equal(out.output, undefined);
+  } finally { if (before === undefined) delete process.env.GENESIS_ENGINE_USE_PURPOSE; else process.env.GENESIS_ENGINE_USE_PURPOSE = before; }
+});

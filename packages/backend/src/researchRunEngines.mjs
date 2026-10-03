@@ -10,6 +10,13 @@
  */
 import { descriptors, embed3d } from './compute/rdkitAdapter.mjs';
 import { singlePoint as pyscfSinglePoint } from './compute/qmAdapter.mjs';
+import { dock as vinaDock } from './compute/dockingAdapter.mjs';
+import { referenceCase as openmmWaterBox } from './compute/mdAdapter.mjs';
+import { predict as admetPredict } from './compute/admetAdapter.mjs';
+import { admitAdmetUse } from './compute/admetResearchRunExecutor.mjs';
+import { resolveEngineUsePurpose } from './compute/engineUsePurpose.mjs';
+import { endpointCategories, splitAdmetPrediction } from './campaign/multiFidelity.mjs';
+import { DEFAULT_DOCKING_TARGET, listDockingTargets, prepareDockingTarget } from './compute/dockingTargets.mjs';
 import { getTool, TOOL_STATUS } from './campaign/toolchain.mjs';
 
 export const PREDICTION_OPERATORS = Object.freeze(['<', '<=', '>', '>=', '==', '!=']);
@@ -85,6 +92,100 @@ export const RESEARCH_RUN_EXECUTORS = Object.freeze({
       if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
       if (r.error === 'invalid_input') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
       return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
+    },
+  }),
+
+  vina: Object.freeze({
+    engineId: 'vina',
+    /** Same capability the existing replayer ('molecular-docking' in campaign/verify.mjs) re-runs, same fixed seed. */
+    scienceCapability: 'molecular-docking',
+    inputShape: '{ "ligandSmiles": string, "targetId"?: a vetted docking target id, "exhaustiveness"?: 1-16, "nPoses"?: 1-5, "seed"?: integer }',
+    observables: Object.freeze({ bestAffinityKcalMol: 'number', nPoses: 'number' }),
+    parseInput(parameters) {
+      const ligandSmiles = typeof parameters?.ligandSmiles === 'string' ? parameters.ligandSmiles.trim() : '';
+      if (!ligandSmiles) return { ok: false, reason: 'ligand_smiles_required' };
+      if (ligandSmiles.length > MAX_SMILES || /\s/.test(ligandSmiles)) return { ok: false, reason: 'smiles_invalid_shape' };
+      const targetId = parameters?.targetId ?? DEFAULT_DOCKING_TARGET;
+      if (!listDockingTargets().includes(targetId)) return { ok: false, reason: 'unknown_docking_target' };
+      const exhaustiveness = parameters?.exhaustiveness ?? 8;
+      const nPoses = parameters?.nPoses ?? 3;
+      const seed = parameters?.seed ?? 42;
+      if (!Number.isInteger(exhaustiveness) || exhaustiveness < 1 || exhaustiveness > 16) return { ok: false, reason: 'exhaustiveness_out_of_range' };
+      if (!Number.isInteger(nPoses) || nPoses < 1 || nPoses > 5) return { ok: false, reason: 'n_poses_out_of_range' };
+      if (!Number.isInteger(seed)) return { ok: false, reason: 'seed_invalid' };
+      // The receptor identity is part of the frozen input: the prediction is made against exactly this PDBQT.
+      const target = prepareDockingTarget(targetId);
+      if (!target.ok) return { ok: false, reason: target.error ?? 'target_preparation_failed' };
+      return { ok: true, input: { ligandSmiles, targetId, receptorPdbqtSha256: target.receptorPdbqtSha256, center: target.center, boxSize: target.boxSize, exhaustiveness, nPoses, seed } };
+    },
+    run(input) {
+      const target = prepareDockingTarget(input.targetId);
+      if (!target.ok) return { ok: false, status: 'BLOCKED', reason: `TARGET: ${target.error}${target.reason ? `: ${target.reason}` : ''}` };
+      if (target.receptorPdbqtSha256 !== input.receptorPdbqtSha256) return { ok: false, status: 'BLOCKED', reason: 'RECEPTOR_PREPARATION_DRIFT' };
+      const r = vinaDock({
+        ligandSmiles: input.ligandSmiles, receptorPdbqtPath: target.receptorPdbqtPath,
+        center: input.center, boxSize: input.boxSize, exhaustiveness: input.exhaustiveness, nPoses: input.nPoses, seed: input.seed,
+      });
+      if (r.ok) return { ok: true, output: { bestAffinityKcalMol: r.data.bestAffinityKcalMol, nPoses: r.data.nPoses, poseSha256: r.data.poseSha256 }, engineLabel: r.data.vinaVersion };
+      if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
+      if (r.error === 'invalid_input') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
+      return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
+    },
+  }),
+
+  openmm: Object.freeze({
+    engineId: 'openmm',
+    // No scienceCapability: platform numerics are not bit-exact, so no replay path is wired and the
+    // ResearchRun records replay as NOT_APPLICABLE instead of claiming a MATCH it cannot verify.
+    inputShape: '{ "steps"?: integer 100-2000 }  (the only OpenMM system Genesis runs is a TIP3P water box: software integration, not candidate stability)',
+    observables: Object.freeze({
+      waters: 'number', atoms: 'number', steps: 'number', temperatureK: 'number', potentialEnergyInitialKjmol: 'number',
+      potentialEnergyMinimizedKjmol: 'number', potentialEnergyProductionKjmol: 'number',
+    }),
+    parseInput(parameters) {
+      const steps = parameters?.steps ?? 300;
+      if (!Number.isInteger(steps) || steps < 100 || steps > 2000) return { ok: false, reason: 'steps_out_of_range' };
+      return { ok: true, input: { steps } };
+    },
+    run(input) {
+      const r = openmmWaterBox({ steps: input.steps });
+      if (r.ok) return { ok: true, output: r.data, engineLabel: `${r.version} ${r.platform}` };
+      if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
+      return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
+    },
+  }),
+
+  admet: Object.freeze({
+    engineId: 'admet',
+    /** Same capability the existing replayer ('admet-estimation' in campaign/verify.mjs) re-runs, 1e-4 tolerance. */
+    scienceCapability: 'admet-estimation',
+    inputShape: '{ "smiles": string }  (absorption, distribution, metabolism, excretion and physicochemical endpoints; MODEL_ESTIMATE, never a measurement)',
+    // The endpoint list comes from the installed model, so it is read when needed and empty when the engine is absent.
+    get observables() {
+      return Object.fromEntries(Object.entries(endpointCategories())
+        .filter(([id, meta]) => meta.category !== 'Toxicity' && !id.endsWith('_drugbank_approved_percentile'))
+        .map(([id]) => [id, 'number']));
+    },
+    parseInput(parameters) {
+      const smiles = typeof parameters?.smiles === 'string' ? parameters.smiles.trim() : '';
+      if (!smiles) return { ok: false, reason: 'smiles_required' };
+      if (smiles.length > MAX_SMILES || /\s/.test(smiles)) return { ok: false, reason: 'smiles_invalid_shape' };
+      return { ok: true, input: { smiles } };
+    },
+    run(input) {
+      // The licence gate is evaluated at execution time, not cached: COMMERCIAL_PRODUCT stays BLOCKED_BY_LICENSE.
+      const admission = admitAdmetUse({ purpose: resolveEngineUsePurpose().admet });
+      if (!admission.ok) return { ok: false, status: 'BLOCKED', reason: `${admission.status}: ${admission.failureCode}` };
+      const r = admetPredict([input.smiles]);
+      if (!r.ok) {
+        if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
+        if (r.error === 'invalid_input') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
+        return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
+      }
+      const full = r.predictions[input.smiles] ?? {};
+      const { admetOut } = splitAdmetPrediction(full, endpointCategories());
+      if (Object.keys(admetOut).length === 0) return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: 'no_endpoints_for_input' };
+      return { ok: true, output: admetOut, engineLabel: r.version };
     },
   }),
 });

@@ -12,6 +12,10 @@ on:
         description: Commit production should be serving (40 characters); empty skips the commit check
         required: false
         default: ''
+      base_url:
+        description: Site to check
+        required: false
+        default: 'https://genesis-physics.com'
       attempts:
         description: Health attempts, 15 s apart
         required: false
@@ -26,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      BASE: https://genesis-physics.com
+      BASE: ${{ inputs.base_url || vars.GENESIS_PRODUCTION_URL || 'https://genesis-physics.com' }}
       EXPECTED_SHA: ${{ github.event.deployment.sha || inputs.expected_sha }}
       ATTEMPTS: ${{ inputs.attempts || '20' }}
     steps:
@@ -34,8 +38,8 @@ jobs:
         run: |
           last=''
           for i in $(seq 1 "$ATTEMPTS"); do
-            code=$(curl -sS -o health.json -w '%{http_code}' --max-time 20 "$BASE/api/health" 2>curl.err) || code="000 $(tr '\n' ' ' < curl.err) dns=$(getent hosts "${BASE#https://}" | head -1)"
-            if [ "$code" = 200 ]; then
+            code=$(curl -sS -L -o health.json -w '%{http_code} %{url_effective}' --max-time 20 "$BASE/api/health" 2>curl.err) || code="000 $(tr '\n' ' ' < curl.err) dns=$(getent hosts "$(echo "$BASE" | sed -E 's#^https?://##; s#/.*##')" | head -1)"
+            if [ "${code%% *}" = 200 ]; then
               if last=$(node -e "
                 const h = require('./health.json');
                 const want = process.env.EXPECTED_SHA;
@@ -47,7 +51,7 @@ jobs:
                 console.log('health OK ' + h.commit + ' ' + h.db.durability);
               "); then echo "::notice title=Production health::$last"; exit 0; fi
             else
-              last="HTTP $code"
+              last="HTTP $code body=$(head -c 200 health.json 2>/dev/null | tr '\n' ' ')"
             fi
             echo "attempt $i: $last"
             sleep 15

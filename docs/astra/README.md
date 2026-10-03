@@ -13,4 +13,4 @@ Current audit: main `5d064c4e`, PR #54 `fc29ef60`, PR #56 `0a372cdd`, checked on
 7. [Reference-only JSON Schema](./schema.json) and [synthetic example](./example.json)
 8. [Review response and validation](./REVIEW_RESPONSE.md)
 
-The schema and example are documentation artifacts, not a new persistence model or working serializer. They index existing records and explicitly distinguish synthetic examples from resolved exports. Source verification, licence decisions, human publication, runtime integration and delivery controls stay with their current owners. No merge or deployment is implied.
+The schema and example define an export, not a new persistence model. Since 2026-10-03 the pack is implemented in `packages/backend/src/researchRunEvidencePack.mjs` (builder, verifier, route); see the spec's Implementation section and [INTEGRATION-STATUS.md](./INTEGRATION-STATUS.md). They index existing records and explicitly distinguish synthetic examples from resolved exports. Source verification, licence decisions, human publication, runtime integration and delivery controls stay with their current owners. No merge or deployment is implied.

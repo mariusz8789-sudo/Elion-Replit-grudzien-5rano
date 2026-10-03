@@ -50,12 +50,12 @@ import { getToken } from '../core/backend/session';
 import { getCandidateProtocol, getExperimentMemory, type CandidateProtocol } from '../core/backend/client';
 import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
-import { BENCH_ZONES, benchLayoutOf, zoneOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
+import { BENCH_ZONES, benchLayoutOf, zoneOf } from '../core/liveExperiment/drugBenchLayout';
 import { labProcedureOf } from '../core/liveExperiment/labProcedure';
-import type { DockingStep } from '../core/liveExperiment/drugRunState';
 import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy, targetAnatomyRoute } from '../core/liveExperiment/targetAnatomy';
 import { UNRESOLVED_LABEL, UNRESOLVED_REASON_PL, resolveTwinContext, twinContextCommands, twinContextRequestFrom, twinContextRoute, type TwinContext } from '../core/liveExperiment/twinContext';
 import { FinalistFalsificationPanel } from './FinalistFalsificationPanel';
+import { DOCKING_SHORT, DrugBenchNote, DrugBenchReadout } from './DrugBenchReadout';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -72,15 +72,6 @@ import { FinalistFalsificationPanel } from './FinalistFalsificationPanel';
  * real command, session or verdict.
  */
 
-/** What the bench shows for each persisted docking step (the backend writes a step only once it is done). */
-const DOCKING_STEP_LABEL: Record<DockingStep | 'NONE', string> = {
-  NONE: '—',
-  SELECTED: 'kandydat wybrany do dokowania',
-  LIGAND_PREPARED: 'ligand przygotowany (RDKit + Meeko)',
-  VINA_STARTED: 'Vina liczy',
-  POSE_SCORED: 'poza wyznaczona i oceniona',
-  FAILED: 'dokowanie nie powiodło się',
-};
 
 const STATE_NAMES: readonly AgentActionState[] = ['IDLE', 'MOVING_TO_TARGET', 'ARRIVED', 'ALIGNING', 'REACHING', 'INTERACTING', 'EXECUTING', 'OBSERVING', 'REPORTING', 'RETURNING', 'BLOCKED'];
 
@@ -136,10 +127,6 @@ export interface TranscriptEntry { readonly id: number; readonly who: 'user' | '
 /** Stages whose length is worth measuring: the ones where an engine is actually working. */
 const WORKING_STAGES = new Set(['GENERATING', 'ADMET', 'DOCKING', 'QUANTUM']);
 
-/** What each bench row is called in the world — plain words, no engine names. */
-const ZONE_LABEL_PL: Readonly<Record<BenchZone, string>> = {
-  QUEUE: 'w kolejce', ADMET: 'w analizatorze', DOCKING: 'w dokowaniu', FINALIST: 'finaliści', DISCARD: 'odrzucone',
-};
 
 /** What the scientist is doing, in the words a visitor would use. */
 const HAND_ACTION_PL: Readonly<Record<string, string>> = {
@@ -947,7 +934,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                         <span className="sw-cand-stages">
                           <span className={`sw-cand-stage is-${(admet?.status ?? 'none').toLowerCase()}`}>ADMET {admet?.status ?? '—'}</span>
                           <span className={`sw-cand-stage is-${(dock?.status ?? 'none').toLowerCase()}`}>
-                            Vina {dock?.value != null ? `${dock.value.toFixed(2)} kcal/mol` : dock?.status ?? '—'}
+                            {DOCKING_SHORT} {dock?.value != null ? `${dock.value.toFixed(2)} kcal/mol` : dock?.status ?? '—'}
                           </span>
                           <span className={`sw-cand-stage is-${(qm?.status ?? 'none').toLowerCase()}`}>
                             QM {qm?.value != null ? `${qm.value.toFixed(2)} eV` : qm?.status ?? '—'}
@@ -990,21 +977,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
               </p>
             )}
             {drugRun.phase === 'FAILED' && <p role="alert">Run zatrzymany: {drugRun.error}</p>}
-            <dl className="sw-drug-dl">
-              <dt>Cel białkowy</dt><dd>{st.target ? `${st.target.protein} · PDB ${st.target.pdbId}, łańcuch ${st.target.chain} (${st.target.receptorAtoms} atomów)` : 'receptor jeszcze nieprzygotowany'}</dd>
-              <dt>Generacje</dt><dd>{st.generationsCompleted}/{st.maxGenerations}</dd>
-              <dt>Kandydaci</dt><dd>{st.candidates.length} (zachowani {st.candidates.filter((c) => c.status === 'retained').length})</dd>
-              <dt>Na stole</dt><dd>{BENCH_ZONES.map((z) => `${ZONE_LABEL_PL[z]} ${layout.counts[z]}`).join(' · ')}</dd>
-              {layout.finalists.length > 0 && <><dt>Finaliści</dt><dd>{layout.finalists.map((f) => `#${f.rank} ${f.dockingScore?.toFixed(2)} kcal/mol`).join(' · ')}</dd></>}
-              {layout.samples.some((x) => x.rejectedReason) && <><dt>Odrzucone</dt><dd>{[...new Set(layout.samples.filter((x) => x.rejectedReason).map((x) => x.rejectedReason))].join(' · ')}</dd></>}
-              <dt>Fokus</dt><dd className="cw-mono">{focus?.smiles ?? '—'}</dd>
-              <dt>ADMET</dt><dd>{focus?.stages.admet?.status ?? '—'}</dd>
-              <dt>Krok dokowania</dt><dd>{DOCKING_STEP_LABEL[focus?.dockingStep ?? 'NONE']}</dd>
-              <dt>Docking (Vina)</dt><dd>{focus?.stages.docking?.value != null ? `${focus.stages.docking.value.toFixed(2)} kcal/mol` : focus?.stages.docking?.status ?? '—'}</dd>
-              <dt>Poza w kieszeni</dt><dd>{focus?.pose ? `${focus.pose.atoms.length} atomów, reszty: ${focus.pose.pocketResidues.slice(0, 6).join(', ')}${focus.pose.pocketResidues.length > 6 ? '…' : ''}` : '—'}</dd>
-              <dt>QM (PySCF)</dt><dd>{focus?.stages.quantum?.value != null ? `${focus.stages.quantum.value.toFixed(2)} eV` : focus?.stages.quantum?.status ?? '—'}</dd>
-              {st.blocked.length > 0 && <><dt>Zablokowane</dt><dd>{st.blocked.map((b) => `${b.stage}: ${b.blocker}`).join(' · ')}</dd></>}
-            </dl>
+            <DrugBenchReadout state={st} focus={focus} layout={layout} />
             {protocol && (() => {
               /* THE EXPERIMENT ENDS WITH A PROTOCOL — shown here exactly as the backend assembled it from
                  the record, split into what WAS computed (A), what a synthesis engine proposed if any (B),
@@ -1077,10 +1050,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                 </section>
               );
             })()}
-            <p className="sw-drug-note">
-              Geometria RDKit i przebieg Vina to REAL ENGINE OUTPUT; wynik Vina pozostaje estymatą funkcji oceniającej przy sztywnym receptorze, nie zmierzonym powinowactwem.
-              Predykcje ADMET to MODEL_ESTIMATE. Przekształcenia cząsteczek to COMPUTATIONAL TRANSFORMATION — obliczenia, nie synteza w laboratorium.
-            </p>
+            <DrugBenchNote focus={focus} />
           </aside>
         );
       })()}

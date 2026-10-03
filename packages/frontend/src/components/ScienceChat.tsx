@@ -41,6 +41,8 @@ import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './Decipherm
 import { fnv1a, canonicalJson } from '../core/events/hash';
 import { UnifiedResearchJourney } from './UnifiedResearchJourney';
 import { CHAT_ENGINES, chatEngineLine, type ChatEngine } from '../core/scienceChat/engines';
+import { capabilityLabel } from '../core/capabilityNames';
+import { TechnicalDetails, engineRowsFor, type TechnicalRow } from './TechnicalDetails';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -87,7 +89,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * atrap; funkcje niegotowe są jawnie oznaczone w odpowiedzi jako VERIFY_REQUIRED.
  */
 
-interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData; technical?: TechnicalRow[] }
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
 
@@ -253,7 +255,7 @@ export function precisionQuestionFromMessage(message: string): PrecisionQuestion
   return { question: message.trim(), compound: match[1], target: match[2] };
 }
 
-function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
+export function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
   const top = [...result.reports].sort((a, b) => (b.ranking?.score ?? -1) - (a.ranking?.score ?? -1)).slice(0, 5);
   const why = result.candidateWhy ?? [];
   const compute = (result.cheapCompute ?? []).slice(0, 5).map((run) => `compute CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary} · fingerprint ${run.runFingerprint}`);
@@ -261,11 +263,16 @@ function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveN
   const admet = (result.admetCompute ?? []).map((run) => `ADMET CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary}${run.runId ? ` · run ${run.runId}` : ''}`);
   const combination = result.combinationHypothesis;
   const neuro = result.neurobiology;
-  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(neuro ? [`NEUROBIOLOGY: target ${neuro.targetId}; receptor ${neuro.receptor}; family ${neuro.receptorFamily}; system ${neuro.neurotransmitterSystem}`, `Pathway: ${neuro.pathway.label} · ${neuro.pathway.status}; mechanism: ${neuro.mechanism.label} · ${neuro.mechanism.status}`, `Neuro uncertainty: ${neuro.pathway.uncertainty} ${neuro.mechanism.uncertainty}`] : []), ...(combination ? [`COMBINATION HYPOTHESIS ${combination.combinationId}: ${combination.candidateIds.join(' + ')}`, `Research priority: ${combination.researchPriority}; evidence coverage: ${combination.coveredEvidenceIds.length} covered, ${combination.missingEvidenceIds.length} missing`, `Target coverage: ${combination.coveredTargetIds.join(', ') || 'UNKNOWN'}; mechanism coverage: ${combination.coveredMechanismIds.join(', ') || 'UNKNOWN'}; uncovered targets: ${combination.uncoveredTargetIds.join(', ') || 'none declared'}`, `Uncertainty: ${combination.uncertainty}`, ...combination.validationPlan.map((step) => `NEXT VALIDATION: ${step}`)] : []), ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...(heavy.length ? ['HEAVY COMPUTE (existing backend Fabric):', ...heavy] : []), ...(admet.length ? ['ADMET-AI (MODEL_ESTIMATE):', ...admet] : []), ...top.map((report, index) => {
+  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(neuro ? [`NEUROBIOLOGY: target ${neuro.targetId}; receptor ${neuro.receptor}; family ${neuro.receptorFamily}; system ${neuro.neurotransmitterSystem}`, `Pathway: ${neuro.pathway.label} · ${neuro.pathway.status}; mechanism: ${neuro.mechanism.label} · ${neuro.mechanism.status}`, `Neuro uncertainty: ${neuro.pathway.uncertainty} ${neuro.mechanism.uncertainty}`] : []), ...(combination ? [`COMBINATION HYPOTHESIS ${combination.combinationId}: ${combination.candidateIds.join(' + ')}`, `Research priority: ${combination.researchPriority}; evidence coverage: ${combination.coveredEvidenceIds.length} covered, ${combination.missingEvidenceIds.length} missing`, `Target coverage: ${combination.coveredTargetIds.join(', ') || 'UNKNOWN'}; mechanism coverage: ${combination.coveredMechanismIds.join(', ') || 'UNKNOWN'}; uncovered targets: ${combination.uncoveredTargetIds.join(', ') || 'none declared'}`, `Uncertainty: ${combination.uncertainty}`, ...combination.validationPlan.map((step) => `NEXT VALIDATION: ${step}`)] : []), ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...(heavy.length ? ['HEAVY COMPUTE (existing backend Fabric):', ...heavy] : []), ...(admet.length ? [`${capabilityLabel('property-safety')} (MODEL_ESTIMATE):`, ...admet] : []), ...top.map((report, index) => {
     const cid = report.candidateId.match(/pubchem:(\d+)/)?.[1];
     const explanation = cid ? why.find((item) => item.pubchemCid === Number(cid)) : undefined;
     return `${index + 1}. ${report.candidateId} · research priority ${(report.ranking?.score ?? 0).toFixed(4)} · ${explanation?.rationale ?? 'brak live activity dla tego kandydata'} · uncertainty: ${explanation?.uncertainty ?? report.uncertainty}`;
   }), 'Granice: binding ≠ efficacy; prediction ≠ observation; brakujące ADME/Tox i clinical efficacy pozostają UNKNOWN.'].join('\n');
+}
+
+/** The engines behind a natural-discovery answer, for its collapsed technical details. */
+export function naturalDiscoveryTechnical(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): TechnicalRow[] {
+  return (result.admetCompute ?? []).length > 0 ? engineRowsFor(['property-safety']) : [];
 }
 
 export function formatFabricRun(run: ExperimentRun): string {
@@ -628,7 +635,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       }
       const targetMatch = msg.match(/(?:target(?:u)?|receptor(?:a)?|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
       const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1', executeHeavyCompute: true });
-      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), technical: naturalDiscoveryTechnical(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
       if (result.reports.length >= 2) {
         const computeRuns: SavedBiotechComputeRun[] = (result.cheapCompute ?? []).map((run) => ({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs }));
         for (const run of result.heavyCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
@@ -1058,6 +1065,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
             )}
             <div className="sc-text"><TurnText turn={t} /></div>
             {t.quantum && <QuantumHistogram data={t.quantum} />}
+            {t.technical && t.technical.length > 0 && <TechnicalDetails rows={t.technical} />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
             )}

@@ -6123,3 +6123,11 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .reality-deriv.status-cinematic { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
 .reality-deriv.status-blocked, .reality-deriv.status-not_modeled,
 .reality-deriv.replay-blocked, .reality-deriv.replay-not_reproducible { color: var(--red, #ef6f7b); border-color: rgba(239, 111, 123, 0.45); }
+
+/* Technical details (components/TechnicalDetails.tsx): exact engine identity, collapsed by default. */
+.tech-details { margin-block: 8px; font-size: 12px; color: var(--muted, #a3b1bd); }
+.tech-details summary { cursor: pointer; width: max-content; max-width: 100%; }
+.tech-details dl { display: grid; gap: 4px; margin: 6px 0 0; }
+.tech-details dl > div { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.tech-details dt { min-width: 10rem; font-weight: 600; }
+.tech-details dd { margin: 0; overflow-wrap: anywhere; }

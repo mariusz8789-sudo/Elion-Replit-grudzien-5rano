@@ -8,7 +8,7 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 import { useSession } from '../core/backend/session';
 import { profileLabel, profileOfUser } from '../core/accountProfiles';
-import { LOCALE_NATIVE_NAME, LOCALE_SHORT, UI_LOCALES, setLocale, useLocale } from '../core/i18n';
+import { LOCALE_NATIVE_NAME, LOCALE_SHORT, UI_LOCALES, localeDirection, setLocale, useLocale } from '../core/i18n';
 import { navDescription, navGroupLabel, navLabel, navShortLabel, shellText } from '../core/navigationText';
 import { useFocusTrap } from '../core/useFocusTrap';
 import { Icon, type IconName } from './home/Icon';
@@ -253,8 +253,8 @@ export function AppShell({ children, chat, chatInline = false }: {
       mounted twice, so its conversation never forks. */
   chatInline?: boolean;
 }): JSX.Element {
-  // The menu re-renders in the chosen language.
-  useLocale();
+  // The menu re-renders in the chosen language; Arabic turns the whole shell right-to-left.
+  const locale = useLocale();
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -392,7 +392,7 @@ export function AppShell({ children, chat, chatInline = false }: {
     <>
       {/* App owns the single dashboard-only code wallpaper. Worlds own their own scenery. */}
       <div className="hud-scrim" aria-hidden="true" />
-    <div className="shell" data-nav={collapsed ? 'collapsed' : 'expanded'}>
+    <div className="shell" data-nav={collapsed ? 'collapsed' : 'expanded'} dir={localeDirection(locale)} lang={locale}>
       <nav className={`gn-side${collapsed ? ' is-collapsed' : ''}`} id="genesis-sidebar" aria-label={shellText('navigation')} data-testid="desktop-navigation">
         <div className="gn-side-head">
           <a className="gn-brand" href="#/" aria-label="Genesis Physics — Start">

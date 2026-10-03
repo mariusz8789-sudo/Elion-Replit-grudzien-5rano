@@ -1,5 +1,6 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { stableStringify, sha256hex, type EvidenceLedger, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '../knowledge/generatedRecordAdmission.js';
 import { mulberry32 } from '../determinism.js';
 export { mulberry32 };
 export const CONST = Object.freeze({ G: 6.67430e-11, C: 299792458, HBAR: 1.054571817e-34, KB: 1.380649e-23, GEV_TO_KG: 1.78266192e-27, GEV_TO_J: 1.602176634e-10, M_PLANCK_GEV: 1.220910e19 } as const);
@@ -73,6 +74,6 @@ export class BlackHoleEventHorizonEngine {
   }
   commitToLedger(ledger: EvidenceLedger, res: FormationResult): string {
     const input: NewEvidenceInput = { sourceUrl: 'genesis://cern/bh/' + res.eventHash.slice(0, 12), sourceTimestamp: null, claim: 'micro-BH formation=' + res.formed + ' regime=' + (res.regime ?? 'none') + ' label=' + (res.bh?.label ?? 'n/a') + ' rs=' + (res.bh?.rsM ?? 0) + 'm', claimType: 'model', confidence: 1, provenance: { sourceKind: 'dataset', retrievedBy: 'blackhole-event-horizon-engine', independentSourceIds: [] } };
-    return ledger.addRecord(input).record.contentHash;
+    return proposeGeneratedRecord(ledger, input);
   }
 }

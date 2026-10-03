@@ -20,7 +20,8 @@
  */
 
 import http from 'node:http';
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -41,10 +42,17 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { createFanOutAwareWorker } from './researchRunFanOut.mjs';
+import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
+import { createReasoningProvider } from './reasoningProvider.mjs';
+import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
+import { createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
-import { listToolchain } from './campaign/toolchain.mjs';
+import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
+import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
+import { MAX_VERIFY_INPUT_BYTES } from './genesisVerify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -64,9 +72,21 @@ const startedAt = Date.now();
 let scientificRuntimeCache = null;
 let scientificRuntimeCachedAt = 0;
 const SCIENTIFIC_RUNTIME_CACHE_MS = 15_000;
+async function refreshScientificRuntime() {
+  if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
+    scientificRuntimeCache = await buildScientificRuntimeStatus(db);
+    scientificRuntimeCachedAt = Date.now();
+  }
+}
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
+// ENTITY-3: the one backend adapter to an external reasoning model. The key stays in this process's environment.
+const reasoningProvider = createReasoningProvider(process.env);
+const scientificSandboxImage = process.env.GENESIS_SCIENTIFIC_SANDBOX_IMAGE?.trim() || null;
+const scientificSandboxPort = scientificSandboxImage
+  ? createScientificSandboxPort({ backend: createDockerScientificSandboxBackend() })
+  : null;
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -76,6 +96,8 @@ const DB_PATH = process.env.GENESIS_DB_PATH ?? path.join(__dirname, '../data/gen
 // startowym, i w /api/health — operator nie musi zgadywać, a komisja nie musi
 // wierzyć na słowo. Sama diagnoza NIE blokuje startu: wdrożenie świadomie
 // efemeryczne (demo, :memory:) jest legalne, o ile jest NAZWANE.
+// Single-node content-addressed artifact custody next to the database (GENESIS_ARTIFACT_DIR overrides).
+const artifactStorage = createLocalContentAddressedArtifactStorage({ rootDir: path.resolve(process.env.GENESIS_ARTIFACT_DIR ?? (DB_PATH === ':memory:' ? mkdtempSync(path.join(tmpdir(), 'genesis-artifacts-')) : path.join(path.dirname(DB_PATH), 'artifacts'))) });
 const DB_DURABILITY = classifyDbPath({ dbPath: DB_PATH, appDir: path.resolve(__dirname, '..') });
 let db = null;
 try {
@@ -88,10 +110,12 @@ try {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
 }
-// Evidence ledger of the knowledge channel (proposals, published records): a JSON snapshot beside the DB,
+// Evidence ledger of the knowledge channel (proposals, published records): append-only rows in genesis.db (V16), shared
+// by every process on the file; the JSON file beside the DB is imported once if the table is empty, then kept as an export.
+// Without a database it is the legacy single-process JSON snapshot,
 // restored at boot and rewritten after every appended entry (D-130). ':memory:' keeps it ephemeral, and says so.
 const LEDGER_PATH = process.env.GENESIS_LEDGER_PATH ?? (DB_PATH === ':memory:' ? ':memory:' : path.join(path.dirname(DB_PATH), 'evidence-ledger.json'));
-const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH);
+const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH, { db });
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
@@ -326,6 +350,9 @@ function handlePersistApi(req, res, url) {
   // bigger than a typical trial/run's small parameter vectors) — same size class as the other two
   // upload routes above, not the default 64 kB meant for small JSON payloads.
   const isWorldUpload = (req.method === 'POST' || req.method === 'PUT') && /^\/api\/worlds(\/[^/]+)?\/?$/.test(url.pathname);
+  // Genesis Verify: the submitted record is a JSON string inside the JSON body (escaping grows it), and the
+  // verifier itself accepts records up to MAX_VERIFY_INPUT_BYTES; the default 64 kB would refuse a docking record.
+  const isVerifyUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/genesis-verify\/?$/.test(url.pathname);
   if (isKnowledgeUpload && !knowledgeUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'knowledge_upload_rate_limited', message: 'Limit uploadu materiałów: 6 na minutę.' });
   }
@@ -336,7 +363,12 @@ function handlePersistApi(req, res, url) {
   if (url.pathname === '/api/ingestion/source' && !biotechSourceLimiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
-  const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
+  // ENTITY-3: each claim proposal is one paid call to the external reasoning model — same budget as /api/ask.
+  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments(\/[^/]+\/replays)?))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
+  }
+  const maxBodyBytes = isVerifyUpload ? 2 * MAX_VERIFY_INPUT_BYTES + 65_536
+    : (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
     return json(res, 413, { error: 'payload_too_large', message: 'Przesłany materiał przekracza limit transportu.' });
@@ -360,7 +392,17 @@ function handlePersistApi(req, res, url) {
       try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
     }
     try {
-      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query });
+      const result = await handleApi(db, {
+        method: req.method,
+        pathname: url.pathname,
+        token,
+        body,
+        query,
+        reasoningProvider,
+        artifactStorage,
+        scientificSandboxPort,
+        scientificSandboxImage,
+      });
       return json(res, result.status, result.body);
     } catch (err) {
       log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
@@ -400,10 +442,7 @@ const server = http.createServer(async (req, res) => {
     // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
     // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
     const dbState = checkDatabaseState(db);
-    if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
-      scientificRuntimeCache = await buildScientificRuntimeStatus(db);
-      scientificRuntimeCachedAt = Date.now();
-    }
+    await refreshScientificRuntime();
     const effectiveByTool = new Map(scientificRuntimeCache.engines.map((engine) => [engine.id, engine]));
     return json(res, 200, {
       ok: true,
@@ -422,20 +461,37 @@ const server = http.createServer(async (req, res) => {
       // Operator i tak dostaje ścieżkę w logu startowym.
       db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
       persistence: dbState.state,
-      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, entries: LEDGER_PERSISTENCE.entries },
+      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, store: LEDGER_PERSISTENCE.store, entries: LEDGER_PERSISTENCE.entries },
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => {
+      toolchain: listToolchainMetadata().map((tool) => {
         const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
         const remote = effectiveByTool.get(id);
         return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };
       }),
       scientificWorkers: scientificRuntimeCache,
     });
+  }
+  if (req.method === 'GET' && req.url === '/api/genesis/self') {
+    // ENTITY-1: the same sources as /api/health, assembled as Genesis's view of itself. Like /api/health
+    // it is unauthenticated, so it carries no project data: lab work awaiting a measurement is a count.
+    const dbState = checkDatabaseState(db);
+    await refreshScientificRuntime();
+    return json(res, 200, buildSelfModel({
+      db,
+      runtime: scientificRuntimeCache,
+      reasoningModel: reasoningProvider.describe(),
+      environment: {
+        version: VERSION, commit: BUILD.commit, commitShort: BUILD.commitShort, commitSource: BUILD.commitSource, builtAt: BUILD.builtAt,
+        uptimeSec: Math.round((Date.now() - startedAt) / 1000), node: process.versions.node, arch: process.arch,
+        db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
+        workers: scientificRuntimeCache.groups,
+      },
+    }));
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
@@ -464,6 +520,25 @@ server.listen(PORT, () => {
   if (LEDGER_PERSISTENCE.status === 'REJECTED_IN_MEMORY') log('error', 'knowledge_ledger_snapshot_rejected', { path: LEDGER_PERSISTENCE.path, reason: LEDGER_PERSISTENCE.reason });
   if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
+
+// Jeden lokalny worker opróżnia trwałą kolejkę zadań ResearchRun (research-run:experiment-jobs). To ta sama
+// ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
+// (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
+if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
+  // One worker identity per process, so a lease left by a killed process is attributable after restart.
+  // GENESIS_RESEARCH_WORKER_LEASE_MS bounds how long such an abandoned lease blocks recovery (default 30 s;
+  // the runtime rejects values outside 1 s..1 h at boot instead of guessing).
+  const leaseMs = process.env.GENESIS_RESEARCH_WORKER_LEASE_MS ? Number(process.env.GENESIS_RESEARCH_WORKER_LEASE_MS) : undefined;
+  const worker = createFanOutAwareWorker(db, { artifactStorage, workerId: `worker-research-run-${process.pid}`, ...(leaseMs === undefined ? {} : { leaseMs }) });
+  let busy = false;
+  setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      for (let i = 0; i < 8; i += 1) if ((await worker.runOnce()).state === 'IDLE') break;
+    } catch (error) { log('error', 'research_worker_failed', { error: String(error?.message ?? error) }); } finally { busy = false; }
+  }, 500).unref();
+}
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.
 for (const sig of ['SIGTERM', 'SIGINT']) {

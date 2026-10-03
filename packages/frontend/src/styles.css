@@ -919,6 +919,22 @@ button:disabled { cursor: default; }
 .honesty-explanation > summary::-webkit-details-marker { display: none; }
 .honesty-explanation > summary::after { content: '  +'; color: var(--cyan); }
 .honesty-explanation[open] > summary::after { content: '  −'; }
+
+/* U0-b: what in this scene is a measurement, theory, reconstruction, claim or fiction. */
+.scene-provenance { width: 100%; display: flex; flex-direction: column; gap: .3rem; }
+.scene-provenance-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.scene-basis, .scene-reliability {
+  font-family: var(--font-mono); font-size: .64rem; letter-spacing: .06em; text-transform: uppercase;
+  padding: .24rem .6rem; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-dim);
+}
+.scene-basis-measured_data { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.scene-basis-computed_model { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); }
+.scene-basis-historical_reconstruction { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.scene-basis-alleged_claim { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.scene-basis-fiction { color: #f472b6; border-color: rgba(244, 114, 182, 0.4); }
+.scene-provenance-body p { margin: 0 0 .4rem; }
+.scene-provenance-body strong { display: block; margin-top: .4rem; color: var(--text); font-weight: 600; }
+.scene-provenance-body ul { margin: .15rem 0 0; padding-left: 1.1rem; }
 .honesty-explanation .honesty-note { margin: .35rem 0 0; padding: .65rem .75rem; border-left: 2px solid color-mix(in srgb, var(--accent, var(--cyan)) 55%, transparent); background: rgba(4, 13, 23, .7); }
 
 /* Investor-facing laboratory views put the scientific world first. The controls and
@@ -1585,11 +1601,12 @@ kbd {
 
 /* ---------- Skip link ---------- */
 .skip-link {
-  position: absolute; left: -999px; top: 0; z-index: 200;
+  /* Moved up out of sight, not sideways: a sideways offset widens the page in right-to-left (Arabic). */
+  position: absolute; left: 0; top: 0; z-index: 200; transform: translateY(-120%);
   background: var(--cyan); color: var(--bg); font-weight: 700;
   padding: 0.6rem 1rem; border-radius: 0 0 10px 0;
 }
-.skip-link:focus { left: 0; }
+.skip-link:focus { transform: none; }
 
 /* ---------- 3D (Three.js) sceny — patrz core/three/ ---------- */
 .sim-stage.stage-3d canvas { touch-action: none; }
@@ -4540,7 +4557,7 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .shell-sidebar { display: none; }
   .shell-main { padding-bottom: calc(3.9rem + var(--safe-bottom)); }
   .shell-mobilebar {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     padding: 0.35rem 0.2rem calc(0.35rem + var(--safe-bottom));
     background: var(--glass-strong);
@@ -4761,6 +4778,14 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .science-chat-empty > div { display: flex; justify-content: center; flex-wrap: wrap; gap: .45rem; }
 .science-chat-empty button { padding: .48rem .8rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); background: rgba(92, 214, 232, .06); cursor: pointer; }
 .science-chat-empty button:hover { border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
+.science-chat-empty > .sc-engine-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; text-align: left; }
+.sc-engine-grid button { display: flex; flex-direction: column; gap: .15rem; padding: .6rem .75rem; border-radius: .7rem; }
+.sc-engine-grid b { font-size: .88rem; font-weight: 650; }
+.sc-engine-grid small { color: var(--cyan); font: 500 .68rem/1.2 var(--font-mono); letter-spacing: .02em; }
+.sc-engine-row { display: flex; gap: .35rem; overflow-x: auto; padding: .35rem .75rem 0; scrollbar-width: none; }
+.sc-engine-row::-webkit-scrollbar { display: none; }
+.sc-engine-row button { flex: none; padding: .3rem .65rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-dim); background: transparent; font: 500 .72rem/1.2 var(--font-mono); cursor: pointer; }
+.sc-engine-row button.on { color: var(--text); border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
 .sc-long-answer > summary { cursor: pointer; list-style: none; display: grid; gap: .55rem; }
 .sc-long-answer > summary::-webkit-details-marker { display: none; }
 .sc-long-answer > summary b { color: var(--cyan); font: 650 .68rem/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
@@ -5807,12 +5832,12 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   .science-chat:not(.science-chat-inline) {
     left: .5rem;
     right: .5rem;
-    top: auto;
+    /* One chat on the screen: the drawer covers the page above it, so no second field shows through. */
+    top: calc(.5rem + env(safe-area-inset-top, 0px));
     bottom: calc(4.4rem + var(--safe-bottom));
     z-index: 55;
     width: auto;
-    height: min(68vh, 38rem);
-    height: min(68dvh, 38rem);
+    height: auto;
     max-height: calc(100vh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
     max-height: calc(100dvh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
     border-radius: .9rem .9rem .35rem .35rem;
@@ -6060,3 +6085,41 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 }
 /* The ring is an estimate of TIME. This note keeps it from being read as progress. */
 .gx-loading-note { font-size: 0.72em; color: var(--text-faint); white-space: nowrap; }
+
+/* ---- One Laboratory, several modes ---- */
+.lab-mode-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 1rem; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
+.lab-mode-link { padding: 0.4rem 0.85rem; border-radius: 999px; font: 500 0.8rem/1.4 inherit; color: #cbd5e1; text-decoration: none; border: 1px solid rgba(148, 163, 184, 0.3); min-height: 36px; display: inline-flex; align-items: center; }
+.lab-mode-link.is-active { color: #e2e8f0; border-color: rgba(34, 211, 238, 0.7); background: rgba(34, 211, 238, 0.12); }
+.sw-world-controls { display: flex; gap: 0.5rem; align-items: center; }
+.lab-mode-select { display: inline-flex; align-items: center; gap: 0.4rem; }
+.lab-mode-select-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lab-mode-select select { padding: 0.45rem 0.7rem; border-radius: 999px; min-height: 44px; font: 500 0.78rem/1.4 inherit; color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.72); }
+
+/* Pilot A/B over the protocol's own arms — wraps at 375/390/430 px, long fingerprints break. */
+.pilot-ab-panel { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid rgba(148, 163, 184, 0.25); min-width: 0; }
+.pilot-ab-panel h3 { margin: 0 0 0.5rem; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.pilot-ab-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.pilot-ab-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; flex: 1 1 10rem; min-width: 0; }
+.pilot-ab-controls select { max-width: 100%; min-width: 0; }
+.pilot-ab-result { margin-top: 0.7rem; min-width: 0; }
+.pilot-ab-result dd, .pilot-ab-result dt, .pilot-ab-result .mono { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Multiverse branch → evidence (pre-registered question + per-world pack). Fits 375/390/430 px. */
+.temporal-question-select { display: flex; flex-direction: column; gap: .25rem; margin: .4rem .68rem; min-width: 0; font-size: .62rem; }
+.temporal-question-select select { max-width: 100%; min-width: 0; font-size: .62rem; }
+.temporal-question-select small { opacity: .8; overflow-wrap: anywhere; }
+.temporal-branch-evidence { margin: .3rem .68rem .6rem; min-width: 0; display: flex; flex-direction: column; gap: .35rem; align-items: flex-start; }
+.temporal-branch-evidence p, .temporal-branch-evidence details { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+.temporal-branch-evidence .scenario-provenance { width: 100%; box-sizing: border-box; }
+
+/* Reality Navigator scene capture — colour carries the epistemic status. Wraps at 375/390/430 px. */
+.reality-capture { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border); min-width: 0; }
+.reality-capture-toggle { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); cursor: pointer; }
+.reality-capture .reality-compare-row { flex-wrap: wrap; min-width: 0; }
+.reality-capture .reality-compare-hint, .reality-capture .mono { overflow-wrap: anywhere; word-break: break-word; }
+.reality-capture-details summary { cursor: pointer; font-size: 0.66rem; color: var(--text-faint); }
+.reality-deriv.status-model, .reality-deriv.replay-match { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.reality-deriv.status-scenario, .reality-deriv.replay-drift { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.reality-deriv.status-cinematic { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.reality-deriv.status-blocked, .reality-deriv.status-not_modeled,
+.reality-deriv.replay-blocked, .reality-deriv.replay-not_reproducible { color: var(--red, #ef6f7b); border-color: rgba(239, 111, 123, 0.45); }

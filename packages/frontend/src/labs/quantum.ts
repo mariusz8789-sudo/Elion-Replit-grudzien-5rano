@@ -1,4 +1,5 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { doubleSlitProbabilityDensity, type DoubleSlitConfig } from '../core/physics';
 import { quantumTunneling } from './experiments/quantum-tunneling';
 import { quantumBloch } from './experiments/quantum-bloch-3d';
 import { quantumChsh } from './experiments/quantum-chsh';
@@ -44,30 +45,30 @@ class DoubleSlitSim implements Sim {
     this.glowCtx?.clearRect(0, 0, this.glowW, this.glowH);
   };
 
-  /** |ψ|² na ekranie: pozycja u ∈ (-1, 1). */
-  private prob(u: number, p: SimParams): number {
-    const lambda = Number(p.lambda); // 400..700 (jedn. wizualne)
-    const d = Number(p.slitDist); // rozstaw szczelin
-    const measured = Boolean(p.measured);
-    const a = 0.35; // szerokość szczeliny (jedn. wizualne)
-    const k = 5200 / lambda;
-    const env = (off: number) => {
-      const b = k * a * (u - off);
-      const s = b === 0 ? 1 : Math.sin(b) / b;
-      return s * s;
+  /**
+   * Konfiguracja modelu z parametrów UI. Sam model |ψ|² mieszka w
+   * core/physics.ts::doubleSlitProbabilityDensity — renderer go WYWOŁUJE,
+   * nie posiada. Dzięki temu wynik da się przetestować, odcisnąć i odtworzyć
+   * bez rysowania czegokolwiek.
+   */
+  private config(p: SimParams): DoubleSlitConfig {
+    return {
+      wavelength: Number(p.lambda), // 400..700 (jedn. wizualne)
+      slitDistance: Number(p.slitDist), // rozstaw szczelin
+      measured: Boolean(p.measured),
     };
-    if (measured) {
-      const off = d * 0.02;
-      return 0.5 * env(-off) + 0.5 * env(off);
-    }
-    const phase = k * d * 0.06 * u;
-    return env(0) * Math.cos(phase) ** 2;
   }
 
+  /**
+   * Losowanie odrzucające pozycji trafienia z |ψ|². To SAMPLER, nie model:
+   * losowość zostaje po stronie renderera, żeby funkcja modelu pozostała
+   * deterministyczna.
+   */
   private sample(p: SimParams): number {
+    const config = this.config(p);
     for (let i = 0; i < 60; i++) {
       const u = Math.random() * 2 - 1;
-      if (Math.random() < this.prob(u, p)) return u;
+      if (Math.random() < doubleSlitProbabilityDensity(u, config)) return u;
     }
     return 0;
   }

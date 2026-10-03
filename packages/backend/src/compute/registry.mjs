@@ -371,6 +371,14 @@ const MODELS = [
           { id: 'heteroatomCount', label: 'Heteroatomy', unit: '' },
           { id: 'formalCharge', label: 'Ładunek formalny', unit: '' },
           { id: 'lipinskiViolations', label: 'Naruszenia reguły 5 Lipińskiego', unit: '' },
+          // Structure-derived identity. The worker has always computed these in the SAME
+          // invocation as the descriptors above; the projection simply dropped them, so a
+          // persisted candidate carried no identifier that could be checked for accidental
+          // duplication against anything outside its own campaign. Surfacing them adds no
+          // RDKit call and no second chemistry path. A molecule whose InChI module is
+          // missing gets null — never a fabricated key.
+          { id: 'inchiKey', label: 'InChIKey', unit: '' },
+          { id: 'inchi', label: 'InChI', unit: '' },
         ],
         assumptions: 'RDKit (open-source, walidowany). logP metodą wkładów atomowych Crippena; deskryptory topologiczne 2D (bez konformacji 3D).',
         validity: 'Poprawny SMILES ORAZ RDKit dostępny przez skonfigurowany interpreter GENESIS_RDKIT_PYTHON.',
@@ -387,6 +395,7 @@ const MODELS = [
             fractionCsp3: d.fractionCsp3, tpsa: d.tpsa, heavyAtomCount: d.heavyAtomCount,
             heteroatomCount: d.heteroatomCount, formalCharge: d.formalCharge, lipinskiViolations: d.lipinskiViolations,
             canonicalSmiles: d.canonicalSmiles, molecularFormula: d.molecularFormula,
+            inchiKey: d.inchiKey ?? null, inchi: d.inchi ?? null,
           },
           warnings: [],
           provenance: { engine: r.engine, requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON' },

@@ -38,6 +38,9 @@ import { saveHypothesisLoopToMemory, saveScientificEvidencePackToMemory } from '
 import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } from '../core/experimentFabric/experimentGraph';
 import type { ExperimentRoute, ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
+import { comparableProtocolArms, compareProtocolArms, defaultProtocolArmPair, type ProtocolArmComparison } from '../core/experimentFabric/protocolArmComparison';
+import { useLocale } from '../core/i18n';
+import { pilotAbDisclaimer, pilotAbSeed, pilotAbStatus, pilotAbText } from './pilot/pilotAbText';
 
 function productRouteHash(route: Extract<ExperimentRoute, { kind: 'product-route' }>, values: Readonly<Record<string, ExperimentValue>>): string {
   const [path, query = ''] = route.hash.split('?');
@@ -157,6 +160,11 @@ export function ExperimentPilotScreen() {
   const [protocolDesign, setProtocolDesign] = useState<ScientificExperimentDesign | null>(null);
   const [protocolEvidence, setProtocolEvidence] = useState<ScientificEvidenceChain | null>(null);
   const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
+  // A/B over two arms the executed protocol already produced (protocolArmComparison.ts).
+  const [abBaselineArm, setAbBaselineArm] = useState('');
+  const [abVariantArm, setAbVariantArm] = useState('');
+  const [abResult, setAbResult] = useState<ProtocolArmComparison | null>(null);
+  const locale = useLocale();
   const [replayReferencePack, setReplayReferencePack] = useState<ScientificEvidencePack | null>(null);
   const [replayVerdict, setReplayVerdict] = useState<ScientificEvidenceReplayVerdict | null>(null);
 
@@ -266,6 +274,10 @@ export function ExperimentPilotScreen() {
         ? await executeScientificBackendExperiment(protocolDesign)
         : executeScientificExperiment(protocolDesign);
       setProtocolEvidence(evidence);
+      const pair = defaultProtocolArmPair(evidence);
+      setAbBaselineArm(pair?.baselineArmId ?? '');
+      setAbVariantArm(pair?.variantArmId ?? '');
+      setAbResult(null);
       const pack = createScientificEvidencePack(evidence);
       saveScientificEvidencePack(pack);
       saveScientificEvidencePackToMemory(pack);
@@ -276,6 +288,15 @@ export function ExperimentPilotScreen() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleCompareArms() {
+    if (!protocolEvidence) return;
+    try {
+      setAbResult(compareProtocolArms(protocolEvidence, abBaselineArm, abVariantArm));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -813,6 +834,48 @@ export function ExperimentPilotScreen() {
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
           {replayReferencePack && replayVerdict && <div className="pilot-disclosure"><span className={`honesty ${replayVerdict === 'MATCH' ? 'simplified' : 'theoretical'}`}>REPLAY {replayVerdict}</span><p className="pilot-summary">Porównanie nowego jawnie uruchomionego packa z lokalnym snapshotem referencyjnym. Identyfikatory backend runów nie są kryterium MATCH.</p></div>}
           <div className="pilot-actions"><button className="chip-btn pilot-primary" onClick={handleExportProtocolEvidence}>⬇ Evidence Pack JSON</button><button className="chip-btn" onClick={handleExportProtocolRoCrate}>⬇ RO-Crate JSON-LD</button></div>
+          {comparableProtocolArms(protocolEvidence).length > 1 && (
+            <div className="pilot-ab-panel" data-testid="pilot-ab-panel">
+              <h3>{pilotAbText('title', locale)}</h3>
+              <p className="pilot-summary">{pilotAbText('lead', locale)}</p>
+              <div className="pilot-ab-controls">
+                <label>{pilotAbText('baseline', locale)}
+                  <select value={abBaselineArm} onChange={(e) => { setAbBaselineArm(e.currentTarget.value); setAbResult(null); }}>
+                    {comparableProtocolArms(protocolEvidence).map((arm) => <option key={arm.armId} value={arm.armId}>{arm.label}</option>)}
+                  </select>
+                </label>
+                <label>{pilotAbText('variant', locale)}
+                  <select value={abVariantArm} onChange={(e) => { setAbVariantArm(e.currentTarget.value); setAbResult(null); }}>
+                    {comparableProtocolArms(protocolEvidence).map((arm) => <option key={arm.armId} value={arm.armId}>{arm.label}</option>)}
+                  </select>
+                </label>
+                <button className="chip-btn" onClick={handleCompareArms} disabled={abBaselineArm === abVariantArm}>{pilotAbText('compare', locale)}</button>
+              </div>
+              {abBaselineArm === abVariantArm && <p className="pilot-summary">{pilotAbText('sameArm', locale)}</p>}
+              {abResult && (
+                <div className="pilot-ab-result">
+                  <span className={`honesty ${abResult.comparison.status === 'COMPLETED' ? 'simplified' : 'theoretical'}`}>{pilotAbStatus(abResult.comparison.status, locale)}</span>
+                  {abResult.comparison.status !== 'COMPLETED'
+                    ? <p className="pilot-summary">{pilotAbText('notRun', locale)} {abResult.comparison.validationErrors.join(' ')}</p>
+                    : (
+                      <dl className="pilot-outputs">
+                        {abResult.comparison.parameterDifferences.filter((d) => d.changed).map((d) => (
+                          <div key={d.key} className="pilot-output-row"><dt>{pilotAbText('changedSetting', locale)} · <code>{d.key}</code></dt><dd>{String(d.baseline)} → {String(d.variant)}</dd></div>
+                        ))}
+                        {abResult.comparison.metrics.map((m) => (
+                          <div key={m.key} className="pilot-output-row"><dt><code>{m.key}</code> {m.unit}</dt><dd>{m.baseline} → {m.variant} · Δ {m.absoluteDelta}{m.relativeDeltaStatus === 'AVAILABLE' && m.relativeDeltaPercent !== null ? ` (${m.relativeDeltaPercent.toFixed(1)}%)` : ` (${pilotAbText('baselineZero', locale)})`}</dd></div>
+                        ))}
+                      </dl>
+                    )}
+                  <dl className="pilot-provenance">
+                    <div><dt>{pilotAbText('repeatability', locale)}</dt><dd>{pilotAbSeed(abResult.comparison.seedControl.status, locale)}</dd></div>
+                    {abResult.comparison.evidence && <div><dt>{pilotAbText('fingerprints', locale)}</dt><dd><span className="mono">{abResult.comparison.evidence.baselineRunFingerprint} → {abResult.comparison.evidence.variantRunFingerprint}</span> · {pilotAbText(abResult.fingerprintsMatchProtocol ? 'fingerprintsMatch' : 'fingerprintsDiffer', locale)}</dd></div>}
+                  </dl>
+                  <p className="pilot-disclaimer">{pilotAbDisclaimer(abResult.comparison.disclaimer, abResult.comparison.status === 'COMPLETED', locale)}</p>
+                </div>
+              )}
+            </div>
+          )}
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
           {protocolSeriesAnalysis && <div className="pilot-why-panel" data-testid="experiment-series-analysis"><h3>SERIES OBSERVATION · NOT A DISCOVERY</h3><p><strong>Status:</strong> {protocolSeriesAnalysis.findings.length > 0 ? protocolSeriesAnalysis.findings[0].verdict : 'NO_THRESHOLD_FINDING'}</p><p><strong>Parametr:</strong> <code>{protocolSeriesAnalysis.parameterKey}</code> · <strong>Wynik:</strong> <code>{protocolSeriesAnalysis.outputKey}</code></p>{protocolSeriesAnalysis.findings.length === 0 ? <p className="pilot-summary">Nie zaobserwowano korelacji przekraczającej próg w tej serii. To nie jest dowód braku zależności ani wynik negatywny.</p> : <ul className="pilot-limitations">{protocolSeriesAnalysis.findings.map((finding) => <li key={`${finding.kind}-${finding.runIds.join('-')}`}>{finding.message} <span className="mono">[{finding.runIds.join(', ')}]</span></li>)}</ul>}<p className="pilot-disclaimer">{protocolSeriesAnalysis.disclaimer} Model: {protocolSeriesAnalysis.modelId ?? 'brak porównywalnego modelu'}.</p></div>}
         </section>

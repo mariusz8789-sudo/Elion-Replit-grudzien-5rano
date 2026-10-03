@@ -6,6 +6,7 @@ import { disposeSceneResources } from './graphics/lifecycle';
 import { attachAnatomyLayerShellMetadata, resolveAnatomyLayerShell, type AnatomyLayerPresentation } from './anatomyIntegrationShell';
 import { addPremiumCellMembraneDetail, addPremiumOrganSurfaceDetail } from './premiumMacroMicroDetails';
 import type { FullAtlasOrganMesh } from './bodyParts3dFullAtlas';
+import { brainRegionOf } from './brainParts';
 
 /**
  * V7 — HUMAN MACRO → MICRO VISUAL LAYER.
@@ -24,6 +25,9 @@ export type HumanMacroMicroLevel = 'body' | 'organ_system' | 'organ' | 'tissue' 
 export interface HumanMacroMicroState {
   readonly level: HumanMacroMicroLevel;
   readonly selectedOrganId: string | null;
+  /** Close-up structure the person tapped (atlas name), and the region they chose. */
+  readonly selectedPart?: string | null;
+  readonly selectedRegion?: string | null;
   readonly selectedNodeId: string | null;
   readonly artifactKind: BiologyArtifact['kind'] | null;
   readonly evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION';
@@ -127,20 +131,33 @@ function organColor(id: string): number {
   return 0xa76368;
 }
 
-/** The organ close-up from its own BodyParts3D structures, centred and sized like the ellipsoid it replaces. */
+/** The organ close-up from its own BodyParts3D structures, one mesh per structure so a tap names it. */
 function buildAtlasOrganModel(THREE: typeof THREE_NS, node: AnatomyNode, atlas: FullAtlasOrganMesh): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-organ:${node.id}`;
   const rotor = createPresentationStage(THREE, root, 0.7);
-  if (!atlas.geometry.boundingBox) atlas.geometry.computeBoundingBox();
-  const box = atlas.geometry.boundingBox!;
+  const box = new THREE.Box3();
+  for (const part of atlas.parts) {
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    box.union(part.geometry.boundingBox!);
+  }
   const size = box.getSize(new THREE.Vector3()); const centre = box.getCenter(new THREE.Vector3());
-  const displayScale = 0.72 / Math.max(size.x, size.y, size.z, 1e-6);
-  const organ = new THREE.Mesh(atlas.geometry, biologicalMaterial(THREE, organColor(node.id), { emissive: 0x210a0d, roughness: 0.5 }));
+  // The close-up is the subject: the organ fills the stage (was 0.72, a small object on a plinth).
+  const displayScale = 1.05 / Math.max(size.x, size.y, size.z, 1e-6);
+  const organ = new THREE.Group();
   organ.name = 'organ:bodyparts3d';
   organ.userData.geometryRole = 'BODYPARTS3D_REFERENCE';
   organ.userData.structures = atlas.partCount;
+  for (const part of atlas.parts) {
+    const tint = node.id === 'brain' ? brainRegionOf(part.name).color : organColor(node.id);
+    const mesh = new THREE.Mesh(part.geometry, biologicalMaterial(THREE, tint, { emissive: 0x210a0d, roughness: 0.5 }));
+    mesh.name = `organ-part:${part.name}`;
+    mesh.userData.partName = part.name;
+    mesh.userData.baseColor = tint;
+    organ.add(mesh);
+  }
   organ.scale.setScalar(displayScale);
   organ.position.copy(centre).multiplyScalar(-displayScale);
+  organ.position.y += 0.1;
   rotor.add(organ);
   markModel(root, 'organ'); addShadows(root); return root;
 }
@@ -263,6 +280,87 @@ function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Gro
     const vessel = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.026, 10, false), new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0.09, roughness: 0.34, clearcoat: 0.28 }));
     vessel.name = `tissue:capillary-model:${index}`; rotor.add(vessel);
   }
+  markModel(root, 'tissue'); addShadows(root); return root;
+}
+
+/**
+ * Pancreas tissue, as a pathologist would recognise it under H&E: exocrine acini (rings of pyramidal cells
+ * with basal nuclei and apical zymogen granules round a tiny lumen, drained by an intercalated duct) and one
+ * pale islet of Langerhans threaded by capillaries. The islet's endocrine cells are intermixed, as in human
+ * islets; the beta/alpha/delta shares are textbook proportions used for layout only, not a measurement.
+ * Beta cells carry GLP-1R, which is why this organ needs its own tissue rather than a generic sample.
+ */
+function buildPancreasTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
+  const root = new THREE.Group(); root.name = 'macro-tissue:PANCREAS';
+  const rotor = createPresentationStage(THREE, root, 0.82);
+  // A section is read face-on: the tile leans towards the viewer and turns in its own plane, so the acini and
+  // the islet stay legible on a phone instead of being seen edge-on.
+  const lean = new THREE.Group(); lean.name = 'pancreas:section-lean'; lean.rotation.x = 0.62; lean.position.y = -0.04;
+  root.add(lean); lean.add(rotor); rotor.scale.setScalar(1.12);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.1, 0.92, 8, 2, 6), biologicalMaterial(THREE, 0xc98aa4, { emissive: 0x2a0f1a, roughness: 0.7 }));
+  slab.name = 'tissue:stroma'; rotor.add(slab);
+  const acinarApex = biologicalMaterial(THREE, 0xd5577a, { emissive: 0x3a0c1c, roughness: 0.5 });
+  const acinarNucleus = biologicalMaterial(THREE, 0x3e2a78, { emissive: 0x120a2a, roughness: 0.45 });
+  const zymogen = biologicalMaterial(THREE, 0xf08a4b, { emissive: 0x4a1a06, roughness: 0.4 });
+  const lumenMat = new THREE.MeshStandardMaterial({ color: 0xf6e7ee, roughness: 0.9 });
+  const ductMat = new THREE.MeshPhysicalMaterial({ color: 0xeac7d4, roughness: 0.5, clearcoat: 0.2 });
+  // Acini sit round the islet; each one drains through its intercalated duct towards the tile's main duct.
+  const acini: Array<[number, number]> = [[-0.48, -0.24], [-0.5, 0.2], [-0.18, 0.31], [0.47, -0.25], [0.5, 0.18], [0.2, 0.32], [-0.14, -0.3], [0.18, -0.32]];
+  const CELLS_PER_ACINUS = 8;
+  for (const [a, [x, z]] of acini.entries()) {
+    const acinus = new THREE.Group(); acinus.name = `pancreas:acinus:${a}`; acinus.position.set(x, 0.09, z); rotor.add(acinus);
+    const lumen = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), lumenMat); lumen.name = `pancreas:acinus:${a}:lumen`; acinus.add(lumen);
+    for (let c = 0; c < CELLS_PER_ACINUS; c += 1) {
+      const t = (c / CELLS_PER_ACINUS) * Math.PI * 2 + a * 0.37;
+      const dir = new THREE.Vector3(Math.cos(t), 0, Math.sin(t));
+      // A pyramidal acinar cell: apex at the lumen, broad base outward.
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.085, 7), acinarApex);
+      body.name = `pancreas:acinar-cell:${a}:${c}`;
+      body.position.copy(dir.clone().multiplyScalar(0.058));
+      body.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+      acinus.add(body);
+      const nucleus = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), acinarNucleus);
+      nucleus.name = `pancreas:acinar-nucleus:${a}:${c}`; nucleus.position.copy(dir.clone().multiplyScalar(0.088)); acinus.add(nucleus);
+      for (let g = 0; g < 2; g += 1) {
+        const granule = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 5), zymogen);
+        granule.name = `pancreas:zymogen-granule:${a}:${c}:${g}`;
+        granule.position.copy(dir.clone().multiplyScalar(0.03 + g * 0.009)).add(new THREE.Vector3(0, 0.012 * (g ? 1 : -1), 0)); acinus.add(granule);
+      }
+    }
+    const towards = new THREE.Vector3(Math.sign(x) * 0.66, 0.06, z * 0.4);
+    const duct = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(x, 0.09, z), new THREE.Vector3((x + towards.x) / 2, 0.075, (z + towards.z) / 2), towards]), 12, 0.009, 6, false), ductMat);
+    duct.name = `pancreas:intercalated-duct:${a}`; rotor.add(duct);
+  }
+  // The islet of Langerhans: a pale, rounded cluster of small endocrine cells in the middle of the acini.
+  const islet = new THREE.Group(); islet.name = 'pancreas:islet-of-langerhans'; islet.position.set(0, 0.1, 0); rotor.add(islet);
+  const isletHalo = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 20), new THREE.MeshPhysicalMaterial({ color: 0xf3dde6, roughness: 0.6, transparent: true, opacity: 0.35, depthWrite: false }));
+  isletHalo.name = 'pancreas:islet:capsule'; isletHalo.scale.set(1, 0.42, 1); islet.add(isletHalo);
+  const kinds = [
+    { kind: 'beta', share: 0.55, color: 0xe9c3a0 },
+    { kind: 'alpha', share: 0.35, color: 0xd99aac },
+    { kind: 'delta', share: 0.1, color: 0xb9a6d8 },
+  ] as const;
+  const ENDOCRINE_CELLS = 40;
+  const counts = kinds.map((k) => Math.round(k.share * ENDOCRINE_CELLS));
+  const pool: Array<(typeof kinds)[number]['kind']> = kinds.flatMap((k, i) => Array.from({ length: counts[i] }, () => k.kind));
+  const rnd = (n: number): number => { const v = Math.sin((n + 1) * 12.9898 + cell.cellId.length * 78.233) * 43758.5453; return v - Math.floor(v); };
+  for (let i = pool.length - 1; i > 0; i -= 1) { const j = Math.floor(rnd(i) * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const materials = new Map<string, THREE_NS.Material>(kinds.map((k) => [k.kind, biologicalMaterial(THREE, k.color, { emissive: 0x1d1210, roughness: 0.55 })]));
+  pool.forEach((kind, i) => {
+    const r = 0.165 * Math.sqrt((i + 0.5) / pool.length); const t = i * 2.399963229728653;
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.022, 1), materials.get(kind));
+    c.name = `pancreas:islet:${kind}-cell:${i}`; c.position.set(Math.cos(t) * r, (rnd(i + 99) - 0.5) * 0.05, Math.sin(t) * r); islet.add(c);
+  });
+  // Islets are richly vascularised: fenestrated capillaries run straight through the cluster.
+  for (const [index, angle] of [[0, 0.3], [1, 1.9]] as const) {
+    const d = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+    const curve = new THREE.CatmullRomCurve3([d.clone().multiplyScalar(-0.32).setY(0.06), new THREE.Vector3(0, 0.11, 0), d.clone().multiplyScalar(0.32).setY(0.07)]);
+    const vessel = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.012, 8, false), new THREE.MeshPhysicalMaterial({ color: 0xbe3048, emissive: 0xbe3048, emissiveIntensity: 0.09, roughness: 0.34 }));
+    vessel.name = `pancreas:islet-capillary:${index}`; rotor.add(vessel);
+  }
+  root.userData.modeledComponents = ['ACINI', 'ACINAR_CELLS_BASAL_NUCLEI', 'ZYMOGEN_GRANULES', 'INTERCALATED_DUCTS', 'ISLET_OF_LANGERHANS', 'BETA_CELLS', 'ALPHA_CELLS', 'DELTA_CELLS', 'ISLET_CAPILLARIES'];
+  root.userData.isletCellShares = 'TEXTBOOK_LAYOUT_NOT_MEASURED';
+  root.userData.endocrineCellCounts = Object.fromEntries(kinds.map((k, i) => [k.kind, counts[i]]));
   markModel(root, 'tissue'); addShadows(root); return root;
 }
 
@@ -390,6 +488,12 @@ export class HumanMacroMicroLayer {
   private time = 0;
   private anatomyLayers: readonly AnatomyLayerPresentation[];
   private atlasOrgans: ReadonlyMap<string, FullAtlasOrganMesh> | null = null;
+  private selectedPart: string | null = null;
+  private selectedRegion: string | null = null;
+  /** Rotation the person set by dragging; auto-rotation stops once they touch the organ. */
+  private manualYaw: number | null = null;
+  /** The organ on its own plinth: off while the person explores the organ inside the body. */
+  private organStage = true;
 
   constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
     this.group = new THREE.Group(); this.group.name = 'genesis-human-macro-micro-layer'; this.group.visible = false;
@@ -408,6 +512,8 @@ export class HumanMacroMicroLayer {
       level,
       selectedNodeId: this.selectedNodeId,
       selectedOrganId: this.selectedOrganId,
+      selectedPart: this.selectedPart,
+      selectedRegion: this.selectedRegion,
       artifactKind: this.artifact?.kind ?? null,
       evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION',
       anatomyLayers: {
@@ -432,6 +538,12 @@ export class HumanMacroMicroLayer {
     this.atlasOrgans = organs; if (!this.artifact) this.rebuild();
   }
 
+  /** Show (or keep away) the separate organ plinth; tissue and microscope views always show. */
+  setOrganStage(on: boolean): void {
+    if (this.organStage === on) return;
+    this.organStage = on; if (!this.artifact) this.rebuild();
+  }
+
   setArtifact(artifact: BiologyArtifact | null): void {
     this.artifact = artifact; this.rebuild();
   }
@@ -445,12 +557,14 @@ export class HumanMacroMicroLayer {
 
   private rebuild(): void {
     this.refreshAnatomyLayers();
+    this.selectedPart = null; this.selectedRegion = null; this.manualYaw = null;
     const artifact = this.artifact;
-    if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : buildTissueModel(this.THREE, artifact.cell)); return; }
+    if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.slide.tissueType === 'PANCREAS' ? buildPancreasTissueModel(this.THREE, artifact.cell) : buildTissueModel(this.THREE, artifact.cell)); return; }
     if (artifact?.kind === 'hyperscope' && artifact.cell) {
       this.replace(artifact.cell.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
     }
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
+    if (!this.organStage) { this.replace(null); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);
     const atlasOrgan = organ ? this.atlasOrgans?.get(organ.id) : undefined;
     this.replace(organ ? atlasOrgan ? buildAtlasOrganModel(this.THREE, organ, atlasOrgan) : buildOrganModel(this.THREE, organ) : null);
@@ -479,7 +593,50 @@ export class HumanMacroMicroLayer {
     if (!this.content) return;
     // Slow museum-like rotation: presentation only, deterministic for the same elapsed time.
     const rotor = this.content.getObjectByName('macro-rotor');
-    if (rotor) rotor.rotation.y = this.time * 0.22;
+    if (rotor) rotor.rotation.y = this.manualYaw ?? this.time * 0.22;
+  }
+
+  /** Meshes of the current close-up that carry a structure name (empty for ellipsoid organs). */
+  partMeshes(): THREE_NS.Mesh[] {
+    const out: THREE_NS.Mesh[] = [];
+    this.content?.traverse((n) => { const m = n as THREE_NS.Mesh; if (m.isMesh && typeof m.userData.partName === 'string') out.push(m); });
+    return out;
+  }
+
+  /** Drag turns the organ; the first drag freezes the automatic turn where it is. */
+  rotateBy(radians: number): void {
+    if (!this.content) return;
+    this.manualYaw = (this.manualYaw ?? this.time * 0.22) + radians;
+  }
+
+  /** Highlight one structure (null clears). Everything else stays visible. */
+  selectPart(name: string | null): void {
+    this.selectedPart = name; this.selectedRegion = null;
+    if (name !== null && this.manualYaw === null) this.manualYaw = this.time * 0.22;
+    this.applyHighlight();
+  }
+
+  /** Show one region: its structures lit, the rest ghosted so the inner ones can be seen. */
+  selectRegion(regionId: string | null): void {
+    this.selectedRegion = regionId; this.selectedPart = null;
+    this.applyHighlight();
+  }
+
+  getSelection(): { part: string | null; region: string | null } { return { part: this.selectedPart, region: this.selectedRegion }; }
+
+  private applyHighlight(): void {
+    const part = this.selectedPart; const region = this.selectedRegion;
+    for (const mesh of this.partMeshes()) {
+      const mat = mesh.material as THREE_NS.MeshPhysicalMaterial;
+      const name = mesh.userData.partName as string;
+      const lit = part !== null ? name === part : region !== null ? brainRegionOf(name).id === region : false;
+      const ghost = region !== null && !lit;
+      mat.color.setHex(mesh.userData.baseColor as number);
+      mat.emissive.setHex(lit ? 0x2fc7ff : 0x210a0d);
+      mat.emissiveIntensity = lit ? 0.55 : 0.08;
+      mat.transparent = ghost; mat.opacity = ghost ? 0.12 : 1; mat.depthWrite = !ghost;
+      mat.needsUpdate = true;
+    }
   }
 
   dispose(): void {

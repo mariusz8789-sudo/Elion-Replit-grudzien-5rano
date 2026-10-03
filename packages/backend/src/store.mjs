@@ -23,7 +23,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
 import { ensureAccessSchema } from './access.mjs';
 import { hashSecret, looksHashed } from './secrets.mjs';
+import { ACCOUNT_PROFILES, DEFAULT_ACCOUNT_PROFILE, normalizeAccountProfile } from './accountProfiles.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
+import { snapshotDatabase } from './dbDurability.mjs';
+import path from 'node:path';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -499,6 +502,58 @@ CREATE TRIGGER IF NOT EXISTS experiment_records_append_only_delete BEFORE DELETE
 BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experiment record cannot be deleted'); END;
 `;
 
+// V16: the knowledge channel's evidence ledger (src/knowledgeApi.mjs) moves from a per-process JSON snapshot into
+// this database, so several backend processes on one data directory append to ONE chain. Entries are append-only
+// (triggers), contiguous (idx = row count) and chained (prev_hash = hash of idx - 1), enforced here, not only in JS.
+// `effect_json` carries what the entry did (the proposed record, the approver), so the ledger state is a replay of
+// the rows. Entries imported from a legacy JSON snapshot have effect_json NULL; their state is the one
+// `evidence_ledger_base` row written in the same transaction.
+const SCHEMA_V16 = `
+CREATE TABLE IF NOT EXISTS evidence_ledger_entries (
+  idx          INTEGER PRIMARY KEY CHECK (idx >= 0),
+  kind         TEXT NOT NULL CHECK (kind IN ('ADD','PROPOSE','PUBLISH','REJECT')),
+  record_id    TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  prev_hash    TEXT NOT NULL UNIQUE,
+  hash         TEXT NOT NULL UNIQUE,
+  entry_json   TEXT NOT NULL,
+  effect_json  TEXT,
+  writer       TEXT,
+  created_at   INTEGER NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS evidence_ledger_entries_contiguous BEFORE INSERT ON evidence_ledger_entries
+WHEN NEW.idx <> (SELECT COUNT(*) FROM evidence_ledger_entries)
+  OR (NEW.idx = 0 AND NEW.prev_hash <> 'GENESIS')
+  OR (NEW.idx > 0 AND NEW.prev_hash IS NOT (SELECT hash FROM evidence_ledger_entries WHERE idx = NEW.idx - 1))
+BEGIN SELECT RAISE(ABORT, 'evidence_ledger_entries: an entry must extend the current head of the chain'); END;
+CREATE TRIGGER IF NOT EXISTS evidence_ledger_entries_append_only_update BEFORE UPDATE ON evidence_ledger_entries
+BEGIN SELECT RAISE(ABORT, 'evidence_ledger_entries is append-only: an entry cannot be updated'); END;
+CREATE TRIGGER IF NOT EXISTS evidence_ledger_entries_append_only_delete BEFORE DELETE ON evidence_ledger_entries
+BEGIN SELECT RAISE(ABORT, 'evidence_ledger_entries is append-only: an entry cannot be deleted'); END;
+CREATE TABLE IF NOT EXISTS evidence_ledger_base (
+  id            INTEGER PRIMARY KEY CHECK (id = 1),
+  head_count    INTEGER NOT NULL,
+  state_json    TEXT NOT NULL,
+  source_path   TEXT,
+  source_sha256 TEXT,
+  imported_at   INTEGER NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS evidence_ledger_base_append_only_update BEFORE UPDATE ON evidence_ledger_base
+BEGIN SELECT RAISE(ABORT, 'evidence_ledger_base is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS evidence_ledger_base_append_only_delete BEFORE DELETE ON evidence_ledger_base
+BEGIN SELECT RAISE(ABORT, 'evidence_ledger_base is append-only'); END;
+`;
+
+// V15 extends the existing `jobs` table for lease-based scientific workers. Legacy in-process jobs
+// keep all new columns NULL and retain their old lifecycle; only rows carrying idempotency_key are
+// claimed by the scientific queue backend.
+const JOB_LEASE_COLUMNS_V15 = Object.freeze([
+  ['idempotency_key', 'TEXT'], ['research_run_id', 'TEXT'], ['experiment_id', 'TEXT'], ['capability_id', 'TEXT'],
+  ['priority', 'INTEGER NOT NULL DEFAULT 0'], ['max_attempts', 'INTEGER NOT NULL DEFAULT 1'],
+  ['attempts', 'INTEGER NOT NULL DEFAULT 0'], ['timeout_ms', 'INTEGER'], ['worker_id', 'TEXT'],
+  ['lease_id', 'TEXT'], ['lease_expires_at', 'INTEGER'], ['failure_json', 'TEXT'], ['cancel_reason', 'TEXT'],
+]);
+
 /**
  * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
  * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
@@ -509,7 +564,7 @@ BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experimen
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 16;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -568,6 +623,17 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
+  if (version < 15) {
+    // SCHEMA_V5 is idempotent and guarantees the table exists for a fresh or very old database.
+    db.exec(SCHEMA_V5);
+    const columns = db.prepare('PRAGMA table_info(jobs)').all();
+    const names = new Set(columns.map((column) => column.name));
+    for (const [name, declaration] of JOB_LEASE_COLUMNS_V15) {
+      if (!names.has(name)) db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${declaration}`);
+    }
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_idempotency ON jobs(idempotency_key) WHERE idempotency_key IS NOT NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_scientific_claim ON jobs(status, priority DESC, created_at ASC) WHERE idempotency_key IS NOT NULL');
+  }
   // R-001 (docs/RISKS.md): hash any PLAINTEXT session token left over from before
   // this migration existed. `looksHashed` makes this idempotent by construction,
   // not just by the `version < 13` gate: a token that is already a 64-hex-char
@@ -590,10 +656,26 @@ function migrate(db) {
   if (version < 12) db.exec('PRAGMA user_version = 12');
   if (version < 13) db.exec('PRAGMA user_version = 13');
   if (version < 14) db.exec('PRAGMA user_version = 14');
+  // v15: profil konta (accountProfiles.mjs). Kolumna dodawana nie-destrukcyjnie i
+  // tylko gdy jej brak (idempotentne także poza bramką wersji); istniejące konta
+  // dostają DEFAULT_ACCOUNT_PROFILE (BADACZ), więc nikt nie traci dotychczasowego dostępu.
+  ensureAccountProfileColumn(db);
+  if (version < 15) db.exec('PRAGMA user_version = 15');
+  if (version < 16) {
+    db.exec(SCHEMA_V16);
+    db.exec('PRAGMA user_version = 16');
+  }
+}
+
+function ensureAccountProfileColumn(db) {
+  const cols = db.prepare('PRAGMA table_info(users)').all();
+  if (cols.some((c) => c.name === 'account_profile')) return;
+  const allowed = ACCOUNT_PROFILES.map((p) => `'${p}'`).join(',');
+  db.exec(`ALTER TABLE users ADD COLUMN account_profile TEXT NOT NULL DEFAULT '${DEFAULT_ACCOUNT_PROFILE}' CHECK (account_profile IN (${allowed}))`);
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
-export function openDatabase(filename = ':memory:') {
+export function openDatabase(filename = ':memory:', { backupDir = null } = {}) {
   const db = new DatabaseSync(filename);
   try {
     db.exec('PRAGMA foreign_keys = ON;');
@@ -601,6 +683,15 @@ export function openDatabase(filename = ':memory:') {
       db.exec('PRAGMA journal_mode = WAL;');
       // A heavy job writes from a worker thread on its own connection; wait for the lock instead of failing.
       db.exec('PRAGMA busy_timeout = 5000;');
+    }
+    const { user_version: before } = db.prepare('PRAGMA user_version').get();
+    // An older release refuses a database whose schema is newer than it knows, so a code-only rollback cannot
+    // reopen a migrated database. The pre-migration snapshot is what a rollback restores.
+    const preMigrationSnapshot = filename !== ':memory:' && before > 0 && before < CURRENT_SCHEMA_VERSION
+      ? snapshotDatabase({ dbPath: filename, dir: backupDir ?? process.env.GENESIS_BACKUP_DIR ?? path.join(path.dirname(filename), 'backups'), keep: Number.MAX_SAFE_INTEGER })
+      : null;
+    if (preMigrationSnapshot) {
+      console.log(JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'db_pre_migration_snapshot', fromSchema: before, toSchema: CURRENT_SCHEMA_VERSION, file: preMigrationSnapshot.file, bytes: preMigrationSnapshot.bytes }));
     }
     db.exec(SCHEMA);
     migrate(db);
@@ -617,7 +708,13 @@ export function openDatabase(filename = ':memory:') {
 
 function toUser(row) {
   if (!row) return null;
-  return { id: row.id, email: row.email, displayName: row.display_name, createdAt: row.created_at };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    accountProfile: normalizeAccountProfile(row.account_profile) ?? DEFAULT_ACCOUNT_PROFILE,
+    createdAt: row.created_at,
+  };
 }
 function toProject(row, role) {
   if (!row) return null;
@@ -685,18 +782,20 @@ function toMergeRequest(row) {
 /* ---------------- Użytkownicy ---------------- */
 
 /** Tworzy użytkownika. Rzuca Error('email_taken') przy duplikacie adresu. */
-export function createUser(db, { email, displayName, passwordHash }) {
+export function createUser(db, { email, displayName, passwordHash, accountProfile = DEFAULT_ACCOUNT_PROFILE }) {
   const id = newId();
   const now = Date.now();
+  const profile = normalizeAccountProfile(accountProfile);
+  if (!profile) throw new Error('invalid_account_profile');
   try {
     db.prepare(
-      'INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(id, email, displayName, passwordHash, now);
+      'INSERT INTO users (id, email, display_name, password_hash, account_profile, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, email, displayName, passwordHash, profile, now);
   } catch (err) {
     if (String(err?.message ?? '').includes('UNIQUE')) throw new Error('email_taken', { cause: err });
     throw err;
   }
-  return { id, email, displayName, createdAt: now };
+  return { id, email, displayName, accountProfile: profile, createdAt: now };
 }
 
 export function getUserByEmail(db, email) {

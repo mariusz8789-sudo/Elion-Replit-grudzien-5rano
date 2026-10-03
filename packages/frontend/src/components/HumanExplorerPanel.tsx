@@ -1,3 +1,4 @@
+import { BRAIN_REGIONS, brainPartLabel, brainRegionOf } from '../core/three/brainParts';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { t, getLocale } from '../core/i18n';
 import { drawBiologyArtifact } from '../core/three/biologyStationKit';
@@ -31,6 +32,15 @@ import './HumanExplorerHero.css';
  * no session the microscope shows its empty state.
  */
 export interface HumanExplorerPanelProps {
+  /** The body is being explored (region/organ/structure): the small selection HUD takes over and the hero steps aside. */
+  readonly exploring?: boolean;
+  /** Taps on the body descend into it (the atlas organs are in place). */
+  readonly exploreReady?: boolean;
+  /** The anatomy HUD is on screen: the old scale path, main action and hint give way to it. */
+  readonly hudOn?: boolean;
+  /** Organ close-up: the structure tapped on the model and the region chosen below it. */
+  readonly closeUp?: { part: string | null; region: string | null };
+  readonly onCloseUpRegion?: (regionId: string | null) => void;
   readonly subjectBounds?: { left: number; right: number; top: number; bottom: number } | null;
   readonly researchControls?: ReactNode;
   readonly manifest: HumanDigitalTwinManifest;
@@ -69,7 +79,7 @@ const PREVENTION_TOPICS: readonly PreventionTopic[] = ['cigarette', 'vaping', 'a
 const PREVENTION_TARGETS: readonly PreventionTarget[] = ['lungs', 'heart', 'brain', 'liver', 'whole-body'];
 const PREVENTION_TARGET_LABEL_PL: Readonly<Record<PreventionTarget, string>> = { lungs: 'płuca', heart: 'serce', brain: 'mózg', liver: 'wątroba', 'whole-body': 'organizm' };
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy, twinContext = null }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy, twinContext = null, closeUp, onCloseUpRegion, exploring = false, exploreReady = false, hudOn = false }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const initialHash = typeof window === 'undefined' ? '' : window.location.hash;
   const initialQuery = new URLSearchParams(initialHash.split('?')[1] ?? '');
@@ -187,7 +197,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
   return (
-    <section ref={heroRef} className={`sw-hud sw-hud-explorer human-hero${inspectorOpen ? ' has-inspector' : peek !== 'closed' ? ' has-context' : ''}`} aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
+    <section ref={heroRef} className={`sw-hud sw-hud-explorer human-hero${exploring ? ' is-exploring' : ''}${hudOn ? ' has-hud' : ''}${inspectorOpen ? ' has-inspector' : peek !== 'closed' ? ' has-context' : ''}`} aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
       {subjectBounds && !inspectorOpen && <button type="button" className="human-subject-target" data-testid="human-subject-target" data-subject-bounds={JSON.stringify(subjectBounds)} style={{ left: `clamp(8px, ${subjectBounds.right - (heroRef.current?.offsetLeft ?? 0) + 10}px, calc(100% - 46px))`, top: `clamp(240px, ${(subjectBounds.top + subjectBounds.bottom) / 2}px, calc(100% - 200px))` }} aria-label={`Informacje o modelu: ${level === 'body' ? 'ciało człowieka' : organ?.label}`} aria-expanded={peek !== 'closed'} onPointerEnter={event => { if (event.pointerType === 'mouse' && peek !== 'pinned') setPeek('hover'); }} onPointerLeave={() => { if (peek === 'hover') setPeek('closed'); }} onFocus={() => { if (peek !== 'pinned') setPeek('hover'); }} onBlur={() => { if (peek === 'hover') setPeek('closed'); }} onClick={() => setPeek(peek === 'pinned' ? 'closed' : 'pinned')}>+</button>}
       {peek !== 'closed' && !inspectorOpen && <aside className={`human-context${subjectBounds && subjectBounds.right > (heroRef.current?.parentElement?.clientWidth ?? 1440) - 300 ? ' is-left' : ''}`} data-testid="human-context" aria-label="Wybrany model">
         <button type="button" className="human-context-close" aria-label="Zamknij informacje" onClick={() => setPeek('closed')}>×</button>
@@ -203,9 +213,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
         <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
         <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
-        {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures} title={BODYPARTS3D_ATTRIBUTION}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur · {BODYPARTS3D_ATTRIBUTION}</span>}
+        {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures} title={BODYPARTS3D_ATTRIBUTION}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur</span>}
         {referenceAnatomy?.fullAtlas?.status === 'LOADING' && <span className="human-model-label" data-testid="bp3d-full-atlas-loading">Wczytywanie pełnego atlasu anatomicznego…</span>}
-        {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])} title={BODYPARTS3D_ATTRIBUTION}>{BODYPARTS3D_ATTRIBUTION}</span>}
+        {(referenceShown || referenceAnatomy?.fullAtlas?.status === 'READY') && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])} title={BODYPARTS3D_ATTRIBUTION}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
       {/* HERO → twin (D-146): what the finalist is, what it was docked against, where that target sits, and
           what kind of knowledge each line is. RESOLVED came from the canonical run; UNRESOLVED says why and
@@ -255,10 +265,12 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
         <button type="button" className="sw-chip human-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="human-inspector" onClick={() => setInspectorOpen(!inspectorOpen)} data-testid="human-inspector-toggle">{inspectorOpen ? 'Zamknij ×' : 'Instrumenty +'}</button>
       </div>
+      {!exploring && level === 'organ' && organ?.id === 'brain' && closeUp && onCloseUpRegion && <BrainPartsCard selection={closeUp} onRegion={onCloseUpRegion} />}
+      {!exploring && exploreReady && level === 'body' && !inspectorOpen && <p className="human-touch-hint" data-testid="human-touch-hint">Dotknij części ciała: głowy, klatki, brzucha…</p>}
       <nav className="human-hero-path" aria-label="Od ciała do komórki">
         {(['body', 'organ', 'tissue', 'cell'] as const).map((target, index) => <button key={target} type="button" aria-current={level === target ? 'step' : undefined} onClick={() => { onTwinCamera(true); zoom(target); }} disabled={busy || !explorer} data-testid={`human-hero-${target}`}><span>0{index + 1}</span><strong>{levelLabel(target, locale)}</strong></button>)}
       </nav>
-      <div className="human-hero-action"><button type="button" className="sw-btn sw-btn-primary" disabled={busy || !explorer} onClick={() => { onTwinCamera(true); zoom(level === 'body' ? 'organ' : level === 'organ' ? 'tissue' : level === 'tissue' ? 'cell' : 'body'); }}>{busy ? 'Trwa wykonanie…' : level === 'body' ? `Poznaj ${organ?.label ?? 'narząd'} →` : level === 'organ' ? 'Zobacz tkankę →' : level === 'tissue' ? 'Zobacz komórkę →' : 'Wróć do ciała'}</button></div>
+      <div className="human-hero-action"><button type="button" className="sw-btn sw-btn-primary" disabled={busy || !explorer} onClick={() => { onTwinCamera(true); zoom(level === 'body' ? 'organ' : level === 'organ' ? 'tissue' : level === 'tissue' ? 'cell' : 'body'); }}>{busy ? 'Trwa wykonanie…' : level === 'body' ? `Poznaj: ${explorer ? t(explorer.labelKey, locale) : organ?.label ?? 'narząd'} →` : level === 'organ' ? 'Zobacz tkankę →' : level === 'tissue' ? 'Zobacz komórkę →' : 'Wróć do ciała'}</button></div>
       <div id="human-inspector" className="human-inspector" hidden={!inspectorOpen} data-testid="human-inspector" onKeyDown={(event) => { if (event.key === 'Escape') setInspectorOpen(false); }}>
       <h2>Instrumenty Human Explorer</h2>
       <div className="human-inspector-tabs" role="tablist" aria-label="Narzędzia eksploracji">
@@ -392,6 +404,30 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <HumanExperimentSessionInspector session={session} />
         {researchControls}
       </div>
+      </div>
+    </section>
+  );
+}
+
+/** Brain close-up guide: what was tapped, and the regions to light (inner ones are otherwise hidden under the cortex). */
+function BrainPartsCard({ selection, onRegion }: { readonly selection: { part: string | null; region: string | null }; readonly onRegion: (regionId: string | null) => void }): JSX.Element {
+  const partRegion = selection.part ? brainRegionOf(selection.part) : null;
+  const region = partRegion ?? BRAIN_REGIONS.find((r) => r.id === selection.region) ?? null;
+  const label = selection.part ? brainPartLabel(selection.part) : null;
+  return (
+    <section className="human-brain-card" aria-label="Części mózgu" data-testid="human-brain-parts" data-part={selection.part ?? ''} data-region={selection.region ?? ''}>
+      {label ? (
+        <p className="human-brain-picked"><strong>{label.label}</strong>{label.side && <span> · {label.side} półkula</span>}<small>{region!.label}: {region!.role}</small></p>
+      ) : region ? (
+        <p className="human-brain-picked"><strong>{region.label}</strong><small>{region.role}</small></p>
+      ) : (
+        <p className="human-brain-picked"><strong>Dotknij część mózgu</strong><small>Przeciągnij palcem, żeby obrócić. Części w środku pokaże wybór obszaru.</small></p>
+      )}
+      <div className="human-brain-regions" role="group" aria-label="Obszary mózgu">
+        <button type="button" className={`sw-chip${!selection.part && !selection.region ? ' is-on' : ''}`} onClick={() => onRegion(null)}>Cały</button>
+        {BRAIN_REGIONS.map((r) => (
+          <button key={r.id} type="button" className={`sw-chip${selection.region === r.id ? ' is-on' : ''}`} aria-pressed={selection.region === r.id} onClick={() => onRegion(selection.region === r.id ? null : r.id)} data-testid={`human-brain-region-${r.id}`}>{r.label}</button>
+        ))}
       </div>
     </section>
   );

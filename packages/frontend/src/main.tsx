@@ -2,13 +2,15 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { t } from './core/i18n';
+import { initLocale, t } from './core/i18n';
 import './styles.css';
 import './styles-2040.css';
 import './styles-2040-screens.css';
 import './styles-2040-hud.css';
 import './styles-investor-polish.css';
 import './components/genesis-ui/worldViewShell.css';
+import './styles-account.css';
+import './styles-profile-dashboard.css';
 
 // Deep links by path (`/matrix`, as the Playwright specs and external links use) are served
 // by the backend's SPA fallback; the router is hash-based, so map the path onto the hash
@@ -17,6 +19,8 @@ if (window.location.pathname !== '/' && !window.location.hash) {
   window.history.replaceState(null, '', `/#${window.location.pathname}${window.location.search}`);
 }
 
+// The language chosen earlier in this browser (Polish by default), before the first render.
+initLocale();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <a href="#main-content" className="skip-link">{t('skipLink')}</a>

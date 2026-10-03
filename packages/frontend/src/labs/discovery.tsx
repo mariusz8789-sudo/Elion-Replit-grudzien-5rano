@@ -75,6 +75,7 @@ function DiscoveryView({ lab }: { lab: LabDefinition }) {
         />
       </div>
       <HonestyBadge
+        sceneId="lab:discovery:discovery"
         level={lab.honesty}
         note={`Diagram powyżej odzwierciedla prawdziwą architekturę kodu, nie ilustrację poglądową: ścieżka silnika deterministycznego pulsuje zawsze, bo dosłownie liczy się na Twoim urządzeniu co klatkę w każdym laboratorium; ścieżka modelu językowego jaśnieje i przesyła cząstki WYŁĄCZNIE gdy status pobrany z GET /api/health faktycznie mówi „ready”. ${lab.honestyNote}`}
       />

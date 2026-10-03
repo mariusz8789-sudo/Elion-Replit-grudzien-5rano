@@ -1,0 +1,686 @@
+{
+ "kind": "glp1r-source-fetch",
+ "rawFilesUnmodified": true,
+ "files": [
+  {
+   "sourceId": "7C2E",
+   "kind": "mmCIF",
+   "sourceUrl": "https://files.rcsb.org/download/7C2E.cif",
+   "finalUrl": "https://files.rcsb.org/download/7C2E.cif",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:52Z",
+   "path": "rcsb/7C2E/7C2E.cif",
+   "bytes": 959370,
+   "sha256": "1141f7aacb5b9a5746e288354d844c457167a6ee8b910367a1305e067c765321"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-entry",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/7C2E",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/entry/7C2E",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:52Z",
+   "path": "rcsb/7C2E/entry.json",
+   "bytes": 10170,
+   "sha256": "4a68dd8165c40ebce97d482550a88eca78042868e8a9960237e354ced98f50a6"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/1",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/1",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:52Z",
+   "path": "rcsb/7C2E/polymer_entity_1.json",
+   "bytes": 68944,
+   "sha256": "b7c77b4f5c209f79448e191a34ed7f924817a38d85fe72a745249cc6c410eeb0"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/2",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/2",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:52Z",
+   "path": "rcsb/7C2E/polymer_entity_2.json",
+   "bytes": 37061,
+   "sha256": "763d909b09d86574631888b8d5f0bee96368f27e8446458d7313f39644b6aa9d"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/3",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/3",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:52Z",
+   "path": "rcsb/7C2E/polymer_entity_3.json",
+   "bytes": 25360,
+   "sha256": "d3d26a14ec56314fb7c4b4072c63372f80db26c84ccf013a7727847aabdb383e"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/4",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/4",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:53Z",
+   "path": "rcsb/7C2E/polymer_entity_4.json",
+   "bytes": 11483,
+   "sha256": "b7f1f882b6956f98d1da72d1c23f5ed117dec1d2efa5350027ddb6c47b4c9c37"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/5",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/5",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:53Z",
+   "path": "rcsb/7C2E/polymer_entity_5.json",
+   "bytes": 66957,
+   "sha256": "73bdf1fd2c09b6c37a9d636b75740660b55335fbea67cd29dcea9fdb34eb7b9c"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-nonpolymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7C2E/6",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7C2E/6",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:53Z",
+   "path": "rcsb/7C2E/nonpolymer_entity_6.json",
+   "bytes": 1297,
+   "sha256": "b14c1f775540ff1e86649fea5eeb74054b63a4bdf9a34f543c6d1c639e9acc2f"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "rcsb-assembly",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/assembly/7C2E/1",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/assembly/7C2E/1",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:53Z",
+   "path": "rcsb/7C2E/assembly_1.json",
+   "bytes": 3219,
+   "sha256": "81555a1ad54035472206ae7a956d89763fd89e4c82dde8ea0355e50e6f08e90c"
+  },
+  {
+   "sourceId": "7C2E",
+   "kind": "wwpdb-validation-report",
+   "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/c2/7c2e/7c2e_validation.xml.gz",
+   "finalUrl": "https://files.rcsb.org/pub/pdb/validation_reports/c2/7c2e/7c2e_validation.xml.gz",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:53Z",
+   "path": "rcsb/7C2E/7c2e_validation.xml.gz",
+   "bytes": 34266,
+   "sha256": "6739464fe95df4095ecd10e0de772f7b0dd8fd1b5d79d37c500e02713dcddd8d"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "mmCIF",
+   "sourceUrl": "https://files.rcsb.org/download/7S15.cif",
+   "finalUrl": "https://files.rcsb.org/download/7S15.cif",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:54Z",
+   "path": "rcsb/7S15/7S15.cif",
+   "bytes": 369669,
+   "sha256": "046ca75de7b357fc0bde20b212ab3d76eae326c16afbb43f9b52c5c6db7b60fb"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "rcsb-entry",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/7S15",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/entry/7S15",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:54Z",
+   "path": "rcsb/7S15/entry.json",
+   "bytes": 14971,
+   "sha256": "ceb31a33903dd75442bf3e61d478d99c2df4f078f4dc8e04f73894f36bb1f4d1"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "rcsb-polymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7S15/1",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7S15/1",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:54Z",
+   "path": "rcsb/7S15/polymer_entity_1.json",
+   "bytes": 65129,
+   "sha256": "744fa6e9bc6fb6ec89e12b5c0f6006d885c8216e1736861f8f2bc1227df91807"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "rcsb-nonpolymer-entity",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7S15/2",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7S15/2",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:54Z",
+   "path": "rcsb/7S15/nonpolymer_entity_2.json",
+   "bytes": 1247,
+   "sha256": "20c337dd8a585a5138f6efb6b1af8fd5bba2541acaf80109369095b0ab40adca"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "rcsb-assembly",
+   "sourceUrl": "https://data.rcsb.org/rest/v1/core/assembly/7S15/1",
+   "finalUrl": "https://data.rcsb.org/rest/v1/core/assembly/7S15/1",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:55Z",
+   "path": "rcsb/7S15/assembly_1.json",
+   "bytes": 2537,
+   "sha256": "e3a207801ca0af3a7de0696bdebfec0cff155e16fda69c61cd40ba434c5c586d"
+  },
+  {
+   "sourceId": "7S15",
+   "kind": "wwpdb-validation-report",
+   "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/s1/7s15/7s15_validation.xml.gz",
+   "finalUrl": "https://files.rcsb.org/pub/pdb/validation_reports/s1/7s15/7s15_validation.xml.gz",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:55Z",
+   "path": "rcsb/7S15/7s15_validation.xml.gz",
+   "bytes": 23668,
+   "sha256": "b4736a54b64d36ce3f2a473b1bb13beeb89b0c2719fced0ab95554a751250902"
+  },
+  {
+   "sourceId": "reactome-version",
+   "kind": "reactome-version",
+   "sourceUrl": "https://reactome.org/ContentService/data/database/version",
+   "finalUrl": "https://reactome.org/ContentService/data/database/version",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:55Z",
+   "path": "reactome/database-version.txt",
+   "bytes": 2,
+   "sha256": "d6d824abba4afde81129c71dea75b8100e96338da5f416d2f69088f1960cb091"
+  },
+  {
+   "sourceId": "R-HSA-381684",
+   "kind": "reactome-event",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381684",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381684",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:55Z",
+   "path": "reactome/R-HSA-381684.enhanced.json",
+   "bytes": 30425,
+   "sha256": "4700cb0848a249c8429730676a156a8ec5d7b308aa7b7b66c06d220e240a0d9e"
+  },
+  {
+   "sourceId": "R-HSA-381684",
+   "kind": "reactome-participants",
+   "sourceUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381684",
+   "finalUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381684",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:56Z",
+   "path": "reactome/R-HSA-381684.participants.json",
+   "bytes": 2,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+   "sourceId": "R-HSA-381706",
+   "kind": "reactome-event",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381706",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381706",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:56Z",
+   "path": "reactome/R-HSA-381706.enhanced.json",
+   "bytes": 19291,
+   "sha256": "ced9581ad2851eaada65d07779a0c92fd28cf660528e726f0a799292cefea7e5"
+  },
+  {
+   "sourceId": "R-HSA-381706",
+   "kind": "reactome-participants",
+   "sourceUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381706",
+   "finalUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381706",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:56Z",
+   "path": "reactome/R-HSA-381706.participants.json",
+   "bytes": 10583,
+   "sha256": "381df01409995f8de0f132ba25e9b1ed8b4d307ec6a819acc5c61b9cd1696326"
+  },
+  {
+   "sourceId": "ENSG00000112164",
+   "kind": "hpa-gene",
+   "sourceUrl": "https://www.proteinatlas.org/ENSG00000112164.json",
+   "finalUrl": "https://www.proteinatlas.org/ENSG00000112164.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:56Z",
+   "path": "hpa/ENSG00000112164.json",
+   "bytes": 6958,
+   "sha256": "ba3c1e0328b6511195114fcd96eee13b8918bc6f0cbb3bedd0c33ea64b76c130"
+  },
+  {
+   "sourceId": "ENSG00000112164",
+   "kind": "hpa-gene-tsv",
+   "sourceUrl": "https://www.proteinatlas.org/ENSG00000112164.tsv",
+   "finalUrl": "https://www.proteinatlas.org/ENSG00000112164.tsv",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:57Z",
+   "path": "hpa/ENSG00000112164.tsv",
+   "bytes": 6406,
+   "sha256": "52367a330314af9e382483e34f06e86108717f05e96834248f5bb234619cb768"
+  },
+  {
+   "sourceId": "chembl-status",
+   "kind": "chembl-status",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/status.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/status.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:17:58Z",
+   "path": "chembl/status.json",
+   "bytes": 212,
+   "sha256": "29dc1fb09487a8d2962253a4d0d92c4ded0aa0d831effab42445d0c3483d4740"
+  },
+  {
+   "sourceId": "CHEMBL1246709",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1246709.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1246709.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:00Z",
+   "path": "chembl/assay/CHEMBL1246709.json",
+   "bytes": 955,
+   "sha256": "da2105342fa306836822af7ee9e58b7cdc1f2203ba0060207e0095acfac5f4b3"
+  },
+  {
+   "sourceId": "CHEMBL1648248",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1648248.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1648248.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:01Z",
+   "path": "chembl/assay/CHEMBL1648248.json",
+   "bytes": 969,
+   "sha256": "add17506da84e8c186eeeb46b8d0025893f53947fd3a70421e09ef0c5cde5f4c"
+  },
+  {
+   "sourceId": "CHEMBL1924543",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1924543.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1924543.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:01Z",
+   "path": "chembl/assay/CHEMBL1924543.json",
+   "bytes": 894,
+   "sha256": "c7736353fcc04334ea87738e0c93b57d015a6f3f6d23c11297520e99ea5fc73d"
+  },
+  {
+   "sourceId": "CHEMBL1925821",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1925821.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1925821.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:02Z",
+   "path": "chembl/assay/CHEMBL1925821.json",
+   "bytes": 922,
+   "sha256": "10646fb139f7ddeaab21434ea49532339985fc9da7009aa07c190efb05fc661b"
+  },
+  {
+   "sourceId": "CHEMBL1937452",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1937452.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1937452.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:02Z",
+   "path": "chembl/assay/CHEMBL1937452.json",
+   "bytes": 888,
+   "sha256": "27b896f22bbcec3373fe1ab99928c2c37e3ff4d185300e8ca0b114c83e58870f"
+  },
+  {
+   "sourceId": "CHEMBL829559",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL829559.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL829559.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:03Z",
+   "path": "chembl/assay/CHEMBL829559.json",
+   "bytes": 954,
+   "sha256": "eb58afbdbb296afd08444dc2104c1f36de1d10ae59c65584c0940ca04913b71f"
+  },
+  {
+   "sourceId": "CHEMBL874550",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL874550.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL874550.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:03Z",
+   "path": "chembl/assay/CHEMBL874550.json",
+   "bytes": 951,
+   "sha256": "f7b30048c11b6af54e57d6f8353de88a2e20e24a3117033e323019c2fcffbe6c"
+  },
+  {
+   "sourceId": "CHEMBL884187",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL884187.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL884187.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:04Z",
+   "path": "chembl/assay/CHEMBL884187.json",
+   "bytes": 939,
+   "sha256": "80e8f29cb80ccd6d94c7b5dd7c3155f32570bcb138c18d3c781150725e697a64"
+  },
+  {
+   "sourceId": "CHEMBL911100",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL911100.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL911100.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:04Z",
+   "path": "chembl/assay/CHEMBL911100.json",
+   "bytes": 866,
+   "sha256": "1fb19501372fef522b571326685aaef59f831b0d5abc72273bb81af137919c3d"
+  },
+  {
+   "sourceId": "CHEMBL923946",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL923946.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL923946.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:05Z",
+   "path": "chembl/assay/CHEMBL923946.json",
+   "bytes": 896,
+   "sha256": "69c0fdae5e02c701316f2717bb5744f467249b2fc43589afd6fcc9e1b4ba5549"
+  },
+  {
+   "sourceId": "CHEMBL937687",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL937687.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL937687.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:05Z",
+   "path": "chembl/assay/CHEMBL937687.json",
+   "bytes": 922,
+   "sha256": "d9487785d4877e0cc3dffdba6043bb5c870b69531a4cfde83248858b29aef72a"
+  },
+  {
+   "sourceId": "CHEMBL972348",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972348.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972348.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:06Z",
+   "path": "chembl/assay/CHEMBL972348.json",
+   "bytes": 918,
+   "sha256": "889806b1b32b3c909f4f2a185ce9188e272723b40ad0cff2f491390f995fa514"
+  },
+  {
+   "sourceId": "CHEMBL972349",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972349.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972349.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:06Z",
+   "path": "chembl/assay/CHEMBL972349.json",
+   "bytes": 992,
+   "sha256": "3fd834ff9d2f800644c48a15044f0e51832dafbecf90f55a276114c908217b00"
+  },
+  {
+   "sourceId": "CHEMBL977343",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL977343.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL977343.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:07Z",
+   "path": "chembl/assay/CHEMBL977343.json",
+   "bytes": 903,
+   "sha256": "40d9ef39d0ddda3fd254ce439f9f2ac222a4f7292e28095272a1d69bc3000ebc"
+  },
+  {
+   "sourceId": "CHEMBL991608",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991608.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991608.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:08Z",
+   "path": "chembl/assay/CHEMBL991608.json",
+   "bytes": 928,
+   "sha256": "b2ffe1f9237bac17cd05b80fdee7bdc926cb91caf6f2a1aa3aa400624fdd9461"
+  },
+  {
+   "sourceId": "CHEMBL991609",
+   "kind": "chembl-assay",
+   "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991609.json",
+   "finalUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991609.json",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T02:18:08Z",
+   "path": "chembl/assay/CHEMBL991609.json",
+   "bytes": 988,
+   "sha256": "ac5cd43f3fb3c51fbea3e02494632b8b373b2e2fe0e55dcd01551451180255bf"
+  }
+ ],
+ "summary": {
+  "structures": {
+   "7C2E": {
+    "method": [
+     "ELECTRON MICROSCOPY"
+    ],
+    "resolutionA": [
+     4.2
+    ],
+    "title": "GLP-1R-Gs complex structure with a small molecule full agonist",
+    "initialRelease": "2020-08-26T00:00:00.000+00:00",
+    "polymerEntities": [
+     {
+      "entityId": "1",
+      "description": "Guanine nucleotide-binding protein G(s) subunit alpha isoforms short",
+      "chains": [
+       "A"
+      ],
+      "uniprot": [
+       "P63092"
+      ],
+      "species": [
+       "Homo sapiens"
+      ],
+      "mutationsStated": null,
+      "engineeredMutationCount": 0,
+      "polymerType": "Protein"
+     },
+     {
+      "entityId": "2",
+      "description": "Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1",
+      "chains": [
+       "B"
+      ],
+      "uniprot": [
+       "P62873"
+      ],
+      "species": [
+       "Homo sapiens"
+      ],
+      "mutationsStated": null,
+      "engineeredMutationCount": 0,
+      "polymerType": "Protein"
+     },
+     {
+      "entityId": "3",
+      "description": "Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2",
+      "chains": [
+       "G"
+      ],
+      "uniprot": [
+       "P59768"
+      ],
+      "species": [
+       "Homo sapiens"
+      ],
+      "mutationsStated": null,
+      "engineeredMutationCount": 0,
+      "polymerType": "Protein"
+     },
+     {
+      "entityId": "4",
+      "description": "Nanobody 35|Lama glama",
+      "chains": [
+       "N"
+      ],
+      "uniprot": null,
+      "species": [
+       "Lama glama"
+      ],
+      "mutationsStated": null,
+      "engineeredMutationCount": 0,
+      "polymerType": "Protein"
+     },
+     {
+      "entityId": "5",
+      "description": "Glucagon-like peptide 1 receptor",
+      "chains": [
+       "R"
+      ],
+      "uniprot": [
+       "P43220"
+      ],
+      "species": [
+       "Homo sapiens"
+      ],
+      "mutationsStated": "L260F",
+      "engineeredMutationCount": 0,
+      "polymerType": "Protein"
+     }
+    ],
+    "nonPolymerLigands": [
+     {
+      "compId": "FFR",
+      "name": "2-[[4-[6-[(4-cyano-2-fluoranyl-phenyl)methoxy]pyridin-2-yl]-3,6-dihydro-2~{H}-pyridin-1-yl]methyl]-3-[[(2~{S})-oxetan-2-yl]methyl]imidazo[4,5-b]pyridine-5-carboxylic acid",
+      "entityId": "6"
+     }
+    ],
+    "readFrom": "data.rcsb.org REST JSON saved alongside; values copied, not inferred"
+   },
+   "7S15": {
+    "method": [
+     "ELECTRON MICROSCOPY"
+    ],
+    "resolutionA": [
+     3.8
+    ],
+    "title": "GLP-1 receptor bound with Pfizer small molecule agonist",
+    "initialRelease": "2022-06-08T00:00:00.000+00:00",
+    "polymerEntities": [
+     {
+      "entityId": "1",
+      "description": "Glucagon-like peptide 1 receptor",
+      "chains": [
+       "R"
+      ],
+      "uniprot": [
+       "P43220"
+      ],
+      "species": [
+       "Homo sapiens"
+      ],
+      "mutationsStated": "I146Y, A208R, Q213E, S219R, L260A, Y291A, L339E, K346Q",
+      "engineeredMutationCount": 8,
+      "polymerType": "Protein"
+     }
+    ],
+    "nonPolymerLigands": [
+     {
+      "compId": "82L",
+      "name": "2-[(4-{6-[(2,4-difluorophenyl)methoxy]pyridin-2-yl}piperidin-1-yl)methyl]-1-[(1-ethyl-1H-imidazol-5-yl)methyl]-1H-benzimidazole-6-carboxylic acid",
+      "entityId": "2"
+     }
+    ],
+    "readFrom": "data.rcsb.org REST JSON saved alongside; values copied, not inferred"
+   }
+  },
+  "reactome": {
+   "R-HSA-381684": {
+    "displayName": "GLP1R [plasma membrane]",
+    "schemaClass": "EntityWithAccessionedSequence",
+    "species": "Homo sapiens"
+   },
+   "R-HSA-381706": {
+    "displayName": "GLP1R:GLP1 activates G(s)",
+    "schemaClass": "Reaction",
+    "species": "Homo sapiens"
+   }
+  },
+  "hpa": {
+   "gene": "GLP1R",
+   "ensembl": "ENSG00000112164",
+   "uniprot": [
+    "P43220"
+   ]
+  },
+  "chembl": {
+   "release": "ChEMBL_37",
+   "CHEMBL1246709": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL1648248": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL1924543": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL1925821": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL1937452": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL829559": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL874550": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL884187": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL911100": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL923946": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL937687": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL972348": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL972349": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL977343": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL991608": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   },
+   "CHEMBL991609": {
+    "descriptionPresent": true,
+    "target": "CHEMBL1784",
+    "organism": "Homo sapiens"
+   }
+  }
+ }
+}

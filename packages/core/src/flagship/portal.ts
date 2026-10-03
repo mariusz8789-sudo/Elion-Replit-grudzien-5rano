@@ -2,6 +2,7 @@
 import { sha256hex, stableStringify } from '../knowledge/EvidenceLedger.js';
 import type { FlagshipEpistemicStatus, FlagshipMode } from './epistemicGuard.js';
 import { guardWorldMode } from './epistemicGuard.js';
+import { CODATA_2018, schwarzschildRadius } from '../physics/relativity.js';
 
 /**
  * CIRCULAR GATE / PHASE TUNNEL (D-130) — an original portal mechanic as a
@@ -26,11 +27,12 @@ export interface PortalSnapshot {
 }
 function seal(p: Omit<PortalSnapshot, 'fingerprint'>): PortalSnapshot { return { ...p, fingerprint: sha256hex(stableStringify(p)) }; }
 
-// The Schwarzschild radius / warp-factor formulas are reproduced locally (not imported from
-// GenesisSpacetimePortalEngine.ts) so this frontend-reachable module never pulls in that
-// engine's `node:crypto` import — Vite cannot bundle it for the browser. Same physics, no coupling.
-const PORTAL_G = 6.67430e-11; const PORTAL_C = 299792458;
-function localSchwarzschildRadius(massKg: number): number { return (2 * PORTAL_G * massKg) / (PORTAL_C * PORTAL_C); }
+// r_s comes from the shared, dependency-free physics/relativity.ts (safe for the browser bundle).
+// Known issue kept unchanged in U0-a (no result may change): localWarpFactor doubles r_s, so it
+// evaluates √(1 − 4GM/(c²r)) where GenesisSpacetimePortalEngine used rs = 2·(GM/c²). The value
+// only drives the portal's visual ring warp (VISUAL_TUNNEL_ONLY = FICTIONAL); fixing it is a
+// separate, visible change.
+function localSchwarzschildRadius(massKg: number): number { return schwarzschildRadius(massKg, CODATA_2018); }
 function localWarpFactor(massKg: number, r: number): number { const rs = 2 * localSchwarzschildRadius(massKg); return 1 / Math.sqrt(Math.max(1e-9, 1 - rs / Math.max(r, rs + 1e-9))); }
 
 export function createPortal(input: { readonly sessionId: string; readonly style: PortalStyle; readonly sourceWorldId: string; readonly destinationWorldId: string; readonly destinationMode: FlagshipMode; readonly requestedDestinationStatus: FlagshipEpistemicStatus; readonly tunnelMode?: TunnelVisualMode; readonly massKgForVisual?: number }): PortalSnapshot {

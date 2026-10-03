@@ -6,6 +6,11 @@ import { LabShell } from './components/LabShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
+import { AccountScreen } from './components/AccountScreen';
+import { ProfileDashboard } from './components/ProfileDashboard';
+import { useSession } from './core/backend/session';
+import { profileOfUser } from './core/accountProfiles';
+import { isSimplifiedProfile } from './core/profileNavigation';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
@@ -17,7 +22,9 @@ import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { requestOpenScienceChat } from './core/scienceChatBridge';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
-import { t } from './core/i18n';
+import { getLocale, t } from './core/i18n';
+import { fcText } from './components/flightControl/flightControlText';
+import { vText } from './components/verify/verifyText';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
@@ -84,6 +91,7 @@ const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').
 const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
 const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
 const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
+import { LaboratoryModeBar } from './components/LaboratoryModeBar';
 const ScientificWorldsScreen = lazy(() => import('./components/ScientificWorldsScreen').then((m) => ({ default: m.ScientificWorldsScreen })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -96,6 +104,8 @@ const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen'
 const ReviewerRoomScreen = lazy(() => import('./components/ReviewerRoomScreen').then((m) => ({ default: m.ReviewerRoomScreen })));
 const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
 const DiscoveryTrackScreen = lazy(() => import('./components/DiscoveryTrackScreen').then((m) => ({ default: m.DiscoveryTrackScreen })));
+const FlightControlScreen = lazy(() => import('./components/FlightControlScreen').then((m) => ({ default: m.FlightControlScreen })));
+const VerifyScreen = lazy(() => import('./components/VerifyScreen').then((m) => ({ default: m.VerifyScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -116,9 +126,10 @@ function HeavyRoute({ children }: { children: ReactNode }) {
  */
 
 type Route =
-  | { kind: 'home' }
+  | { kind: 'home'; full?: boolean }
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
+  | { kind: 'account' }
   | { kind: 'memory' }
   | { kind: 'dossier' }
   | { kind: 'discovery-log' }
@@ -183,6 +194,8 @@ type Route =
   | { kind: 'meta-cognition' }
   | { kind: 'mirror' }
   | { kind: 'discovery-track' }
+  | { kind: 'flight-control' }
+  | { kind: 'verify' }
   | { kind: 'more' };
 
 export function parseHash(): Route {
@@ -192,6 +205,7 @@ export function parseHash(): Route {
   // More · Scientific OS, the whole catalogue; `?group=<id>` opens one group.
   if (h === '#/more' || h.startsWith('#/more?')) return { kind: 'more' };
   if (h === '#/settings') return { kind: 'settings' };
+  if (h === '#/konto' || h.startsWith('#/konto?')) return { kind: 'account' };
   if (h === '#/memory') return { kind: 'memory' };
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
@@ -268,6 +282,10 @@ export function parseHash(): Route {
   if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
   if (h === '#/mirror') return { kind: 'mirror' };
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
+  if (h === '#/flight-control') return { kind: 'flight-control' };
+  if (h === '#/verify') return { kind: 'verify' };
+  // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
+  if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };
 }
 
@@ -278,6 +296,10 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
+  // Uczeń, student i nauczyciel widzą na Start własny, prostszy pulpit; `#/?full` pokazuje pełny StartHero.
+  const session = useSession();
+  const signedInProfile = profileOfUser(session?.user);
+  const profileDashboard = route.kind === 'home' && !route.full && isSimplifiedProfile(signedInProfile) ? signedInProfile : null;
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // Start is itself the introduction: landing there counts as having seen the tour, so it never
@@ -285,6 +307,8 @@ export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     if (hasCompletedOnboarding()) return false;
     if (parseHash().kind === 'home') { markOnboardingComplete(); return false; }
+    // A direct link to sign in / register opens the form, not the tour in front of it.
+    if (parseHash().kind === 'account') return false;
     return true;
   });
   const lastLabId = useRef<string | null>(null);
@@ -444,6 +468,16 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'account') {
+      return (
+        <div className="app">
+          <TopBar title="👤 Konto" onSearch={() => setSearchOpen(true)} />
+          <AccountScreen />
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'memory') {
       return (
         <div className="app">
@@ -491,6 +525,26 @@ export default function App() {
         <div className="app">
           <TopBar title="More · Scientific OS" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><ScientificOsScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'flight-control') {
+      return (
+        <div className="app">
+          <TopBar title={`◎ ${fcText('kicker', getLocale())}`} onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><FlightControlScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'verify') {
+      return (
+        <div className="app">
+          <TopBar title={`✓ ${vText('kicker', getLocale())}`} onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><VerifyScreen /></HeavyRoute>
           {overlays}
         </div>
       );
@@ -812,7 +866,8 @@ export default function App() {
     if (route.kind === 'lab-fpv') {
       return (
         <div className="app">
-          <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="🧪 Laboratorium — Kwantowy FPV" onSearch={() => setSearchOpen(true)} />
+          <LaboratoryModeBar active="quantum" />
           <HeavyRoute>
             <LabFpvView />
           </HeavyRoute>
@@ -1007,7 +1062,8 @@ export default function App() {
     if (route.kind === 'first-person-lab') {
       return (
         <div className="app">
-          <TopBar title="Wirtualne laboratorium" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Laboratorium — scenariusze" onSearch={() => setSearchOpen(true)} />
+          <LaboratoryModeBar active="scenarios" />
           <HeavyRoute>
             <FirstPersonLabScreen />
           </HeavyRoute>
@@ -1183,15 +1239,18 @@ export default function App() {
 
     return (
       <div className="app">
-        <TopBar title="Dashboard" onSearch={() => setSearchOpen(true)} ask={false} />
+        <TopBar title={profileDashboard ? 'Twój pulpit' : 'Start'} onSearch={() => setSearchOpen(true)} ask={false} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
               mounted right here beside the chat. Opening a world no longer
-              unmounts the conversation. */}
-          <HeavyRoute>
-            <StartHero />
-          </HeavyRoute>
+              unmounts the conversation. Uczeń, student i nauczyciel dostają
+              tu własny, prostszy pulpit (ProfileDashboard). */}
+          {profileDashboard ? <ProfileDashboard profile={profileDashboard} /> : (
+            <HeavyRoute>
+              <StartHero />
+            </HeavyRoute>
+          )}
         </main>
         {overlays}
       </div>

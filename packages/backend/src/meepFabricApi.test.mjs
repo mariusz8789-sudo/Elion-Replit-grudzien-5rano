@@ -6,6 +6,7 @@ import { detect } from './compute/meepAdapter.mjs';
 
 const runtime = detect();
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'meep-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0',
   modelId: 'electrodynamics-maxwell-fdtd',
@@ -27,7 +28,7 @@ test('Fabric contract exposes the actual Maxwell/FDTD backend model', () => {
 
 if (runtime.available) {
   test('Fabric API runs real PyMeep FDTD through the canonical compute registry', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.contractVersion, '1.0.0');
     assert.equal(response.body.run.status, 'ok');
@@ -38,7 +39,7 @@ if (runtime.available) {
   });
 } else {
   test('Fabric API rejects Meep execution instead of emitting a fabricated result without runtime', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
     assert.equal(response.body.run.error, 'capability_unavailable');

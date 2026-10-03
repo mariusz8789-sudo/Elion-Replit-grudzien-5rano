@@ -13,6 +13,7 @@ import {
   hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
   hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
 } from './discoveryQuestions';
+import { buildCapabilityIndex, buildDestinationIndex, buildGoalIndex } from '../search';
 import { matchGenesisCapabilityIntent, type GenesisCapability } from '../capabilities/genesisCapabilityRegistry';
 
 /**
@@ -90,6 +91,9 @@ export type ChatAction =
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
   | { type: 'ingestUrls'; urls: readonly string[] }
+  /** RESEARCH RUN — explicit commands continue one canonical backend run. Generated analysis is also
+   * appended to that run and can execute only through its configured ScientificSandboxPort. */
+  | { type: 'researchRun'; op: 'start' | 'next' | 'replay' | 'analyze' | 'replayAnalysis'; question?: string; objective?: string }
   /** D-128 — EPISTEMIC TRUTH RESPONSE: the LaypersonAssistant over the kernel ledger answers `query`
    * with status + sources, or literally "Nie wiem"; ScienceChat.tsx executes it, the resolver only routes. */
   | { type: 'evidenceAnswer'; query: string }
@@ -143,6 +147,13 @@ export interface ChatResponse {
   /** Dla odpowiedzi „pokaż równanie". */
   equations?: string[];
 }
+
+/**
+ * Etykieta pokazywana użytkownikowi przy odpowiedzi z `todo: true`. Wewnętrzne
+ * „TODO" nie jest komunikatem dla użytkownika — mówi, że odpowiedź wymaga
+ * weryfikacji, a nie że coś policzono.
+ */
+export const INCOMPLETE_RESPONSE_LABEL = 'VERIFY_REQUIRED';
 
 /** Migawka aktualnej symulacji dla resolvera (odsprzężona od żywego mostu — testowalna). */
 export interface ChatSimSnapshot {
@@ -421,6 +432,28 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   const scientificIntegrationEntry = resolveScientificIntegrationEntry(message, norm);
   if (scientificIntegrationEntry) return scientificIntegrationEntry;
 
+  // --- ResearchRun (R1-c): explicit commands only, so no other route can swallow them or be swallowed.
+  const researchAsk = message.match(/^\s*\/badanie(?=\s|$)\s*([\s\S]*)$/i);
+  if (researchAsk) {
+    const question = researchAsk[1].trim();
+    if (!question) return { text: RESEARCH_RUN_HELP, tag: 'SYSTEM', intent: 'HELP' };
+    return { text: `Zakładam przebieg badawczy dla pytania: „${question}”. Model tylko proponuje hipotezy; przewidywanie zamrażam, zanim uruchomię silnik.`, tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'researchRun', op: 'start', question } };
+  }
+  const analysisAsk = message.match(/^\s*\/analiza(?=\s|$)\s*([\s\S]*)$/i);
+  if (analysisAsk) {
+    const objective = analysisAsk[1].trim();
+    if (!objective) return { text: GENERATED_ANALYSIS_HELP, tag: 'SYSTEM', intent: 'HELP' };
+    return {
+      text: `Proszę model wyłącznie o kod analizy dla: „${objective}”. Kod zostanie zamrożony przed wykonaniem i uruchomiony tylko w skonfigurowanym sandboxie; wynik nie jest Evidence.`,
+      tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'researchRun', op: 'analyze', objective },
+    };
+  }
+  if (/^\s*\/analiza-(?:powt[oó]rz|replay)\s*$/i.test(message)) {
+    return { text: 'Powtarzam ostatnią udaną analizę z zamrożonego kodu w tym samym sandboxie i porównuję hasze.', tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'researchRun', op: 'replayAnalysis' } };
+  }
+  if (/^\s*\/eksperyment\s*$/i.test(message)) return { text: 'Uruchamiam następny eksperyment z planu tego przebiegu.', tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'researchRun', op: 'next' } };
+  if (/^\s*\/(?:powt[oó]rz|replay)\s*$/i.test(message)) return { text: 'Powtarzam ostatni wykonany eksperyment tym samym silnikiem i porównuję wynik.', tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'researchRun', op: 'replay' } };
+
   // --- Knowledge ingestion: `/ingest <url>` (also "zaingestuj", "pobierz źródło"). URLs come from the RAW
   //     message (normalize() strips punctuation); with no URL the command explains itself instead of guessing.
   if (/^\s*\/ingest\b/i.test(message) || has(norm, 'zaingestuj', 'pobierz zrodlo', 'pobierz zrodla', 'dodaj zrodlo')) {
@@ -621,7 +654,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
   const humanRequested = has(norm, 'pokaz czlowieka', 'pokaz czlowieka w laboratorium', 'digital twin', 'human digital twin', 'human explorer', 'pokaz serce', 'pokaz watrobe', 'pokaz pluca', 'pokaz aorte', 'pokaz mozg', 'pokaz nerke', 'pokaz zoladek', 'show human', 'show heart', 'show liver', 'show lungs', 'show aorta', 'show brain', 'show kidney', 'show stomach')
-    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ)\w*\b/.test(norm);
+    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ|robi|dziala|czym|zbuduj|budow|what|how|does)\w*\b/.test(norm);
   if (humanRequested) {
     const focus = /\b(aort)\w*\b/.test(norm) ? 'aorta'
       : /\b(watrob|liver)\w*\b/.test(norm) ? 'liver'
@@ -1009,8 +1042,8 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       return { text: 'Otwieram istniejący Campaign Screen. To nawigacja read-only: kampania nie zostanie utworzona ani uruchomiona bez osobnej akcji i autoryzacji.', tag: 'MODEL', intent: 'OPEN_CAMPAIGN', action: { type: 'openRoute', hash: '#/campaign' } };
     }
     if (has(norm, 'pomoc', 'help', 'co potrafisz', 'co umiesz')) return helpResponse();
-    return {
-      text: 'Nie mam teraz otwartej symulacji. Powiedz np. „pokaż czarną dziurę" albo „zasymuluj dylatację czasu", a potem będę mógł zmieniać parametry, wyjaśniać i tworzyć zadania.',
+    return closestDestination(message) ?? {
+      text: `Na „${message.trim()}" nie mam jeszcze silnika ani otwartej symulacji. Wybierz silnik z listy: każdy od razu wpisze polecenie, które Genesis umie wykonać.`,
       tag: 'SYSTEM',
       intent: 'UNKNOWN',
     };
@@ -1021,7 +1054,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // --- Równania ---
   if (has(norm, 'rownanie', 'rownania', 'wzor', 'wzory', 'equation')) {
     const eqs = recipe?.equations ?? [];
-    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. TODO: uzupełnić metadane modelu.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
+    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. Status: MODEL_METADATA_UNAVAILABLE — nie uruchomiono dodatkowego solvera ani nie wyprowadzono równania.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
     return { text: `Równania modelu „${ctx.experimentName}":`, tag: 'MODEL', intent: 'SHOW_EQUATION', equations: eqs };
   }
 
@@ -1204,6 +1237,8 @@ function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
   };
 }
 
+const GENERATED_ANALYSIS_HELP = 'Podaj cel analizy: `/analiza <co policzyć>`. Wymagany jest aktywny ResearchRun oraz skonfigurowany izolowany sandbox; wynik pozostaje NOT_EVIDENCE.';
+const RESEARCH_RUN_HELP = 'Napisz pytanie po komendzie: `/badanie <pytanie>`, np. „/badanie Czy aspiryna spełnia regułę Lipinskiego?”. Potem `/eksperyment` uruchamia następny eksperyment, `/powtórz` powtarza go, `/analiza <cel>` generuje i wykonuje audytowalny kod w sandboxie, a `/analiza-powtórz` sprawdza jego odtwarzalność.';
 const QUANTUM_HELP = 'Formy: `/quantum bell-state`, `/quantum ghz 3`, `/quantum superposition 4`, `/quantum run <OpenQASM 3.0>` (obwód w treści wiadomości, może być wieloliniowy; bramki h x y z s t rx ry rz cx cz swap barrier measure, maks. 16 kubitów), opcjonalnie `shots=2048 seed=5` (1–8192 strzałów). Bez klucza QPU w środowisku wynik pochodzi z lokalnego symulatora i jest etykietowany MODEL_ESTIMATE — nigdy jako pomiar.';
 const QUANTUM_MAX_SHOTS = 8192;
 const QUANTUM_MAX_QUBITS = 16;
@@ -1246,7 +1281,7 @@ function helpResponse(): ChatResponse {
       'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), porównać dwa modele ' +
       '(„porównaj SIR R0=1.5 z SIR R0=3"), wyjaśnić stan („co się zmieniło?"), pokazać równania i założenia, ' +
       'zbudować zadanie oraz zaproponować kolejny eksperyment („zaproponuj eksperyment"). ' +
-      'Komendy: `/ingest <url>` (pozyskanie źródła jako propozycji) i `/quantum bell-state` (mostek kwantowy; lokalny symulator = MODEL_ESTIMATE). ' +
+      'Komendy: `/badanie <pytanie>` (przebieg badawczy: hipoteza, eksperyment, werdykt, Evidence, powtórzenie), `/ingest <url>` (pozyskanie źródła jako propozycji) i `/quantum bell-state` (mostek kwantowy; lokalny symulator = MODEL_ESTIMATE). ' +
       'Weryfikacja inwariantami jest dostępna dla wspieranych snapshotów, a SHOW_SOURCE pokazuje internal model provenance; brak niezależnej referencji pozostaje VERIFY_REQUIRED.',
     tag: 'SYSTEM',
     intent: 'HELP',
@@ -1258,4 +1293,25 @@ function round(v: number): number {
   const a = Math.abs(v);
   if (a !== 0 && (a < 0.01 || a >= 1e5)) return Number(v.toPrecision(3)) as number;
   return Math.round(v * 1000) / 1000;
+}
+
+/**
+ * A question no command matched: before giving up, look for the product screen it
+ * names (goals, workflows, catalogue capabilities), word by word. Polish endings
+ * are cut to a 4-letter stem ("mózgu" → "mozg"), so inflected words still match.
+ */
+const FALLBACK_STOPWORDS = new Set(['jest', 'jaki', 'jaka', 'jakie', 'czym', 'moze', 'mozesz', 'prosze', 'chce', 'pokaz', 'zrob', 'what', 'with', 'that', 'this', 'show', 'open', 'about', 'genesis', 'robi', 'dziala', 'teraz', 'tutaj']);
+
+function closestDestination(message: string): ChatResponse | null {
+  const stems = normalize(message).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !FALLBACK_STOPWORDS.has(w)).map((w) => w.slice(0, Math.max(4, w.length - 2)));
+  if (stems.length === 0) return null;
+  let best: { name: string; hash: string; score: number } | null = null;
+  for (const e of [...buildGoalIndex(), ...buildDestinationIndex(), ...buildCapabilityIndex()]) {
+    if (e.hash === undefined) continue;
+    const words = e.keywords.split(/[^a-z0-9]+/);
+    const score = stems.filter((s) => words.some((w) => w.startsWith(s))).length;
+    if (score > 0 && (!best || score > best.score)) best = { name: e.expName, hash: e.hash, score };
+  }
+  if (!best) return null;
+  return { text: `Najbliżej pasuje: ${best.name}. Otwieram.`, tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: best.hash } };
 }

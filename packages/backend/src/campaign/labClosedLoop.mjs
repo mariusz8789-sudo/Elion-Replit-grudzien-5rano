@@ -20,12 +20,14 @@
  */
 import * as campaignStore from './persistence.mjs';
 import { getScienceRun, listScienceRunsForCandidate } from '../store.mjs';
+import { createHash } from 'node:crypto';
+
 import { sha256Hex16 as sha16 } from '../provenance.mjs';
 import { researchGateVerdict } from './scientificIntegration.mjs';
 import { protocolInvariantHolds } from './preclinicalProtocol.mjs';
 import { buildLabObservationEvidenceInput } from './labEvidenceBridge.mjs';
 
-export const LAB_CLOSED_LOOP_VERSION = '1.0.0';
+export const LAB_CLOSED_LOOP_VERSION = '1.1.0'; // 1.1.0: the raw-artifact hash is computed by Genesis from the transmitted bytes, and the integrity level is part of the record
 
 export const LAB_EVENT = Object.freeze({
   VALIDATION_REQUESTED: 'LAB_VALIDATION_REQUESTED',
@@ -51,6 +53,39 @@ export const LAB_PROVIDER_TYPES = Object.freeze([
 const REVIEW_VERDICTS = new Set(LAB_REVIEW_VERDICTS);
 const PROVIDER_TYPES = new Set(LAB_PROVIDER_TYPES);
 const SHA256_HEX = /^[0-9a-f]{64}$/i;
+/** 32 MiB of decoded bytes. A laboratory report, a chromatogram or a plate export fits; a
+ *  whole imaging dataset does not belong in a JSON request body and is refused rather than
+ *  silently truncated into a hash of the wrong bytes. */
+const MAX_RAW_ARTIFACT_BYTES = 32 * 1024 * 1024;
+const BASE64_ONLY = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * THE INTEGRITY FIX (item E). A hash that arrives as a string in the same request as the claim
+ * it is supposed to protect protects nothing: whoever sends the claim chooses the hash. So when
+ * the bytes themselves are transmitted, Genesis hashes THOSE BYTES itself and uses its own
+ * result. A declared hash is then evidence about the sender, not about the file, and the two
+ * disagreeing is a refusal — never a silent preference for one of them.
+ *
+ * Strict decode on purpose: Buffer.from(x, 'base64') discards anything it does not recognise, so
+ * a corrupted upload would otherwise hash cleanly as whatever survived.
+ */
+function decodeRawArtifact(base64) {
+  if (typeof base64 !== 'string' || base64.length === 0) return { present: false };
+  const compact = base64.replace(/\s+/g, '');
+  if (!BASE64_ONLY.test(compact) || compact.length % 4 !== 0) {
+    return { present: true, ok: false, error: 'raw_artifact_not_base64' };
+  }
+  if ((compact.length / 4) * 3 > MAX_RAW_ARTIFACT_BYTES + 3) {
+    return { present: true, ok: false, error: 'raw_artifact_too_large' };
+  }
+  const bytes = Buffer.from(compact, 'base64');
+  if (bytes.toString('base64').replace(/=+$/, '') !== compact.replace(/=+$/, '')) {
+    return { present: true, ok: false, error: 'raw_artifact_not_base64' };
+  }
+  if (bytes.length === 0) return { present: true, ok: false, error: 'raw_artifact_empty' };
+  if (bytes.length > MAX_RAW_ARTIFACT_BYTES) return { present: true, ok: false, error: 'raw_artifact_too_large' };
+  return { present: true, ok: true, bytes, sha256: createHash('sha256').update(bytes).digest('hex') };
+}
 
 const CLAIM_BOUNDARY =
   'A laboratory observation is an external measurement artifact. It is not automatically clinical efficacy, safety, therapeutic approval, or proof that a candidate is a medicine.';
@@ -170,6 +205,26 @@ function resolveProtocolLink({ preclinicalProtocol, requiredWetLabId, governedMa
   return { ok: false, error: 'preclinical_protocol_or_governed_manual_request_required' };
 }
 
+function sanitizeComputationalEvidence(raw) {
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (raw?.status !== 'READY' || !Array.isArray(raw.scienceRuns) || raw.scienceRuns.length === 0) {
+    return { ok: false, error: 'computational_evidence_not_ready' };
+  }
+  const scienceRuns = raw.scienceRuns.map((entry) => ({
+    scienceRunId: boundedString(entry?.scienceRunId, 200),
+    capability: boundedString(entry?.capability, 200) || null,
+    outputHash: boundedString(entry?.outputHash, 200) || null,
+    evidenceProposalId: boundedString(entry?.evidenceProposalId, 200),
+    evidenceContentHash: boundedString(entry?.evidenceContentHash, 200) || null,
+    replayVerificationId: boundedString(entry?.replayVerificationId, 200),
+    replayVerdict: boundedString(entry?.replayVerdict, 80),
+  }));
+  if (scienceRuns.some((entry) => !entry.scienceRunId || !entry.evidenceProposalId || !entry.replayVerificationId || entry.replayVerdict !== 'MATCH')) {
+    return { ok: false, error: 'computational_evidence_not_ready' };
+  }
+  return { ok: true, value: { status: 'READY', scienceRuns } };
+}
+
 /**
  * Creates a governed external-validation request.
  *
@@ -189,6 +244,7 @@ export function createLabValidationRequest(db, {
   preclinicalProtocol = null,
   requiredWetLabId = null,
   governedManualRequest = null,
+  computationalEvidence = null,
 } = {}) {
   const linked = requireCampaignCandidate(db, campaignId, candidateId);
   if (!linked.ok) return linked;
@@ -206,6 +262,14 @@ export function createLabValidationRequest(db, {
   const sanitizedPlan = sanitizeEndpointPlan(endpointPlan);
   if (!sanitizedPlan.ok) return sanitizedPlan;
   const normalizedEndpoints = sanitizedPlan.entries;
+  const normalizedComputationalEvidence = sanitizeComputationalEvidence(computationalEvidence);
+  if (!normalizedComputationalEvidence.ok) return normalizedComputationalEvidence;
+  const normalizedExternalProvider = externalProvider ? {
+    providerId: boundedString(externalProvider.providerId, 160) || null,
+    providerType: PROVIDER_TYPES.has(externalProvider.providerType)
+      ? externalProvider.providerType
+      : 'OTHER_EXTERNAL',
+  } : null;
 
   const requestFingerprint = sha16({
     v: LAB_CLOSED_LOOP_VERSION,
@@ -213,9 +277,10 @@ export function createLabValidationRequest(db, {
     candidateId,
     objective: normalizedObjective,
     endpointPlan: normalizedEndpoints,
-    externalProvider: externalProvider ?? null,
+    externalProvider: normalizedExternalProvider,
     preregistrationRef: preregistrationRef ?? null,
     protocolLink,
+    computationalEvidence: normalizedComputationalEvidence.value,
   });
   const requestId = `LABREQ-${requestFingerprint}`;
 
@@ -239,10 +304,8 @@ export function createLabValidationRequest(db, {
     objective: normalizedObjective,
     endpointPlan: normalizedEndpoints,
     protocolLink,
-    externalProvider: externalProvider ? {
-      providerId: boundedString(externalProvider.providerId, 160) || null,
-      providerType: PROVIDER_TYPES.has(externalProvider.providerType) ? externalProvider.providerType : 'OTHER_EXTERNAL',
-    } : null,
+    computationalEvidence: normalizedComputationalEvidence.value,
+    externalProvider: normalizedExternalProvider,
     preregistrationRef: boundedString(preregistrationRef, 500) || null,
     requestedBy: boundedString(requestedBy, 160) || null,
     executionAuthority: 'EXTERNAL_LAB_ONLY',
@@ -325,9 +388,45 @@ export function ingestExternalLabObservation(db, {
   const providerType = PROVIDER_TYPES.has(observation?.source?.providerType)
     ? observation.source.providerType
     : 'OTHER_EXTERNAL';
-  // Item 3 — a full immutable raw-artifact SHA-256, normalized lowercase.
+  // Item 3 — a full immutable raw-artifact SHA-256, normalized lowercase. Item E — a DECLARED
+  // hash is only ever a fallback now; when the bytes are sent, Genesis computes the hash itself
+  // and its own result wins.
   const rawArtifactSha256Raw = boundedString(observation?.rawArtifactSha256, 64);
-  const rawArtifactSha256 = SHA256_HEX.test(rawArtifactSha256Raw) ? rawArtifactSha256Raw.toLowerCase() : null;
+  const declaredSha256 = SHA256_HEX.test(rawArtifactSha256Raw) ? rawArtifactSha256Raw.toLowerCase() : null;
+
+  const decoded = decodeRawArtifact(observation?.rawArtifactBase64);
+  if (decoded.present && !decoded.ok) return { ok: false, error: decoded.error };
+  if (decoded.ok && declaredSha256 && declaredSha256 !== decoded.sha256) {
+    // Both hashes are reported. Genesis does not choose the convenient one.
+    return {
+      ok: false,
+      error: 'raw_artifact_hash_mismatch',
+      declaredSha256,
+      computedSha256: decoded.sha256,
+      byteLength: decoded.bytes.length,
+      reason: 'The SHA-256 of the bytes received does not match the SHA-256 declared in the same request. The observation is refused; nothing is ingested.',
+    };
+  }
+  const rawArtifactSha256 = decoded.ok ? decoded.sha256 : declaredSha256;
+  const rawArtifactIntegrity = decoded.ok
+    ? {
+      level: 'VERIFIED_BY_GENESIS',
+      computedBy: 'Genesis, from the bytes received in this request',
+      algorithm: 'sha256',
+      byteLength: decoded.bytes.length,
+      declaredSha256,
+      declaredMatchesComputed: declaredSha256 ? declaredSha256 === decoded.sha256 : null,
+      limitation: 'Genesis hashed the bytes it was given. That proves which bytes it holds; it does not prove the instrument produced them.',
+    }
+    : {
+      level: 'DECLARED_BY_CLIENT',
+      computedBy: null,
+      algorithm: 'sha256',
+      byteLength: null,
+      declaredSha256,
+      declaredMatchesComputed: null,
+      limitation: 'The raw artifact was NOT transmitted, so Genesis never saw the bytes and could not hash them. This value is a claim made by the submitting client about a file Genesis does not hold, and it must not be presented as a verified artifact hash. Send the bytes as rawArtifactBase64 to make it verifiable.',
+    };
 
   const value = observation?.value;
   const valueSupported = typeof value === 'string'
@@ -360,6 +459,9 @@ export function ingestExternalLabObservation(db, {
     observedAt,
     methodReference,
     rawArtifactSha256,
+    // The integrity level is part of the record's identity: an observation whose bytes Genesis
+    // hashed and one that merely quotes a hash are not the same record, even for the same file.
+    rawArtifactIntegrityLevel: rawArtifactIntegrity.level,
     source: { labId, externalObservationId, sourceUri, providerType },
     quality,
   });
@@ -396,6 +498,9 @@ export function ingestExternalLabObservation(db, {
     observedAt,
     methodReference,
     rawArtifactSha256,
+    // The bytes are deliberately NOT stored in the append-only event: the event is a record, not
+    // a file store. What is stored is their length and the hash Genesis computed over them.
+    rawArtifactIntegrity,
     source: {
       labId,
       providerType,

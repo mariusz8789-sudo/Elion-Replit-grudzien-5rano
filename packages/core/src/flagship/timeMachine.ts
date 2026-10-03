@@ -4,6 +4,7 @@ import { sha256hex, stableStringify } from '../knowledge/EvidenceLedger.js';
 // module never pulls in that engine's `node:crypto` import — Vite cannot bundle it for the browser.
 const FICTION_DISCLAIMER = '[DISCLAIMER] Fikcja / symulacja syntetyczna (SYNTHETIC_CINEMATIC). To nie jest nagranie z przyszłości ani realne miejsce.';
 import type { FlagshipEpistemicStatus } from './epistemicGuard.js';
+import { CODATA_2018, lorentzGamma, schwarzschildRadius } from '../physics/relativity.js';
 
 /**
  * TIME MACHINE LAB (D-130) — three modes that share one engine and never mix
@@ -15,7 +16,7 @@ import type { FlagshipEpistemicStatus } from './epistemicGuard.js';
  * fiction disclaimer. No mode ever produces a REAL_OBSERVATION.
  */
 export type TimeMachineMode = 'SCIENTIFIC_MODEL' | 'SPECULATIVE_PHYSICS' | 'FICTIONAL_UNIVERSE';
-export const C_M_PER_S = 299_792_458; export const G_SI = 6.67430e-11;
+export const C_M_PER_S = CODATA_2018.c; export const G_SI = CODATA_2018.G;
 
 export interface ClockComparisonInput { readonly kind: 'CLOCK_COMPARISON'; readonly relativeSpeedMps: number; readonly gravitationalMassKg: number; readonly radiusM: number; readonly referenceRadiusM: number; readonly coordinateSeconds: number; }
 export interface ClockComparisonResult { readonly lorentzGamma: number; readonly kinematicRateRatio: number; readonly gravitationalRateRatio: number; readonly properSecondsMoving: number; readonly properSecondsAtReference: number; readonly differenceSeconds: number; readonly regime: 'WEAK_FIELD' | 'OUT_OF_MODEL'; }
@@ -28,8 +29,8 @@ export interface TimeMachineScenario {
 export function clockComparison(i: Omit<ClockComparisonInput, 'kind'>): ClockComparisonResult {
   const beta = Math.abs(i.relativeSpeedMps) / C_M_PER_S;
   if (beta >= 1) throw new Error('SPEED_MUST_BE_BELOW_C');
-  const gamma = 1 / Math.sqrt(1 - beta * beta);
-  const rs = (2 * G_SI * i.gravitationalMassKg) / (C_M_PER_S * C_M_PER_S);
+  const gamma = lorentzGamma(beta);
+  const rs = schwarzschildRadius(i.gravitationalMassKg, CODATA_2018);
   const weak = i.radiusM > 20 * rs && i.referenceRadiusM > 20 * rs;
   const rate = (r: number): number => Math.sqrt(Math.max(0, 1 - rs / r));
   const gRatio = rate(i.radiusM) / rate(i.referenceRadiusM);

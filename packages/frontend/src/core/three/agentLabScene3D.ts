@@ -21,7 +21,7 @@ import type { LabArtifact } from '../scientificWorlds/experimentRunners';
 import type { RoomBounds } from './firstPersonController';
 import type { BiologyArtifact } from '../scientificWorlds/biologyRunners';
 import type { ExperimentSession } from '../scientificWorlds/experimentSession';
-import { BIOLOGY_SCENE, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld';
+import { BIOLOGY_SCENE, CHAMBER_CONSOLES, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld';
 import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/anatomyAtlas';
 import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
@@ -34,6 +34,8 @@ import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
+import { AnatomyFocusLayer, type ExploreHit } from './anatomyFocusLayer';
+import { EXPLORE_BODY, exploreBack, exploreInto, type BodyRegionId, type ExploreState } from './anatomyExplore';
 import { createHolographicResearchCompanion, type HolographicResearchCompanion } from './holographicResearchCompanion';
 import { createPremiumLabDetail, type PremiumLabDetailHandle } from './premiumLabDetail';
 import { createPremiumHumanDetail, type PremiumHumanDetailHandle } from './premiumHumanDetail';
@@ -89,6 +91,10 @@ interface StationVisual {
 
 const FLOOR_Y = 0;
 const CEILING_Y = 3.6;
+const THREE_MATH_DEG = Math.PI / 180;
+const BIOLOGY_HALL_HEIGHT_M = 7.5;
+// 'nervous' too: the atlas's own copy of the brain would cover the organ view's glass shell in solid white.
+const BRAIN_FOCUS_HIDDEN: readonly string[] = ['skeletal', 'muscular', 'connective', 'integumentary', 'nervous'];
 /** createTwinChamber lifts its anchor 0.2 m above the floor; the twin stands on it. */
 const TWIN_ANCHOR_HEIGHT = 0.2;
 
@@ -181,7 +187,188 @@ export class AgentLabScene3D implements Sim3D {
   private onOrganPicked: ((nodeId: string) => void) | null = null;
   private lastPickedNode: string | null = null;
   setOrganPickListener(listener: ((nodeId: string) => void) | null): void { this.onOrganPicked = listener; }
-  pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+  private onPartPicked: ((selection: { part: string | null; region: string | null }) => void) | null = null;
+  private dragFrom: { x: number; y: number; moved: boolean } | null = null;
+  setPartPickListener(listener: ((selection: { part: string | null; region: string | null }) => void) | null): void { this.onPartPicked = listener; }
+  /** The close-up region chips: light one region (null shows the whole organ again). */
+  selectCloseUpRegion(regionId: string | null): void { this.macroMicro?.selectRegion(regionId); this.onPartPicked?.(this.macroMicro?.getSelection() ?? { part: null, region: null }); }
+  /**
+   * The Human Explorer descent: body → region → organ → structure, all IN the body inside the glass
+   * cylinder. One state, one camera fit per step, Back widens by exactly one level.
+   */
+  private focusLayer: AnatomyFocusLayer | null = null;
+  private explore: ExploreState = EXPLORE_BODY;
+  private onExplore: ((state: ExploreState) => void) | null = null;
+  /** The yaw the user dragged the body to; the twin holds this pose instead of the plain front. */
+  private manualYaw = 0;
+  private exploreDrag: { startX: number; startY: number; lastX: number; moved: boolean } | null = null;
+  private touches = new Map<number, { x: number; y: number }>();
+  private pinch: { from: number; zoom: number } | null = null;
+  private exploreZoom = 1;
+  private focusTween: { pos: THREE_NS.Vector3; look: THREE_NS.Vector3; t0: number; seconds: number } | null = null;
+  private glassStrength: { value: number } | null = null;
+  /** The lens: the scene's own field of view, and the narrower one a close explore framing asks for. */
+  private baseFov = 50;
+  private exploreFov = 50;
+  private fovFrom: number | null = null;
+  setExploreListener(listener: ((state: ExploreState) => void) | null): void { this.onExplore = listener; }
+  /**
+   * LAB_WIDE: the establishing shot before the descent — the whole glass chamber, the human inside it and
+   * the hall around it, seen from several metres away. A tap on the chamber walks up to it (HUMAN_FOCUS,
+   * the body framing); Back from the whole body walks away again. The camera only moves; nothing else changes.
+   */
+  private labWide = true;
+  private onLabWide: ((on: boolean) => void) | null = null;
+  setLabWideListener(listener: ((on: boolean) => void) | null): void { this.onLabWide = listener; listener?.(this.labWide); }
+  isLabWide(): boolean { return this.labWide; }
+  setLabWide(on: boolean): void {
+    if (on === this.labWide) return;
+    this.labWide = on;
+    if (on && this.explore !== EXPLORE_BODY) { this.explore = EXPLORE_BODY; this.focusLayer?.apply(EXPLORE_BODY); this.onExplore?.(EXPLORE_BODY); }
+    this.startFocusTween(0.85);
+    this.onLabWide?.(on);
+  }
+  getExplore(): ExploreState { return this.explore; }
+  /** True once the atlas organs stand in the body and taps descend through them. */
+  hasExploreAtlas(): boolean { return this.focusLayer !== null; }
+  exploreSelect(hit: ExploreHit): void { this.applyExplore(exploreInto(this.explore, hit)); }
+  exploreBack(): void { if (this.explore.level === 'BODY') { this.setLabWide(true); return; } this.applyExplore(exploreBack(this.explore)); }
+  exploreReset(): void { this.applyExplore(EXPLORE_BODY); }
+  /** Layers taken off the body (muscles, bones, ...): what lies under them can then be tapped. */
+  private exploreHidden: readonly string[] = [];
+  private exploreForceShow: readonly string[] = [];
+  setExploreHiddenSystems(systems: readonly string[], forceShow: readonly string[] = []): void {
+    this.exploreHidden = [...systems]; this.exploreForceShow = [...forceShow];
+    this.applyHiddenSystems();
+  }
+  /** Looking into the brain, the skull and the head's muscles step aside (only while it is in focus). */
+  private applyHiddenSystems(): void {
+    const brain = this.explore.organId === 'brain' && (this.explore.level === 'ORGAN' || this.explore.level === 'STRUCTURE');
+    this.focusLayer?.setHiddenSystems(brain ? [...new Set([...this.exploreHidden, ...BRAIN_FOCUS_HIDDEN])] : this.exploreHidden, this.exploreForceShow);
+  }
+  /** A PNG of what the camera sees right now (drawn once more so the image is never an empty buffer). */
+  capturePng(): string | null {
+    if (!this.renderer || !this.scene || !this.pickCamera) return null;
+    this.renderer.render(this.scene, this.pickCamera);
+    try { return this.renderer.domElement.toDataURL('image/png'); } catch { return null; }
+  }
+  searchStructures(query: string): { name: string; label: string; system: string; regionId: BodyRegionId }[] { return this.focusLayer?.search(query) ?? []; }
+  /** Search: fly straight to a structure by its atlas name (in its body region). */
+  exploreFind(name: string, regionId: BodyRegionId): boolean {
+    const found = this.focusLayer?.findPart(name);
+    if (!found) return false;
+    this.applyExplore({ level: 'STRUCTURE', regionId, organId: null, structure: found.name, system: found.system });
+    return true;
+  }
+  /** A saved view: back to the same place, as long as the atlas still has it. */
+  exploreRestore(state: ExploreState): boolean {
+    if (!this.focusLayer) return false;
+    if (state.organId && !this.focusLayer.hasOrgan(state.organId)) return false;
+    if (state.level === 'STRUCTURE' && !state.organId && (!state.structure || !this.focusLayer.findPart(state.structure))) return false;
+    this.applyExplore(state);
+    return true;
+  }
+  /** Pinch / wheel: closer (< 1) or further (> 1) than the fitted framing, within sane bounds. */
+  zoomExplore(factor: number): void { this.exploreZoom = Math.min(1.8, Math.max(0.45, this.exploreZoom * factor)); }
+  /** "Osobno": the organ on its own plinth beside the body (the earlier close-up), or back into the body. */
+  setExploreIsolated(manifestOrganId: string | null): void {
+    if (!this.macroMicro) return;
+    this.macroMicro.setOrganStage(manifestOrganId !== null || this.explore.level === 'BODY');
+    if (manifestOrganId) this.macroMicro.setOrgan(manifestOrganId);
+    this.startFocusTween();
+  }
+  /** Leaves the microscope: the tissue/cell view beside the body closes and the body is the subject again. */
+  clearMacroArtifact(): void { this.macroMicro?.setArtifact(null); this.startFocusTween(); }
+  /** Names placed next to the anatomy, in canvas pixels, for the DOM label layer. */
+  getExploreLabels(): { key: string; text: string; hit: ExploreHit; x: number; y: number }[] {
+    const layer = this.focusLayer; const camera = this.pickCamera; const renderer = this.renderer;
+    if (!layer || !camera || !renderer || this.explore.level === 'BODY' || this.macroMicro?.group.visible) return [];
+    const w = renderer.domElement.clientWidth; const h = renderer.domElement.clientHeight;
+    return layer.labels(this.explore).flatMap((label) => {
+      const p = label.world.clone().project(camera);
+      if (p.z > 1 || Math.abs(p.x) > 1.1 || Math.abs(p.y) > 1.1) return [];
+      return [{ key: label.key, text: label.text, hit: label.hit, x: (p.x + 1) * w / 2, y: (1 - p.y) * h / 2 }];
+    });
+  }
+  private applyExplore(state: ExploreState): void {
+    const deeper = state.level !== 'BODY';
+    if (state === this.explore) return;
+    // Any descent (a tap, a search, a saved view) starts at the chamber, never from across the hall.
+    if (this.labWide) { this.labWide = false; this.onLabWide?.(false); }
+    this.explore = state;
+    this.applyHiddenSystems();
+    this.focusLayer?.apply(state);
+    for (const t of this.twins.slice(0, 1)) { t.setProxiesHidden(deeper); t.setAtlasFade(state.level === 'ORGAN' || state.level === 'STRUCTURE' ? 0.45 : 1); }
+    this.macroMicro?.setOrganStage(!deeper);
+    if (!deeper) this.manualYaw = 0;
+    if (this.glassStrength) this.glassStrength.value = deeper ? 0.5 : 1.6;
+    this.exploreZoom = 1;
+    this.startFocusTween();
+    this.onExplore?.(state);
+  }
+  private startFocusTween(seconds = 0.55): void {
+    if (this.twinCamPos && this.twinCamLook) this.focusTween = { pos: this.twinCamPos.clone(), look: this.twinCamLook.clone(), t0: this.elapsedWallSeconds, seconds };
+    this.fovFrom = this.pickCamera?.fov ?? null;
+  }
+  private rebuildFocusLayer(): void {
+    this.focusLayer?.dispose(); this.focusLayer = null;
+    const atlasGroup = this.twins[0]?.getAtlasGroup();
+    if (!this.THREE || !atlasGroup || !this.fullAtlas?.organs) return;
+    this.focusLayer = new AnatomyFocusLayer(this.THREE, atlasGroup, this.fullAtlas.organs, this.fullAtlas.heightMeters, this.fullAtlas.systems);
+    this.applyHiddenSystems();
+    this.focusLayer.setClipping(this.twins[0]?.getCutawayPlane() ?? null);
+    this.focusLayer.apply(this.explore);
+    this.twins[0]?.setProxiesHidden(this.explore.level !== 'BODY');
+    this.twins[0]?.setAtlasFade(this.explore.level === 'ORGAN' || this.explore.level === 'STRUCTURE' ? 0.45 : 1);
+  }
+  /** Body descent: a drag (> 10 px) turns the body, a tap descends, two fingers zoom. True when handled. */
+  private pointerExplore(x: number, y: number, type: 'down' | 'move' | 'up', id: number): boolean {
+    if (!this.focusLayer || this.cameraMode !== 'TWIN' || !this.THREE || !this.pickCamera || !this.renderer) return false;
+    const spread = (): number => { const [a, b] = [...this.touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    if (type === 'down') {
+      this.touches.set(id, { x, y });
+      if (this.touches.size === 1) this.exploreDrag = { startX: x, startY: y, lastX: x, moved: false };
+      if (this.touches.size === 2) { this.pinch = { from: spread(), zoom: this.exploreZoom }; if (this.exploreDrag) this.exploreDrag.moved = true; }
+      return true;
+    }
+    if (type === 'move') {
+      if (!this.touches.has(id)) return false;
+      this.touches.set(id, { x, y });
+      if (this.touches.size >= 2 && this.pinch) { const d = spread(); if (d > 10) this.exploreZoom = Math.min(1.8, Math.max(0.45, this.pinch.zoom * this.pinch.from / d)); return true; }
+      const drag = this.exploreDrag; if (!drag) return true;
+      if (!drag.moved && Math.hypot(x - drag.startX, y - drag.startY) > 10) drag.moved = true;
+      if (drag.moved) { const turn = (x - drag.lastX) * 0.01; this.manualYaw += turn; this.twinYaw += turn; }
+      drag.lastX = x;
+      return true;
+    }
+    this.touches.delete(id);
+    if (this.touches.size < 2) this.pinch = null;
+    const drag = this.exploreDrag;
+    if (this.touches.size > 0) return true;
+    this.exploreDrag = null;
+    if (!drag || drag.moved) return true;
+    const canvas = this.renderer.domElement;
+    if (this.labWide) { if (this.hitsChamber(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2)) this.setLabWide(false); return true; }
+    const ray = new this.THREE.Raycaster();
+    ray.setFromCamera(new this.THREE.Vector2(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2), this.pickCamera);
+    const hit = this.focusLayer.pick(ray.ray);
+    if (hit) this.exploreSelect(hit);
+    return true;
+  }
+  /** The chamber's pick volume on screen: its full height and width plus a generous finger margin. */
+  private hitsChamber(nx: number, ny: number): boolean {
+    const THREE = this.THREE; const camera = this.pickCamera;
+    if (!THREE || !camera) return false;
+    const { x: cx, z: cz } = TWIN_CHAMBER.position; const r = TWIN_CHAMBER.radius;
+    const pts = [[cx - r, 0, cz], [cx + r, 0, cz], [cx - r, TWIN_CHAMBER.height, cz], [cx + r, TWIN_CHAMBER.height, cz]].map(([x, y, z]) => new THREE.Vector3(x, y, z).project(camera));
+    const minX = Math.min(...pts.map((p) => p.x)); const maxX = Math.max(...pts.map((p) => p.x));
+    const minY = Math.min(...pts.map((p) => p.y)); const maxY = Math.max(...pts.map((p) => p.y));
+    const mx = (maxX - minX) * 0.2; const my = (maxY - minY) * 0.1;
+    return nx >= minX - mx && nx <= maxX + mx && ny >= minY - my && ny <= maxY + my;
+  }
+  pointer(x: number, y: number, type: 'down' | 'move' | 'up', pointerId = 1): void {
+    if (this.pointerCloseUp(x, y, type)) return;
+    if (this.pointerExplore(x, y, type, pointerId)) return;
     if (type !== 'up' || !this.THREE || !this.pickCamera || !this.renderer || this.cameraMode !== 'TWIN') return;
     const canvas = this.renderer.domElement;
     const ray = new this.THREE.Raycaster();
@@ -194,6 +381,32 @@ export class AgentLabScene3D implements Sim3D {
     });
     const id = hit?.object.userData.nodeId;
     if (typeof id === 'string') { this.lastPickedNode = id; this.onOrganPicked?.(id); }
+  }
+
+  /** Organ close-up: drag turns it, a tap names the structure under the finger. True when handled. */
+  private pointerCloseUp(x: number, y: number, type: 'down' | 'move' | 'up'): boolean {
+    const layer = this.macroMicro;
+    if (!layer?.group.visible || !this.THREE || !this.pickCamera || !this.renderer) return false;
+    const parts = layer.partMeshes();
+    if (parts.length === 0) return false;
+    if (type === 'down') { this.dragFrom = { x, y, moved: false }; return true; }
+    if (type === 'move') {
+      if (!this.dragFrom) return false;
+      const dx = x - this.dragFrom.x;
+      if (Math.abs(dx) > 10 || this.dragFrom.moved) { layer.rotateBy(dx * 0.012); this.dragFrom = { x, y, moved: true }; }
+      return true;
+    }
+    const drag = this.dragFrom; this.dragFrom = null;
+    if (drag?.moved) return true;
+    const canvas = this.renderer.domElement;
+    const ray = new this.THREE.Raycaster();
+    ray.setFromCamera(new this.THREE.Vector2(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2), this.pickCamera);
+    const hit = ray.intersectObjects(parts, false).find((c) => ((c.object as THREE_NS.Mesh).material as THREE_NS.Material).opacity > 0.5);
+    const name = hit?.object.userData.partName;
+    if (typeof name !== 'string') return false;
+    layer.selectPart(layer.getSelection().part === name ? null : name);
+    this.onPartPicked?.(layer.getSelection());
+    return true;
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void { this.renderMetrics = metrics; }
@@ -291,10 +504,11 @@ export class AgentLabScene3D implements Sim3D {
     const abort = new AbortController(); this.fullAtlasAbort = abort;
     this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'LOADING' });
     loadFullAtlas(THREE, abort.signal).then((atlas) => {
-      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); for (const o of atlas.organs?.values() ?? []) o.geometry.dispose(); return; }
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); for (const o of atlas.organs?.values() ?? []) for (const part of o.parts) part.geometry.dispose(); return; }
       this.fullAtlasAbort = null; this.fullAtlas = atlas;
       for (const t of this.twins) t.applyFullAtlas(atlas);
       this.macroMicro?.setAtlasOrgans(atlas.organs ?? null);
+      this.rebuildFocusLayer();
       this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'READY', structures: atlas.structures, concepts: atlas.concepts, triangles: atlas.triangles });
     }).catch((error: unknown) => {
       if (abort.signal.aborted) return;
@@ -382,6 +596,7 @@ export class AgentLabScene3D implements Sim3D {
     if (state.enabled && Math.abs(this.twinYaw - Math.round(this.twinYaw / (Math.PI * 2)) * Math.PI * 2) > 1e-3) this.cutawaySettled = false;
     if (this.renderer) this.renderer.localClippingEnabled = state.enabled;
     for (const t of this.twins) t.setCutaway(state);
+    this.focusLayer?.setClipping(this.twins[0]?.getCutawayPlane() ?? null);
   }
   getTwinCutaway(): CutawayState { return this.cutawayState; }
 
@@ -539,6 +754,7 @@ export class AgentLabScene3D implements Sim3D {
     this.grade = WORLD_GRADES.physics;
     applyWorldGrade(THREE, scene, this.grade);
     configureCinematicCamera(camera, 'SCIENTIST_POV');
+    this.baseFov = camera.fov; this.exploreFov = camera.fov;
 
     const W = this.room.maxX - this.room.minX; const D = this.room.maxZ - this.room.minZ;
     const cx = (this.room.maxX + this.room.minX) / 2; const cz = (this.room.maxZ + this.room.minZ) / 2;
@@ -612,7 +828,7 @@ export class AgentLabScene3D implements Sim3D {
     const mainTwinPosition: [number, number, number] = [0, 0, 0.4];
     const chamber = createTwinChamber(THREE, { position: mainTwinPosition, radius: 0.88, height: 2.65, glass: islandGlass, palette, ceilingHeight: CEILING_Y });
     chamber.group.name = 'main-lab-human-chamber';
-    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
+    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass; this.glassStrength = findGlassStrength(chamber.glass); if (this.glassStrength) this.glassStrength.value = 1.6;
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     twin.group.name = 'main-lab-human-presence';
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
@@ -649,12 +865,14 @@ export class AgentLabScene3D implements Sim3D {
    * (layered ceiling, glass curtain walls, twin chamber, manipulators, stations). Same class, same pipeline, same cameras.
    */
   private initBiology(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, palette: GenesisMaterialPalette, tier: ReturnType<typeof detectRenderTier>): void {
-    this.ceilingY = BIOLOGY_SCENE.dimensionsMeters.y;
+    // The hall is taller than the pack's 4.2 m room: a high ceiling over the chamber is what makes it read as the main machine.
+    this.ceilingY = Math.max(BIOLOGY_SCENE.dimensionsMeters.y, BIOLOGY_HALL_HEIGHT_M);
     const H = this.ceilingY;
     // D-132: the biology lab's own grade — deep black point, dark mirrored floor, light on the twin.
     this.grade = WORLD_GRADES.biology;
     applyWorldGrade(THREE, scene, this.grade);
     configureCinematicCamera(camera, 'SCIENTIST_POV');
+    this.baseFov = camera.fov; this.exploreFov = camera.fov;
     this.spectatorPos?.set(0, 2.6, 9.5); this.spectatorLook?.set(0, 1.4, 0);
     const W = this.room.maxX - this.room.minX; const D = this.room.maxZ - this.room.minZ;
     const cx = (this.room.maxX + this.room.minX) / 2; const cz = (this.room.maxZ + this.room.minZ) / 2;
@@ -690,7 +908,7 @@ export class AgentLabScene3D implements Sim3D {
     // asset when the gate approves it, otherwise the labelled proxy. Either way its ANATOMY stays a MODEL:
     // the organ shapes are atlas ellipsoids, and the asset itself carries no medical anatomy.
     const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
-    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
+    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass; this.glassStrength = findGlassStrength(chamber.glass); if (this.glassStrength) this.glassStrength.value = 1.6;
     this.macroMicro = new HumanMacroMicroLayer(THREE, this.manifest);
     this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 1.12, 1.42, TWIN_CHAMBER.position.z + 0.08);
     this.macroMicro.group.scale.setScalar(0.76);
@@ -713,6 +931,20 @@ export class AgentLabScene3D implements Sim3D {
       scene.add(arm.group); this.arms.push(arm);
     }
     createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 8.4, rim: 2.4 }, color: { key: 0xe9f2ff, rim: 0x68c9ee }, castShadow: false });
+    // The operator ring around the chamber: desks with glowing screens facing the machine and still, faceless
+    // figures at them. Scenery for scale (reference: the Human Digital Twin lab), lit only by its own screens.
+    const screenGlow = createEmissiveInstrumentMaterial(THREE, { color: 0x5cc8f0, intensity: 0.85, baseColor: 0x0b1c2a });
+    const figureMat = new THREE.MeshStandardMaterial({ color: 0x3a4856, roughness: 0.85, metalness: 0.05 });
+    const figureBody = new THREE.CapsuleGeometry(0.17, 1.0, 4, 10); const figureHead = new THREE.SphereGeometry(0.11, 14, 10);
+    for (const c of CHAMBER_CONSOLES) {
+      const g = new THREE.Group(); g.name = 'chamber-console'; g.position.set(c.x, 0, c.z);
+      g.rotation.y = Math.atan2(TWIN_CHAMBER.position.x - c.x, TWIN_CHAMBER.position.z - c.z);
+      g.add(createBench(THREE, { position: [0, 0, 0], width: 1.4, depth: 0.6, height: 0.76, topMaterial: palette.PAINTED_METAL, legMaterial: palette.BRUSHED_METAL }));
+      for (const x of [-0.34, 0.34]) g.add(createMonitor(THREE, { position: [x, 0.76, -0.14], width: 0.6, height: 0.36, standHeight: 0.1, frameMaterial: palette.PAINTED_METAL, screenMaterial: screenGlow }));
+      const body = new THREE.Mesh(figureBody, figureMat); body.position.set(0.1, 0.77, 0.62); g.add(body);
+      const head = new THREE.Mesh(figureHead, figureMat); head.position.set(0.1, 1.55, 0.62); g.add(head);
+      scene.add(g);
+    }
     // Stations (pack ids), their practical lights, and the pack's hanging signs.
     for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
     const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };
@@ -972,7 +1204,7 @@ export class AgentLabScene3D implements Sim3D {
       // pose (the short way round) instead of snapping, and resumes turning from where it is.
       const hold = this.cameraMode === 'TWIN' || this.cutawayState.enabled;
       if (hold) {
-        const front = Math.round(this.twinYaw / (Math.PI * 2)) * Math.PI * 2;
+        const front = Math.round((this.twinYaw - this.manualYaw) / (Math.PI * 2)) * Math.PI * 2 + this.manualYaw;
         this.twinYaw += (front - this.twinYaw) * (reducedMotionSpin ? 1 : cameraDampingFactor(Math.min(0.2, spinDt), 4));
         if (Math.abs(front - this.twinYaw) < 1e-3) {
           this.twinYaw = front;
@@ -990,6 +1222,7 @@ export class AgentLabScene3D implements Sim3D {
     const cameraEase = (speed: number) => reducedMotion ? 1 : cameraDampingFactor(cameraDt, speed);
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
+    if (this.cameraMode !== 'TWIN' && camera.fov !== this.baseFov) { camera.fov = this.baseFov; camera.updateProjectionMatrix(); }
     if (this.cameraMode === 'VISOR') {
       if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = true;
       if (this.chamberGlass) this.chamberGlass.visible = true;
@@ -1010,27 +1243,57 @@ export class AgentLabScene3D implements Sim3D {
       // the view narrows — one isolated organ, or an active section — and eases back out when it widens.
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
-      if (this.chamberGlass) this.chamberGlass.visible = false;
+      // Keep the vitrine around the full body, but open it for the offset macro stage:
+      // its additive rim otherwise paints a blue band across organs, tissue and cells.
+      if (this.chamberGlass) this.chamberGlass.visible = this.macroMicro?.group.visible !== true;
       if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
       // Portrait leaves room for the lower dock; an isolate/section moves closer to the torso.
       const portrait = camera.aspect < 1;
       const macroVisible = this.macroMicro?.group.visible === true;
-      const dist = portrait ? (macroVisible ? 3.1 : tight ? 3.0 : 4.0) : (macroVisible ? 1.7 : tight ? 2.3 : 2.5);
+      // The close-up is the subject: close enough that the organ fills the free middle of the screen.
+      const dist = portrait ? (macroVisible ? 2.05 : tight ? 3.0 : 3.45) : (macroVisible ? 1.35 : tight ? 2.3 : 2.5);
       // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
-      const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
+      // The microscope stage stands at a fixed height, so it is framed the same whatever organ it came from
+      // (a low organ such as the pancreas would otherwise put the camera under the tissue tile).
+      const organFocus = this.isolatedCount > 0 && !macroVisible ? this.selectedOrganFocusY : null;
       const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : macroVisible ? 1.58 : tight ? 1.45 : 1.4;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
       const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.035;
       const subjectOffset = macroVisible ? 1.12 : 0;
-      this.scratchA.set(TWIN_CHAMBER.position.x + subjectOffset + drift, height, TWIN_CHAMBER.position.z + dist);
-      this.twinCamPos.lerp(this.scratchA, cameraEase(5));
+      const exploring = !macroVisible && this.explore.level !== 'BODY';
+      this.scratchA.set(TWIN_CHAMBER.position.x + subjectOffset + (exploring ? 0 : drift), height, TWIN_CHAMBER.position.z + dist * (this.explore.level === 'BODY' && !macroVisible ? this.exploreZoom : 1));
       const panelOffset = subjectOffset + (this.researchLayoutOpen && !portrait ? 0.35 : 0);
       // Portrait keeps the subject in the upper half, above the lower research dock.
-      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : macroVisible ? 1.42 : portrait ? 1.03 : 1.08;
+      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : macroVisible ? (portrait ? 1.22 : 1.42) : portrait ? 1.03 : 1.08;
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, lookY, TWIN_CHAMBER.position.z);
-      this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
+      this.exploreFov = this.baseFov;
+      if (exploring) this.fitExplore(camera, portrait);
+      else if (this.labWide && !macroVisible && !tight) {
+        // LAB_WIDE: the chamber takes about 60% of the frame's height (the human about a third of it), the hall
+        // shows around it; on a narrow phone the chamber's width decides instead (about 60% of the screen, so the hall shows beside it).
+        const tan = Math.tan(THREE_MATH_DEG * this.baseFov / 2);
+        const d = Math.max((TWIN_CHAMBER.height / 0.55) / (2 * tan) + TWIN_CHAMBER.radius, (TWIN_CHAMBER.radius * 2 / 0.62) / (2 * tan * camera.aspect));
+        this.scratchA.set(TWIN_CHAMBER.position.x, 1.7, TWIN_CHAMBER.position.z + d);
+        this.scratchB.set(TWIN_CHAMBER.position.x, TWIN_CHAMBER.height * (portrait ? 0.4 : 0.47), TWIN_CHAMBER.position.z);
+      }
+      let fov = this.exploreFov;
+      if (this.focusTween) {
+        // One eased flight (0.55 s, 0.85 s to and from the hall) from where the camera was to the new framing; no teleport.
+        const k = reducedMotion ? 1 : Math.min(1, (this.elapsedWallSeconds - this.focusTween.t0) / this.focusTween.seconds);
+        const e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+        this.twinCamPos.copy(this.focusTween.pos).lerp(this.scratchA, e);
+        this.twinCamLook.copy(this.focusTween.look).lerp(this.scratchB, e);
+        if (this.fovFrom !== null) fov = this.fovFrom + (this.exploreFov - this.fovFrom) * e;
+        if (k >= 1) this.focusTween = null;
+      } else {
+        // Reduced motion copies (a lerp by 1 can wobble in the last bit and turn a held camera by a hair).
+        if (reducedMotion) { this.twinCamPos.copy(this.scratchA); this.twinCamLook.copy(this.scratchB); }
+        else { this.twinCamPos.lerp(this.scratchA, cameraEase(5)); this.twinCamLook.lerp(this.scratchB, cameraEase(7.7)); }
+        fov = camera.fov + (this.exploreFov - camera.fov) * cameraEase(5);
+      }
+      if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
       if (this.chamberGlass) this.chamberGlass.visible = true;
@@ -1046,6 +1309,33 @@ export class AgentLabScene3D implements Sim3D {
       camera.position.copy(this.spectatorPos); camera.lookAt(this.spectatorLook);
     }
     this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : this.cameraMode === 'TWIN' ? (this.macroMicro?.group.visible ? 2.8 : 2.4) : 3.4);
+  }
+
+  /**
+   * Frames the explored region or organ: its world box fills the free part of the screen (portrait keeps
+   * room for the breadcrumb above and the small sheet below), seen from the front, a touch from above.
+   */
+  private fitExplore(camera: THREE_NS.PerspectiveCamera, portrait: boolean): void {
+    const THREE = this.THREE; const layer = this.focusLayer;
+    if (!THREE || !layer || !this.scratchA || !this.scratchB) return;
+    const box = layer.focusBox(this.explore, new THREE.Box3());
+    if (!box || box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3()); const size = box.getSize(new THREE.Vector3());
+    // The height of view the subject needs: its own height in the free band of the screen, or its width.
+    const usable = portrait ? 0.56 : 0.78;
+    // A region fills the screen; an organ keeps some of its neighbours around it, so it is still IN the body.
+    const margin = this.explore.level === 'REGION' ? 1.08 : 1.6;
+    const needed = Math.max(size.y / usable, size.x / (0.9 * camera.aspect)) * margin * this.exploreZoom;
+    // The camera never passes through the glass: it stays just outside the cylinder and narrows its lens
+    // (a telephoto) when the subject is small, so the human is always seen inside the glass.
+    const outside = TWIN_CHAMBER.position.z + TWIN_CHAMBER.radius + 0.25 - c.z;
+    const baseTan = Math.tan(THREE.MathUtils.degToRad(this.baseFov) / 2);
+    let d = needed / (2 * baseTan) + size.z / 2;
+    this.exploreFov = this.baseFov;
+    if (d < outside) { d = outside; this.exploreFov = THREE.MathUtils.radToDeg(2 * Math.atan(needed / (2 * (d - size.z / 2)))); }
+    const visible = needed;
+    this.scratchA.set(c.x, c.y + d * 0.05, c.z + d);
+    this.scratchB.set(c.x + (this.researchLayoutOpen && !portrait ? visible * camera.aspect * 0.12 : 0), c.y - (portrait ? visible * 0.1 : 0), c.z);
   }
 
   /**
@@ -1090,6 +1380,7 @@ export class AgentLabScene3D implements Sim3D {
     old.dispose();
     anchor.add(upgraded.group);
     this.twins[0] = upgraded;
+    this.rebuildFocusLayer();
     this.spinners.push(upgraded.group);
     this.twinTier = upgraded.tier;
     if (this.twinInstruction) upgraded.setView(this.twinInstruction, this.selectedTwinNode);
@@ -1133,9 +1424,10 @@ export class AgentLabScene3D implements Sim3D {
     this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
     this.fullAtlasAbort?.abort(); this.fullAtlasAbort = null; this.fullAtlasState = FULL_ATLAS_IDLE;
     for (const sys of this.fullAtlas?.systems ?? []) sys.geometry.dispose();
-    for (const organ of this.fullAtlas?.organs?.values() ?? []) organ.geometry.dispose();
+    for (const organ of this.fullAtlas?.organs?.values() ?? []) for (const part of organ.parts) part.geometry.dispose();
     this.fullAtlas = null;
     this.pickCamera = null; this.lastPickedNode = null;
+    this.focusLayer?.dispose(); this.focusLayer = null; this.explore = EXPLORE_BODY; this.manualYaw = 0; this.focusTween = null; this.glassStrength = null; this.touches.clear();
     this.macroMicro?.dispose(); this.macroMicro = null;
     this.researchCompanion?.dispose(); this.researchCompanion = null;
     this.premiumHumanDetail?.dispose(); this.premiumHumanDetail = null;
@@ -1151,6 +1443,16 @@ export class AgentLabScene3D implements Sim3D {
     this.probeTaken = false;
     this.stationArmSet = null; this.lastSpinTime = null;
   }
+}
+
+/** The rim glass's brightness uniform, so the cylinder can dim (never vanish) while the view is inside the body. */
+function findGlassStrength(glass: THREE_NS.Object3D): { value: number } | null {
+  let found: { value: number } | null = null;
+  glass.traverse((node) => {
+    const material = (node as THREE_NS.Mesh).material as THREE_NS.ShaderMaterial | undefined;
+    if (!found && material?.uniforms?.strength) found = material.uniforms.strength as { value: number };
+  });
+  return found;
 }
 
 function createAndAdd(scene: THREE_NS.Scene, obj: THREE_NS.Object3D): void { scene.add(obj); }

@@ -11,7 +11,7 @@ test('a new visitor on Start reads what Genesis is and its evidence, not the tou
 
   await expect(page.getByRole('dialog', { name: 'Wprowadzenie do Genesis OS' })).toHaveCount(0);
   const start = page.getByTestId('start-hero');
-  await expect(start.getByRole('heading', { level: 1 })).toHaveText('Verifiable computational drug discovery.');
+  await expect(start.getByRole('heading', { level: 1 })).toHaveText('Sprawdzalne obliczeniowe odkrywanie leków.');
   await expect(page.getByTestId('home-astex-caveat')).toBeVisible();
   // Start counts as the introduction: the tour does not ambush the next screen either.
   await page.goto('/#/scientific-worlds');

@@ -29,7 +29,9 @@ describe('Genesis World Director — canonical production adapter', () => {
     const a = recordDirectedWorld(ledger, directed);
     const b = recordDirectedWorld(ledger, directed);
     expect(a).toBe(b);
-    expect(ledger.getActive()).toHaveLength(1);
+    // ENTITY-0: a generated world is a pending MODEL proposal, never self-published evidence.
+    expect(ledger.getActive()).toHaveLength(0);
+    expect(ledger.getProposals()).toHaveLength(1);
     expect(ledger.verifyLedger()).toEqual({ ok: true, errors: [] });
   });
 
@@ -40,8 +42,8 @@ describe('Genesis World Director — canonical production adapter', () => {
     expect(slot?.geometry?.kind).toBe('ASSET_SLOT');
     const hash = recordDirectedAssetInspection(ledger, directed, { entityId: slot!.id, slotType: slot!.geometry!.kind === 'ASSET_SLOT' ? slot!.geometry!.slotType : '' });
     expect(hash).toHaveLength(64);
-    expect(ledger.getActive()[0]?.claim).toContain('INSPECT_ENTITY');
-    expect(ledger.getActive()[0]?.claim).toContain('scientificResult=UNBOUND');
+    expect(ledger.getProposals()[0]?.record.claim).toContain('INSPECT_ENTITY');
+    expect(ledger.getProposals()[0]?.record.claim).toContain('scientificResult=UNBOUND');
     expect(() => recordDirectedAssetInspection(ledger, directed, { entityId: directed.proof.worldId, slotType: 'COMPUTE_STATION' })).toThrow(/INVALID_ASSET_SELECTION/);
   });
 
@@ -53,7 +55,7 @@ describe('Genesis World Director — canonical production adapter', () => {
       artifactSha256: 'a'.repeat(64), semanticFingerprint: 'b'.repeat(8),
     });
     expect(evidenceHash).toHaveLength(64);
-    expect(ledger.getActive()[0]?.claim).toContain('wormhole.mp4');
+    expect(ledger.getProposals()[0]?.record.claim).toContain('wormhole.mp4');
     expect(ledger.verifyLedger().ok).toBe(true);
     expect(() => recordDirectedPromptWorldArtifact(ledger, {
       worldId: 'world:x', template: 'QUANTUM', descriptorKind: 'QUANTUM_BARRIER', seconds: 0,

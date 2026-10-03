@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -154,20 +154,21 @@ test('P0.2 Dockerfile kieruje bazę poza aplikację, a Railway wymaga montażu /
  * przywiązaną do katalogu wdrożenia.
  */
 test('P0.2 REDEPLOY — rekord utworzony przez HTTP przeżywa wymianę procesu i katalogu', async () => {
-  // Kopie wdrożeniowe muszą leżeć tam, gdzie rozwiązuje się `@anthropic-ai/sdk`,
-  // więc powstają POD `node_modules` repo (rozwiązywanie idzie w górę drzewa).
-  // Katalog jest i tak ignorowany przez git, a `finally` go usuwa.
-  const root = mkdtempSync(path.join(REPO, 'node_modules', '.genesis-redeploy-'));
+  // Izolowany katalog danych i dwa różne katalogi uruchomieniowe. Moduł startowy
+  // pozostaje w repo, dzięki czemu ESM rozwiązuje swoje zależności bez kopiowania
+  // node_modules; prawdziwą wymianę obrazu + wolumenu wykonuje docker-image CI.
+  const root = mkdtempSync(path.join(tmpdir(), 'genesis-redeploy-'));
   const dataDir = path.join(root, 'volume');
   const dbPath = path.join(dataDir, 'genesis.db');
   const deployA = path.join(root, 'deploy-a');
   const deployB = path.join(root, 'deploy-b');
-  cpSync(path.join(REPO, 'packages/backend/src'), path.join(deployA, 'src'), { recursive: true });
-  cpSync(path.join(REPO, 'packages/backend/src'), path.join(deployB, 'src'), { recursive: true });
+  mkdirSync(deployA, { recursive: true });
+  mkdirSync(deployB, { recursive: true });
   const procs = [];
 
   const boot = async (deployDir) => {
-    const proc = spawn(process.execPath, [path.join(deployDir, 'src/start.mjs')], {
+    const proc = spawn(process.execPath, [path.join(REPO, 'packages/backend/src/start.mjs')], {
+      cwd: deployDir,
       env: { ...process.env, PORT: '0', GENESIS_DB_PATH: dbPath, ANTHROPIC_API_KEY: '', GENESIS_STATIC_DIR: path.join(deployDir, 'none') },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -236,7 +237,13 @@ test('P0.2 REDEPLOY — rekord utworzony przez HTTP przeżywa wymianę procesu i
     check.close();
     assert.equal(row?.email, 'grant@komisja.eu', 'restore z backupu żywej bazy musi zwrócić konto');
   } finally {
-    for (const p of procs) p.kill('SIGKILL');
-    rmSync(root, { recursive: true, force: true });
+    for (const p of procs) {
+      if (p.exitCode !== null) continue;
+      p.kill('SIGKILL');
+      for (let i = 0; i < 20 && p.exitCode === null; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

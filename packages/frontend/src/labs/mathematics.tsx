@@ -424,6 +424,7 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
             honesty={mathematicsGaussianConsequence.honesty}
             honestyNote={mathematicsGaussianConsequence.honestyNote}
             experimentId={mathematicsGaussianConsequence.id}
+            sceneId="lab:mathematics:mathematics.gaussian-consequence"
           />
         </div>
       )}
@@ -433,7 +434,7 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
           <div className="sim-stage" style={{ height: '38vh', minHeight: 240 }}>
             <canvas ref={graphCanvasRef} role="img" aria-label={`Wykres funkcji ${graphExpr} i jej pochodnej.`} />
           </div>
-          <HonestyBadge level="exact" note={graphHonesty} />
+          <HonestyBadge level="exact" note={graphHonesty} sceneId="lab:mathematics:graph" />
           <div className="controls">
             <div className="control">
               <label>f(x) =</label>
@@ -493,7 +494,7 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
           <div className="sim-stage" style={{ height: '38vh', minHeight: 240 }}>
             <canvas ref={odeCanvasRef} role="img" aria-label={`Pole kierunkowe i rozwiązanie równania różniczkowego dy/dx = ${odeExpr}.`} />
           </div>
-          <HonestyBadge level="simplified" note={odeHonesty} />
+          <HonestyBadge level="simplified" note={odeHonesty} sceneId="lab:mathematics:ode" />
           <div className="controls">
             <div className="control">
               <label>dy/dx = f(x, y) =</label>
@@ -551,7 +552,7 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
               </div>
             )}
           </div>
-          <HonestyBadge level="exact" note={surfaceHonesty} />
+          <HonestyBadge level="exact" note={surfaceHonesty} sceneId="lab:mathematics:surface" />
           <div className="controls">
             <div className="control">
               <label>z(x, y) =</label>

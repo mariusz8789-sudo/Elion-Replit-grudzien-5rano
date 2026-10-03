@@ -5,6 +5,7 @@ import { makeSoftDotTexture } from '../../core/three/starfield';
 import { detectRenderTier, tierAllowsBloom } from '../../core/three/quality';
 import { createFadePass } from '../../core/three/postfx';
 import { getSettings } from '../../core/settings';
+import { lorentzGamma } from '../../core/physics';
 
 /**
  * Stożek świetlny jako dosłowna bryła 3D, nie płaski diagram "X".
@@ -35,7 +36,7 @@ const RING_POINTS = 64;
 export function runLightConeScenario({ v = 0.6, tripYears = 20 }: { v?: number; tripYears?: number } = {}) {
   if (!Number.isFinite(v) || v < 0 || v > 0.99) throw new Error('v musi mieścić się w zakresie 0–0.99 c.');
   if (!Number.isFinite(tripYears) || tripYears < 2 || tripYears > 60) throw new Error('tripYears musi mieścić się w zakresie 2–60 lat.');
-  const gamma = 1 / Math.sqrt(1 - v * v);
+  const gamma = lorentzGamma(v);
   return { v, tripYears, gamma, travelerYears: tripYears / gamma, turnaroundFraction: 0.5, turnaroundRadiusFraction: v / 2, causal: v < 1 };
 }
 
@@ -261,7 +262,7 @@ export const spacetimeLightCone3D: ExperimentDef = {
   createSim3D: () => new LightCone3DSim(),
   narrate(p) {
     const v = Math.max(0, Math.min(0.99, Number(p.v)));
-    const gamma = 1 / Math.sqrt(1 - v * v);
+    const gamma = lorentzGamma(v);
     const trip = Number(p.tripYears);
     const travelerYears = trip / gamma;
     return [

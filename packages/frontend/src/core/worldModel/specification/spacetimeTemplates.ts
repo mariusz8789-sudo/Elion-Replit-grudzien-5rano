@@ -3,6 +3,7 @@ import type { EntityId } from '../ecs/types';
 import type { WorldGraph } from '../ecs/worldGraph';
 import type { WorldBlueprintNode } from '../generation/worldBlueprint';
 import type { TemplateResult, WorldTemplate } from './templates';
+import { lorentzGamma as lorentzGammaOf } from '../../physics';
 
 const EMPTY: Pick<TemplateResult, 'relationships' | 'postGenerate'> = { relationships: [], postGenerate: [] };
 
@@ -53,7 +54,7 @@ export const TIME_DILATION_LAB_TEMPLATE: WorldTemplate = () => {
   const referenceClockId: EntityId = 'instrument:reference-clock';
   const movingClockId: EntityId = 'instrument:moving-clock';
   const velocityFractionC = 0.8;
-  const lorentzGamma = 1 / Math.sqrt(1 - velocityFractionC ** 2);
+  const lorentzGamma = lorentzGammaOf(velocityFractionC);
   return {
     children: [
       node('instrument', 'reference-clock', 'Reference Atomic Clock', { x: -8, y: 2, z: 0 }, { velocityFractionC: 0, lorentzGamma: 1 }, 'MODEL · REFERENCE CLOCK', 'ROOM'),

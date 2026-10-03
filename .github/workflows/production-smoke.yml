@@ -1,0 +1,58 @@
+name: Production smoke
+
+# Runs after Railway reports a successful production deployment, and on demand.
+# It checks the live site serves the deployed commit with a persistent database,
+# and that the customer-critical pages and API answer. A red run means the
+# release must be rolled back to the previous production commit.
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Commit production should be serving (40 characters); empty skips the commit check
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE: https://genesis-physics.com
+      EXPECTED_SHA: ${{ github.event.deployment.sha || inputs.expected_sha }}
+    steps:
+      - name: Health reports the deployed commit and a persistent database
+        run: |
+          set -e
+          for i in $(seq 1 20); do
+            if curl -sf --max-time 20 "$BASE/api/health" > health.json; then
+              node -e "
+                const h = require('./health.json');
+                const want = process.env.EXPECTED_SHA;
+                if (!h.ok) throw new Error('health not ok');
+                if (want && h.commit !== want) throw new Error('commit ' + h.commit + ' != expected ' + want);
+                if (h.db?.durability !== 'PERSISTENT') throw new Error('db durability ' + h.db?.durability);
+                console.log('health OK', h.commit, h.db.durability);
+              " && exit 0
+            fi
+            sleep 15
+          done
+          cat health.json || true
+          exit 1
+
+      - name: Customer-critical pages and API answer
+        run: |
+          set -e
+          code() { curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$1"; }
+          for path in / /index.html; do
+            c=$(code "$BASE$path"); echo "$path $c"; [ "$c" = 200 ]
+          done
+          # The shell must load its own JavaScript bundle.
+          curl -sf --max-time 20 "$BASE/" | grep -q '<script' || { echo 'index has no script tag'; exit 1; }
+          # An unauthenticated private API call must be refused, never served or crashed.
+          c=$(code "$BASE/api/projects"); echo "/api/projects $c"
+          case "$c" in 401|403|404) ;; *) echo "unexpected $c"; exit 1 ;; esac

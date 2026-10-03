@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "genesis.test-suite-evidence@1",
+  "capability": "full-local-backend-regression",
+  "testedCommit": "88269a25",
+  "testedAt": "2026-10-02",
+  "environment": {
+    "platform": "win32",
+    "runtime": "Node.js 22",
+    "workspace": "packages/backend"
+  },
+  "command": "npm run test --workspace=packages/backend",
+  "result": {
+    "status": "PASS",
+    "tests": 1474,
+    "suites": 327,
+    "passed": 1393,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 81,
+    "todo": 0,
+    "durationMs": 355755.7208
+  },
+  "limitations": [
+    "The 81 explicit skips are runtime-dependent tests and are not proof for unavailable PySCF, Vina/Meeko, OpenMM, ADMET, Biopython, PyMeep, retrosynthesis model-data or external infrastructure.",
+    "This Windows result does not replace the separate Linux CI quality gate.",
+    "A passing regression suite does not change any external licence or production-runtime status."
+  ]
+}

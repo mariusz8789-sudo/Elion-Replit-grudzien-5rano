@@ -35,7 +35,11 @@ const NON_EVIDENCE: ReadonlySet<ExplorerEvidenceMode> = new Set(['RECONSTRUCTED'
 export function canClaimDirectObservation(mode: ExplorerEvidenceMode): boolean { return !NON_EVIDENCE.has(mode); }
 export function explorerTruthLabel(mode: ExplorerEvidenceMode): string { return NON_EVIDENCE.has(mode) ? `${mode}: NOT_DIRECT_OBSERVATION` : mode; }
 
-export interface ExplorerOrgan { readonly organId: string; readonly tissue: 'CARDIAC' | 'NEURAL' | 'LUNG' | 'LIVER' | 'EPITHELIUM'; readonly labelKey: string; readonly keywords: readonly string[]; }
+/**
+ * `genericSample`: no tissue model exists for this organ yet, so its slide is a generic epithelium
+ * reference, not this organ's tissue. The UI must say so next to the slide (never a silent stand-in).
+ */
+export interface ExplorerOrgan { readonly organId: string; readonly tissue: 'CARDIAC' | 'NEURAL' | 'LUNG' | 'LIVER' | 'PANCREAS' | 'EPITHELIUM'; readonly labelKey: string; readonly keywords: readonly string[]; readonly genericSample?: true; }
 
 /** Organs the ladder can start from — each one is an ORGAN node of the V3 atlas. */
 const EXPLORER_ORGANS_RAW: readonly ExplorerOrgan[] = [
@@ -43,13 +47,13 @@ const EXPLORER_ORGANS_RAW: readonly ExplorerOrgan[] = [
   { organId: 'brain', tissue: 'NEURAL', labelKey: 'explorer.brain', keywords: ['mozg', 'brain', 'cerebro', 'الدماغ'] },
   { organId: 'left-lung', tissue: 'LUNG', labelKey: 'explorer.lungs', keywords: ['pluc', 'lung', 'pulmon', 'الرئ'] },
   { organId: 'liver', tissue: 'LIVER', labelKey: 'explorer.liver', keywords: ['watrob', 'liver', 'higado', 'الكبد'] },
-  { organId: 'left-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['nerk', 'kidney', 'rinon', 'الكل'] },
+  { organId: 'left-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['nerk', 'kidney', 'rinon', 'الكل'], genericSample: true },
   { organId: 'right-lung', tissue: 'LUNG', labelKey: 'explorer.lungs', keywords: ['prawe pluc', 'right lung'] },
-  { organId: 'right-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['prawa nerk', 'right kidney'] },
-  { organId: 'stomach', tissue: 'EPITHELIUM', labelKey: 'explorer.stomach', keywords: ['zoladek', 'zoladk', 'stomach', 'estomago', 'المعدة'] },
+  { organId: 'right-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['prawa nerk', 'right kidney'], genericSample: true },
+  { organId: 'stomach', tissue: 'EPITHELIUM', labelKey: 'explorer.stomach', keywords: ['zoladek', 'zoladk', 'stomach', 'estomago', 'المعدة'], genericSample: true },
   { organId: 'liver', tissue: 'LIVER', labelKey: 'explorer.liver', keywords: [] },
-  { organId: 'pancreas', tissue: 'EPITHELIUM', labelKey: 'explorer.pancreas', keywords: ['trzustk', 'pancreas', 'البنكرياس'] },
-  { organId: 'small-intestine', tissue: 'EPITHELIUM', labelKey: 'explorer.smallIntestine', keywords: ['jelit', 'intestine', 'intestino', 'الأمعاء'] },
+  { organId: 'pancreas', tissue: 'PANCREAS', labelKey: 'explorer.pancreas', keywords: ['trzustk', 'pancreas', 'البنكرياس'] },
+  { organId: 'small-intestine', tissue: 'EPITHELIUM', labelKey: 'explorer.smallIntestine', keywords: ['jelit', 'intestine', 'intestino', 'الأمعاء'], genericSample: true },
 ];
 export const EXPLORER_ORGANS: readonly ExplorerOrgan[] = EXPLORER_ORGANS_RAW.filter((o, i, arr) => arr.findIndex((x) => x.organId === o.organId) === i);
 

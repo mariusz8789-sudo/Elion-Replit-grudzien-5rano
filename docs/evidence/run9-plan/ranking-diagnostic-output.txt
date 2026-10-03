@@ -1,0 +1,21 @@
+cases 308, scored 290, denominator 308
+
+single-score rules, top-1 over the same pooled poses:
+  GNINA cnnScore (the Run 8 rule)    204/308
+  GNINA cnnAffinity                  200/308
+  Vina affinity                      202/308
+  cnnScore x cnnAffinity             207/308
+  cnnScore - cnnVariance             199/308
+
+rank-sum consensus of the two scores:
+  weight on GNINA 0.3                 216/308
+  weight on GNINA 0.5                 215/308
+  weight on GNINA 0.7                 217/308
+
+ranking failures: 69
+  position of the first sub-2.0 A pose in the GNINA order: [(2, 36), (3, 11), (4, 9), (5, 2), (6, 1), (7, 3), (9, 1), (12, 3), (14, 1), (15, 1), (35, 1)]
+  median position 2
+  of those, Vina alone would have been right: 32
+
+the two scorers pick the same pose: 138 cases, correct 128
+they pick different poses: 152 cases, GNINA correct 76, Vina correct 74, either correct 108

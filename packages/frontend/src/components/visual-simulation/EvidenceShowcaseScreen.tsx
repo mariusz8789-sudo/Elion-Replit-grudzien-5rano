@@ -72,6 +72,13 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
  * drugiej kotwicy do rejestru wystarcza, żeby wyrenderowała się tutaj bez
  * dalszych zmian w tym ekranie.
  */
+/** What the protocol verdict means, in words a layperson reads; the token itself stays under Technical details. */
+const ANCHOR_VERDICT_PLAIN: Readonly<Record<string, string>> = {
+  SUPPORTED_WITHIN_PROTOCOL: 'Matches the published value',
+  FALSIFIED_WITHIN_PROTOCOL: 'Does not match the published value',
+  INCONCLUSIVE: 'Not decided',
+};
+
 function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
   const result = useMemo(() => runExternalAnchor(anchor.id), [anchor.id]);
 
@@ -84,31 +91,37 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
         </p>
       ) : (
         <>
+          {/* Plain answer first; the protocol token, provenance and gates stay one tap away. */}
           <p data-testid={`ecs-anchor-verdict-${anchor.id}`}>
-            <b>{result.verification.assessment}</b>{' — '}
-            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric};
-            the externally published value is {result.verification.observedValue} {anchor.unit}.
-            Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
+            <b>{ANCHOR_VERDICT_PLAIN[result.verification.assessment] ?? result.verification.assessment}</b>{' — '}
+            {anchor.label}: Genesis predicted {result.verification.predictedValue} {anchor.unit};
+            the published value is {result.verification.observedValue} {anchor.unit}{' '}
+            (allowed difference ±{anchor.tolerance.toFixed(3)} {anchor.unit}, fixed before the comparison).
           </p>
-          <dl className="pilot-provenance" data-testid={`ecs-anchor-provenance-${anchor.id}`}>
-            <div><dt>observation origin</dt><dd><ProvenanceBadge provenance={result.observationOrigin} /></dd></div>
-            <div><dt>source</dt><dd className="mono">{anchor.sourceUrl}</dd></div>
-            <div><dt>version / retrieved</dt><dd className="mono">{anchor.sourceVersion} · {anchor.retrievedAt}</dd></div>
-            <div><dt>licence</dt><dd className="mono">{anchor.license}</dd></div>
-            <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
-            <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
-          </dl>
-          <p className="gsc-caption" data-testid={`ecs-anchor-tautology-${anchor.id}`}>
-            <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
-            {result.tautologyAssessment.classification === 'EMPIRICAL_TEST'
-              ? 'the observation is registered as an independent channel, separate from whatever produced the prediction — agreement or disagreement here carries real information.'
-              : result.tautologyAssessment.reasons[0]}
-          </p>
-          <p data-testid={`ecs-anchor-belief-${anchor.id}`}>
-            <b>Belief revision</b>{' — '}
-            confidence that this model correctly predicts this real observation moved from{' '}
-            {result.belief.before.toFixed(3)} to {result.belief.after.toFixed(3)} ({result.belief.status}).
-          </p>
+          <p className="gsc-caption" data-testid={`ecs-anchor-source-${anchor.id}`}>Source: <span className="mono">{anchor.sourceUrl}</span></p>
+          <details className="honesty-explanation">
+            <summary>Technical details</summary>
+            <p className="mono">{result.verification.assessment} · {anchor.metric}</p>
+            <dl className="pilot-provenance" data-testid={`ecs-anchor-provenance-${anchor.id}`}>
+              <div><dt>observation origin</dt><dd><ProvenanceBadge provenance={result.observationOrigin} /></dd></div>
+              <div><dt>source</dt><dd className="mono">{anchor.sourceUrl}</dd></div>
+              <div><dt>version / retrieved</dt><dd className="mono">{anchor.sourceVersion} · {anchor.retrievedAt}</dd></div>
+              <div><dt>licence</dt><dd className="mono">{anchor.license}</dd></div>
+              <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
+              <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
+            </dl>
+            <p className="gsc-caption" data-testid={`ecs-anchor-tautology-${anchor.id}`}>
+              <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
+              {result.tautologyAssessment.classification === 'EMPIRICAL_TEST'
+                ? 'the observation is registered as an independent channel, separate from whatever produced the prediction — agreement or disagreement here carries real information.'
+                : result.tautologyAssessment.reasons[0]}
+            </p>
+            <p data-testid={`ecs-anchor-belief-${anchor.id}`}>
+              <b>Belief revision</b>{' — '}
+              confidence that this model correctly predicts this real observation moved from{' '}
+              {result.belief.before.toFixed(3)} to {result.belief.after.toFixed(3)} ({result.belief.status}).
+            </p>
+          </details>
           <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid={`ecs-anchor-replay-${anchor.id}`}>
             <b>{result.replay}</b>{' — '}
             the comparison was re-executed just now, in this browser, from the pinned payload; the two

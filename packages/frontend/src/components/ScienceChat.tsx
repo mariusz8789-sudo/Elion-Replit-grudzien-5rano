@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
-import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { INCOMPLETE_RESPONSE_LABEL, resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
 import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
+import { runResearchRunAction } from '../core/scienceChat/researchRunTurn';
 import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
@@ -39,6 +40,7 @@ import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
 import { UnifiedResearchJourney } from './UnifiedResearchJourney';
+import { CHAT_ENGINES, type ChatEngine } from '../core/scienceChat/engines';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -82,7 +84,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * otwiera zjawiska (reuse generatora), steruje parametrami AKTUALNEJ symulacji
  * (przez core/simContext), wyjaśnia stan, pokazuje równania/założenia i buduje
  * zadania. Ścieżka sterująca jest deterministyczna (core/scienceChat) — bez
- * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
+ * atrap; funkcje niegotowe są jawnie oznaczone w odpowiedzi jako VERIFY_REQUIRED.
  */
 
 interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
@@ -348,12 +350,6 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
  * router as any other message; each was checked in the browser to land on the
  * screen its label names.
  */
-const ASK_EXAMPLES = [
-  { label: 'Open a molecule in 3D', prompt: 'Show molecule lab' },
-  { label: 'Explore a human organ', prompt: 'Show brain' },
-  { label: 'Inspect CMS data', prompt: 'Open real CMS data' },
-  { label: 'Run a physics experiment', prompt: 'Run a three-body simulation' },
-] as const;
 
 function TurnText({ turn }: { turn: ChatTurn }) {
   if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
@@ -377,6 +373,9 @@ function TurnText({ turn }: { turn: ChatTurn }) {
 export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [engineId, setEngineId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickEngine = (engine: ChatEngine): void => { setEngineId(engine.id); setInput(engine.prompt); inputRef.current?.focus(); };
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
@@ -403,6 +402,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [lastResearchCycle, setLastResearchCycle] = useState<ResearchCycle | null>(null);
   const [drugJourneyRequest, setDrugJourneyRequest] = useState<DrugDiscoveryChatRequest | null>(null);
   const [drugJourneyProject, setDrugJourneyProject] = useState<ActiveKnowledgeProject | null>(null);
+  // R1-c: the backend ResearchRun this chat continues with `/eksperyment` and `/powtórz`.
+  const [researchRunId, setResearchRunId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -435,7 +436,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     }).catch(() => { if (!cancelled) setResearchAccessLoading(false); });
     return () => { cancelled = true; };
   }, [activeKnowledgeProject]);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
+  // The engine chooser starts at its heading; only conversations follow the newest turn.
+  useEffect(() => { scrollRef.current?.scrollTo({ top: turns.length ? scrollRef.current.scrollHeight : 0 }); }, [turns, open]);
 
   const appendProjectKnowledgeSources = async (query: string) => {
     const token = getToken();
@@ -544,6 +546,21 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       } finally {
         setBackendConfirmationPending(false);
       }
+      return;
+    }
+    // R1-c RESEARCH RUN — explicit `/badanie`, `/eksperyment`, `/powtórz`, resolved before any other route so a
+    // research question is never swallowed by the drug or Fabric parsers. The backend ResearchRun does the work.
+    const researchCommand = resolveCommand(msg, null);
+    if (researchCommand.action?.type === 'researchRun') {
+      const action = researchCommand.action;
+      setInput('');
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: researchCommand.text, tag: researchCommand.tag, intent: researchCommand.intent }]);
+      const token = getToken();
+      const project = token ? (activeKnowledgeProject ?? await resolveResearchProject(token).then((r) => (r.ok ? r.data : null))) : null;
+      const turn = await runResearchRunAction(action, { token, projectId: project?.id ?? null, researchRunId });
+      if (turn.researchRunId !== researchRunId) setResearchRunId(turn.researchRunId);
+      setTurns((t) => [...t, { role: 'genesis', text: turn.text, tag: turn.tag }]);
+      track('ask_ai_used', { via: 'science-chat-research-run', op: action.op });
       return;
     }
     const drugRequest = drugDiscoveryRequestFromMessage(msg);
@@ -1025,16 +1042,18 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         {turns.length === 0 && (
           <section className="science-chat-empty" aria-label="Ask Genesis" lang="en">
             <span>ASK</span>
-            <h2>What do you want to investigate?</h2>
-            <p>Describe the research task. Genesis routes it to an available model, engine or verified workflow.</p>
-            <div data-testid="ask-examples">{ASK_EXAMPLES.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+            <h2>Choose an engine</h2>
+            <p>It fills in a task Genesis can run. Nothing starts until you send it.</p>
+            <div className="sc-engine-grid" data-testid="chat-engines">{CHAT_ENGINES.map((e) => (
+              <button key={e.id} type="button" data-testid={`chat-engine-${e.id}`} onClick={() => pickEngine(e)}><b>{e.task}</b><small>{e.engine}</small></button>
+            ))}</div>
           </section>
         )}
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>
             {t.role === 'genesis' && t.tag && (
               <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>
-                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
+                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ` · ${INCOMPLETE_RESPONSE_LABEL}` : ''}
               </span>
             )}
             <div className="sc-text"><TurnText turn={t} /></div>
@@ -1080,12 +1099,20 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
+      {turns.length > 0 && (
+        <div className="sc-engine-row" data-testid="chat-engine-row" aria-label="Engine">
+          {CHAT_ENGINES.map((e) => (
+            <button key={e.id} type="button" className={engineId === e.id ? 'on' : undefined} aria-pressed={engineId === e.id} onClick={() => pickEngine(e)}>{e.engine}</button>
+          ))}
+        </div>
+      )}
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
+          ref={inputRef}
           placeholder="Describe the research task…"
           aria-label="Wiadomość do Science Chat"
         />

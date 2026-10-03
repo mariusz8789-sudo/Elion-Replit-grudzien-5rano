@@ -244,6 +244,33 @@ function seeded(hash: string): () => number {
   return () => { state = (state + 0x6D2B79F5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
+/** H&E pancreas, schematic: purple-based acini with pink apices round a pale islet of Langerhans. A model, not a scan. */
+function drawPancreasSection(ctx: CanvasRenderingContext2D, cx: number, cy: number, rad: number): void {
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.clip();
+  const acinus = (x: number, y: number, r: number): void => {
+    for (let c = 0; c < 8; c += 1) {
+      const t = (c / 8) * Math.PI * 2;
+      ctx.fillStyle = '#d97b9b'; ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.arc(x, y, r, t - 0.36, t + 0.36); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#4b2f86'; ctx.beginPath(); ctx.arc(x + Math.cos(t) * r * 0.78, y + Math.sin(t) * r * 0.78, r * 0.16, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#f6e7ee'; ctx.beginPath(); ctx.arc(x, y, r * 0.12, 0, Math.PI * 2); ctx.fill();
+  };
+  const r = rad * 0.17;
+  for (let i = 0; i < 14; i += 1) {
+    const t = i * 2.399963229728653; const d = rad * (0.5 + (i % 3) * 0.17);
+    acinus(cx + Math.cos(t) * d, cy + Math.sin(t) * d, r);
+  }
+  ctx.fillStyle = '#f4e3d9'; ctx.beginPath(); ctx.arc(cx, cy, rad * 0.32, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 36; i += 1) {
+    const t = i * 2.399963229728653; const d = rad * 0.29 * Math.sqrt((i + 0.5) / 36);
+    ctx.fillStyle = i % 9 === 0 ? '#a58fcf' : i % 3 === 0 ? '#d79aac' : '#e3b48f';
+    ctx.beginPath(); ctx.arc(cx + Math.cos(t) * d, cy + Math.sin(t) * d, rad * 0.035, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = '#c0394f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - rad * 0.36, cy - rad * 0.08); ctx.quadraticCurveTo(cx, cy + rad * 0.06, cx + rad * 0.36, cy - rad * 0.02); ctx.stroke();
+  ctx.restore();
+}
+
 function drawBloodSmear(ctx: CanvasRenderingContext2D, cx: number, cy: number, rad: number, hash: string): void {
   const rnd = seeded(hash); const count = 34;
   for (let i = 0; i < count; i += 1) {
@@ -312,6 +339,7 @@ export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact,
       const cx = W * 0.33; const cy = H * 0.56; const rad = H * 0.34;
       ctx.fillStyle = artifact.slide.stain === 'H_AND_E' ? '#f1d6e0' : '#101826'; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
       if (artifact.slide.tissueType === 'BLOOD') drawBloodSmear(ctx, cx, cy, rad, artifact.slide.slideId);
+      else if (artifact.slide.tissueType === 'PANCREAS') drawPancreasSection(ctx, cx, cy, rad);
       else for (const o of artifact.cell.organelles) { const x = cx + (o.positionNormalized.x - 0.5) * rad * 1.5; const y = cy + (o.positionNormalized.y - 0.5) * rad * 1.5; ctx.fillStyle = o.kind === 'NUCLEUS' ? '#5a2d6b' : o.kind === 'MITOCHONDRION' ? '#c2606f' : '#8a5a7a'; ctx.beginPath(); ctx.ellipse(x, y, o.scaleNormalized * rad * 1.2, o.scaleNormalized * rad * 0.85, 0.4, 0, Math.PI * 2); ctx.fill(); }
       ctx.fillStyle = '#e6f2ec'; ctx.font = small;
       [artifact.slide.slideId, artifact.cell.cellId, `${artifact.cell.organelles.length} organelli`, artifact.slide.preparationStatus].forEach((t, i) => ctx.fillText(t, W * 0.62, H * 0.3 + i * H * 0.11));

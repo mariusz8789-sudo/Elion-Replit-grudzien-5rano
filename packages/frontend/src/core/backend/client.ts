@@ -16,11 +16,14 @@
  */
 
 import type { GenesisSpatialDataset } from '../experimentFabric/spatialImport';
+import type { AccountProfile } from '../accountProfiles';
 
 export interface User {
   id: string;
   email: string;
   displayName: string;
+  /** Profil konta wybrany przy rejestracji (backend: users.account_profile). Starsze zapisane sesje mogą go nie mieć do pierwszego /auth/me. */
+  accountProfile?: AccountProfile;
   createdAt: number;
 }
 
@@ -133,8 +136,8 @@ async function request<T>(
 
 /* ---------------- Uwierzytelnianie ---------------- */
 
-export function register(email: string, password: string, displayName?: string): Promise<ApiResult<Session>> {
-  return request<Session>('POST', '/auth/register', { body: { email, password, displayName } });
+export function register(email: string, password: string, displayName?: string, accountProfile?: AccountProfile): Promise<ApiResult<Session>> {
+  return request<Session>('POST', '/auth/register', { body: { email, password, displayName, accountProfile } });
 }
 
 export function login(email: string, password: string): Promise<ApiResult<Session>> {
@@ -521,6 +524,238 @@ export function runResearchIntake(
   input: { originalQuery: string; declaredInputKind?: string; maxCandidateBudget?: number; prepareCampaignDraft?: boolean },
 ): Promise<ApiResult<ResearchIntakeResponse>> {
   return request<ResearchIntakeResponse>('POST', `/projects/${projectId}/research-intake`, { token, body: input });
+}
+
+/* ---------------- ResearchRun (R1-a..R1-c): question → plan → experiment → verdict → Evidence → Replay → next ---------------- */
+
+/** Scoped to one frozen hypothesis under its protocol; never a statement of scientific truth. */
+export type ResearchRunVerdict = 'SUPPORTED_WITHIN_PROTOCOL' | 'FALSIFIED_WITHIN_PROTOCOL' | 'INCONCLUSIVE';
+export type ResearchRunReplayVerdict = 'MATCH' | 'DRIFT' | 'ENGINE_VERSION_CHANGED' | 'BLOCKED_BY_RUNTIME' | 'REPLAY_UNSUPPORTED' | 'NOT_APPLICABLE';
+export type ResearchRunNextStep =
+  | 'FORMALIZE_PROBLEM' | 'PROPOSE_PLAN' | 'EXECUTE_EXPERIMENT' | 'PROPOSE_EVIDENCE' | 'PROPOSE_NEXT_EXPERIMENT'
+  | 'AWAITING_EXECUTION' | 'AWAITING_HUMAN_REVIEW' | 'STATE_INTEGRITY_FAILURE' | 'NONE';
+
+export interface ResearchRunReplay {
+  verificationId?: string;
+  verdict: ResearchRunReplayVerdict;
+  originalOutputHash?: string | null;
+  replayOutputHash?: string | null;
+  replayEngineVersion?: string | null;
+  verifiedAt?: number;
+  reason?: string;
+}
+
+export interface ResearchRunExperiment {
+  experimentId: string;
+  frozen: { hypothesisId: string; claim: string; engineId: string; input: Record<string, unknown>; inputHash: string; protocolId: string; predictionFingerprint: string; preregistrationFingerprint: string; criteria: Array<Record<string, unknown>> } | null;
+  execution: { status: string; engine: { engineId: string; engineLabel: string | null; version: string | null }; output: Record<string, unknown>; inputHash: string; outputHash: string; scienceRunId: string | null; startedAt: string; finishedAt: string } | null;
+  falsification: { verdict: ResearchRunVerdict; scope: string; criteria: Array<Record<string, unknown>> } | null;
+  evidence: { evidenceProposalId: string; status: 'PROPOSED'; publication: 'REQUIRES_HUMAN_APPROVAL' } | null;
+  next: { replay: ResearchRunReplay | null; proposal: { action: 'EXECUTE_NEXT_HYPOTHESIS' | 'HUMAN_REVIEW'; hypothesisId?: string; engineId?: string; reason: string }; decidedBy: string } | null;
+}
+
+export interface ResearchRunView {
+  researchRunId: string;
+  /** The canonical AgentRun behind the research run; its `status` is what pause, resume and cancel change. */
+  run?: AgentRunSummary;
+  question: string;
+  plan: { hypotheses: Array<{ hypothesisId: string; claim: string; experimentProposal?: { kind: string; engineId?: string; decision?: string } }> } | null;
+  experiments: ResearchRunExperiment[];
+  nextStep: ResearchRunNextStep;
+  researchState: { chain: { ok: boolean }; events: Array<{ seq: number; type: string }> };
+}
+
+/** One question → one research run (deduplicated by the server). */
+export function startResearchRun(token: string, projectId: string, question: string): Promise<ApiResult<{ deduped: boolean; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs`, { token, body: { question } });
+}
+
+export function getResearchRun(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ researchRun: ResearchRunView }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}`, { token });
+}
+
+/** One row of `GET /research-runs`: the server's own summary, nothing derived on the client. */
+export interface ResearchRunSummary {
+  researchRunId: string;
+  question: string;
+  status: string;
+  nextStep: ResearchRunNextStep;
+  events: number;
+  createdAt: number;
+}
+
+export function listResearchRuns(token: string, projectId: string): Promise<ApiResult<{ researchRuns: ResearchRunSummary[] }>> {
+  return request('GET', `/projects/${projectId}/research-runs`, { token });
+}
+
+/**
+ * A ResearchRun experiment job in the durable lease queue (backend compute/workerInfrastructureContract.mjs).
+ * The queue clears `workerId`, `leaseId` and `leaseExpiresAt` when a job ends, so a finished job no longer names its worker.
+ */
+export type ResearchRunJobState = 'QUEUED' | 'CLAIMED' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'DEAD_LETTER';
+
+export interface ResearchRunQueueJob {
+  jobId: string;
+  researchRunId: string;
+  experimentId: string;
+  capabilityId: string;
+  state: string;
+  workerId: string | null;
+  leaseId: string | null;
+  leaseExpiresAt: number | null;
+  attempts: number;
+  maxAttempts: number;
+  timeoutMs: number;
+  payload: { projectId?: string; hypothesisId?: string | null; userId?: string | null };
+  result: unknown;
+  /** Set when the job ended badly, e.g. `{ code: 'LEASE_EXPIRED_AFTER_MAX_ATTEMPTS' }` or the worker's `{ code, status, retryable }`. */
+  failure: { code?: string; [key: string]: unknown } | null;
+  cancelReason: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ResearchRunControlAction = 'pause' | 'resume' | 'cancel';
+
+/**
+ * What a pause, resume or cancel did, as the server reports it. During a pause `queue.inFlight` lists the
+ * jobs a worker had already claimed: they are NOT interrupted and run to their end.
+ */
+export interface ResearchRunControlResult {
+  ok: true;
+  status: string;
+  researchRun: ResearchRunView;
+  queue: { withdrawn: string[]; inFlight: string[]; requeued: string[]; refused: string[] };
+}
+
+export function controlResearchRun(
+  token: string, projectId: string, researchRunId: string, action: ResearchRunControlAction, reason?: string,
+): Promise<ApiResult<ResearchRunControlResult>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/${action}`, { token, body: reason ? { reason } : {} });
+}
+
+export function getResearchRunJob(token: string, projectId: string, researchRunId: string, jobId: string): Promise<ApiResult<{ job: ResearchRunQueueJob }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiment-jobs/${encodeURIComponent(jobId)}`, { token });
+}
+
+export function cancelResearchRunJob(token: string, projectId: string, researchRunId: string, jobId: string): Promise<ApiResult<{ job: ResearchRunQueueJob }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiment-jobs/${encodeURIComponent(jobId)}/cancel`, { token });
+}
+
+/* ---------------- Genesis Verify: one submitted record → integrity, ledger anchor, replay → one report ---------------- */
+
+export type GenesisVerifyVerdict = 'MATCH' | 'DRIFT' | 'TAMPERED' | 'BLOCKED';
+export type GenesisVerifyCheckStatus = 'PASS' | 'FAIL' | 'NOT_RUN';
+export type GenesisVerifyCheckId = 'readable' | 'file-hash' | 'provenance' | 'content-hash' | 'ledger-anchor' | 'replay';
+
+/** The report exactly as packages/backend/src/genesisVerify.mjs builds it; nothing here is derived on the client. */
+export interface GenesisVerifyReport {
+  kind: string;
+  version: string;
+  verdict: GenesisVerifyVerdict;
+  meaning: string;
+  reasons: string[];
+  input: {
+    shape: 'EXECUTION_BUNDLE' | 'EXECUTION_RECORD' | 'UNKNOWN' | null;
+    submittedSha256: string | null;
+    declaredSha256: string | null;
+    researchRunId: string | null;
+    experimentId: string | null;
+    engine: { engineId: string | null; engineLabel: string | null } | null;
+    engineStatus: string | null;
+  };
+  hashes: Record<string, string | null>;
+  replay: { capability: string; replayEngineVersion: string | null; hashMatch: boolean; maxRelativeDiff: number | null; tolerance: number } | null;
+  checks: Array<{ id: GenesisVerifyCheckId | string; label: string; status: GenesisVerifyCheckStatus | string; detail: string }>;
+  notChecked: string[];
+  signature: string;
+  boundary: string;
+  reportFingerprint: string;
+  generatedAt: string;
+}
+
+/** POST /genesis-verify. `record` is the file text as the customer has it (the bytes are hashed server-side). */
+export function runGenesisVerify(
+  token: string, projectId: string, input: { record: string; declaredSha256?: string | null; format?: 'html' },
+): Promise<ApiResult<{ report: GenesisVerifyReport; html?: string }>> {
+  const body: Record<string, unknown> = { record: input.record };
+  if (input.declaredSha256) body.declaredSha256 = input.declaredSha256;
+  if (input.format) body.format = input.format;
+  return request('POST', `/projects/${projectId}/genesis-verify`, { token, body });
+}
+
+/** The exported record of one executed experiment: the exact bytes Genesis issued, and their sha256. */
+export interface GenesisRecordExport {
+  researchRunId: string;
+  experimentId: string;
+  fileName: string;
+  mimeType: string;
+  record: string;
+  sha256: string;
+  size: number;
+  custody: { status: string; artifactRef: { sha256: string; size: number; key?: string } | null };
+}
+
+export function exportResearchRunRecord(token: string, projectId: string, researchRunId: string, experimentId: string): Promise<ApiResult<GenesisRecordExport>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/record`, { token });
+}
+
+/** The model PROPOSES hypotheses and experiments; nothing it says becomes evidence. */
+export function proposeResearchPlan(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ deduped: boolean; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/proposals`, { token });
+}
+
+/**
+ * Freezes the prediction, runs the real engine, falsifies, proposes evidence, replays and proposes the
+ * next experiment. An engine that is not available answers 503 BLOCKED, with nothing substituted.
+ */
+export function executeResearchExperiment(
+  token: string, projectId: string, researchRunId: string, hypothesisId?: string,
+): Promise<ApiResult<{ status: 'EXECUTED' | 'ALREADY_EXECUTED'; deduped: boolean; experimentId: string; experiment?: ResearchRunExperiment; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments`, { token, body: hypothesisId ? { hypothesisId } : {} });
+}
+
+/** Re-runs one executed experiment through the existing Scientific Run verifier; append-only. */
+export function replayResearchExperiment(
+  token: string, projectId: string, researchRunId: string, experimentId: string,
+): Promise<ApiResult<{ experimentId: string; verification: ResearchRunReplay; replays: ResearchRunReplay[] }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/replays`, { token });
+}
+
+export interface GeneratedScientificAnalysis {
+  analysisId: string;
+  proposal: {
+    analysisId: string; objective: string; methodSummary: string; expectedOutputKeys: string[];
+    sourceHash: string; environmentFingerprint: string; status: 'PROPOSED'; epistemicStatus: 'NOT_EVIDENCE';
+  } | null;
+  execution: {
+    analysisId: string; status: string; failureCode?: string | null; output?: Record<string, unknown>;
+    outputHash?: string | null; sourceHash: string; environmentFingerprint: string;
+    stdoutHash?: string | null; stderrHash?: string | null; epistemicStatus: 'NOT_EVIDENCE';
+    evidenceEligibility?: 'REQUIRES_SEPARATE_REVIEW';
+  } | null;
+  replays: Array<{
+    analysisId: string; verdict: 'MATCH' | 'DRIFT'; outputHash: string | null;
+    sourceHash: string; environmentFingerprint: string; epistemicStatus: 'NOT_EVIDENCE';
+  }>;
+}
+
+export function listGeneratedScientificAnalyses(
+  token: string, projectId: string, researchRunId: string,
+): Promise<ApiResult<{ generatedAnalyses: GeneratedScientificAnalysis[] }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses`, { token });
+}
+
+export function generateScientificAnalysis(
+  token: string, projectId: string, researchRunId: string, objective: string,
+): Promise<ApiResult<{ deduped: boolean; execution: NonNullable<GeneratedScientificAnalysis['execution']>; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses`, { token, body: { objective } });
+}
+
+export function replayGeneratedScientificAnalysis(
+  token: string, projectId: string, researchRunId: string, analysisId: string,
+): Promise<ApiResult<{ status: 'REPLAYED'; verdict: 'MATCH' | 'DRIFT'; replay: GeneratedScientificAnalysis['replays'][number]; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses/${encodeURIComponent(analysisId)}/replay`, { token });
 }
 
 export type ComputeValue = string | number | boolean;
@@ -981,6 +1216,38 @@ export async function sealExperimentSession(
 export async function getExperimentMemory(token: string, projectId: string, campaignId: string): Promise<ApiResult<ExperimentMemory>> {
   const r = await request<{ memory: ExperimentMemory }>('GET', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, { token });
   return r.ok ? { ok: true, data: r.data.memory } : r;
+}
+
+/* ---------------- Genesis Mind research state (ENTITY-0) ---------------- */
+
+export interface AgentRunSummary {
+  readonly id: string;
+  readonly projectId: string;
+  readonly goal: string;
+  readonly domain: string;
+  readonly status: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface PersistedResearchState {
+  readonly events: readonly unknown[];
+  readonly chain: { readonly ok: boolean; readonly length: number; readonly head: string | null; readonly brokenAt: number | null; readonly reason: string | null };
+}
+
+export async function createAgentRun(token: string, projectId: string, goal: string, domain: string): Promise<ApiResult<{ run: AgentRunSummary }>> {
+  return request('POST', `/projects/${projectId}/agent-runs`, { token, body: { goal, domain } });
+}
+
+export async function getPersistedResearchState(token: string, projectId: string, runId: string): Promise<ApiResult<PersistedResearchState>> {
+  const r = await request<{ researchState: PersistedResearchState }>('GET', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token });
+  return r.ok ? { ok: true, data: r.data.researchState } : r;
+}
+
+export async function appendPersistedResearchStateEvent(
+  token: string, projectId: string, runId: string, event: unknown,
+): Promise<ApiResult<{ event: unknown; head: string; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/agent-runs/${runId}/research-state`, { token, body: { event } });
 }
 
 /**
@@ -1481,4 +1748,236 @@ export async function publishKnowledgeProposal(
 /** Requires a signed-in approver — the backend returns 401 without a token. */
 export async function rejectKnowledgeProposal(token: string, proposalId: string): Promise<ApiResult<Record<string, never>>> {
   return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/reject`, { token });
+}
+
+/* ---------------- ENTITY-1: Genesis's view of itself (GET /api/genesis/self) ---------------- */
+
+/** One engine: the adapter exists (`capabilityExists`) and, separately, whether its runtime works now. */
+export interface SelfModelEngine {
+  toolId: string;
+  engineName: string;
+  capabilityId: string | null;
+  capabilityExists: true;
+  runtimeAvailableNow: boolean;
+  status: 'AVAILABLE' | 'BLOCKED';
+  blockedBy: string | null;
+  reason: string | null;
+  proof: { kind: 'LOCAL_REFERENCE_CASE' | 'REMOTE_REAL_EXECUTION'; [key: string]: unknown } | null;
+  statement: string;
+}
+
+export interface GenesisSelfModel {
+  schemaVersion: number;
+  generatedAt: string;
+  identity: { entityId: string; mission: string; constitutionVersion: string; identitySchemaVersion: number };
+  references: Record<string, string>;
+  environment: Record<string, unknown>;
+  engines: SelfModelEngine[];
+  availableEngines: string[];
+  blockedEngines: { toolId: string; blockedBy: string | null }[];
+  knownModels: { kind: string; status?: string; providerId?: string | null; model?: string | null; target?: string; ruleId?: string | null; ruleFingerprint?: string | null }[];
+  failedGates: { source: string; evaluationId: string | null; arm: string | null; reasons: string[]; computedAt: string | null }[];
+  missingCapabilities: { id: string; label: string; status: string; requires: string | null }[];
+  dataAccessBlockers: { source: string; status: string; pinnedFallbackIds: string[] }[];
+  awaitingMeasurements: { known: boolean; candidates: number; campaigns: number };
+}
+
+/** Unauthenticated, like /api/health: it carries no project data. */
+export async function getGenesisSelfModel(): Promise<ApiResult<GenesisSelfModel>> {
+  return request<GenesisSelfModel>('GET', '/genesis/self');
+}
+
+/* ---------------- ENTITY-2: cognitive state (a view) and the knowledge registry (persisted) ---------------- */
+
+/** A section whose source failed verification is reported, never filled in. */
+export interface UnknownSection { status: 'UNKNOWN'; reason: string; brokenAt?: number | null }
+
+export interface RegistryGap {
+  gapId: string;
+  question: string;
+  source: { kind: string; ref: string | null };
+  relatedHypotheses: string[];
+  missingEvidence: string[];
+  requiredCapability: string | null;
+  createdEvidenceRefs: string[];
+  status: 'OPEN' | 'RESOLVED';
+  openedAt: string;
+  resolvedAt: string | null;
+  resolvedEvidenceRefs: string[];
+}
+
+export interface RegistryContradiction {
+  contradictionId: string;
+  type: string;
+  claimA: { recordId: string | null; source: string | null; statement: string | null };
+  claimB: { recordId: string | null; source: string | null; statement: string | null };
+  evidenceRefs: string[];
+  reason: string | null;
+  status: 'UNRESOLVED' | 'RESOLVED';
+  epistemicState: 'CONFLICTING_EVIDENCE' | 'RESOLVED_BY_NEW_EVIDENCE';
+  resolution: { statement: string; evidenceRefs: string[]; resolvedBy: string | null; at: string } | null;
+}
+
+/* ---- Science Flight Control (backend campaign/scienceFlightControl.mjs), carried inside BYT ---- */
+
+export type ScienceFlightStatus = 'READY_TO_EXECUTE' | 'AWAITING_EVIDENCE' | 'AWAITING_REPLAY' | 'VERIFIED' | 'BLOCKED' | 'BLOCKED_RETRYABLE' | 'FAILED';
+export type ScienceFlightFailureLayer = 'PREFLIGHT' | 'RESEARCH_GATE' | 'CAPABILITY_BINDING' | 'RUNTIME' | 'WORKER_TRANSPORT' | 'ENGINE' | 'REPLAY';
+export interface ScienceFlightSourceRef { eventId: string; eventType: string; occurredAt: number | string }
+
+/** One flight: a frozen Virtual Lab plan and what the canonical campaign events say happened to it. */
+export interface ScienceFlight {
+  campaignId: string;
+  candidateId: string;
+  contractVersion: string;
+  executionId: string | null;
+  status: string;
+  preflight: {
+    decision: string;
+    inputFingerprint: string | null;
+    requestedCapability: string | null;
+    budget: { maxComputeSeconds?: number; [key: string]: unknown } | null;
+    expectation: unknown;
+    checks: { check: string; status: string; detail: unknown }[];
+    source: ScienceFlightSourceRef | null;
+  };
+  executionDelta: {
+    observed: boolean;
+    inputIntegrity: string;
+    plannedCapability: string | null;
+    selectedEngine: string | null;
+    scienceRunId?: string | null;
+    outputFingerprint?: string | null;
+    computeBudgetSeconds: number | null;
+    actualDurationMs: number | null;
+    budgetVerdict: string;
+    plannedExpectation: unknown;
+    observedClassification: string | null;
+    source?: ScienceFlightSourceRef | null;
+  };
+  failureAttribution: { layer: string; code: string; reason?: string | null; retryable: boolean; source: ScienceFlightSourceRef | null } | null;
+  evidenceUpdate: { status: string; proposalId: string | null; source: ScienceFlightSourceRef | null };
+  replay: { status: string; verificationId: string | null; source: ScienceFlightSourceRef | null };
+  bytUpdate: {
+    mode: 'DERIVED_READ_MODEL_ONLY'; persistence: 'NONE'; status: string; epistemicState: string; classification: string | null;
+    scienceRunRef: string | null; evidenceRef: string | null; replayRef: string | null; failureLayer: string | null; limitation: string;
+  };
+  flightFingerprint: string;
+}
+
+/** NOT_COMPUTED means the server did not rebuild Flight Control for this view; it never means "zero flights". */
+export type ScienceFlightControl =
+  | { status: 'AVAILABLE'; flights: ScienceFlight[]; verified: number; blocked: number; rejectedUntraceableRecords: number; limitation: string }
+  | { status: 'NOT_COMPUTED'; flights: ScienceFlight[]; verified: null; blocked: null; rejectedUntraceableRecords: null; limitation: string };
+
+/** BYT — the derived read model of Genesis' scientific self (backend bytProjection.mjs). Sections the UI does not read stay loose. */
+export interface BytProjection {
+  schemaVersion: number;
+  view: 'DERIVED_FROM_CANONICAL_STATE';
+  identity: unknown;
+  epistemicVocabulary: string[];
+  continuity: { researchRuns: number; verifiedRuns: number; brokenRuns: number };
+  knowledgeState: { openGaps: number; unresolvedContradictions: number; proposedClaims: number } | UnknownSection;
+  capabilities: { availableNow: unknown[]; blocked: unknown[]; missing: unknown[] } | UnknownSection;
+  predictionLedger: Array<Record<string, unknown>>;
+  calibration: Record<string, unknown>;
+  necropolis: Array<Record<string, unknown>>;
+  decisionTraces: Array<Record<string, unknown>>;
+  surprise: Record<string, unknown>;
+  scienceFlightControl: ScienceFlightControl;
+  integrity: { researchRuns: Array<{ researchRunId: string; ok: boolean; [key: string]: unknown }>; knowledgeRegistry: unknown };
+}
+
+/** A ResearchRun job of the lease queue as the cognitive state lists it: QUEUED in pending, CLAIMED (with worker and lease) in running. */
+export interface CognitiveResearchRunJob {
+  kind: 'RESEARCH_RUN_JOB';
+  id: string;
+  researchRunId: string;
+  hypothesisId: string | null;
+  workerId?: string | null;
+  leaseExpiresAt?: number | null;
+  attempts?: number;
+}
+
+export interface GenesisCognitiveState {
+  schemaVersion: number;
+  projectId: string;
+  generatedAt: string;
+  view: 'MATERIALIZED_VIEW';
+  byt: BytProjection;
+  currentGoals: { kind: string; id: string; goal: string; domain: string; status: string }[];
+  activeQuestions: { kind: string; [key: string]: unknown }[];
+  activeHypotheses: { source: string; status: string; [key: string]: unknown }[];
+  knowledgeGaps: RegistryGap[] | UnknownSection;
+  contradictions: RegistryContradiction[] | UnknownSection;
+  proposedClaims: ScientificClaimProposal[] | UnknownSection;
+  blockedCapabilities: { kind: string; id: string; blockedBy: string | null }[] | UnknownSection;
+  pendingExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  runningExperiments: { kind: string; id: string; [key: string]: unknown }[];
+  awaitingExternalMeasurements: { campaignId: string; candidateId: string | null; requestEventId: string; objective: string | null }[];
+  recentEvidenceRefs: string[];
+  proposedNextActions: { status: 'PROPOSED'; kind: string; [key: string]: unknown }[];
+  integrity: { researchRuns: { runId: string; ok: boolean; [key: string]: unknown }[]; knowledgeRegistry: { ok: boolean; brokenAt: number | null; reason: string | null } };
+}
+
+export async function getCognitiveState(token: string, projectId: string): Promise<ApiResult<GenesisCognitiveState>> {
+  const r = await request<{ cognitiveState: GenesisCognitiveState }>('GET', `/projects/${projectId}/cognitive-state`, { token });
+  return r.ok ? { ok: true, data: r.data.cognitiveState } : r;
+}
+
+export async function openKnowledgeGap(token: string, projectId: string, gap: unknown): Promise<ApiResult<{ gap: RegistryGap; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps`, { token, body: gap });
+}
+
+export async function resolveKnowledgeGap(token: string, projectId: string, gapId: string, evidenceRefs: readonly string[]): Promise<ApiResult<{ gap: RegistryGap }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/gaps/${encodeURIComponent(gapId)}/resolve`, { token, body: { evidenceRefs } });
+}
+
+export async function recordKnowledgeContradiction(token: string, projectId: string, contradiction: unknown): Promise<ApiResult<{ contradiction: RegistryContradiction; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/knowledge-registry/contradictions`, { token, body: contradiction });
+}
+
+/* ---------------- ENTITY-3: an external model proposes, the backend validates, the registry keeps it PROPOSED ---------------- */
+
+export interface ExperimentProposalDecision {
+  kind: string;
+  engineId: string | null;
+  description: string | null;
+  parameters: Record<string, unknown>;
+  parameterChanges: { target: string | null; to: unknown }[];
+  executedByModel: false;
+  decision: 'REJECTED_MALFORMED' | 'REJECTED_FROZEN_THRESHOLD' | 'HUMAN_APPROVAL_REQUIRED' | 'BLOCKED_BY_SELF_MODEL' | 'BLOCKED_BY_RUNTIME' | 'PROPOSED';
+  reason: string | null;
+}
+
+export interface ScientificClaimProposal {
+  proposalId: string;
+  contractVersion: number;
+  question: string | null;
+  claim: string;
+  claimType: 'HYPOTHESIS' | 'PREDICTION' | 'MECHANISM_PROPOSAL' | 'OPEN_QUESTION';
+  hypothesisId: string | null;
+  assumptions: string[];
+  supportingEvidenceRefs: string[];
+  contradictingEvidenceRefs: string[];
+  missingEvidence: string[];
+  uncertainty: { level: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN'; statement: string | null };
+  falsificationProposal: string;
+  experimentProposal: ExperimentProposalDecision | null;
+  unresolvedEvidenceRefs: { field: string; ref: string; reason: string }[];
+  degradations: { field: string; from: unknown; to: unknown; reason: string }[];
+  generatedBy: { kind: 'EXTERNAL_REASONING_MODEL'; providerId: string; model: string | null; version: string };
+  epistemicStatus: 'NOT_EVIDENCE';
+  status: 'PROPOSED';
+  proposedAt: string;
+}
+
+/** Asks the backend's configured reasoning model. Failure statuses: BLOCKED_BY_PROVIDER_CONFIGURATION, PROVIDER_TIMEOUT, REJECTED_MALFORMED_RESPONSE, ... */
+export async function proposeScientificClaim(
+  token: string, projectId: string, input: { question: string; hypothesisId?: string | null },
+): Promise<ApiResult<{ ok: true; status: 'PROPOSED'; deduped: boolean; proposal: ScientificClaimProposal }>> {
+  return request('POST', `/projects/${projectId}/claim-proposals`, { token, body: input });
+}
+
+export async function listClaimProposals(token: string, projectId: string): Promise<ApiResult<{ proposals: ScientificClaimProposal[] }>> {
+  return request('GET', `/projects/${projectId}/claim-proposals`, { token });
 }

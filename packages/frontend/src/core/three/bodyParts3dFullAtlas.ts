@@ -1,5 +1,6 @@
 import type * as THREE_NS from 'three';
 import { BODYPARTS3D_ATTRIBUTION, BODYPARTS3D_LICENSE } from './bodyParts3dPilot';
+import { EXPLORE_ORGANS } from './anatomyExplore';
 
 /**
  * The FULL BodyParts3D 4.0 male reference body (2,234 source meshes) as packed by the MIT-licensed
@@ -48,21 +49,35 @@ export const FULL_ATLAS_SYSTEM_COLOR: Readonly<Record<string, number>> = {
 export const FULL_ATLAS_HIDDEN_BY_DEFAULT: readonly string[] = ['integumentary', 'reproductive'];
 
 /**
- * Whole organs assembled from their atlas structures, for the organ close-up. The brain is every
- * nervous-system structure in the skull (gyri, white matter, deep nuclei, brainstem, cerebellum),
- * without the cranial nerves and their branches.
+ * Organs assembled from their own atlas structures (brain, heart, eyes, airways, abdominal and pelvic
+ * organs — see EXPLORE_ORGANS), each structure kept as its own geometry so a tap can name it.
  */
-export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPart) => boolean>> = {
-  brain: (p) => p.system === 'nervous' && p.bounds[0]![1]! > 1.35 && !/nerve|ganglion|branch|spinal/i.test(p.name),
-};
+export const FULL_ATLAS_ORGAN_PARTS: Readonly<Record<string, (part: FullAtlasPart) => boolean>> =
+  Object.fromEntries(EXPLORE_ORGANS.map((o) => [o.id, o.atlas]));
 
-export interface FullAtlasOrganMesh {
+export interface FullAtlasOrganPart {
+  readonly name: string;
   readonly geometry: THREE_NS.BufferGeometry;
+}
+
+/** One organ's structures, each its own geometry so a tap in the close-up can name it. */
+export interface FullAtlasOrganMesh {
+  readonly parts: readonly FullAtlasOrganPart[];
   readonly partCount: number;
+}
+
+/** Where one structure sits inside its system's merged geometry (index range) and its bounds in atlas meters. */
+export interface FullAtlasPartRange {
+  readonly name: string;
+  readonly start: number;
+  readonly count: number;
+  readonly bounds: readonly [readonly number[], readonly number[]];
 }
 
 export interface FullAtlasSystemMesh {
   readonly system: string;
+  /** Every structure of the system, in merge order: any of them can be found and named from a tap. */
+  readonly parts?: readonly FullAtlasPartRange[];
   readonly geometry: THREE_NS.BufferGeometry;
   readonly partCount: number;
   readonly triangles: number;
@@ -70,7 +85,7 @@ export interface FullAtlasSystemMesh {
 
 export interface LoadedFullAtlas {
   readonly systems: readonly FullAtlasSystemMesh[];
-  /** Organ id → that organ's own atlas structures merged (see FULL_ATLAS_ORGAN_PARTS). */
+  /** Organ id → that organ's own atlas structures (see FULL_ATLAS_ORGAN_PARTS). */
   readonly organs?: ReadonlyMap<string, FullAtlasOrganMesh>;
   readonly structures: number;
   readonly concepts: number;
@@ -158,12 +173,14 @@ export async function loadFullAtlas(
   const systems: FullAtlasSystemMesh[] = [];
   for (const [system, parts] of bySystem) {
     const geometry = mergeSystemParts(THREE, parts, buffers);
-    systems.push({ system, geometry, partCount: parts.length, triangles: (geometry.index?.count ?? 0) / 3 });
+    let start = 0;
+    const ranges = parts.map((p) => { const r = { name: p.name, start, count: p.indexCount, bounds: p.bounds }; start += p.indexCount; return r; });
+    systems.push({ system, geometry, parts: ranges, partCount: parts.length, triangles: (geometry.index?.count ?? 0) / 3 });
   }
   const organs = new Map<string, FullAtlasOrganMesh>();
   for (const [organId, selects] of Object.entries(FULL_ATLAS_ORGAN_PARTS)) {
     const parts = manifest.parts.filter(selects);
-    if (parts.length) organs.set(organId, { geometry: mergeSystemParts(THREE, parts, buffers), partCount: parts.length });
+    if (parts.length) organs.set(organId, { parts: parts.map((p) => ({ name: p.name, geometry: mergeSystemParts(THREE, [p], buffers) })), partCount: parts.length });
   }
   return {
     systems,

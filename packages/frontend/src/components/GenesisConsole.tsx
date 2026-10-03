@@ -65,6 +65,13 @@ function guideModeFromHash(hash: string): GuideMode | null {
   return null;
 }
 
+// Plain words for a layperson; the domain id and its decision ids stay in the button's title.
+const DOMAIN_PLAIN: Readonly<Record<GenesisDomainId, string>> = {
+  LOWER_HARM: 'Zamiennik o mniejszej szkodliwości (GLP-1R, GIPR, GCGR)',
+  E2E01: 'Wygenerowani kandydaci osi inkretyn (ChEMBL)',
+  MIND: 'Pętla hipotez w przestrzeni modelu',
+};
+
 export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | null } = {}): React.ReactElement {
   const initialGuide = autoplay !== undefined ? autoplay : (typeof window === 'undefined' ? null : guideModeFromHash(window.location.hash));
   const [guideMode, setGuideMode] = useState<GuideMode | null>(initialGuide);
@@ -217,7 +224,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
   );
 
   return (
-    <main className="settings-view" id="main-content" tabIndex={-1}>
+    <main className="settings-view research-console" id="main-content" tabIndex={-1}>
       <section className="settings-section">
         <h2>Genesis Research Console</h2>
         <textarea
@@ -230,11 +237,12 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         />
         <div className="gu-locale-switch" style={{ margin: '8px 0', flexWrap: 'wrap' }}>
           {([
-            ['SANDBOX', 'SANDBOX (toy adapters)'],
-            ['REAL_PRODUCTION', 'REAL — LOWER-HARM (production data)'],
-            ['REAL_SYNTHETIC_WINNER_DEMO', 'REAL — LOWER-HARM (synthetic winner demo)'],
+            // Plain words for a layperson; the mode id stays in the button's title.
+            ['SANDBOX', 'Ćwiczenie: modele zabawkowe, bez prawdziwych danych'],
+            ['REAL_PRODUCTION', 'Prawdziwe dane: ChEMBL i ClinicalTrials.gov'],
+            ['REAL_SYNTHETIC_WINNER_DEMO', 'Pokaz: prawdziwy proces, syntetyczny zwycięzca'],
           ] as const).map(([value, label]) => (
-            <button key={value} type="button" className={source === value ? 'chip-btn primary' : 'chip-btn'} onClick={() => setSource(value)}>
+            <button key={value} type="button" className={source === value ? 'chip-btn primary' : 'chip-btn'} onClick={() => setSource(value)} title={value}>
               {label}
             </button>
           ))}
@@ -249,20 +257,20 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
                   has its own real, working entry point: the MindPanel section rendered further
                   down this console. */}
               {GENESIS_DOMAINS.filter((d) => d.domainId !== 'MIND').map((d) => (
-                <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label}>
-                  {d.domainId}
+                <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label} data-testid={`console-domain-${d.domainId}`}>
+                  {DOMAIN_PLAIN[d.domainId]}
                 </button>
               ))}
             </div>
             <label className="gu-hint" style={{ display: 'block', margin: '4px 0' }}>
               <input type="checkbox" checked={vagueProblem} onChange={(e) => setVagueProblem(e.target.checked)} />
-              {' '}Submit as a vague problem (text only, no objectives/evidenceMinimum) — tests the real fail-closed NEEDS_INPUT path
+              {' '}Wyślij samo pytanie, bez celów i progów dowodu: Genesis powinien poprosić o brakujące dane, a nie zgadywać
             </label>
           </>
         )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
+        <div className="research-console-actions">
           <button type="button" className="chip-btn primary" onClick={() => void start()} disabled={busy}>
-            {busy ? 'Running…' : 'Run full scientific process'}
+            {busy ? 'Trwa…' : 'Uruchom cały proces badawczy'}
           </button>
           {guideMode === null && (
             <>

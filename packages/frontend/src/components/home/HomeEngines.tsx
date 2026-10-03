@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
-import { listToolchain, type ToolchainEntry } from '../../core/backend/client';
+import { getGenesisSelfModel, listToolchain, type SelfModelEngine, type ToolchainEntry } from '../../core/backend/client';
 
 /**
  * ENGINES — the scientific engines Genesis calls, each with two separate facts:
- *   - "This server": the live status the backend's toolchain registry reports
- *     (`GET /api/compute/toolchain`, validated at runtime). Never assumed: until
- *     it answers the chip reads "checking", and a BLOCKED engine reads blocked.
+ *   - "This server": whether the runtime works NOW, read from the backend self
+ *     model (`GET /api/genesis/self`: an engine is available only with current
+ *     worker health and a proof run), with its own sentence when it is not. The
+ *     toolchain registry only adds the version. Never assumed: until the self
+ *     model answers the chip reads "checking", and a BLOCKED engine reads blocked.
  *   - "Recorded run": the committed evidence file in which the engine really ran,
  *     or plainly "no committed run yet".
  * Engines outside the runtime registry (Meeko, GNINA) say so instead of borrowing
@@ -35,17 +37,27 @@ export const HOME_ENGINES: readonly HomeEngine[] = [
   { name: 'Biopython', role: 'Reads protein structures and sequences.', toolId: 'biopython', record: null },
 ];
 
-export type Live = { phase: 'checking' } | { phase: 'ready'; byId: ReadonlyMap<string, ToolchainEntry> } | { phase: 'unreachable' };
+export type Live =
+  | { phase: 'checking' }
+  | { phase: 'ready'; self: ReadonlyMap<string, SelfModelEngine>; byId: ReadonlyMap<string, ToolchainEntry> }
+  | { phase: 'unreachable' };
 
-export function liveLabel(engine: HomeEngine, live: Live): { text: string; tone: 'ok' | 'warn' | 'bad' | 'muted' } {
+export interface LiveLabel { text: string; tone: 'ok' | 'warn' | 'bad' | 'muted'; detail?: string }
+
+/** Polish chip words for `pl`; every other language keeps the English ones (no unchecked translation). */
+const CHIP_PL = { checking: 'sprawdzam…', unreachable: 'serwer nie odpowiada', notReported: 'brak zgłoszenia', blocked: 'ZABLOKOWANY', available: 'DOSTĘPNY' } as const;
+const CHIP_EN = { checking: 'checking…', unreachable: 'server unreachable', notReported: 'not reported', blocked: 'BLOCKED', available: 'AVAILABLE' } as const;
+
+export function liveLabel(engine: HomeEngine, live: Live, locale: 'pl' | 'en' = 'en'): LiveLabel {
+  const w = locale === 'pl' ? CHIP_PL : CHIP_EN;
   if (engine.toolId === null) return { text: engine.note ?? 'Not a registered runtime', tone: 'muted' };
-  if (live.phase === 'checking') return { text: 'checking…', tone: 'muted' };
-  if (live.phase === 'unreachable') return { text: 'server unreachable', tone: 'muted' };
-  const entry = live.byId.get(engine.toolId);
-  if (!entry) return { text: 'not reported', tone: 'muted' };
-  if (entry.status === 'AVAILABLE') return { text: `AVAILABLE${entry.version ? ` · ${entry.version}` : ''}`, tone: 'ok' };
-  if (entry.status === 'VALIDATION_FAILED') return { text: 'VALIDATION_FAILED', tone: 'bad' };
-  return { text: entry.status, tone: 'warn' };
+  if (live.phase === 'checking') return { text: w.checking, tone: 'muted' };
+  if (live.phase === 'unreachable') return { text: w.unreachable, tone: 'muted' };
+  const self = live.self.get(engine.toolId);
+  if (!self) return { text: w.notReported, tone: 'muted' };
+  if (!self.runtimeAvailableNow) return { text: w.blocked, tone: 'warn', detail: self.statement };
+  const version = live.byId.get(engine.toolId)?.version;
+  return { text: `${w.available}${version ? ` · ${version}` : ''}`, tone: 'ok', detail: self.statement };
 }
 
 export function HomeEngines(): React.ReactElement {
@@ -63,7 +75,7 @@ export function HomeEngines(): React.ReactElement {
           return (
             <li key={e.name} className="hp-engine" data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`} title={e.role}>
               <p className="hp-engine-name">{e.name}</p>
-              <p className={`hp-pill hp-pill-${s.tone}`}>{s.text}</p>
+              <p className={`hp-pill hp-pill-${s.tone}`} title={s.detail}>{s.text}</p>
               <p className="hp-engine-record">{e.record ? <>Ran: {e.record}</> : 'No committed run yet'}</p>
             </li>
           );
@@ -73,15 +85,20 @@ export function HomeEngines(): React.ReactElement {
   );
 }
 
-/** The live toolchain answer, shared by the full panel and the dashboard row. */
+/** The live engine answer (self model first, toolchain for versions), shared by the full panel and the dashboard row. */
 export function useLiveToolchain(): Live {
   const [live, setLive] = useState<Live>({ phase: 'checking' });
   useEffect(() => {
     let cancelled = false;
-    void listToolchain()
-      .then((r) => {
+    void Promise.all([getGenesisSelfModel(), listToolchain().catch(() => null)])
+      .then(([self, tools]) => {
         if (cancelled) return;
-        setLive(r.ok ? { phase: 'ready', byId: new Map(r.data.map((t) => [t.toolId, t])) } : { phase: 'unreachable' });
+        if (!self.ok) { setLive({ phase: 'unreachable' }); return; }
+        setLive({
+          phase: 'ready',
+          self: new Map(self.data.engines.map((e) => [e.toolId, e])),
+          byId: new Map(tools?.ok ? tools.data.map((t) => [t.toolId, t]) : []),
+        });
       })
       .catch(() => { if (!cancelled) setLive({ phase: 'unreachable' }); });
     return () => { cancelled = true; };
@@ -109,7 +126,7 @@ export function HomeEnginesRow(): React.ReactElement {
         {runtimes.map((e) => {
           const s = liveLabel(e, live);
           return (
-            <li key={e.name} className={`hp-tone-${s.tone}`} title={`${e.role} ${s.text}`} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
+            <li key={e.name} className={`hp-tone-${s.tone}`} title={`${e.role} ${s.detail ?? s.text}`} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
               <i aria-hidden="true" />{e.name}<span className="hp-sr"> · {s.text}</span>
             </li>
           );

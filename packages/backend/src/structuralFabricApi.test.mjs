@@ -6,6 +6,7 @@ import { detect } from './compute/structuralAdapter.mjs';
 
 const runtime = detect();
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'structural-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0',
   modelId: 'biology-hiv-10e8-pdb-structural-comparison',
@@ -27,7 +28,7 @@ test('Fabric contract exposes the bounded real PDB structural-comparison model',
 
 if (runtime.available) {
   test('Fabric API runs real Biopython C-alpha RMSD for public HIV MPER/10E8 structures', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.run.status, 'ok');
     assert.equal(response.body.run.modelId, request.modelId);
@@ -50,7 +51,7 @@ if (runtime.available) {
       sourceText: 'Porównaj publiczne PDB RMSD 10E8v4 5WDF z 5GHW.',
       inputs: { referencePdb: '5GHW', mobilePdb: '5WDF' },
     };
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: variantRequest, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: variantRequest, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.run.status, 'ok');
     assert.equal(response.body.run.outputs.fabMatchedCaAtoms, 367);
@@ -64,7 +65,7 @@ if (runtime.available) {
   });
 } else {
   test('Fabric API rejects structural comparison rather than emitting a synthetic RMSD without runtime', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
     assert.equal(response.body.run.error, 'capability_unavailable');
@@ -73,7 +74,7 @@ if (runtime.available) {
 
 test('Fabric API rejects an unsupported PDB pair before structural execution', () => {
   const response = handleApi(db, {
-    method: 'POST', pathname: '/api/compute/fabric/run', query: {}, token: null,
+    method: 'POST', pathname: '/api/compute/fabric/run', query: {}, token: authToken,
     body: { ...request, inputs: { referencePdb: '5GHW', mobilePdb: '2PV6' } },
   });
   assert.equal(response.status, 400);

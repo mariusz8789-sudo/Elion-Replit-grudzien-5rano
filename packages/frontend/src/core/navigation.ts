@@ -62,14 +62,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: 'main',
     label: '',
     items: [
-      { id: 'home', label: 'Dashboard', shortLabel: 'Home', icon: '◉', hash: '#/', primary: true, description: 'Przegląd: obszary, ostatnie badania, dowody i silniki' },
-      { id: 'science', label: 'Drug Discovery', icon: '💊', hash: '#/drug', description: 'Docking, retrosynteza, Evidence i Replay' },
-      { id: 'human-biology-lab', label: 'Human Explorer', icon: '🧍', hash: '#/human-biology-lab', description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
-      { id: 'reviewer', label: 'Reviewer Room', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
-      { id: 'evidence', label: 'Evidence & Replay', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
-      { id: 'scientific-worlds', label: 'Laboratory', shortLabel: 'Lab', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
-      { id: 'cms-open-data', label: 'CERN / CMS', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
-      { id: 'discover', label: 'Research Console', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
+      { id: 'home', label: 'Start', shortLabel: 'Start', icon: '◉', hash: '#/', primary: true, description: 'Przegląd: obszary, ostatnie badania, dowody i silniki' },
+      { id: 'science', label: 'Odkrywanie leków', icon: '💊', hash: '#/drug', description: 'Docking, retrosynteza, Evidence i Replay' },
+      { id: 'human-biology-lab', label: 'Człowiek · Human Explorer', shortLabel: 'Człowiek', icon: '🧍', hash: '#/human-biology-lab', primary: true, description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
+      { id: 'reviewer', label: 'Pokój recenzenta', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
+      { id: 'evidence', label: 'Dowody i powtórzenie', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
+      { id: 'scientific-worlds', label: 'Laboratorium', shortLabel: 'Lab', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
+      { id: 'cms-open-data', label: 'CERN · dane CMS', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
+      { id: 'discover', label: 'Konsola badań', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
     ],
   },
 ];
@@ -106,7 +106,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   // read as absent, so it stands as its own capability with the detector chamber folded under it.
   { id: 'cern-complex', label: 'Kompleks CERN', icon: '◉', hash: '#/cern-complex', description: 'Przejście przez halę, tunel i komorę detektora — model zderzeń, oddzielnie od danych CMS' },
   { id: 'collider', label: 'CERN — komora detektora', icon: '⚛', hash: '#/cern-complex?room=detector', variantOf: 'cern-complex' },
-  { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
+  { id: 'lab-fpv', label: 'Laboratorium — Kwantowy FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement', variantOf: 'lab-fpv' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
   // — Człowiek i biologia —
@@ -116,6 +116,8 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log', variantOf: 'memory' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', variantOf: 'memory', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
+  { id: 'verify', label: 'Genesis Verify — sprawdź zapis wyniku', icon: '✓', hash: '#/verify', variantOf: 'memory', description: 'Wgraj zapis z Genesis: odciski sha256, rejestr i powtórzenie obliczenia, raport HTML' },
+  { id: 'flight-control', label: 'Kontrola lotów nauki', icon: '◎', hash: '#/flight-control', description: 'Przebiegi badań, kolejka zadań i loty eksperymentów; wstrzymaj, wznów, anuluj' },
   // — Światy i symulacje —
   { id: 'worlds', label: 'Wizualizacje i światy', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },
   { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world', variantOf: 'worlds' },
@@ -124,9 +126,10 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal', variantOf: 'worlds' },
   { id: 'city3d', label: 'Miasto 3D (WebGL)', icon: '🏙', hash: '#/city3d', variantOf: 'worlds' },
   { id: 'scientific-city', label: 'Scientific City', icon: '🏗', hash: '#/scientific-city', variantOf: 'worlds' },
-  { id: 'first-person-lab', label: 'Laboratorium 1. osoby', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
+  { id: 'first-person-lab', label: 'Laboratorium — scenariusze', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass', variantOf: 'worlds' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline', variantOf: 'worlds' },
+  { id: 'reality', label: 'Nawigator rzeczywistości — orbita i jej warianty', icon: '🪐', hash: '#/reality', variantOf: 'worlds', description: 'Zmień masę gwiazdy lub orbitę, porównaj warianty, zapisz scenę i policz ją ponownie' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', variantOf: 'worlds', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
   { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix', variantOf: 'worlds' },
   { id: 'matrix-map', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix-map', variantOf: 'worlds' },
@@ -152,31 +155,34 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour', variantOf: 'investor-demo' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
+  { id: 'account', label: 'Konto — zaloguj się lub załóż konto', icon: '👤', hash: '#/konto', description: 'Logowanie, rejestracja i profil konta (uczeń, student, nauczyciel, badacz, instytucja)' },
   { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
 ];
 
 /** The research-mode label, shared by the desktop sidebar and the mobile sheet. */
-export const RESEARCH_MODE_LABEL = 'More · Scientific OS';
+export const RESEARCH_MODE_LABEL = 'Więcej · wszystkie moduły';
 
 /**
  * The first entry of the More disclosure: the whole catalogue on one page
  * (`#/more`), every capability with its audit status.
  */
-export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'All capabilities', icon: '▦', hash: '#/more', description: 'Wszystko w 7 grupach, ze statusem z audytu' };
+export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'Wszystkie możliwości', icon: '▦', hash: '#/more', description: 'Wszystko w 7 grupach, ze statusem z audytu' };
 
 /**
  * One entry per capability, in the owner's groups (29 Sep 2026, same as
  * `core/scientificOs/catalogue.ts`); `variantOf` entries fold under their capability.
  */
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
-  { id: 'more-ls', label: 'Life Sciences', ids: ['campaign', 'chemistry', 'virtual-bio'] },
-  { id: 'more-evidence', label: 'Evidence & Verification', ids: ['memory', 'meta-cognition'] },
-  { id: 'more-public', label: 'Government & Public Sector', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
-  { id: 'more-physics', label: 'Physics, Quantum & CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
-  { id: 'more-worlds', label: 'World & Digital Twin', ids: ['worlds', 'whatif'] },
-  { id: 'more-learning', label: 'Education', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
-  { id: 'more-system', label: 'Platform', ids: ['projects', 'settings'] },
-  { id: 'more-showcase', label: 'Showcases (experiments)', ids: ['myths-theories', 'decipherment'] },
+  { id: 'more-ls', label: 'Nauki o życiu', ids: ['campaign', 'chemistry', 'virtual-bio'] },
+  { id: 'more-evidence', label: 'Dowody i weryfikacja', ids: ['memory', 'flight-control', 'meta-cognition'] },
+  { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'sovereign'] },
+  { id: 'more-physics', label: 'Fizyka, kwanty i CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
+  { id: 'more-worlds', label: 'Świat i cyfrowy bliźniak', ids: ['worlds', 'whatif'] },
+  { id: 'more-learning', label: 'Edukacja', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
+  { id: 'more-system', label: 'Platforma', ids: ['account', 'projects', 'settings'] },
+  // Cyber runs on a toy target application: the catalogue files it under
+  // "Demo only", so it is listed with the showcases, not as a public-sector product.
+  { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment', 'cyber'] },
 ];
 
 const byId = new Map(MORE_ITEMS.map((item) => [item.id, item] as const));
@@ -200,9 +206,12 @@ export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) 
  * not in the menu (the menu is navigation only); it sits in the mobile bottom
  * bar between Home and Lab and opens the one global ScienceChat.
  */
-export const ASK_ITEM: NavItem = { id: 'chat', label: 'Ask', icon: '✦', kind: 'chat', description: 'Opisz zadanie badawcze; Genesis kieruje je do modelu, silnika albo zweryfikowanego ekranu' };
+export const ASK_ITEM: NavItem = { id: 'chat', label: 'Zapytaj', shortLabel: 'Zapytaj', icon: '✦', kind: 'chat', description: 'Opisz zadanie badawcze; Genesis kieruje je do modelu, silnika albo zweryfikowanego ekranu' };
 
-/** Mobile bottom bar, left to right: Home, Ask, Lab (AppShell adds Menu). */
+/**
+ * Mobile bottom bar, left to right: Start, Zapytaj, Człowiek, Laboratorium (AppShell adds Więcej, whose sheet
+ * holds the account entry). Five fixed, always visible targets in plain words (Apple HIG tab bars, NN/g on hidden navigation).
+ */
 export const PRIMARY_NAV_ITEMS: readonly NavItem[] = (() => {
   const [home, ...rest] = NAV_ITEMS.filter((item) => item.primary);
   return home ? [home, ASK_ITEM, ...rest] : [ASK_ITEM, ...rest];

@@ -110,8 +110,8 @@ export function experimentsOf(researchState) {
   const byId = new Map();
   const slot = { PREDICTIONS_FROZEN: 'frozen', EXPERIMENT_HANDOFF: 'execution', SELF_FALSIFICATION: 'falsification', EVIDENCE_UPDATE: 'evidence', NEXT_EXPERIMENT: 'next', EXPERIMENT_CONTINUED: 'continuedFrom' };
   for (const e of researchState.events) {
-    const key = slot[e.type];
-    const id = e.payload?.experimentId;
+    const key = slot[e?.type];
+    const id = e?.payload?.experimentId;
     if (!key || !id) continue;
     if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null, continuedFrom: null });
     const experiment = byId.get(id);
@@ -139,10 +139,33 @@ export function nextStepOf(run, researchState) {
   return last.next.proposal?.action === 'EXECUTE_NEXT_HYPOTHESIS' ? 'AWAITING_EXECUTION' : 'AWAITING_HUMAN_REVIEW';
 }
 
+/**
+ * Tail truncation cannot be seen by the hash chain alone: every prefix of a valid chain is valid. Scientific
+ * Memory (`experiment_records`, append-only by DB trigger) is written in the SAME transaction as the chain event
+ * that names it, so every preregistration of this run must be named by a PREDICTIONS_FROZEN event and every
+ * sealed session by a SELF_FALSIFICATION event. A record the chain does not account for means the chain lost
+ * its tail: the run is reported broken (fail closed) instead of resuming and executing the engine again.
+ */
+export function anchoredResearchState(db, runId, state = readResearchState(db, runId)) {
+  if (!state.chain.ok) return state;
+  const prefix = `research-run:${runId}:`;
+  const records = db.prepare('SELECT id, kind FROM experiment_records WHERE substr(campaign_id, 1, ?) = ?').all(prefix.length, prefix);
+  if (records.length === 0) return state;
+  const named = new Set(state.events.flatMap((e) => (
+    e.type === 'PREDICTIONS_FROZEN' ? [e.payload?.preregistrationRecordId] : e.type === 'SELF_FALSIFICATION' ? [e.payload?.sealRecordId] : []
+  )));
+  const unaccounted = records.filter((r) => ['PREREGISTRATION', 'SESSION'].includes(r.kind) && !named.has(r.id));
+  if (unaccounted.length === 0) return state;
+  return {
+    ...state,
+    chain: { ok: false, length: state.events.length, head: null, brokenAt: state.events.length, reason: 'chain_truncated_behind_scientific_memory', unaccountedRecordIds: unaccounted.map((r) => r.id) },
+  };
+}
+
 function view(db, run) {
-  const researchState = readResearchState(db, run.id);
-  const last = (type) => researchState.events.filter((e) => e.type === type).at(-1)?.payload ?? null;
-  const literatureSnapshots = researchState.events.filter((event) => event.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
+  const researchState = anchoredResearchState(db, run.id);
+  const last = (type) => researchState.events.filter((e) => e?.type === type).at(-1)?.payload ?? null;
+  const literatureSnapshots = researchState.events.filter((event) => event?.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
   const plan = last('HYPOTHESES_GENERATED');
   const experiments = experimentsOf(researchState);
   return {
@@ -189,7 +212,7 @@ export function controlResearchRun(db, projectId, runId, action, { userId = null
   return inWriteTransaction(db, () => {
     const run = ownRun(db, projectId, runId);
     if (!run) return { ok: false, status: 'NOT_FOUND' };
-    const state = readResearchState(db, run.id);
+    const state = anchoredResearchState(db, run.id);
     if (!state.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', chain: state.chain };
     if (!transition.from.includes(run.status)) {
       return { ok: false, status: 'INVALID_CONTROL_TRANSITION', from: run.status, action: normalized };
@@ -214,7 +237,7 @@ export function researchSteeringOf(researchState) {
   let focusedHypothesisId = null;
   const context = [];
   for (const event of researchState?.events ?? []) {
-    if (event.type !== 'RESEARCH_STEERING') continue;
+    if (event?.type !== 'RESEARCH_STEERING') continue;
     const payload = event.payload ?? {};
     if (payload.action === 'FOCUS_HYPOTHESIS') focusedHypothesisId = payload.hypothesisId;
     if (payload.action === 'ABANDON_HYPOTHESIS') {

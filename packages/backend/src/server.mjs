@@ -530,7 +530,6 @@ if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     log('info', 'shutdown', { signal: sig });
-    clearInterval(researchWorkerTimer);
     server.close(() => {
       try { db?.close(); } catch { /* ignore */ }
       process.exit(0);

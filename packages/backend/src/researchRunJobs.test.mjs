@@ -63,7 +63,6 @@ test('async experiment: enqueue → claim → same ResearchRun path → restart 
     assert.equal(run.experiments.length, 1);
     assert.equal(run.experiments[0].execution.status, 'EXECUTED');
     assert.equal(run.researchState.chain.ok, true);
-    const fingerprint = run.experiments[0].frozen.predictionFingerprint;
 
     ctx.db.close();
   } finally { try { ctx.db.close(); } catch { /* closed */ } }

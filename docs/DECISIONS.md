@@ -10349,3 +10349,25 @@ Per probe, resolved from: **NUMERICAL_ARTIFACT** score/pose spread across the fi
 **What this does not license.** A pathway record is not evidence that any molecule activates the receptor. An expression record is not evidence that a molecule reaches that tissue or does anything there. Binding is not functional agonism, docking is not agonism, and a heterologous-system response is not a native-tissue response. No frozen gate, sealed artefact, or earlier decision is changed.
 
 **Evidence.** Generator `scripts/glp1r-d155-pathway-expression.mjs`; artefact `packages/backend/src/campaign/glp1r-d155-pathway-expression.external-evidence.json`; adapter `packages/backend/src/knowledgeSources.mjs::externalPublishedDocuments`; tests `packages/backend/src/campaign/glp1rD155External.test.mjs` (8, including "the cAMP step, absent from the fetched records, is reported missing rather than asserted").
+
+## D-156 — a wider GLP-1R candidate set under the unchanged D-154 rule, frozen before any of it was fetched
+
+**Date:** 2026-10-03. **Requested by:** Mariusz, 2026-10-03 02:52Z: "WYBIERAM OPCJĘ B. Nie zmieniaj progu 4.0 Å. Zachowaj obecny wynik NO_SUITABLE_STRUCTURE dla 7C2E i 7S15 jako finalny…" — a new, separate preregistration covering exactly 6X18, 6B3J, 6LN2 and 5VEW, the candidate list frozen before analysis, the same rule applied unchanged.
+
+**State.** Preregistration frozen alone (`d5c8e2be`) before any of the four was fetched into the repository. The rule is reused **by reference** — D-154's preregistration file, sha256 `80639b5a…10506`, frozen at `4252acf7`, applied by the same runner — so it cannot drift by transcription. D-154's verdict for 7C2E and 7S15 is final and is not revisited. No fifth candidate may be added to this decision. **Not yet applied:** the four RCSB artefact sets must first be fetched by the ingest thread, because this session's egress predates the project's cloud environment and still refuses `files.rcsb.org`. The result will be appended here when it is sealed.
+
+## D-157 — the 16 assays D-152 could not read, classified by the unchanged rule as a new audit layer: one becomes functional agonism
+
+**Date:** 2026-10-03. **Requested by:** Mariusz, 2026-10-03 02:35Z: use the 16 missing assay descriptions to update the role classification; do not change D-151/D-152 historically; record any change of interpretation as a new layer.
+
+**Order of work.** Preregistration committed alone (`a229ad65`) before any of the 16 descriptions went through the classifier. The rule is the D-152 classifier, imported and not edited, fed exactly as the D-152 runner fed it. The 16 must equal D-152's own `blockedByDataAccess` list or the run aborts. All 17 source files (16 assays plus the ChEMBL release record, ChEMBL 37 of 2026-05-01) were sha256-verified first.
+
+**Result — INTERPRETATION_CHANGED, for one assay.** 1 → `FUNCTIONAL_AGONISM` (CHEMBL972349, 21 rows); 5 → `BINDING_AFFINITY`; 2 → `OTHER_FUNCTIONAL` (antagonism); 8 stay `UNKNOWN`, now for a stated reason instead of missing data — 4 `CAMP_READOUT_BUT_AGONISM_NOT_STATED` and 4 `UNCLASSIFIABLE_UNDER_FROZEN_RULES`.
+
+**Disclosed limitation, not corrected here.** Some of the four `CAMP_READOUT_BUT_AGONISM_NOT_STATED` assays describe receptor *activation* measured by cAMP accumulation (e.g. CHEMBL1246709, "Activation of human GLP1 receptor expressed in HEK293 cells assessed as increase in cAMP accumulation"). A human reader would call that agonism; the frozen rule requires agonism to be stated and does not count "activation". This is the same kind of gap D-151 disclosed and D-152 then addressed by its own separate preregistration. It is **not** patched here, because changing a rule after seeing what it does to these rows is what the preregistration forbids.
+
+**Counterfactual, reported and not adopted.** Adding CHEMBL972349 would put 21 more rows and 20 compounds not already present into the functional arm. **D-153 stands exactly as sealed on its 320-row arm.** Re-validating on an enlarged arm needs its own preregistered decision, written before that run.
+
+**What is not changed.** D-151's and D-152's sealed artefacts and per-assay role files are not edited; this layer sits beside them. No gate threshold is read, no model is trained, no candidate is touched.
+
+**Evidence.** Preregistration `packages/backend/src/campaign/glp1r-d157-assay-role-audit-prereg.json` (frozen alone in `a229ad65`); runner `scripts/glp1r-d157-assay-role-audit.mjs`; sealed audit `packages/backend/src/campaign/glp1r-d157-assay-role-audit.sealed.json`; tests `packages/backend/src/campaign/glp1rD157Sealed.test.mjs` (6, including "the enlarged functional arm is reported, never adopted, and D-153 is left exactly as sealed").

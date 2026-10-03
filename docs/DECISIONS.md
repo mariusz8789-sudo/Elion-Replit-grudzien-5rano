@@ -10288,3 +10288,15 @@ Per probe, resolved from: **NUMERICAL_ARTIFACT** score/pose spread across the fi
 **What this is not.** Not a permission. It licenses exactly one thing: a separately preregistered model-development arm. It starts no training, alters no gate, nominates no candidate, and says nothing about the receptor — it changes only what Genesis can read from a description.
 
 **Evidence.** Preregistration `packages/backend/src/campaign/glp1r-d152-endpoint-scope-prereg.json` (frozen in its own commit); runner `scripts/glp1r-d152-endpoint-scope.mjs`; sealed result with the per-assay before/after `packages/backend/src/campaign/glp1r-d152-endpoint-scope.sealed.json`; per-assay roles `packages/backend/src/campaign/glp1r-assay-roles-d152.json`.
+
+## D-160 — Run 9 phase D selects C1(0.7) by seal A's rule, and seal B freezes everything before the final run
+
+**Date:** 2026-10-03. **Requested by:** Mariusz, 2026-10-03 02:24Z: development phase only, on the Run 8 poses, no docking, no access to the 300 fresh cases, select the ranker exactly as preregistered, prove determinism, freeze the configuration, prepare seal B, STOP before Run 9.
+
+**Numbering.** D-153 to D-159 are taken or reserved by the GLP-1R line; this is the next free number.
+
+**Decision.** `scripts/run9-phase-d.py` reproduces Run 8 first (C0 204/308, Vina 202/308, identical to the published numbers, or it stops) and then applies seal A's nine candidates and its mechanical selection rule (`scripts/run9_rankers.py::select`). The winner is **C1(0.7)**, rank-sum consensus with GNINA weight 0.7, **217/308, +4.22 pp over C0**, above the +2.0 pp floor. Two full runs with different worker counts were byte-identical. Seal B (`docs/evidence/run9/run9-seal-b.json`) pins the selection, the phase D result, the 300-case list, the Zenodo 18366081 files, the similarity thirds, every Run 9 script, the Run 8 pinned code, the GNINA binary and the library versions; `scripts/run9-final.py` refuses to run if any of them changes.
+
+**What this is not.** Not a result. +4.22 pp is in-sample: the candidates were measured on the set they were chosen on. Seal A's prediction for the fresh set (+1.5 to +4.0 pp, most likely PARTIAL) and every threshold are unchanged. C1(0.7) uses GNINA, so it cannot enter the product whatever Run 9 shows until GNINA's licensing is resolved. The one gap filled before sealing is how to cut seal A's similarity thirds (15 cases have no value and are reported apart); it is descriptive and decides nothing.
+
+**Evidence.** `docs/evidence/run9/run9-phase-d-report.md`, `docs/evidence/run9/run9-phase-d-result.json`, `docs/evidence/run9/run9-seal-b.json`, `docs/evidence/run9/run9-similarity-bins.json`; tests `scripts/test-run9-rankers.py`. Run 9 itself runs only on the owner's explicit GO.

@@ -2,7 +2,11 @@
 
 `run9-ranking-prereg.json`, fingerprint `7f9981173699aa917fa3299c904c23a8749a656b0720200a48caee0d2c017762`
 (recipe `sha256(json.dumps(protocol, sort_keys=True))`). Frozen on the owner's word of
-2026-10-03 00:14Z. Nothing has been run under it.
+2026-10-03 00:14Z.
+
+**Status 2026-10-03:** the fresh set is downloaded and verified, phase D is done (C1(0.7) selected,
+217/308, +4.22 pp in-sample) and seal B is frozen; see `run9-phase-d-report.md` (D-160).
+**The final Run 9 has not run** and runs only on the owner's explicit GO.
 
 **Run 8 is untouched.** Its verdict, DOES_NOT_GENERALISE, stands. PoseBusters is now a
 development set, so nothing measured on it can validate anything.

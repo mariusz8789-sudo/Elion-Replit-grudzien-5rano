@@ -289,6 +289,9 @@ export function openKnowledgeLedgerPersistence(filePath, { db = null } = {}) {
   return persistence;
 }
 
+/** Where this process's ledger lives, so a child process working on the same database can open the same ledger. */
+export function knowledgeLedgerSource() { return { store: persistence?.store ?? 'MEMORY', path: persistence?.path ?? null }; }
+
 export function knowledgeLedgerPersistenceStatus() { const l = readLedger(); return { ...persistence, ledgerOk: l.verifyLedger().ok, activeRecords: l.getActive().length, entries: l.getEntries().length }; }
 
 function buildController(deps) {

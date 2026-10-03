@@ -8,6 +8,7 @@ import { controlResearchRun, getResearchRun } from './researchRun.mjs';
 import { advanceResearchRun, MAX_ADVANCE_STEPS } from './researchRunAdvance.mjs';
 import { databaseFile } from './compute/heavyJobThread.mjs';
 import { CHILD_RESULT_MARKER, runIsolatedProcess } from './compute/isolatedProcess.mjs';
+import { knowledgeLedgerSource } from './knowledgeApi.mjs';
 
 /**
  * Asynchronous front door to the ONE ResearchRun execution path. A queued job owns no scientific state:
@@ -132,7 +133,7 @@ async function runInChild(db, kind, request, { signal, processTimeoutMs }) {
   const ran = await runIsolatedProcess({
     command: process.execPath,
     args: ['--no-warnings', CHILD_ENTRY],
-    input: JSON.stringify({ dbPath: databaseFile(db), kind, ...request }),
+    input: JSON.stringify({ dbPath: databaseFile(db), ledger: knowledgeLedgerSource(), kind, ...request }),
     timeoutMs: processTimeoutMs,
     signal,
   });

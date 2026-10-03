@@ -9,6 +9,7 @@ import { openDatabase } from './store.mjs';
 import { executeResearchExperiment } from './researchRunExecution.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { CHILD_RESULT_MARKER } from './compute/isolatedProcess.mjs';
+import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 
 
 async function readStdin() {
@@ -19,6 +20,10 @@ async function readStdin() {
 
 const request = JSON.parse(await readStdin());
 const db = openDatabase(request.dbPath);
+// Evidence proposals go to the parent's ledger: with a SQLite ledger that is the same append-only table in this
+// database file, so the server sees them on its next read. Without one, this process would propose into a
+// throwaway in-memory ledger and the evidence would be lost.
+if (request.ledger?.store === 'SQLITE') openKnowledgeLedgerPersistence(request.ledger.path, { db });
 try {
   const full = request.kind === 'advance'
     ? await advanceResearchRun(db, request.projectId, request.runId, { maxSteps: request.maxSteps, userId: request.userId ?? null })

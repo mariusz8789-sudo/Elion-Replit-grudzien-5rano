@@ -12,8 +12,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const REPO = resolve(__dirname, '../../../..');
 const json = (path: string): Record<string, unknown> => JSON.parse(readFileSync(resolve(REPO, path), 'utf8')) as Record<string, unknown>;
 
-async function render(): Promise<string> {
+async function render(locale: 'pl' | 'en' | 'ar' = 'en'): Promise<string> {
   vi.stubGlobal('window', { localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {}, key: () => null, length: 0 }, location: { hash: '' } });
+  // English unless a test asks for Polish: the assertions below read the English wording.
+  const { setLocale } = await import('../core/i18n');
+  setLocale(locale);
   const { StartHero } = await import('../components/StartHero');
   return renderToStaticMarkup(<StartHero />);
 }
@@ -31,6 +34,21 @@ describe('StartHero dashboard', () => {
     expect(html).toContain('checking backend…');
     expect(html).not.toContain('science-chat');
     expect(html).not.toContain('undefined');
+  });
+
+  it('follows the language switch: Polish under PL, English under EN, English under Arabic until a native check', async () => {
+    const pl = await render('pl');
+    expect(pl).toContain('lang="pl"');
+    expect(pl).toContain('<em>Sprawdzalne</em> obliczeniowe odkrywanie leków.');
+    expect(pl).toContain('placeholder="Co chcesz zbadać?"');
+    expect(pl).toContain('Biologia człowieka');
+    expect(pl).not.toContain('Verifiable');
+    // Engine names, hashes and protocol tokens stay as they are.
+    expect(pl).toContain('REPLAY MATCH');
+    expect(pl).toContain('RDKit');
+    const ar = await render('ar');
+    expect(ar).toContain('<em>Verifiable</em> computational drug discovery.');
+    expect(ar).toContain('lang="en"');
   });
 
   it('keeps molecules out of the centre: Molecule World is reached only from the Drug Discovery card', async () => {

@@ -33,7 +33,7 @@ import { routeArtefactFromRun } from './retrosynthesis.mjs';
 import { RETRO_CAPABILITY } from '../compute/retroAdapter.mjs';
 
 export const PROTOCOL_KIND = 'GENESIS_COMPUTATIONAL_CANDIDATE_PROTOCOL';
-export const PROTOCOL_CONTRACT_VERSION = 1;
+export const PROTOCOL_CONTRACT_VERSION = 2; // 2: adds per-candidate inchiKey and the modelProvenance section
 
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -109,6 +109,54 @@ function targetOf(events, runs) {
 }
 
 /** Everything the record holds about one candidate, including why it was dropped. */
+/**
+ * MODEL_ESTIMATE runs only — a deterministic RDKit descriptor or an AutoDock pose is a
+ * computation, not a fitted model, and gets no training-data hash because it has none.
+ */
+function modelProvenanceOf(runs) {
+  const estimates = runs.filter((r) => r.evidenceClass === 'MODEL_ESTIMATE');
+  const rows = estimates.map((r) => {
+    const src = { ...(r.provenance ?? {}), ...(r.outputs ?? {}) };
+    const pick = (k) => (typeof src[k] === 'string' && src[k].length ? src[k] : null);
+    const modelVersion = pick('modelVersion') ?? r.engineVersion ?? null;
+    const modelFingerprint = pick('modelFingerprint');
+    const trainingDataHash = pick('trainingDataHash');
+    const missing = [
+      modelVersion ? null : 'modelVersion',
+      modelFingerprint ? null : 'modelFingerprint',
+      trainingDataHash ? null : 'trainingDataHash',
+    ].filter(Boolean);
+    return {
+      runId: r.id,
+      capability: r.capability,
+      engine: r.engine,
+      candidateId: r.candidateId ?? null,
+      evidenceClass: r.evidenceClass,
+      modelVersion,
+      modelFingerprint,
+      trainingDataHash,
+      gateFingerprint: pick('gateFingerprint'),
+      inputHash: r.inputHash ?? null,
+      outputHash: r.outputHash ?? null,
+      environmentHash: r.environmentHash ?? null,
+      auditable: missing.length === 0,
+      unrecorded: missing.length ? missing : null,
+      why: missing.length
+        ? `UNRECORDED: the engine that produced this estimate stored no ${missing.join(', ')}. Nothing here is inferred, so this number cannot be traced to a specific trained model.`
+        : null,
+    };
+  });
+  return {
+    statement: 'Model identity for every MODEL_ESTIMATE in this dossier. A deterministic computation (RDKit descriptors, a docking pose) is not listed here, because it has no trained model and no training data.',
+    modelEstimateRuns: rows.length,
+    fullyAuditable: rows.filter((r) => r.auditable).length,
+    rows,
+    limitation: rows.length === 0
+      ? 'No model estimate contributed to this dossier.'
+      : 'A model fingerprint identifies the trained model; it is not evidence that the model was validated. Validation lives in its own sealed gate record.',
+  };
+}
+
 function candidateRows(db, campaignId, candidates, events, runs) {
   const byCandidate = (id) => events.filter((e) => e.payload?.candidateId === id);
   return candidates.map((c) => {
@@ -121,6 +169,14 @@ function candidateRows(db, campaignId, candidates, events, runs) {
     return {
       candidateId: c.id,
       canonicalSmiles: c.canonicalSmiles,
+      // Structure-derived identity, READ from the descriptor run already persisted for this
+      // candidate — no engine runs here. A SMILES string is not an identifier anyone outside
+      // this campaign can match on; an InChIKey is. Absent means the descriptor run predates
+      // the field or RDKit's InChI module was missing, and that is said rather than filled in.
+      inchiKey: c.descriptors?.inchiKey ?? null,
+      inchiKeyAbsentReason: c.descriptors?.inchiKey
+        ? null
+        : 'No InChIKey in the persisted descriptor run for this candidate. Nothing is computed here to supply one.',
       generation: c.generation,
       parentSmiles: c.parentSmiles,
       coParentSmiles: c.coParentSmiles,
@@ -347,6 +403,16 @@ export function buildCandidateProtocol(db, campaignId) {
     },
     finalists,
     uncertainty: uncertaintyOf(target, runs, memory),
+    /**
+     * Every number in this dossier that came out of a FITTED MODEL, with the identity of the
+     * model that produced it. A model estimate without its model version, its model fingerprint
+     * and the hash of the data it was trained on cannot be audited or reproduced by a reader, and
+     * an unauditable estimate is what makes a dossier look stronger than it is.
+     *
+     * Read from the runs themselves. Where the recording engine did not store an identity, this
+     * says UNRECORDED and why — it is never inferred from the engine name or the run date.
+     */
+    modelProvenance: modelProvenanceOf(runs),
     evidence: {
       scienceRuns: runs.map((r) => ({ id: r.id, capability: r.capability, engine: r.engine, engineVersion: r.engineVersion ?? null, status: r.status, inputHash: r.inputHash ?? null, outputHash: r.outputHash ?? null, environmentHash: r.environmentHash ?? null, durationMs: r.durationMs })),
       proposalLinks: virtualEvidenceLinksOf(events),

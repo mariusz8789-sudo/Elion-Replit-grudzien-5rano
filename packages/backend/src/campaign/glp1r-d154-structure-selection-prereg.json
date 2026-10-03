@@ -1,0 +1,102 @@
+{
+  "decisionId": "D-154",
+  "title": "GLP-1R docking target — the selection rule, frozen before a single value of either candidate structure was read",
+  "question": "Which of the two authoritative GLP-1R structures now in this repository, 7C2E or 7S15, may be registered as the canonical GLP-1R docking target, and is either of them fit for that purpose at all?",
+  "frozenAt": "2026-10-03T02:45:00Z",
+  "author": "Claude, for Mariusz (mariusz8789-sudo)",
+  "authorisation": "Mariusz, 2026-10-03 02:35Z: compare 7C2E and 7S15 strictly on criteria determined in advance; record source, version, resolution, receptor state, ligand/reference context, validation report and sha256; the choice must be frozen before any docking; no choosing by result.",
+
+  "orderOfWork": {
+    "whyThisFileExistsAlone": "This file is committed on its own, before any code that can read a resolution, a mutation list or a missing-residue count. A structure chosen after its numbers were seen is a structure chosen to win, and the whole point of this decision is that it cannot be.",
+    "whatHasBeenReadSoFar": "File names, byte counts and the fetch manifest (SOURCES.json). No resolution, no receptor state, no ligand identity, no validation metric and no residue numbering of either entry has been read by the author of this file.",
+    "whatHappensNext": "A runner reads the raw artefacts, extracts every field named below, applies the rule below mechanically, and writes a sealed artefact. The rule is not touched after that."
+  },
+
+  "sourceData": {
+    "provenance": "Fetched from RCSB on 2026-10-03 by the ingest thread, raw and unmodified, recorded in docs/evidence/source-data/glp1r-2026-10-03/SOURCES.json with a per-file sha256.",
+    "arrivesOnMainVia": "branch claude/project-thread-2wdmhf, commit 887c54cc. This decision does not re-commit those bytes: duplicating an artefact in two branches is how two sources of truth are created.",
+    "independentVerification": "The runner recomputes the sha256 of every file it reads and compares it with SOURCES.json. A mismatch aborts with SOURCE_HASH_MISMATCH. A hash recorded by another thread is a claim; the runner checks it first-hand.",
+    "artefactsPerEntry": [
+      "<ID>.cif — the mmCIF coordinate file, the authoritative record",
+      "entry.json — RCSB core entry metadata (method, resolution, title, deposition)",
+      "polymer_entity_*.json — one per polymer chain, with UniProt mapping and construct mutations",
+      "nonpolymer_entity_*.json — the non-polymer components",
+      "assembly_1.json — the deposited assembly",
+      "<id>_validation.xml.gz — the wwPDB validation report"
+    ],
+    "whatIsNotAvailable": "Nothing further is fetched for this decision. If a field below cannot be read from these artefacts, it is reported as UNKNOWN and the eligibility rule treats UNKNOWN as a failure, never as a pass."
+  },
+
+  "intendedUse": {
+    "statement": "A canonical GLP-1R docking target for docking PURCHASABLE SMALL MOLECULES, inside the existing compute/dockingTargets.mjs registry.",
+    "whyThisMatters": "The criteria below are not generic structure-quality criteria. A structure can be excellent and still be the wrong structure for this purpose. GLP-1R is a class-B GPCR whose endogenous agonist is a 30-residue peptide; a pocket defined by a peptide is not evidence of a small-molecule pocket.",
+    "defaultTargetUntouched": "DEFAULT_DOCKING_TARGET stays ABL1_1IEP whatever this decision returns. Registering a target is not making it the default."
+  },
+
+  "fieldsRecordedForEachCandidate": [
+    "pdbId, title, depositionDate, releaseDate, revisionCount (the entry 'version')",
+    "experimentalMethod and, for cryo-EM, reconstruction method",
+    "resolution in Angstrom, as RCSB reports it for the entry",
+    "every polymer entity: description, UniProt accession, source organism, sequence length, and the mutations RCSB records for the construct",
+    "whether human GLP1R (UniProt P43220) is present as a polymer entity, and in which chain",
+    "every non-polymer component: chemical component id, name, formula weight, heavy-atom count",
+    "receptor state as it can be established from the chain composition and the entry's own description — G-protein-bound, nanobody/scFv-stabilised, or apo",
+    "ligand/reference context of the orthosteric site: peptide agonist, small molecule, or nothing",
+    "missing residues: the gaps in the GLP1R chain's author numbering across the modelled range, and the count inside the transmembrane region",
+    "validation report: clashscore, Ramachandran outlier percentage, rotamer outlier percentage, and RSRZ outliers where the report carries them",
+    "sha256 of every file read, recomputed by the runner"
+  ],
+
+  "eligibility": {
+    "note": "ALL of these must hold. Any failure, and any UNKNOWN, makes a candidate INELIGIBLE. These are hard filters, not points.",
+    "E1_isHumanGlp1r": "A polymer entity maps to UniProt P43220 (human GLP1R). An entry of a different receptor or a non-human orthologue is ineligible.",
+    "E2_resolution": "Resolution is reported and is <= 4.0 Angstrom. Above that a side-chain pocket is not defined well enough to dock into, whatever the structure is good for otherwise.",
+    "E3_activeState": "The receptor is in an ACTIVE state. This campaign looks for AGONISTS; docking an agonist into an inactive-state pocket predicts the wrong thing, and a structure's quality does not fix that.",
+    "E4_pocketIntegrity": "No missing BACKBONE residue inside the transmembrane region of the GLP1R chain. A hole in the pocket wall makes a docking score meaningless, and filling it by modelling would make the pocket Genesis's invention rather than the deposited structure.",
+    "E5_noPocketMutation": "No engineered construct mutation inside the transmembrane region of the GLP1R chain. A thermostabilising mutation in the pocket changes the thing being docked into.",
+    "ifNeitherCandidateIsEligible": "The outcome is NO_STRUCTURE_SELECTED, with the failing criterion named per candidate. That is a valid result: it says Genesis has no registrable GLP-1R docking target, which is the truth and is already what the product reports."
+  },
+
+  "ranking": {
+    "note": "Applied ONLY to candidates that passed every eligibility criterion, in this exact lexicographic order. The order is fixed here, before any value is known, so that it cannot be reordered to prefer a particular entry.",
+    "R1": "Fewer missing backbone residues across the whole modelled GLP1R chain.",
+    "R2": "An orthosteric or allosteric site occupied by a NON-PEPTIDIC component of 10 to 60 heavy atoms ranks above a site occupied only by a peptide or by nothing — such a component is direct evidence that a small-molecule site exists and where it is.",
+    "R3": "Better (lower) resolution in Angstrom.",
+    "R4": "Fewer engineered construct mutations anywhere in the GLP1R chain.",
+    "R5": "Lower clashscore in the validation report.",
+    "R6": "Tie-break: the lexicographically smaller PDB id. A purely mechanical tie-break on purpose — the alternative is the author picking, which is what this document exists to prevent."
+  },
+
+  "mandatoryLimitationOnTheResult": {
+    "pocketDefinedFromPeptideContext": "If the selected structure carries NO non-peptidic component of 10-60 heavy atoms in its orthosteric or allosteric site, the registered target is recorded with the limitation POCKET_DEFINED_FROM_PEPTIDE_CONTEXT, and it may NOT be used to rank small molecules without a separate decision that establishes a small-molecule pocket. A box drawn around a peptide is not a small-molecule pocket, and a Vina score inside one is a number without a claim.",
+    "whatSelectionDoesNotLicense": [
+      "Docking is not agonism. A score is a scoring-function estimate against a rigid receptor.",
+      "Binding is not functional agonism. The functional axis is D-153's, and D-153 licenses only that the efficacy axis is EVALUABLE.",
+      "A heterologous-system response is not a native-tissue response.",
+      "Selecting a target nominates no candidate and ranks nothing."
+    ]
+  },
+
+  "allowedOutcomes": {
+    "STRUCTURE_SELECTED": "Exactly one eligible candidate won the ranking. It is registered in compute/dockingTargets.mjs with its full provenance and any mandatory limitation. DEFAULT_DOCKING_TARGET is unchanged.",
+    "NO_STRUCTURE_SELECTED": "No candidate passed eligibility. Nothing is registered. Reported as the headline, not as a setback.",
+    "BLOCKED_BY_SOURCE_DATA": "A required field could not be read from the raw artefacts, or a sha256 did not match. Nothing is registered and the missing field is named.",
+    "noFourthOption": "There is no 'best available', no provisional registration and no outcome in which a failed hard filter is described as nearly met."
+  },
+
+  "forbidden": [
+    "running any docking, or reading any docking result, before this decision is sealed",
+    "changing any criterion, threshold or ranking order after a value of either candidate has been read",
+    "modelling in a missing residue, repairing a pocket, or reverting a construct mutation to make a candidate eligible",
+    "fetching a third structure to break a tie",
+    "touching DEFAULT_DOCKING_TARGET",
+    "editing glp1r-validation-gate.json, D-151, D-152, D-153 or any sealed artefact",
+    "describing a selected target as evidence that any molecule binds or works"
+  ],
+
+  "outputs": [
+    "packages/backend/src/campaign/glp1r-d154-structure-selection.sealed.json — every field read per candidate, the eligibility verdicts, the ranking comparisons in order, the outcome, and the recomputed sha256 of every file read"
+  ],
+
+  "boundary": "A comparison of two already-downloaded structures against criteria frozen in this file. No network access, no docking, no biological claim, no candidate, no change to any default."
+}

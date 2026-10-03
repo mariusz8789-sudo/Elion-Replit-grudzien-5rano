@@ -68,6 +68,31 @@ export function decisionLogDocuments({ decisionsPath = path.resolve(HERE, '../..
   });
 }
 
+/**
+ * Published records from OUTSIDE Genesis (*.external-evidence.json): Reactome, the Human Protein
+ * Atlas and the like, copied field by field with their source and hash. They get their own
+ * epistemic status on purpose. Filed under SEALED_ARTIFACT they would read as SIMULATED, i.e. as
+ * Genesis's own in-silico output, which is exactly the confusion they must never create.
+ */
+export function externalPublishedDocuments({ campaignDir = path.join(HERE, 'campaign') } = {}) {
+  if (!existsSync(campaignDir)) return [];
+  return readdirSync(campaignDir).filter((name) => name.endsWith('.external-evidence.json')).sort().flatMap((name) => {
+    const bytes = readFileSync(path.join(campaignDir, name));
+    let parsed;
+    try { parsed = JSON.parse(bytes.toString('utf8')); } catch { return []; }
+    if (parsed.isGenesisResult !== false) return []; // refuse a file that does not say so explicitly
+    return [{
+      docId: `external:${name}`,
+      kind: 'EXTERNAL_PUBLISHED_EVIDENCE',
+      ref: `repo:packages/backend/src/campaign/${name}`,
+      sourceSha256: sha256(bytes),
+      epistemicStatus: 'EXTERNAL_PUBLISHED',
+      title: parsed.decisionId ?? name,
+      text: `${name.replace(/[-_.]/g, ' ')} ${flatten(parsed).join(' ; ')}`.slice(0, MAX_TEXT),
+    }];
+  });
+}
+
 export function loadKnowledgeSources(options = {}) {
-  return [...sealedArtifactDocuments(options), ...decisionLogDocuments(options)];
+  return [...sealedArtifactDocuments(options), ...externalPublishedDocuments(options), ...decisionLogDocuments(options)];
 }

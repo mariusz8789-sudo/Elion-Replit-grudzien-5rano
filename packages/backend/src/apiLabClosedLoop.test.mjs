@@ -1,4 +1,5 @@
 import { test, describe, beforeEach } from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { openDatabase, saveScienceRun } from './store.mjs';
 import { handleApi } from './api.mjs';
@@ -124,6 +125,129 @@ function realisticObservation(overrides = {}) {
     ...overrides,
   };
 }
+
+/**
+ * ITEM E — RAW-ARTIFACT INTEGRITY.
+ *
+ * Before this, `rawArtifactSha256` arrived as a string in the same request as the observation it
+ * was supposed to protect, and Genesis only checked that it looked like a hash. Whoever sent the
+ * claim chose the hash, which means the field proved nothing. These tests fix the contract in
+ * code: when the bytes are transmitted, Genesis hashes THOSE BYTES and uses its own result, a
+ * disagreement is a refusal that reports both values, and an observation sent without bytes is
+ * labelled DECLARED_BY_CLIENT so nobody can read it as a verified artifact.
+ */
+describe('Item E: the raw-artifact hash is computed by Genesis, not accepted from the client', () => {
+  const RAW_BYTES = Buffer.from('ENDPOINT,VALUE,UNIT\ntarget-binding-score,0.42,uM\n', 'utf8');
+  const RAW_BASE64 = RAW_BYTES.toString('base64');
+  const RAW_SHA256 = createHash('sha256').update(RAW_BYTES).digest('hex');
+
+  async function readyRequest() {
+    const owner = register(`lab-e-${Math.random().toString(36).slice(2, 10)}@lab.org`);
+    const project = makeProject(owner.token);
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db, project.id, owner.user.id);
+    const created = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/lab-validation`, {
+      token: owner.token,
+      body: {
+        candidateId,
+        objective: 'Independent external validation of predicted target-binding score.',
+        endpointPlan: [fullEndpointPlanEntry()],
+        externalProvider: { providerId: 'acme-cro', providerType: 'CRO' },
+        governedManualRequest: governedManualRequest(),
+      },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    return { owner, project, campaignId, candidateId, requestId: created.body.request.requestId };
+  }
+
+  const ingest = (ctx, observation) => call('POST', `/api/projects/${ctx.project.id}/campaigns/${ctx.campaignId}/lab-validation/observations`, {
+    token: ctx.owner.token,
+    body: { candidateId: ctx.candidateId, requestId: ctx.requestId, observation },
+  });
+
+  test('when the bytes are sent, Genesis hashes them itself and records VERIFIED_BY_GENESIS', async () => {
+    const ctx = await readyRequest();
+    const res = await ingest(ctx, realisticObservation({ rawArtifactSha256: undefined, rawArtifactBase64: RAW_BASE64 }));
+    assert.equal(res.status, 201);
+    const obs = res.body.observation;
+    assert.equal(obs.rawArtifactSha256, RAW_SHA256, 'the stored hash must be the one Genesis computed');
+    assert.equal(obs.rawArtifactIntegrity.level, 'VERIFIED_BY_GENESIS');
+    assert.equal(obs.rawArtifactIntegrity.algorithm, 'sha256');
+    assert.equal(obs.rawArtifactIntegrity.byteLength, RAW_BYTES.length);
+    assert.equal(obs.rawArtifactIntegrity.declaredSha256, null);
+    // The event is a record, not a file store: the bytes themselves are never persisted in it.
+    assert.equal(obs.rawArtifactBase64, undefined);
+    assert.match(obs.rawArtifactIntegrity.limitation, /does not prove the instrument produced them/);
+  });
+
+  test('a declared hash that matches the bytes is recorded as matching, and the computed value is still the stored one', async () => {
+    const ctx = await readyRequest();
+    const res = await ingest(ctx, realisticObservation({ rawArtifactSha256: RAW_SHA256.toUpperCase(), rawArtifactBase64: RAW_BASE64 }));
+    assert.equal(res.status, 201);
+    assert.equal(res.body.observation.rawArtifactSha256, RAW_SHA256);
+    assert.equal(res.body.observation.rawArtifactIntegrity.declaredMatchesComputed, true);
+  });
+
+  test('a declared hash that contradicts the bytes is REFUSED, and both hashes are reported', async () => {
+    const ctx = await readyRequest();
+    const res = await ingest(ctx, realisticObservation({ rawArtifactSha256: VALID_SHA256, rawArtifactBase64: RAW_BASE64 }));
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'raw_artifact_hash_mismatch');
+    assert.equal(res.body.declaredSha256, VALID_SHA256);
+    assert.equal(res.body.computedSha256, RAW_SHA256);
+    assert.equal(res.body.byteLength, RAW_BYTES.length);
+    // Nothing was ingested.
+    const dossier = await call('GET', `/api/projects/${ctx.project.id}/campaigns/${ctx.campaignId}/lab-validation`, { token: ctx.owner.token, query: { candidate: ctx.candidateId } });
+    assert.equal(dossier.body.dossier.observations.length, 0);
+  });
+
+  test('without the bytes the observation is still accepted, but labelled DECLARED_BY_CLIENT with the reason', async () => {
+    const ctx = await readyRequest();
+    const res = await ingest(ctx, realisticObservation());
+    assert.equal(res.status, 201);
+    const integrity = res.body.observation.rawArtifactIntegrity;
+    assert.equal(integrity.level, 'DECLARED_BY_CLIENT');
+    assert.equal(integrity.declaredSha256, VALID_SHA256.toLowerCase());
+    assert.equal(integrity.byteLength, null);
+    assert.match(integrity.limitation, /Genesis never saw the bytes/);
+    assert.match(integrity.limitation, /must not be presented as a verified artifact hash/);
+  });
+
+  test('corrupted or oversized bytes are refused rather than hashed into a clean-looking value', async () => {
+    const ctx = await readyRequest();
+    const notBase64 = await ingest(ctx, realisticObservation({ rawArtifactSha256: undefined, rawArtifactBase64: 'not base64 @@@' }));
+    assert.equal(notBase64.status, 400);
+    assert.equal(notBase64.body.error, 'raw_artifact_not_base64');
+
+    const empty = await ingest(ctx, realisticObservation({ rawArtifactSha256: undefined, rawArtifactBase64: '' }));
+    // An empty string is "no bytes sent", which falls back to the declared-hash path — and with
+    // rawArtifactSha256 removed there is no hash at all, so the observation is incomplete.
+    assert.equal(empty.status, 400);
+    assert.equal(empty.body.error, 'incomplete_external_observation');
+  });
+
+  test('the integrity level is part of the record identity, so a verified record is not the same record as a declared one', async () => {
+    const a = await readyRequest();
+    const verified = await ingest(a, realisticObservation({ rawArtifactSha256: undefined, rawArtifactBase64: RAW_BASE64 }));
+    const b = await readyRequest();
+    const declared = await ingest(b, realisticObservation({ rawArtifactSha256: RAW_SHA256 }));
+    assert.equal(verified.status, 201);
+    assert.equal(declared.status, 201);
+    assert.equal(verified.body.observation.rawArtifactSha256, declared.body.observation.rawArtifactSha256);
+    assert.notEqual(verified.body.observation.observationFingerprint, declared.body.observation.observationFingerprint);
+  });
+
+  test('an identical verified submission still dedupes to the same append-only event', async () => {
+    const ctx = await readyRequest();
+    const obs = realisticObservation({ rawArtifactSha256: undefined, rawArtifactBase64: RAW_BASE64 });
+    const first = await ingest(ctx, obs);
+    const second = await ingest(ctx, obs);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.equal(second.body.deduped, true);
+    assert.equal(first.body.observation.observationId, second.body.observation.observationId);
+    assert.equal(first.body.eventId, second.body.eventId);
+  });
+});
 
 describe('Test: full closed loop — request -> observation -> human review -> Evidence proposal -> comparison', () => {
   test('a complete, honest round trip produces exactly the expected sequence of governed events', async () => {

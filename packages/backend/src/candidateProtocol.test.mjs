@@ -295,6 +295,71 @@ describe('the synthesis section carries the engine’s route, or the honest abse
     assert.ok(protocol.uncertainty.some((u) => u.claim === 'Proposed synthesis route' && u.label === 'MODEL_ESTIMATE'));
   });
 
+  /* ---- D-153 follow-up (item C): the three fields a reader needs to audit a model estimate ---- */
+
+  test('a candidate carries its InChIKey when the descriptor run recorded one, and says so plainly when it did not', () => {
+    const ctx = seedRun();
+    const withKey = addCandidate(ctx.db, {
+      campaignId: ctx.campaignId, generation: 1, canonicalSmiles: `${IMATINIB}Cl`, status: 'retained',
+      descriptors: { molWt: 528.1, inchiKey: 'KTUFNOKKBVMGRW-UHFFFAOYSA-N' },
+    });
+    const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
+    const keyed = protocol.candidates.find((c) => c.candidateId === withKey);
+    assert.equal(keyed.inchiKey, 'KTUFNOKKBVMGRW-UHFFFAOYSA-N');
+    assert.equal(keyed.inchiKeyAbsentReason, null);
+
+    // The seeded candidates have no InChIKey in their descriptors. The dossier must not invent one.
+    const unkeyed = protocol.candidates.find((c) => c.candidateId === ctx.ids.winner);
+    assert.equal(unkeyed.inchiKey, null);
+    assert.match(unkeyed.inchiKeyAbsentReason, /Nothing is computed here to supply one/);
+  });
+
+  test('every model estimate is listed with its model identity, and an unrecorded identity is named as unrecorded', () => {
+    const ctx = seedRun();
+    const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
+    const mp = protocol.modelProvenance;
+
+    // The seeded ADMET run is the only MODEL_ESTIMATE, and it stored no model identity.
+    assert.equal(mp.modelEstimateRuns, 1);
+    assert.equal(mp.fullyAuditable, 0);
+    const admet = mp.rows[0];
+    assert.equal(admet.capability, 'admet-prediction');
+    assert.equal(admet.auditable, false);
+    assert.deepEqual(admet.unrecorded, ['modelFingerprint', 'trainingDataHash']);
+    assert.match(admet.why, /^UNRECORDED:/);
+    assert.equal(admet.modelVersion, '1.4.0');
+
+    // A deterministic computation is not a model estimate and must not appear here.
+    assert.ok(!mp.rows.some((r) => r.capability === 'molecular-docking'));
+    assert.ok(!mp.rows.some((r) => r.capability === 'quantum-single-point'));
+  });
+
+  test('a QSAR estimate that recorded its model, its fingerprint and its training data is reported as auditable', () => {
+    const ctx = seedRun();
+    saveScienceRun(ctx.db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: ctx.ids.winner,
+      engine: 'genesis-glp1r-qsar', engineVersion: '2.0.0', capability: 'glp1r-activity-prediction',
+      method: 'ridge-ecfp4-morgan-r2-512bit', status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { smiles: IMATINIB },
+      outputs: {
+        value: 7.1, modelVersion: 'glp1r-qsar-v2', modelFingerprint: '8ab87bd5f7565c1c',
+        trainingDataHash: 'c7afb32398abade9', gateFingerprint: 'd2f77a7e6042f0fc',
+      },
+      inputHash: 'qsar-in', outputHash: 'qsar-out', environmentHash: 'qsar-env',
+    });
+    const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
+    const row = protocol.modelProvenance.rows.find((r) => r.capability === 'glp1r-activity-prediction');
+    assert.equal(row.auditable, true);
+    assert.equal(row.unrecorded, null);
+    assert.equal(row.why, null);
+    assert.equal(row.modelFingerprint, '8ab87bd5f7565c1c');
+    assert.equal(row.trainingDataHash, 'c7afb32398abade9');
+    assert.equal(row.gateFingerprint, 'd2f77a7e6042f0fc');
+    assert.equal(protocol.modelProvenance.fullyAuditable, 1);
+    // A fingerprint identifies a model; it is not a validation claim.
+    assert.match(protocol.modelProvenance.limitation, /not evidence that the model was validated/);
+  });
+
   test('when the engine could not run, the protocol names the missing model files instead of a route', () => {
     const ctx = seedRun();
     addCampaignEvent(ctx.db, {

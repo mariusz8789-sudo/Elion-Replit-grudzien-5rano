@@ -1,0 +1,789 @@
+{
+  "decisionId": "D-156",
+  "preregFingerprint": "fcfb4d925c4063ee",
+  "preregFrozenAtCommit": "d5c8e2be",
+  "ruleFrom": {
+    "file": "packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json",
+    "sha256": "80639b5add7ba9e50dbc593ddf1f7c9067adbbb259a8dbac69b46a5b78610506",
+    "frozenAtCommit": "4252acf7"
+  },
+  "computedAt": "2026-10-03T03:04:06.304Z",
+  "sourceData": {
+    "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-d156",
+    "gitRef": "a4ecfc18",
+    "manifest": "SOURCES.json, as fetched by the ingest thread",
+    "filesVerified": 34,
+    "allHashesMatched": true,
+    "files": [
+      {
+        "path": "rcsb/6X18/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/6X18",
+        "retrievedAt": "2026-10-03T02:54:20Z",
+        "httpStatus": 200,
+        "bytes": 15575,
+        "sha256": "a17f20e0f750f44b4fb92af5ff627a8450010fc7ca31b91509a3ca427ad481a3"
+      },
+      {
+        "path": "rcsb/6X18/6X18.cif",
+        "sourceUrl": "https://files.rcsb.org/download/6X18.cif",
+        "retrievedAt": "2026-10-03T02:54:19Z",
+        "httpStatus": 200,
+        "bytes": 1181090,
+        "sha256": "cf18ce80abdffd6c791e4047da0a6fb2a80a3233561842188d9133d255b00d17"
+      },
+      {
+        "path": "rcsb/6X18/6x18_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/x1/6x18/6x18_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:54:21Z",
+        "httpStatus": 200,
+        "bytes": 53413,
+        "sha256": "7be79ecfabd9dcc716f94fed1a370356c416234fdbd772bb5f053ff6d3ffe883"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/1",
+        "retrievedAt": "2026-10-03T02:54:20Z",
+        "httpStatus": 200,
+        "bytes": 69342,
+        "sha256": "ca1cc1fe66cdc9385f85284146639e80b2e10ecfaa573b4306516459473fb4d6"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/2",
+        "retrievedAt": "2026-10-03T02:54:20Z",
+        "httpStatus": 200,
+        "bytes": 34264,
+        "sha256": "954c1c87d646db101c5a44695ad2c083151de665ed2cc163c0dd3fa7ecf10260"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_3.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/3",
+        "retrievedAt": "2026-10-03T02:54:20Z",
+        "httpStatus": 200,
+        "bytes": 22376,
+        "sha256": "d1b67849a3ea994dd94f937037dd7793d40f9124224a1f90ee3e4e85f4490ca2"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_4.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/4",
+        "retrievedAt": "2026-10-03T02:54:20Z",
+        "httpStatus": 200,
+        "bytes": 11296,
+        "sha256": "08d275d179c621ec8b7876405ba919eebbee67859ba962a336ae12ccdb5ecf50"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_5.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/5",
+        "retrievedAt": "2026-10-03T02:54:21Z",
+        "httpStatus": 200,
+        "bytes": 45422,
+        "sha256": "78a68168425ed4e856c2227157f6e03dbc685775ca27ecc395310faaff7e20d7"
+      },
+      {
+        "path": "rcsb/6X18/polymer_entity_6.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6X18/6",
+        "retrievedAt": "2026-10-03T02:54:21Z",
+        "httpStatus": 200,
+        "bytes": 67040,
+        "sha256": "7fc8fbb8d18de251cb8a63d2ee836f9b9f6cb93027a468e0a7102db863962eeb"
+      },
+      {
+        "path": "rcsb/6B3J/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/6B3J",
+        "retrievedAt": "2026-10-03T02:54:22Z",
+        "httpStatus": 200,
+        "bytes": 16118,
+        "sha256": "f88adbd3fceefb51c0835b4fc8bd587620f7c3ae659c392a71fb16e6270b2178"
+      },
+      {
+        "path": "rcsb/6B3J/6B3J.cif",
+        "sourceUrl": "https://files.rcsb.org/download/6B3J.cif",
+        "retrievedAt": "2026-10-03T02:54:22Z",
+        "httpStatus": 200,
+        "bytes": 959248,
+        "sha256": "dd9d0e5bf4457e6e79edb01d6bcae651dab75c465b7b017ba2150a25f06271df"
+      },
+      {
+        "path": "rcsb/6B3J/6b3j_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/b3/6b3j/6b3j_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:54:23Z",
+        "httpStatus": 200,
+        "bytes": 41461,
+        "sha256": "7950b5e977c07edc274a63cf36d51fff079d33d230aa7360654196bd709036d9"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/1",
+        "retrievedAt": "2026-10-03T02:54:22Z",
+        "httpStatus": 200,
+        "bytes": 67468,
+        "sha256": "4603b19d59bcbe510d6b6a2c92cff426ab4afd7da9df76a03f08ae4631742fb0"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/2",
+        "retrievedAt": "2026-10-03T02:54:22Z",
+        "httpStatus": 200,
+        "bytes": 4531,
+        "sha256": "c5ac4862108c8ff2239b7f04d532fffb858743f9da4ecd2d017f8fd05f89db52"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_3.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/3",
+        "retrievedAt": "2026-10-03T02:54:23Z",
+        "httpStatus": 200,
+        "bytes": 71247,
+        "sha256": "9295e95f493a9f0dc6a66dd904091a139723ae9562e89e817297036ce1b6859f"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_4.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/4",
+        "retrievedAt": "2026-10-03T02:54:23Z",
+        "httpStatus": 200,
+        "bytes": 37078,
+        "sha256": "03c9b5bc459700f5ee07dc3058af0f66b58df22d4b3f31a696c2c5578dc2e927"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_5.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/5",
+        "retrievedAt": "2026-10-03T02:54:23Z",
+        "httpStatus": 200,
+        "bytes": 25647,
+        "sha256": "b3f44d8cf10e060b2730243f6251deda7cb6f39181eb5c4dc97448a90ec8bbb6"
+      },
+      {
+        "path": "rcsb/6B3J/polymer_entity_6.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6B3J/6",
+        "retrievedAt": "2026-10-03T02:54:23Z",
+        "httpStatus": 200,
+        "bytes": 11468,
+        "sha256": "bd2ae08eaa958fc4623a42d1f8e99eed5367e561f5e2f3bfc37723f63b154726"
+      },
+      {
+        "path": "rcsb/6LN2/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/6LN2",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 17912,
+        "sha256": "1f891099363065c902b822e1fb917c2bf5daa9529abb30dd48a72fa930851068"
+      },
+      {
+        "path": "rcsb/6LN2/6LN2.cif",
+        "sourceUrl": "https://files.rcsb.org/download/6LN2.cif",
+        "retrievedAt": "2026-10-03T02:54:24Z",
+        "httpStatus": 200,
+        "bytes": 1320757,
+        "sha256": "ecba196a19032ee3d2a9f8d3aff4a7d5dd958251debdd43991ec1e5fdec4b6a6"
+      },
+      {
+        "path": "rcsb/6LN2/6ln2_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/ln/6ln2/6ln2_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:54:26Z",
+        "httpStatus": 200,
+        "bytes": 36409,
+        "sha256": "ea2d878168f615b47361e626bdb61dfc405d60fae82a4ea00cdae1f777b2c13f"
+      },
+      {
+        "path": "rcsb/6LN2/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6LN2/1",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 83000,
+        "sha256": "152c6f8e817bdded3b8da336b1e1ce08920e8ad9e70310da0d2da7026fa63964"
+      },
+      {
+        "path": "rcsb/6LN2/polymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6LN2/2",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 17439,
+        "sha256": "1c1b971433566eec0d68f366e770b0061ec8d41406096ccb9a0dea2b0102294b"
+      },
+      {
+        "path": "rcsb/6LN2/polymer_entity_3.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/6LN2/3",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 27634,
+        "sha256": "72c809820aa3605ce0c2bc77f8ccebc69ee368f1b64248a4e7d16fcf2212223e"
+      },
+      {
+        "path": "rcsb/6LN2/nonpolymer_entity_4.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/6LN2/4",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 1037,
+        "sha256": "8e3847e6bd2f2a2fe657597ac9cee9c4e0f15530824f94e473a9f354d4a33282"
+      },
+      {
+        "path": "rcsb/6LN2/nonpolymer_entity_5.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/6LN2/5",
+        "retrievedAt": "2026-10-03T02:54:25Z",
+        "httpStatus": 200,
+        "bytes": 966,
+        "sha256": "a53798306b8666015b2a787933bfc831c97cc026e5bed4c3e9d087efe2234e2e"
+      },
+      {
+        "path": "rcsb/6LN2/nonpolymer_entity_6.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/6LN2/6",
+        "retrievedAt": "2026-10-03T02:54:26Z",
+        "httpStatus": 200,
+        "bytes": 1225,
+        "sha256": "1899fb59aaa6563dc77f99bc5cd4d7cc8ca8087d948241c3666b84a4f8bfe01c"
+      },
+      {
+        "path": "rcsb/5VEW/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/5VEW",
+        "retrievedAt": "2026-10-03T02:54:27Z",
+        "httpStatus": 200,
+        "bytes": 15433,
+        "sha256": "f08c8baf4f713f2796736bbae790997b3cf2a1a1fe191bc496ead30e347ef1e3"
+      },
+      {
+        "path": "rcsb/5VEW/5VEW.cif",
+        "sourceUrl": "https://files.rcsb.org/download/5VEW.cif",
+        "retrievedAt": "2026-10-03T02:54:27Z",
+        "httpStatus": 200,
+        "bytes": 1366763,
+        "sha256": "f459000acd23c298087bcb41752537d9d4af2cbc558f950badefe3dac0be1fdd"
+      },
+      {
+        "path": "rcsb/5VEW/5vew_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/ve/5vew/5vew_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:54:28Z",
+        "httpStatus": 200,
+        "bytes": 40356,
+        "sha256": "1e50a181786686e558c8765b1199f60265cd12c1f2e613ea047d0db706a10952"
+      },
+      {
+        "path": "rcsb/5VEW/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/5VEW/1",
+        "retrievedAt": "2026-10-03T02:54:27Z",
+        "httpStatus": 200,
+        "bytes": 95630,
+        "sha256": "775a6a8228af6f2f3a440356628fb171ae002701bf0da58c9e0a415c849dafe6"
+      },
+      {
+        "path": "rcsb/5VEW/nonpolymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/5VEW/2",
+        "retrievedAt": "2026-10-03T02:54:28Z",
+        "httpStatus": 200,
+        "bytes": 655,
+        "sha256": "b36b41f52ec22ee977dc7ab6a45bfb1375f18e3a40fc022444e55a66e4ae8510"
+      },
+      {
+        "path": "rcsb/5VEW/nonpolymer_entity_3.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/5VEW/3",
+        "retrievedAt": "2026-10-03T02:54:28Z",
+        "httpStatus": 200,
+        "bytes": 495,
+        "sha256": "9991a3d2a918c323d60ead2204f926cd6fc97bd2a3e81ca5bbde9a1845af018b"
+      },
+      {
+        "path": "rcsb/5VEW/nonpolymer_entity_4.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/5VEW/4",
+        "retrievedAt": "2026-10-03T02:54:28Z",
+        "httpStatus": 200,
+        "bytes": 399,
+        "sha256": "1ccf36d8b2d40fca97d40be72909c47fd6067df1a0d503821eed5620a503a7ef"
+      }
+    ]
+  },
+  "frozenRule": {
+    "humanGlp1rUniprot": "P43220",
+    "maxResolutionAngstrom": 4,
+    "ligandHeavyAtomWindow": [
+      10,
+      60
+    ],
+    "transmembraneRegionFrom": "the structure's own Pfam annotation containing \"7 transmembrane receptor\"",
+    "rankingOrder": [
+      "R1 missing backbone residues",
+      "R2 non-peptidic ligand in window",
+      "R3 resolution",
+      "R4 construct mutations",
+      "R5 clashscore",
+      "R6 PDB id"
+    ]
+  },
+  "candidates": [
+    {
+      "pdbId": "6X18",
+      "title": "GLP-1 peptide hormone bound to Glucagon-Like peptide-1 (GLP-1) Receptor",
+      "experimentalMethod": [
+        "ELECTRON MICROSCOPY"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 2.1,
+      "initialReleaseDate": "2020-09-09T00:00:00.000+00:00",
+      "latestRevisionDate": "2026-05-27T00:00:00.000+00:00",
+      "revisionCount": 6,
+      "polymerEntityCount": 6,
+      "nonpolymerEntityCount": 0,
+      "glp1rEntity": {
+        "entityId": "6",
+        "authChains": [
+          "R"
+        ],
+        "sequenceLength": 491,
+        "sourceOrganisms": [
+          "Homo sapiens"
+        ],
+        "mutationsText": null,
+        "mutationPositions": [],
+        "mutationPositionsInTransmembrane": [],
+        "transmembraneRegion": {
+          "begSeqId": 150,
+          "endSeqId": 407,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 491
+      },
+      "otherChains": [
+        "Guanine nucleotide-binding protein G(s) subunit alpha isoforms short",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2",
+        "Nanobody35",
+        "Glucagon-like peptide-1 (GLP-1)(7-36)NH2"
+      ],
+      "nonpolymers": [],
+      "smallMoleculeLigandInWindow": null,
+      "validationReport": {
+        "clashscore": 10.74,
+        "percentRamachandranOutliers": 0.08,
+        "percentRotamerOutliers": 1.45,
+        "percentRSRZOutliers": null,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": true,
+            "observed": "2.1 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": true,
+            "observed": "active-state evidence in the record: Guanine nucleotide-binding protein G(s) subunit alpha isoforms short ; Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1 ; Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2 ; Nanobody35 ; Glucagon-like peptide-1 (GLP-1)(7-36)NH2"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 150-407"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": true,
+            "observed": "0 engineered mutation(s) inside 150-407"
+          }
+        ],
+        "eligible": true,
+        "failed": []
+      }
+    },
+    {
+      "pdbId": "6B3J",
+      "title": "3.3 angstrom phase-plate cryo-EM structure of a biased agonist-bound human GLP-1 receptor-Gs complex",
+      "experimentalMethod": [
+        "ELECTRON MICROSCOPY"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 3.3,
+      "initialReleaseDate": "2018-02-21T00:00:00.000+00:00",
+      "latestRevisionDate": "2024-10-23T00:00:00.000+00:00",
+      "revisionCount": 5,
+      "polymerEntityCount": 6,
+      "nonpolymerEntityCount": 0,
+      "glp1rEntity": {
+        "entityId": "1",
+        "authChains": [
+          "R"
+        ],
+        "sequenceLength": 491,
+        "sourceOrganisms": [
+          "Homo sapiens"
+        ],
+        "mutationsText": null,
+        "mutationPositions": [
+          269
+        ],
+        "mutationPositionsInTransmembrane": [
+          269
+        ],
+        "transmembraneRegion": {
+          "begSeqId": 150,
+          "endSeqId": 407,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 491
+      },
+      "otherChains": [
+        "Exendin-P5",
+        "Guanine nucleotide-binding protein G(s) subunit alpha isoforms short",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2",
+        "Nanobody 35"
+      ],
+      "nonpolymers": [],
+      "smallMoleculeLigandInWindow": null,
+      "validationReport": {
+        "clashscore": 4.42,
+        "percentRamachandranOutliers": 0,
+        "percentRotamerOutliers": 0,
+        "percentRSRZOutliers": null,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": true,
+            "observed": "3.3 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": true,
+            "observed": "active-state evidence in the record: Exendin-P5 ; Guanine nucleotide-binding protein G(s) subunit alpha isoforms short ; Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1 ; Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2 ; Nanobody 35"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 150-407"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": false,
+            "observed": "1 engineered mutation(s) inside 150-407 at 269"
+          }
+        ],
+        "eligible": false,
+        "failed": [
+          "E5_noPocketMutation"
+        ]
+      }
+    },
+    {
+      "pdbId": "6LN2",
+      "title": "Crystal structure of full length human GLP1 receptor in complex with Fab fragment (Fab7F38)",
+      "experimentalMethod": [
+        "X-RAY DIFFRACTION"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 3.2,
+      "initialReleaseDate": "2020-03-18T00:00:00.000+00:00",
+      "latestRevisionDate": "2024-11-20T00:00:00.000+00:00",
+      "revisionCount": 5,
+      "polymerEntityCount": 3,
+      "nonpolymerEntityCount": 3,
+      "glp1rEntity": {
+        "entityId": "1",
+        "authChains": [
+          "A"
+        ],
+        "sequenceLength": 469,
+        "sourceOrganisms": [
+          "Homo sapiens",
+          "Clostridium pasteurianum",
+          "Homo sapiens"
+        ],
+        "mutationsText": "S193C,I196F,S225A,M233C,S271A,I317C,G318I,K346A,C347F,G361C,E387D",
+        "mutationPositions": [
+          170,
+          173,
+          202,
+          210,
+          301,
+          347,
+          348,
+          376,
+          377,
+          391,
+          417
+        ],
+        "mutationPositionsInTransmembrane": [
+          170,
+          173,
+          202,
+          210,
+          301,
+          347,
+          348,
+          376,
+          377,
+          391,
+          417
+        ],
+        "transmembraneRegion": {
+          "begSeqId": 118,
+          "endSeqId": 428,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 469
+      },
+      "otherChains": [
+        "Fab7F38_light chain",
+        "Fab7F38_heavy chain"
+      ],
+      "nonpolymers": [
+        {
+          "entityFile": "rcsb/6LN2/nonpolymer_entity_4.json",
+          "compId": "NAG",
+          "description": "2-acetamido-2-deoxy-beta-D-glucopyranose",
+          "formulaWeightKDa": 0.221,
+          "copies": 1,
+          "heavyAtomsFromCif": 14
+        },
+        {
+          "entityFile": "rcsb/6LN2/nonpolymer_entity_5.json",
+          "compId": "ZN",
+          "description": "ZINC ION",
+          "formulaWeightKDa": 0.065,
+          "copies": 1,
+          "heavyAtomsFromCif": 1
+        },
+        {
+          "entityFile": "rcsb/6LN2/nonpolymer_entity_6.json",
+          "compId": "97Y",
+          "description": "N-{4-[(R)-(3,3-dimethylcyclobutyl)({6-[4-(trifluoromethyl)-1H-imidazol-1-yl]pyridin-3-yl}amino)methyl]benzene-1-carbonyl}-beta-alanine",
+          "formulaWeightKDa": 0.516,
+          "copies": 1,
+          "heavyAtomsFromCif": 37
+        }
+      ],
+      "smallMoleculeLigandInWindow": {
+        "entityFile": "rcsb/6LN2/nonpolymer_entity_4.json",
+        "compId": "NAG",
+        "description": "2-acetamido-2-deoxy-beta-D-glucopyranose",
+        "formulaWeightKDa": 0.221,
+        "copies": 1,
+        "heavyAtomsFromCif": 14
+      },
+      "validationReport": {
+        "clashscore": 7.68,
+        "percentRamachandranOutliers": 0,
+        "percentRotamerOutliers": 4.5,
+        "percentRSRZOutliers": 2.28,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens/Clostridium pasteurianum/Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": true,
+            "observed": "3.2 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": false,
+            "observed": "no G protein or G-protein mimetic among the other chains (Fab7F38_light chain ; Fab7F38_heavy chain)"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 118-428"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": false,
+            "observed": "11 engineered mutation(s) inside 118-428 at 170, 173, 202, 210, 301, 347, 348, 376, 377, 391, 417"
+          }
+        ],
+        "eligible": false,
+        "failed": [
+          "E3_activeState",
+          "E5_noPocketMutation"
+        ]
+      }
+    },
+    {
+      "pdbId": "5VEW",
+      "title": "Structure of the human GLP-1 receptor complex with PF-06372222",
+      "experimentalMethod": [
+        "X-RAY DIFFRACTION"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 2.7,
+      "initialReleaseDate": "2017-05-24T00:00:00.000+00:00",
+      "latestRevisionDate": "2024-10-16T00:00:00.000+00:00",
+      "revisionCount": 5,
+      "polymerEntityCount": 1,
+      "nonpolymerEntityCount": 3,
+      "glp1rEntity": {
+        "entityId": "1",
+        "authChains": [
+          "A",
+          "B"
+        ],
+        "sequenceLength": 455,
+        "sourceOrganisms": [
+          "Homo sapiens",
+          "Enterobacteria phage T4",
+          "Homo sapiens"
+        ],
+        "mutationsText": null,
+        "mutationPositions": [
+          67,
+          70,
+          92,
+          100,
+          135,
+          177,
+          220,
+          260,
+          295,
+          341,
+          342,
+          370,
+          371,
+          385
+        ],
+        "mutationPositionsInTransmembrane": [
+          67,
+          70,
+          92,
+          100,
+          135,
+          177,
+          220,
+          260,
+          295,
+          341,
+          342,
+          370,
+          371,
+          385
+        ],
+        "transmembraneRegion": {
+          "begSeqId": 15,
+          "endSeqId": 422,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 910
+      },
+      "otherChains": [],
+      "nonpolymers": [
+        {
+          "entityFile": "rcsb/5VEW/nonpolymer_entity_2.json",
+          "compId": "97Y",
+          "description": "N-{4-[(R)-(3,3-dimethylcyclobutyl)({6-[4-(trifluoromethyl)-1H-imidazol-1-yl]pyridin-3-yl}amino)methyl]benzene-1-carbonyl}-beta-alanine",
+          "formulaWeightKDa": 0.516,
+          "copies": 2,
+          "heavyAtomsFromCif": 37
+        },
+        {
+          "entityFile": "rcsb/5VEW/nonpolymer_entity_3.json",
+          "compId": "OLC",
+          "description": "(2R)-2,3-dihydroxypropyl (9Z)-octadec-9-enoate",
+          "formulaWeightKDa": 0.357,
+          "copies": 6,
+          "heavyAtomsFromCif": 25
+        },
+        {
+          "entityFile": "rcsb/5VEW/nonpolymer_entity_4.json",
+          "compId": "OLA",
+          "description": "OLEIC ACID",
+          "formulaWeightKDa": 0.282,
+          "copies": 1,
+          "heavyAtomsFromCif": 20
+        }
+      ],
+      "smallMoleculeLigandInWindow": {
+        "entityFile": "rcsb/5VEW/nonpolymer_entity_2.json",
+        "compId": "97Y",
+        "description": "N-{4-[(R)-(3,3-dimethylcyclobutyl)({6-[4-(trifluoromethyl)-1H-imidazol-1-yl]pyridin-3-yl}amino)methyl]benzene-1-carbonyl}-beta-alanine",
+        "formulaWeightKDa": 0.516,
+        "copies": 2,
+        "heavyAtomsFromCif": 37
+      },
+      "validationReport": {
+        "clashscore": 4.43,
+        "percentRamachandranOutliers": 0,
+        "percentRotamerOutliers": 0.46,
+        "percentRSRZOutliers": 7.46,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens/Enterobacteria phage T4/Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": true,
+            "observed": "2.7 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": false,
+            "observed": "no G protein or G-protein mimetic among the other chains (receptor only)"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 15-422"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": false,
+            "observed": "14 engineered mutation(s) inside 15-422 at 67, 70, 92, 100, 135, 177, 220, 260, 295, 341, 342, 370, 371, 385"
+          }
+        ],
+        "eligible": false,
+        "failed": [
+          "E3_activeState",
+          "E5_noPocketMutation"
+        ]
+      }
+    }
+  ],
+  "rankingTrace": [
+    {
+      "step": "no ranking needed",
+      "detail": "only 6X18 passed every hard filter"
+    }
+  ],
+  "outcome": "STRUCTURE_SELECTED",
+  "selected": {
+    "pdbId": "6X18",
+    "pocketDefinedFromPeptideContext": true,
+    "mandatoryLimitation": "POCKET_DEFINED_FROM_PEPTIDE_CONTEXT — no non-peptidic component of 10-60 heavy atoms sits in this structure, so it may not be used to rank small molecules without a separate decision."
+  },
+  "whatThisDoesNotLicense": [
+    "Docking is not agonism. A score is a scoring-function estimate against a rigid receptor.",
+    "Binding is not functional agonism. The functional axis is D-153's, and D-153 licenses only that the efficacy axis is EVALUABLE.",
+    "A heterologous-system response is not a native-tissue response.",
+    "Selecting a target nominates no candidate and ranks nothing."
+  ],
+  "defaultDockingTarget": "ABL1_1IEP — unchanged by this decision",
+  "artifactHash": "624d6adb1478d3bc"
+}

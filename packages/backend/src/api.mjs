@@ -1249,9 +1249,16 @@ export function handleApi(db, ctx) {
         });
         if (!result.ok) {
           // Item 4 — surface which existing observation this one conflicts with, not just the code.
-          return result.error === 'external_observation_conflict'
-            ? { status: 400, body: { error: result.error, existingObservationId: result.existingObservationId } }
-            : err(400, result.error);
+          if (result.error === 'external_observation_conflict') {
+            return { status: 400, body: { error: result.error, existingObservationId: result.existingObservationId } };
+          }
+          // Item E — when the bytes Genesis hashed disagree with the hash the client declared, the
+          // caller is told BOTH hashes and the byte count. Hiding one of them would let a submitter
+          // guess which value Genesis preferred.
+          if (result.error === 'raw_artifact_hash_mismatch') {
+            return { status: 400, body: { error: result.error, declaredSha256: result.declaredSha256, computedSha256: result.computedSha256, byteLength: result.byteLength, reason: result.reason } };
+          }
+          return err(400, result.error);
         }
         return ok({ observation: result.observation, eventId: result.eventId, deduped: result.deduped }, 201);
       }

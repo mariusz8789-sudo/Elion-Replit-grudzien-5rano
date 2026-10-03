@@ -139,8 +139,6 @@ describe('navigation entry and locked areas', () => {
     const html = renderToStaticMarkup(<AppShell>x</AppShell>);
     expect(html).toContain('data-testid="shell-account"');
     expect(html).toContain('Zaloguj się');
-    expect(html).toContain('data-testid="mobile-account"');
-    expect(html).toContain('>Zaloguj<');
   });
 
   it('logged in: the shell shows the name and the profile', () => {

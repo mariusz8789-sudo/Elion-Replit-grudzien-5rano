@@ -131,9 +131,9 @@ describe('the main menu is the owner\'s list, in his order', () => {
 });
 
 describe('Ask is an action in the bottom bar, not a menu entry', () => {
-  it('bottom bar reads Home, Ask, Lab; the menu has no chat item', async () => {
+  it('bottom bar reads Start, Ask, Człowiek, Lab; the menu has no chat item', async () => {
     const { ASK_ITEM, PRIMARY_NAV_ITEMS } = await import('../core/navigation');
-    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Człowiek']);
+    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Człowiek', 'Lab']);
     expect(ASK_ITEM.kind).toBe('chat');
     expect(NAV_SECTIONS.flatMap((section) => section.items).some((item) => item.kind === 'chat')).toBe(false);
   });

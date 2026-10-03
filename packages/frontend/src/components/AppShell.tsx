@@ -250,7 +250,6 @@ export function AppShell({ children, chat, chatInline = false }: {
   /** HUD readout under the brand: the real current route, nothing invented. */
   const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
-  const account = useAccountEntry();
   // Uczeń, student i nauczyciel dostają krótsze menu (core/profileNavigation.ts); gość, badacz i instytucja — pełne.
   const session = useSession();
   const profile = profileOfUser(session?.user);
@@ -375,15 +374,6 @@ export function AppShell({ children, chat, chatInline = false }: {
             <span>{navShortLabel(item)}</span>
           </button>
         ))}
-        <button
-          className={`shell-mobilebar-item shell-mobilebar-account${accountActive ? ' active' : ''}`}
-          onClick={goAccount}
-          aria-label={account.signedIn ? `${shellText('account')}: ${account.title} (${account.subtitle})` : shellText('signInOrUp')}
-          data-testid="mobile-account"
-        >
-          <span aria-hidden="true">👤</span>
-          <span>{account.short}</span>
-        </button>
         <button
           className={`shell-mobilebar-item${menuOpen ? ' active' : ''}`}
           onClick={() => setMenuOpen((open) => !open)}

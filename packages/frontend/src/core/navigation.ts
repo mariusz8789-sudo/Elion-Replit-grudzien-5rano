@@ -67,7 +67,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { id: 'human-biology-lab', label: 'Człowiek · Human Explorer', shortLabel: 'Człowiek', icon: '🧍', hash: '#/human-biology-lab', primary: true, description: 'Atlas człowieka: skóra, szkielet, narządy, mózg, komórka' },
       { id: 'reviewer', label: 'Pokój recenzenta', icon: '🔎', hash: '#/reviewer', description: 'Sprawdź dowody i podpis CSRN' },
       { id: 'evidence', label: 'Dowody i powtórzenie', icon: '📋', hash: '#/evidence', description: 'Pochodzenie wyników i powtórzenie' },
-      { id: 'scientific-worlds', label: 'Laboratorium', icon: '⌬', hash: '#/scientific-worlds', description: 'Jedna przestrzeń dla eksperymentów Genesis' },
+      { id: 'scientific-worlds', label: 'Laboratorium', shortLabel: 'Lab', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
       { id: 'cms-open-data', label: 'CERN · dane CMS', icon: '⚛', hash: '#/physics/cms-z', description: 'Prawdziwe zdarzenia CMS Z→μμ; analiza offline, nie aktywny LHC' },
       { id: 'discover', label: 'Konsola badań', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
     ],
@@ -204,8 +204,8 @@ export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) 
 export const ASK_ITEM: NavItem = { id: 'chat', label: 'Zapytaj', shortLabel: 'Zapytaj', icon: '✦', kind: 'chat', description: 'Opisz zadanie badawcze; Genesis kieruje je do modelu, silnika albo zweryfikowanego ekranu' };
 
 /**
- * Mobile bottom bar, left to right: Start, Zapytaj, Człowiek (AppShell adds Konto and Więcej).
- * Five fixed, always visible targets in plain words (Apple HIG tab bars, NN/g on hidden navigation).
+ * Mobile bottom bar, left to right: Start, Zapytaj, Człowiek, Laboratorium (AppShell adds Więcej, whose sheet
+ * holds the account entry). Five fixed, always visible targets in plain words (Apple HIG tab bars, NN/g on hidden navigation).
  */
 export const PRIMARY_NAV_ITEMS: readonly NavItem[] = (() => {
   const [home, ...rest] = NAV_ITEMS.filter((item) => item.primary);

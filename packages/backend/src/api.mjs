@@ -78,7 +78,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
-import { verifyExperimentArtifact } from './researchRunArtifacts.mjs';
+import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
@@ -967,9 +967,19 @@ export function handleApi(db, ctx) {
             return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
           })();
         }
-        return runHeavyCompute(db, ctx, `research-run:${current.researchRunId}`, () => {
+        return runHeavyComputeAsync(db, ctx, `research-run:${current.researchRunId}`, async () => {
           const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
-          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          if (result.ok) {
+            // Same custody as the queue path: the artifact is stored and recorded in the chain. A storage failure is
+            // reported, not hidden, and the gap stays recoverable (recoverMissingArtifacts on the next queued job).
+            let artifactCustody = { status: 'NOT_CONFIGURED' };
+            if (ctx.artifactStorage) {
+              const custody = await recoverMissingArtifacts(db, ctx.artifactStorage, projectId, current.researchRunId);
+              artifactCustody = custody.failed.length ? { status: 'FAILED', failed: custody.failed } : { status: 'PERSISTED' };
+            }
+            const refreshed = getResearchRun(db, projectId, current.researchRunId) ?? result.researchRun;
+            return ok({ ...result, researchRun: refreshed, artifactCustody }, result.deduped ? 200 : 201);
+          }
           // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
           const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };

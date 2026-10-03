@@ -160,3 +160,19 @@ test('artifact route: no token is 401, another account cannot read it, the respo
     assert.ok(!JSON.stringify(ok.body).includes(dir), 'no server path leaks');
   } finally { ctx.db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('synchronous experiment route stores and records the artifact too; without storage it says NOT_CONFIGURED', { skip }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-rr-artifact-'));
+  const storage = createLocalContentAddressedArtifactStorage({ rootDir: path.join(dir, 'artifacts') });
+  const ctx = await setup(dir, storage);
+  try {
+    const done = await ctx.call('POST', `${ctx.base}/research-runs/${ctx.runId}/experiments`, { token: ctx.owner.token });
+    assert.equal(done.status, 201, JSON.stringify(done.body));
+    assert.equal(done.body.artifactCustody.status, 'PERSISTED');
+    assert.equal(artifactEvents(done.body.researchRun).length, 1);
+    const x = done.body.researchRun.experiments[0];
+    const got = await ctx.call('GET', `${ctx.base}/research-runs/${ctx.runId}/experiments/${x.experimentId}/artifact`, { token: ctx.owner.token });
+    assert.equal(got.body.verified, true);
+    assert.equal(done.body.researchRun.researchState.chain.ok, true);
+  } finally { ctx.db.close(); rmSync(dir, { recursive: true, force: true }); }
+});

@@ -42,6 +42,7 @@ const ITEMS: Readonly<Record<string, { label: Pair; short?: Pair; description?: 
   'flight-control': { label: ['Science Flight Control'], description: ['Research runs, the job queue and experiment flights; pause, resume, cancel'] },
   'discovery-log': { label: ['Discovery log'] },
   'knowledge-sources': { label: ['Knowledge and public sources'] },
+  verify: { label: ['Genesis Verify: check a result record'], description: ['Upload a Genesis record: sha256 fingerprints, the ledger and a replay of the computation, HTML report'] },
   worlds: { label: ['Visualisations and worlds'] },
   simulation: { label: ['Simulation generator'] },
   'world-proposal': { label: ['Propose a world'] },

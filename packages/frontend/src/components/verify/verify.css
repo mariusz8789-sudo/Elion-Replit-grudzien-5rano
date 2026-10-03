@@ -1,0 +1,115 @@
+/* #/verify — Genesis Verify. Reads the app's tokens (styles.css :root); falls back to the same values. */
+.vf-room {
+  --vf-bg: var(--bg, #070b17);
+  --vf-raised: var(--bg-raised, #0e1426);
+  --vf-line: var(--border, rgba(164, 184, 232, 0.10));
+  --vf-line-strong: var(--border-strong, rgba(164, 184, 232, 0.22));
+  --vf-text: var(--text, #eef2fb);
+  --vf-dim: var(--text-dim, #a9b3cf);
+  --vf-faint: var(--text-faint, #6f7a9b);
+  --vf-good: var(--green, #6ee7a0);
+  --vf-warn: var(--gold, #f0b35c);
+  --vf-bad: var(--red, #f47c7c);
+  --vf-accent: var(--cyan, #5cd6e8);
+  background: var(--vf-bg);
+  color: var(--vf-text);
+  min-height: 100vh;
+  padding: var(--sp-3, 1.1rem) 16px calc(4rem + var(--safe-bottom, 0px));
+  box-sizing: border-box;
+  font-family: var(--font-body, system-ui, sans-serif);
+  overflow-x: clip;
+}
+.vf-room *, .vf-room *::before, .vf-room *::after { box-sizing: border-box; }
+.vf-room > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+.vf-room code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.84em; overflow-wrap: anywhere; word-break: break-word; }
+.vf-room h1, .vf-room h2, .vf-room h3 { margin: 0; line-height: 1.25; }
+.vf-room h2 { font-size: 1.1rem; }
+.vf-room h3 { font-size: 1rem; margin-top: 1.4rem; margin-bottom: 0.5rem; }
+.vf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.vf-hero { padding: var(--sp-3, 1.1rem) 0 var(--sp-2, 0.7rem); }
+.vf-kicker { margin: 0; display: block; font-size: var(--fs-micro, 0.72rem); letter-spacing: 0.12em; text-transform: uppercase; color: var(--vf-accent); font-weight: 700; }
+.vf-hero h1 { font-size: clamp(1.55rem, 4.6vw, 2.4rem); margin: 0.25em 0 0.35em; font-weight: 750; }
+.vf-hero p:last-child { margin: 0; color: var(--vf-dim); line-height: 1.55; font-size: var(--fs-body, 0.95rem); }
+
+.vf-unsigned { margin-top: 0.8rem; padding: 0.7rem 0.9rem; border-radius: var(--r-sm, 12px); border: 1px dashed var(--vf-warn); font-size: 0.9rem; line-height: 1.5; }
+.vf-unsigned strong { color: var(--vf-warn); }
+.vf-unsigned p { margin: 0.2rem 0 0; color: var(--vf-dim); }
+
+.vf-gate { margin-top: var(--sp-3, 1.1rem); padding: var(--sp-3, 1.1rem) 0; border-top: 1px solid var(--vf-line); display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; align-items: center; }
+.vf-gate p { margin: 0; flex: 1 1 240px; color: var(--vf-dim); line-height: 1.55; }
+
+.vf-body { display: flex; flex-direction: column; gap: 1.1rem; margin-top: 1rem; }
+.vf-project { display: flex; align-items: center; gap: 0.6rem; margin: 0; min-width: 0; font-size: var(--fs-meta, 0.82rem); color: var(--vf-dim); }
+.vf-project strong { color: var(--vf-text); overflow-wrap: anywhere; }
+
+.vf-form { display: flex; flex-direction: column; gap: 0.9rem; padding: 1rem 0; border-top: 1px solid var(--vf-line); border-bottom: 1px solid var(--vf-line); }
+.vf-form > p { margin: 0; }
+.vf-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; font-size: 0.9rem; }
+.vf-field > span { font-weight: 600; }
+.vf-field small { line-height: 1.45; }
+.vf-room select, .vf-room textarea, .vf-room input[type="text"] {
+  width: 100%; max-width: 100%; min-height: 44px; padding: 0.55rem 0.8rem; border-radius: var(--r-sm, 12px);
+  border: 1px solid var(--vf-line-strong); background: var(--vf-raised); color: var(--vf-text); font: inherit; font-size: 16px;
+}
+.vf-project select { flex: 1 1 auto; min-width: 0; width: auto; }
+.vf-room textarea { font-family: var(--font-mono, ui-monospace, monospace); font-size: 14px; resize: vertical; min-height: 7rem; }
+.vf-room input[aria-invalid="true"] { border-color: var(--vf-bad); }
+.vf-error { color: var(--vf-bad); }
+.vf-muted { color: var(--vf-dim); margin: 0; line-height: 1.5; }
+.vf-meta { margin: 0.6rem 0 0; font-size: var(--fs-meta, 0.82rem); color: var(--vf-faint); overflow-wrap: anywhere; }
+
+.vf-file { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; position: relative; min-width: 0; }
+.vf-file input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.vf-file:focus-within .vf-btn { outline: 2px solid var(--vf-accent); outline-offset: 2px; }
+.vf-file-name { font-size: 0.88rem; color: var(--vf-dim); overflow-wrap: anywhere; min-width: 0; }
+
+.vf-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; max-width: 100%;
+  padding: 0.4rem 1.05rem; border-radius: 999px; border: 1px solid transparent; text-align: center;
+  background: var(--vf-accent); color: #04121a; font: inherit; font-weight: 650; font-size: 0.92rem; line-height: 1.3;
+  text-decoration: none; cursor: pointer;
+}
+.vf-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.vf-btn:focus-visible, .vf-tech summary:focus-visible, .vf-from-run summary:focus-visible, .vf-room select:focus-visible, .vf-room textarea:focus-visible, .vf-room input:focus-visible { outline: 2px solid var(--vf-accent); outline-offset: 2px; }
+.vf-btn-quiet { background: transparent; color: var(--vf-text); border-color: var(--vf-line-strong); }
+.vf-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.vf-from-run { border: 1px solid var(--vf-line); border-radius: var(--r-sm, 12px); padding: 0 0.9rem; }
+.vf-from-run[open] { padding-bottom: 0.9rem; }
+.vf-from-run > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; font-size: 0.92rem; }
+.vf-from-run > * + * { margin-top: 0.7rem; }
+.vf-exported { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+.vf-exported p { margin: 0; }
+
+.vf-notice { padding: 0.7rem 0.9rem; border-radius: var(--r-sm, 12px); border: 1px solid var(--vf-line-strong); background: var(--vf-raised); font-size: 0.9rem; line-height: 1.5; }
+.vf-notice p { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
+.vf-notice.vf-tone-bad { border-color: rgba(244, 124, 124, 0.55); background: rgba(244, 124, 124, 0.07); }
+
+.vf-tech { margin-top: 0.6rem; font-size: var(--fs-meta, 0.82rem); color: var(--vf-dim); }
+.vf-tech summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; width: fit-content; max-width: 100%; color: var(--vf-faint); }
+.vf-tech ul { margin: 0; padding-left: 1.1rem; }
+.vf-tech li { margin: 0.25rem 0; overflow-wrap: anywhere; }
+
+.vf-result { padding-top: 0.2rem; }
+.vf-verdict { border-left: 6px solid var(--vf-dim); padding: 0.8rem 1rem; background: var(--vf-raised); border-radius: 0 var(--r-sm, 12px) var(--r-sm, 12px) 0; }
+.vf-verdict strong { display: block; font-size: clamp(1.5rem, 6vw, 2rem); letter-spacing: 0.02em; margin: 0.15rem 0 0.35rem; overflow-wrap: anywhere; }
+.vf-verdict p { margin: 0.2rem 0 0; line-height: 1.55; }
+.vf-verdict.vf-tone-good { border-color: var(--vf-good); } .vf-verdict.vf-tone-good strong { color: var(--vf-good); }
+.vf-verdict.vf-tone-warn { border-color: var(--vf-warn); } .vf-verdict.vf-tone-warn strong { color: var(--vf-warn); }
+.vf-verdict.vf-tone-bad { border-color: var(--vf-bad); } .vf-verdict.vf-tone-bad strong { color: var(--vf-bad); }
+.vf-verdict.vf-tone-idle strong { color: var(--vf-dim); }
+
+.vf-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.vf-check { padding: 0.65rem 0.8rem; border: 1px solid var(--vf-line); border-radius: var(--r-sm, 12px); }
+.vf-check p { margin: 0.35rem 0 0; color: var(--vf-dim); font-size: 0.9rem; line-height: 1.5; overflow-wrap: anywhere; }
+.vf-check-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.6rem; }
+.vf-check-title { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.vf-badge { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.vf-check.vf-tone-good .vf-badge { color: var(--vf-good); }
+.vf-check.vf-tone-bad .vf-badge { color: var(--vf-bad); }
+.vf-check.vf-tone-idle .vf-badge { color: var(--vf-dim); }
+.vf-not-checked { margin: 0; padding-left: 1.2rem; color: var(--vf-dim); font-size: 0.9rem; line-height: 1.5; }
+.vf-not-checked li { margin: 0.3rem 0; }
+.vf-report { margin-top: 1.2rem; padding-top: 0.2rem; border-top: 1px solid var(--vf-line); }
+.vf-report .vf-actions { margin-top: 0.7rem; }

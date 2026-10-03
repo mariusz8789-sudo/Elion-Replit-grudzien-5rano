@@ -2,8 +2,32 @@ import { canonicalJson, fnv1a } from '../events/hash';
 import type { ScientificEvidenceChain } from './scientificDiscovery';
 import type { ExperimentRun } from './types';
 import { compareAme2020Observations, type Ame2020Comparison } from '../observation/nuclearAme2020';
+import type { SavedScenarioReplayStatus } from '../simulation/scenarioMemory';
+import type { TemporalBranchRole } from '../simulation/temporalState';
 
 export const EVIDENCE_PACK_VERSION = '1.0.0';
+
+/**
+ * Multiverse-branch provenance. Present ONLY on packs built by
+ * `buildMultiverseBranchEvidencePack` (experimentFabric/multiverseEvidence.ts);
+ * `createScientificEvidencePack` never sets it. Every field is copied from the
+ * already-computed `TemporalMultiverse` / `TemporalDecisionLineage`.
+ */
+export interface MultiverseEvidenceBranchContext {
+  contractVersion: string;
+  sourceMultiverseFingerprint: string;
+  branchId: string;
+  /** Declared intervention day of this branch — never measured. */
+  declaredInterventionStartDay: number;
+  /** Baseline state on the decision day; null when outside the baseline axis. */
+  decisionState: { logicalDay: number; timelineId: string; stateFingerprint: string; branchRole: TemporalBranchRole } | null;
+  /** MEASURED day on which this branch actually diverged from the baseline. */
+  firstDivergentDayFromBaseline: number | null;
+  /** Branch state on the measured divergence day; null without divergence or timeline. */
+  branchState: { logicalDay: number; temporalStateId: string; stateFingerprint: string; branchRole: TemporalBranchRole } | null;
+  /** Replay verdict of the two-arm counterfactual (baseline + this branch) the pack was built from. */
+  replayVerdict: SavedScenarioReplayStatus;
+}
 
 export interface EvidencePackRun {
   runId: string;
@@ -37,6 +61,8 @@ export interface ScientificEvidencePack {
   eventSummaries: readonly { runId: string; count: number; types: readonly string[] }[];
   /** Optional external-observation projection; absent for protocols without a compatible source. */
   externalObservationComparison?: Ame2020Comparison;
+  /** Only on packs built from a multiverse branch; `createScientificEvidencePack` never sets it. */
+  multiverseBranchContext?: MultiverseEvidenceBranchContext;
   disclaimer: string;
 }
 

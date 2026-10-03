@@ -7,14 +7,43 @@ import {
 import {
   buildSavedTemporalMultiverse,
   replaySavedTemporalMultiverse,
+  temporalDecisionLineage,
   type TemporalMultiverse,
   type TemporalMultiverseBranchReplay,
 } from '../../core/simulation/temporalMultiverse';
 import {
+  COMMAND_CENTER_BASELINE_SCENARIO_ID,
   openTemporalMultiverseBranchInWorld,
   runTemporalMultiverseCommandCenter,
 } from '../../core/simulation/scenarioCommandCenter';
 import { temporalStateAt } from '../../core/simulation/temporalState';
+import { GOVERNED_PREPAREDNESS_QUESTIONS, resolvePreparednessQuestion } from '../../core/simulation/preparednessQuestions';
+import { buildMultiverseBranchEvidencePack, proposeNextMultiverseExperiment, type NextMultiverseExperiment } from '../../core/experimentFabric/multiverseEvidence';
+import type { CounterfactualEvidenceResult } from '../../core/experimentFabric/counterfactualEvidence';
+import { serializeEvidencePackRoCrate, verifyEvidencePackRoCrateRoundTrip, type RoCrateRoundTripResult } from '../../core/experimentFabric/evidencePackRoCrate';
+import { useLocale } from '../../core/i18n';
+import { mvCode, mvText } from './multiverseEvidenceText';
+
+/** Questions whose reference world is the one this panel uses as WORLD A. */
+const PANEL_QUESTIONS = GOVERNED_PREPAREDNESS_QUESTIONS.filter((question) => question.baselineScenarioId === COMMAND_CENTER_BASELINE_SCENARIO_ID);
+
+interface BranchEvidenceView {
+  branchId: string;
+  evidence: CounterfactualEvidenceResult;
+  roundTrip: RoCrateRoundTripResult | null;
+  next: NextMultiverseExperiment;
+}
+
+function downloadJson(filename: string, content: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 const DEFAULT_BRANCHES: ScenarioId[] = ['ISOLATION', 'CONTACT_REDUCTION', 'HEALTHCARE_EXPANSION'];
 const WORLD_IDS = ['A', 'B', 'C', 'D'] as const;
@@ -47,6 +76,9 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
   const [selectedWorld, setSelectedWorld] = useState<WorldId>('B');
   const [playing, setPlaying] = useState(false);
   const [replay, setReplay] = useState<ReturnType<typeof replaySavedTemporalMultiverse> | null>(null);
+  const [questionId, setQuestionId] = useState('');
+  const [branchEvidence, setBranchEvidence] = useState<BranchEvidenceView | null>(null);
+  const locale = useLocale();
 
   const availableScenarios = useMemo(() => Object.values(SCENARIOS).filter((scenario) => scenario.id !== 'BASELINE'), []);
   const maxDay = multiverse ? Math.max(0, multiverse.baselineTimeline.days) : 0;
@@ -66,9 +98,16 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
   }, [playing, multiverse, maxDay]);
 
   const execute = () => {
+    // Pre-registration: the chosen question is fixed BEFORE anything runs.
+    const question = PANEL_QUESTIONS.find((entry) => entry.questionId === questionId);
+    const resolution = question ? resolvePreparednessQuestion(question.question, question.questionId) : null;
     const next = runTemporalMultiverseCommandCenter(branchScenarioIds, params, {
       branchInterventionStartDay: temporalDay ?? 0,
+      ...(resolution?.status === 'GOVERNED' && resolution.question
+        ? { preparedness: { questionId: resolution.question.questionId, askedText: resolution.askedText, resolutionFingerprint: resolution.resolutionFingerprint } }
+        : {}),
     });
+    setBranchEvidence(null);
     setMultiverse(next);
     setTimelineDay(0);
     setSelectedWorld('B');
@@ -80,6 +119,18 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
     if (!multiverse) return;
     setReplay(replaySavedTemporalMultiverse(buildSavedTemporalMultiverse(multiverse)));
   };
+
+  const buildBranchEvidence = () => {
+    if (!multiverse || selectedWorld === 'A') return;
+    const evidence = buildMultiverseBranchEvidencePack(multiverse, selectedWorld);
+    const roundTrip = evidence.pack ? verifyEvidencePackRoCrateRoundTrip(evidence.pack) : null;
+    setBranchEvidence({ branchId: selectedWorld, evidence, roundTrip, next: proposeNextMultiverseExperiment(multiverse, selectedWorld) });
+  };
+
+  const selectedLineage = multiverse && selectedWorld !== 'A'
+    ? temporalDecisionLineage(multiverse).find((entry) => entry.branchId === selectedWorld) ?? null
+    : null;
+  const shownEvidence = branchEvidence && branchEvidence.branchId === selectedWorld ? branchEvidence : null;
 
   const selectedDivergence = selectedWorld === 'A'
     ? null
@@ -120,6 +171,13 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
         </label>
       ))}
     </div>
+    <label className="temporal-question-select">{mvText('questionLabel', locale)}
+      <select value={questionId} onChange={(event) => { setQuestionId(event.target.value); setMultiverse(null); setReplay(null); setBranchEvidence(null); }}>
+        <option value="">{mvText('questionNone', locale)}</option>
+        {PANEL_QUESTIONS.map((question) => <option key={question.questionId} value={question.questionId}>{question.question}</option>)}
+      </select>
+      <small>{mvText('questionHint', locale)}</small>
+    </label>
     <button className="world-action accent scenario-run-button" onClick={execute}>▶ {temporalDay === null ? 'Utwórz WORLD A / B / C / D' : `WHAT IF? · od dnia ${temporalDay}`}</button>
 
     {!multiverse && <p className="scenario-empty">NOT_AVAILABLE — wybierz interwencje i uruchom multiverse.</p>}
@@ -179,6 +237,28 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
         <p>{replay.reason}</p>
         <p>BASELINE {replay.baselineStatus ?? 'NOT_AVAILABLE'} · {replay.branches.map(replayLabel).join(' · ')}</p>
       </div>}
+      <div className="temporal-branch-evidence" data-testid="multiverse-branch-evidence">
+        <div className="section-label">{mvText('title', locale)} · WORLD {selectedWorld}</div>
+        <span className="honesty theoretical">{mvText('demo', locale)}</span>
+        {selectedWorld === 'A' || !selectedLineage ? <p className="scenario-rationale">{mvText('selectWorld', locale)}</p> : <>
+          <p className="scenario-rationale">
+            {mvText('decision', locale)} {selectedLineage.declaredInterventionStartDay} · {selectedLineage.firstDivergentDayFromBaseline === null ? mvText('noDivergence', locale) : `${mvText('diverged', locale)} ${selectedLineage.firstDivergentDayFromBaseline}`}
+          </p>
+          <button className="world-action scenario-replay-button" onClick={buildBranchEvidence}>{mvText('build', locale)}</button>
+          {shownEvidence && <div className={`scenario-provenance ${shownEvidence.evidence.status === 'CREATED' ? 'scenario-replay-match' : 'scenario-replay-other'}`}>
+            <b>{mvCode(shownEvidence.evidence.status, locale)}</b>
+            {shownEvidence.roundTrip && <p>{mvText('roundTrip', locale)}: {mvCode(shownEvidence.roundTrip.status, locale)}</p>}
+            <p>{mvText('next', locale)}: {shownEvidence.next.status === 'READY_TO_RUN' && shownEvidence.next.proposal ? shownEvidence.next.proposal.action : mvText('nextNone', locale)}</p>
+            {shownEvidence.evidence.pack && <button className="world-action scenario-replay-button" onClick={() => downloadJson(`${shownEvidence.evidence.pack!.evidencePackId}.ro-crate.json`, serializeEvidencePackRoCrate(shownEvidence.evidence.pack!))}>⬇ {mvText('download', locale)}</button>}
+            <details>
+              <summary>{mvText('details', locale)}</summary>
+              <p>{shownEvidence.evidence.status} · {shownEvidence.evidence.reason}</p>
+              {shownEvidence.roundTrip && <p>RO-Crate {shownEvidence.roundTrip.status} · {shownEvidence.roundTrip.reason}</p>}
+              <p>{shownEvidence.next.status} · {shownEvidence.next.reason}</p>
+            </details>
+          </div>}
+        </>}
+      </div>
     </>}
   </div>;
 }

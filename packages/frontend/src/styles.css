@@ -6103,3 +6103,11 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .pilot-ab-controls select { max-width: 100%; min-width: 0; }
 .pilot-ab-result { margin-top: 0.7rem; min-width: 0; }
 .pilot-ab-result dd, .pilot-ab-result dt, .pilot-ab-result .mono { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Multiverse branch → evidence (pre-registered question + per-world pack). Fits 375/390/430 px. */
+.temporal-question-select { display: flex; flex-direction: column; gap: .25rem; margin: .4rem .68rem; min-width: 0; font-size: .62rem; }
+.temporal-question-select select { max-width: 100%; min-width: 0; font-size: .62rem; }
+.temporal-question-select small { opacity: .8; overflow-wrap: anywhere; }
+.temporal-branch-evidence { margin: .3rem .68rem .6rem; min-width: 0; display: flex; flex-direction: column; gap: .35rem; align-items: flex-start; }
+.temporal-branch-evidence p, .temporal-branch-evidence details { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+.temporal-branch-evidence .scenario-provenance { width: 100%; box-sizing: border-box; }

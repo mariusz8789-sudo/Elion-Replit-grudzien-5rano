@@ -10310,3 +10310,26 @@ Per probe, resolved from: **NUMERICAL_ARTIFACT** score/pose spread across the fi
 **Still blocked.** Sixteen assays in the combined set have no description, so their rows sit in `UNKNOWN` and are absent from this arm — `BLOCKED_EXTERNAL_DATA_ACCESS` on `www.ebi.ac.uk`.
 
 **Evidence.** Preregistration `packages/backend/src/campaign/glp1r-d153-functional-model-prereg.json` (frozen in its own commit `ee70daa5`); runner `scripts/glp1r-d153-functional-model.mjs`; sealed result `packages/backend/src/campaign/glp1r-d153-functional-model.sealed.json`; post-hoc diagnostic `scripts/glp1r-d153-posthoc-similarity.mjs` → `glp1r-d153-posthoc-similarity.json`; guard tests `packages/backend/src/campaign/glp1rD153Sealed.test.mjs` (8, including "a pass requires every leakage control to have held" and "the post-hoc diagnostic never poses as part of the preregistration").
+
+## D-154 — neither authoritative GLP-1R structure passes the selection rule, and the rule was frozen before either was read
+
+**Date:** 2026-10-03. **Requested by:** Mariusz, 2026-10-03 02:35Z: compare 7C2E and 7S15 strictly on criteria determined in advance; record source, version, resolution, receptor state, ligand context, validation report and sha256; the choice frozen before any docking; "żadnego wybierania po wyniku".
+
+**Order of work.** The rule was committed **alone** (`4252acf7`) before any code existed that could read a resolution, a mutation list or a missing-residue count. At that point only file names, byte counts and the fetch manifest had been read. Five hard eligibility filters, then a ranking order fixed in advance ending in a mechanical PDB-id tie-break, so the author never picks. UNKNOWN counts as a failure, never as a pass.
+
+**Source data.** Fetched from RCSB on 2026-10-03 by the ingest thread (branch `claude/project-thread-2wdmhf`, commit `887c54cc`), raw and unmodified, with a per-file sha256 in `docs/evidence/source-data/glp1r-2026-10-03/SOURCES.json`. This decision does not re-commit those bytes; it recomputes the sha256 of all 14 files it reads and aborts on a mismatch. A hash recorded by another thread is a claim, and it was checked first-hand.
+
+**Result — NO_STRUCTURE_SELECTED.**
+
+- **7C2E** (cryo-EM, GLP-1R–Gs complex with a small-molecule full agonist, ligand FFR, 41 heavy atoms, clashscore 4.2, 0 missing backbone residues and 0 engineered mutations inside its transmembrane region 150–407) fails on **one** criterion: resolution **4.2 Å against the 4.0 Å ceiling**. Everything else about it passes.
+- **7S15** (cryo-EM, 3.8 Å, Pfizer small-molecule agonist 82L, 43 heavy atoms) fails on **two**: no G protein or G-protein mimetic in the deposited record, so an active state cannot be established from it, and **8 engineered construct mutations inside the transmembrane region** 118–375 (positions 123, 185, 190, 196, 237, 268, 316, 323).
+
+**The transmembrane region is read from each structure's own Pfam annotation** ("7 transmembrane receptor (Secretin family)"), not from the literature, so E4 and E5 are decided by the deposited record rather than by the author's reading.
+
+**What this means, and what it does not.** Genesis still has no registrable GLP-1R docking target, `TARGETS` still carries only `ABL1_1IEP`, and `DEFAULT_DOCKING_TARGET` is untouched. 4.2 Å missing a 4.0 Å ceiling by 0.2 Å is exactly the kind of near miss a preregistration exists to make unnegotiable: at 4.2 Å a small-molecule pose is not reliably resolved, which is why the ceiling is there. The threshold is **not** relaxed now that the number is known.
+
+**The honest route forward, each requiring its own decision.** Either (a) a new decision that states, in advance and with reasoning, a different resolution criterion appropriate to cryo-EM maps, or (b) a new decision that names a wider candidate set — 6X18, 6B3J, 6LN2 and 5VEW are reachable — and applies **this same frozen rule** to it, written before any of their values are read. Widening the set after seeing these results, without a new frozen decision, would be choosing by result through the back door.
+
+**Evidence.** Preregistration `packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json` (frozen alone in `4252acf7`); runner `scripts/glp1r-d154-structure-selection.mjs`; sealed result with every field read per candidate, every eligibility verdict and the recomputed hash of all 14 source files `packages/backend/src/campaign/glp1r-d154-structure-selection.sealed.json`; guard tests `packages/backend/src/campaign/glp1rD154Sealed.test.mjs` (9, including "a NO_STRUCTURE_SELECTED verdict is not followed by a GLP-1R target in the registry anyway").
+
+**Note on one code fix after the first run.** The first run reported "no ligand in window" for both entries because the heavy-atom count was read from a chem_comp_atom block the RCSB model file does not carry. It was fixed to count the component's modelled non-hydrogen atoms in the mmCIF `atom_site` loop, giving FFR 41 and 82L 43. That fix changed no threshold and could not change either eligibility verdict, which are decided by resolution, receptor state, missing residues and mutations; it is recorded here because a correction made after seeing a result has to be visible.

@@ -1,0 +1,371 @@
+{
+  "decisionId": "D-154",
+  "preregFingerprint": "ad3c642668f176cb",
+  "preregFrozenAtCommit": "4252acf7",
+  "computedAt": "2026-10-03T02:46:09.368Z",
+  "sourceData": {
+    "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
+    "gitRef": "887c54cc",
+    "manifest": "SOURCES.json, as fetched by the ingest thread",
+    "filesVerified": 14,
+    "allHashesMatched": true,
+    "files": [
+      {
+        "path": "rcsb/7C2E/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/7C2E",
+        "retrievedAt": "2026-10-03T02:17:52Z",
+        "httpStatus": 200,
+        "bytes": 10170,
+        "sha256": "4a68dd8165c40ebce97d482550a88eca78042868e8a9960237e354ced98f50a6"
+      },
+      {
+        "path": "rcsb/7C2E/7C2E.cif",
+        "sourceUrl": "https://files.rcsb.org/download/7C2E.cif",
+        "retrievedAt": "2026-10-03T02:17:52Z",
+        "httpStatus": 200,
+        "bytes": 959370,
+        "sha256": "1141f7aacb5b9a5746e288354d844c457167a6ee8b910367a1305e067c765321"
+      },
+      {
+        "path": "rcsb/7C2E/7c2e_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/c2/7c2e/7c2e_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:17:53Z",
+        "httpStatus": 200,
+        "bytes": 34266,
+        "sha256": "6739464fe95df4095ecd10e0de772f7b0dd8fd1b5d79d37c500e02713dcddd8d"
+      },
+      {
+        "path": "rcsb/7C2E/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/1",
+        "retrievedAt": "2026-10-03T02:17:52Z",
+        "httpStatus": 200,
+        "bytes": 68944,
+        "sha256": "b7c77b4f5c209f79448e191a34ed7f924817a38d85fe72a745249cc6c410eeb0"
+      },
+      {
+        "path": "rcsb/7C2E/polymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/2",
+        "retrievedAt": "2026-10-03T02:17:52Z",
+        "httpStatus": 200,
+        "bytes": 37061,
+        "sha256": "763d909b09d86574631888b8d5f0bee96368f27e8446458d7313f39644b6aa9d"
+      },
+      {
+        "path": "rcsb/7C2E/polymer_entity_3.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/3",
+        "retrievedAt": "2026-10-03T02:17:52Z",
+        "httpStatus": 200,
+        "bytes": 25360,
+        "sha256": "d3d26a14ec56314fb7c4b4072c63372f80db26c84ccf013a7727847aabdb383e"
+      },
+      {
+        "path": "rcsb/7C2E/polymer_entity_4.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/4",
+        "retrievedAt": "2026-10-03T02:17:53Z",
+        "httpStatus": 200,
+        "bytes": 11483,
+        "sha256": "b7f1f882b6956f98d1da72d1c23f5ed117dec1d2efa5350027ddb6c47b4c9c37"
+      },
+      {
+        "path": "rcsb/7C2E/polymer_entity_5.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7C2E/5",
+        "retrievedAt": "2026-10-03T02:17:53Z",
+        "httpStatus": 200,
+        "bytes": 66957,
+        "sha256": "73bdf1fd2c09b6c37a9d636b75740660b55335fbea67cd29dcea9fdb34eb7b9c"
+      },
+      {
+        "path": "rcsb/7C2E/nonpolymer_entity_6.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7C2E/6",
+        "retrievedAt": "2026-10-03T02:17:53Z",
+        "httpStatus": 200,
+        "bytes": 1297,
+        "sha256": "b14c1f775540ff1e86649fea5eeb74054b63a4bdf9a34f543c6d1c639e9acc2f"
+      },
+      {
+        "path": "rcsb/7S15/entry.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/entry/7S15",
+        "retrievedAt": "2026-10-03T02:17:54Z",
+        "httpStatus": 200,
+        "bytes": 14971,
+        "sha256": "ceb31a33903dd75442bf3e61d478d99c2df4f078f4dc8e04f73894f36bb1f4d1"
+      },
+      {
+        "path": "rcsb/7S15/7S15.cif",
+        "sourceUrl": "https://files.rcsb.org/download/7S15.cif",
+        "retrievedAt": "2026-10-03T02:17:54Z",
+        "httpStatus": 200,
+        "bytes": 369669,
+        "sha256": "046ca75de7b357fc0bde20b212ab3d76eae326c16afbb43f9b52c5c6db7b60fb"
+      },
+      {
+        "path": "rcsb/7S15/7s15_validation.xml.gz",
+        "sourceUrl": "https://files.rcsb.org/pub/pdb/validation_reports/s1/7s15/7s15_validation.xml.gz",
+        "retrievedAt": "2026-10-03T02:17:55Z",
+        "httpStatus": 200,
+        "bytes": 23668,
+        "sha256": "b4736a54b64d36ce3f2a473b1bb13beeb89b0c2719fced0ab95554a751250902"
+      },
+      {
+        "path": "rcsb/7S15/polymer_entity_1.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/polymer_entity/7S15/1",
+        "retrievedAt": "2026-10-03T02:17:54Z",
+        "httpStatus": 200,
+        "bytes": 65129,
+        "sha256": "744fa6e9bc6fb6ec89e12b5c0f6006d885c8216e1736861f8f2bc1227df91807"
+      },
+      {
+        "path": "rcsb/7S15/nonpolymer_entity_2.json",
+        "sourceUrl": "https://data.rcsb.org/rest/v1/core/nonpolymer_entity/7S15/2",
+        "retrievedAt": "2026-10-03T02:17:54Z",
+        "httpStatus": 200,
+        "bytes": 1247,
+        "sha256": "20c337dd8a585a5138f6efb6b1af8fd5bba2541acaf80109369095b0ab40adca"
+      }
+    ]
+  },
+  "frozenRule": {
+    "humanGlp1rUniprot": "P43220",
+    "maxResolutionAngstrom": 4,
+    "ligandHeavyAtomWindow": [
+      10,
+      60
+    ],
+    "transmembraneRegionFrom": "the structure's own Pfam annotation containing \"7 transmembrane receptor\"",
+    "rankingOrder": [
+      "R1 missing backbone residues",
+      "R2 non-peptidic ligand in window",
+      "R3 resolution",
+      "R4 construct mutations",
+      "R5 clashscore",
+      "R6 PDB id"
+    ]
+  },
+  "candidates": [
+    {
+      "pdbId": "7C2E",
+      "title": "GLP-1R-Gs complex structure with a small molecule full agonist",
+      "experimentalMethod": [
+        "ELECTRON MICROSCOPY"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 4.2,
+      "initialReleaseDate": "2020-08-26T00:00:00.000+00:00",
+      "latestRevisionDate": "2025-07-02T00:00:00.000+00:00",
+      "revisionCount": 4,
+      "polymerEntityCount": 5,
+      "nonpolymerEntityCount": 1,
+      "glp1rEntity": {
+        "entityId": "5",
+        "authChains": [
+          "R"
+        ],
+        "sequenceLength": 491,
+        "sourceOrganisms": [
+          "Homo sapiens"
+        ],
+        "mutationsText": "L260F",
+        "mutationPositions": [],
+        "mutationPositionsInTransmembrane": [],
+        "transmembraneRegion": {
+          "begSeqId": 150,
+          "endSeqId": 407,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 491
+      },
+      "otherChains": [
+        "Guanine nucleotide-binding protein G(s) subunit alpha isoforms short",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1",
+        "Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2",
+        "Nanobody 35|Lama glama"
+      ],
+      "nonpolymers": [
+        {
+          "entityFile": "rcsb/7C2E/nonpolymer_entity_6.json",
+          "compId": "FFR",
+          "description": "2-[[4-[6-[(4-cyano-2-fluoranyl-phenyl)methoxy]pyridin-2-yl]-3,6-dihydro-2~{H}-pyridin-1-yl]methyl]-3-[[(2~{S})-oxetan-2-yl]methyl]imidazo[4,5-b]pyridine-5-carboxylic acid",
+          "formulaWeightKDa": 0.555,
+          "copies": 1,
+          "heavyAtomsFromCif": 41
+        }
+      ],
+      "smallMoleculeLigandInWindow": {
+        "entityFile": "rcsb/7C2E/nonpolymer_entity_6.json",
+        "compId": "FFR",
+        "description": "2-[[4-[6-[(4-cyano-2-fluoranyl-phenyl)methoxy]pyridin-2-yl]-3,6-dihydro-2~{H}-pyridin-1-yl]methyl]-3-[[(2~{S})-oxetan-2-yl]methyl]imidazo[4,5-b]pyridine-5-carboxylic acid",
+        "formulaWeightKDa": 0.555,
+        "copies": 1,
+        "heavyAtomsFromCif": 41
+      },
+      "validationReport": {
+        "clashscore": 4.2,
+        "percentRamachandranOutliers": 0,
+        "percentRotamerOutliers": 0,
+        "percentRSRZOutliers": null,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": false,
+            "observed": "4.2 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": true,
+            "observed": "active-state evidence in the record: Guanine nucleotide-binding protein G(s) subunit alpha isoforms short ; Guanine nucleotide-binding protein G(I)/G(S)/G(T) subunit beta-1 ; Guanine nucleotide-binding protein G(I)/G(S)/G(O) subunit gamma-2 ; Nanobody 35|Lama glama"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 150-407"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": true,
+            "observed": "0 engineered mutation(s) inside 150-407"
+          }
+        ],
+        "eligible": false,
+        "failed": [
+          "E2_resolution"
+        ]
+      }
+    },
+    {
+      "pdbId": "7S15",
+      "title": "GLP-1 receptor bound with Pfizer small molecule agonist",
+      "experimentalMethod": [
+        "ELECTRON MICROSCOPY"
+      ],
+      "emReconstructionMethod": [],
+      "resolutionAngstrom": 3.8,
+      "initialReleaseDate": "2022-06-08T00:00:00.000+00:00",
+      "latestRevisionDate": "2024-10-23T00:00:00.000+00:00",
+      "revisionCount": 4,
+      "polymerEntityCount": 1,
+      "nonpolymerEntityCount": 1,
+      "glp1rEntity": {
+        "entityId": "1",
+        "authChains": [
+          "R"
+        ],
+        "sequenceLength": 399,
+        "sourceOrganisms": [
+          "Homo sapiens"
+        ],
+        "mutationsText": "I146Y, A208R, Q213E, S219R, L260A, Y291A, L339E, K346Q",
+        "mutationPositions": [
+          123,
+          185,
+          190,
+          196,
+          237,
+          268,
+          316,
+          323
+        ],
+        "mutationPositionsInTransmembrane": [
+          123,
+          185,
+          190,
+          196,
+          237,
+          268,
+          316,
+          323
+        ],
+        "transmembraneRegion": {
+          "begSeqId": 118,
+          "endSeqId": 375,
+          "annotation": "7 transmembrane receptor (Secretin family) (7tm_2)"
+        },
+        "missingBackboneResidues": [],
+        "missingBackboneResidueCount": 0,
+        "missingBackboneResiduesInTransmembrane": [],
+        "modelledResidueCount": 399
+      },
+      "otherChains": [],
+      "nonpolymers": [
+        {
+          "entityFile": "rcsb/7S15/nonpolymer_entity_2.json",
+          "compId": "82L",
+          "description": "2-[(4-{6-[(2,4-difluorophenyl)methoxy]pyridin-2-yl}piperidin-1-yl)methyl]-1-[(1-ethyl-1H-imidazol-5-yl)methyl]-1H-benzimidazole-6-carboxylic acid",
+          "formulaWeightKDa": 0.587,
+          "copies": 1,
+          "heavyAtomsFromCif": 43
+        }
+      ],
+      "smallMoleculeLigandInWindow": {
+        "entityFile": "rcsb/7S15/nonpolymer_entity_2.json",
+        "compId": "82L",
+        "description": "2-[(4-{6-[(2,4-difluorophenyl)methoxy]pyridin-2-yl}piperidin-1-yl)methyl]-1-[(1-ethyl-1H-imidazol-5-yl)methyl]-1H-benzimidazole-6-carboxylic acid",
+        "formulaWeightKDa": 0.587,
+        "copies": 1,
+        "heavyAtomsFromCif": 43
+      },
+      "validationReport": {
+        "clashscore": 12.5,
+        "percentRamachandranOutliers": 0,
+        "percentRotamerOutliers": 0,
+        "percentRSRZOutliers": null,
+        "reportSource": "wwPDB validation report (XML), as fetched"
+      },
+      "eligibility": {
+        "checks": [
+          {
+            "id": "E1_isHumanGlp1r",
+            "ok": true,
+            "observed": "UniProt P43220 present, organism Homo sapiens"
+          },
+          {
+            "id": "E2_resolution",
+            "ok": true,
+            "observed": "3.8 A against a 4 A ceiling"
+          },
+          {
+            "id": "E3_activeState",
+            "ok": false,
+            "observed": "no G protein or G-protein mimetic among the other chains (receptor only)"
+          },
+          {
+            "id": "E4_pocketIntegrity",
+            "ok": true,
+            "observed": "0 missing backbone residue(s) inside 118-375"
+          },
+          {
+            "id": "E5_noPocketMutation",
+            "ok": false,
+            "observed": "8 engineered mutation(s) inside 118-375 at 123, 185, 190, 196, 237, 268, 316, 323"
+          }
+        ],
+        "eligible": false,
+        "failed": [
+          "E3_activeState",
+          "E5_noPocketMutation"
+        ]
+      }
+    }
+  ],
+  "rankingTrace": [],
+  "outcome": "NO_STRUCTURE_SELECTED",
+  "selected": null,
+  "whatThisDoesNotLicense": [
+    "Docking is not agonism. A score is a scoring-function estimate against a rigid receptor.",
+    "Binding is not functional agonism. The functional axis is D-153's, and D-153 licenses only that the efficacy axis is EVALUABLE.",
+    "A heterologous-system response is not a native-tissue response.",
+    "Selecting a target nominates no candidate and ranks nothing."
+  ],
+  "defaultDockingTarget": "ABL1_1IEP — unchanged by this decision",
+  "artifactHash": "31b2687d95d68ba1"
+}

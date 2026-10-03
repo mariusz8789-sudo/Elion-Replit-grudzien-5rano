@@ -1,16 +1,20 @@
-# Engine truth table — main 5916987b
+# Engine truth table — updated 2026-10-03 (branch claude/grant-readiness-consolidation-rj04ng)
 
-Each column is stated separately; none is inferred from another. YES / NO / NOT_VERIFIED (not checked in this audit, so not claimed).
+Each column is stated separately; none is inferred from another. YES / NO / NOT_VERIFIED (not checked, so not claimed).
+Proof for the ResearchRun columns: `researchRunEngines.real.test.mjs` runs each real engine twice through the ResearchRun route and the durable queue
+(frozen prediction, real execution, SUPPORTED and FALSIFIED verdicts, replay, database reopen, no second execution). CI job
+"Real engines through ResearchRun and the durable queue" sets GENESIS_REQUIRE_ENGINES=rdkit,pyscf,vina,openmm,admet, so a missing engine fails the job instead of skipping.
 
-| ENGINE | CONTRACT_EXISTS | INSTALLED | REFERENCE_CASE_PASS | ADMITTED | EXECUTABLE_NOW | RESEARCHRUN_INTEGRATED | REPLAYABLE | PRODUCT_ELIGIBLE | BLOCKED |
-|---|---|---|---|---|---|---|---|---|---|
-| RDKit | YES (toolchain + RESEARCH_RUN_EXECUTORS.rdkit) | YES in CI and in this sandbox (2026.03.6) | YES (CI backend job, GENESIS_REQUIRE_ENGINES=rdkit) | YES (BSD-3-Clause) | YES | YES: the only engine reachable through executeResearchExperiment, sync and async | YES (scienceCapability, existing replayer) | NOT_VERIFIED (commercial release admission not exercised for RDKit here) | — |
-| PySCF | YES (pyscfResearchRunExecutor via EngineExecutionPort) | YES in the chem-light worker container and the "Real PySCF benchmark" CI job; NO in this sandbox | YES (CI job; worker probe run 37090215393 on 86823e70 succeeded) | YES (Apache-2.0) | NOT here; yes in worker | NO: not in RESEARCH_RUN_EXECUTORS, so the ResearchRun route cannot run it | NOT_VERIFIED | NOT_VERIFIED | not routable from the ResearchRun route |
-| Vina / Meeko | YES (vinaResearchRunExecutor) | YES in structural worker container; NO here | YES (worker probe success) | licence: Apache-2.0 / LGPL, review not confirmed | worker only | NO | NOT_VERIFIED | NOT_VERIFIED | not routable from the ResearchRun route |
-| OpenMM | YES (openmmResearchRunExecutor) | YES in structural worker container; NO here | YES (worker probe success) | MIT/LGPL | worker only | NO | NOT_VERIFIED | NOT_VERIFIED | not routable from the ResearchRun route |
-| ADMET-AI | YES (admetResearchRunExecutor) | YES in admet worker container; NO here | YES (worker probe success) | admitted for TECHNICAL_VALIDATION only; COMMERCIAL_PRODUCT is BLOCKED_BY_LICENSE | worker only | NO | NOT_VERIFIED | NO (licence gate) | BLOCKED_BY_LICENSE for commercial use |
-| Retrosynthesis (AiZynthFinder) | YES (toolchain entry, route with RETROSYNTHESIS_USE_PURPOSE) | NO here; not in any worker group of the container gate | NOT_VERIFIED | TECHNICAL_VALIDATION only | NO here | NO | NOT_VERIFIED | NO (licence gate) | BLOCKED_BY_RUNTIME in this sandbox |
+| ENGINE | RESEARCHRUN_INTEGRATED | ASYNC_QUEUE_VERIFIED | ARTIFACT_PERSISTED | REPLAY | ADMISSION / PRODUCT | STATUS |
+|---|---|---|---|---|---|---|
+| RDKit | YES (executor `rdkit`) | YES (single node) | YES (bundle custody, `ARTIFACT_PERSISTED`) | MATCH (molecular-descriptors) | BSD-3-Clause; commercial admission not exercised | GREEN |
+| PySCF | YES (RHF, STO-3G/3-21G/6-31G, at most 12 atoms) | YES | YES | MATCH (quantum-chemistry) | Apache-2.0 | GREEN |
+| Vina / Meeko | YES (receptor hash frozen, RECEPTOR_PREPARATION_DRIFT guard) | YES | YES | MATCH (molecular-docking); docking score is a MODEL_ESTIMATE, not binding proof | licence review not confirmed | GREEN for execution; PRODUCT_ELIGIBLE NOT_VERIFIED |
+| OpenMM | YES (TIP3P water-box reference only, 100–2000 steps) | YES | YES | NOT_APPLICABLE: no bit-exact replayer is wired and none is claimed | MIT/LGPL | PARTIAL: reference system only, no protein/ligand MD |
+| ADMET-AI | YES (checked again at execution time) | YES | YES | MATCH (admet-estimation) | TECHNICAL_VALIDATION only; COMMERCIAL_PRODUCT is BLOCKED_BY_LICENSE at execution, tested | GREEN for technical validation; PRODUCT_ELIGIBLE NO |
+| Retrosynthesis (AiZynthFinder) | NO | NO | NO | NOT_VERIFIED | TECHNICAL_VALIDATION only | BLOCKED_BY_RUNTIME (not installed in any CI job or this sandbox) |
 
-Evidence: `packages/backend/src/campaign/toolchain.mjs` (statuses from the live probe), `researchRunEngines.mjs` (RESEARCH_RUN_EXECUTORS has only `rdkit`), workflow "Railway scientific workers — real container gate" run 37090215393 (success on main 86823e70; per-worker artifacts are not readable from this sandbox).
-
-Biggest in-repo gap exposed: four engines have real execution contracts and worker proof but are not reachable from a ResearchRun. Closing it means routing them through the existing EngineExecutionPort inside executeResearchExperiment, one engine at a time, each with a real-engine test in CI.
+Limits that stay true:
+- The queue and the artifact store are single-node (SQLite and local content-addressed files). Multi-replica and shared object storage are not proven and are labelled BLOCKED_EXTERNAL_OBJECT_STORAGE.
+- Artifact custody covers the asynchronous path. The synchronous POST route does not store an artifact.
+- A passing engine test proves the engine ran under the frozen protocol; it does not turn a model estimate into a measurement.

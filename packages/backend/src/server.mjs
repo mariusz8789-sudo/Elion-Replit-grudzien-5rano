@@ -518,7 +518,11 @@ server.listen(PORT, () => {
 // ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
 // (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
 if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
-  const worker = createResearchRunWorker(db, { artifactStorage });
+  // One worker identity per process, so a lease left by a killed process is attributable after restart.
+  // GENESIS_RESEARCH_WORKER_LEASE_MS bounds how long such an abandoned lease blocks recovery (default 30 s;
+  // the runtime rejects values outside 1 s..1 h at boot instead of guessing).
+  const leaseMs = process.env.GENESIS_RESEARCH_WORKER_LEASE_MS ? Number(process.env.GENESIS_RESEARCH_WORKER_LEASE_MS) : undefined;
+  const worker = createResearchRunWorker(db, { artifactStorage, workerId: `worker-research-run-${process.pid}`, ...(leaseMs === undefined ? {} : { leaseMs }) });
   let busy = false;
   setInterval(async () => {
     if (busy) return;

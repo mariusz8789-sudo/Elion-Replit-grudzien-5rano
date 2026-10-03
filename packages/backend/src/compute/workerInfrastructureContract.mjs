@@ -130,24 +130,28 @@ export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now
         return { ok: true, job: read(row.id) };
       });
     },
+    // Lease ownership is the lease_id of a CLAIMED row, not the wall clock. An expired lease that no other worker
+    // reclaimed (claim() would have issued a new lease_id) and that was not swept or cancelled (status would differ)
+    // still belongs to its worker: a synchronous engine call can block heartbeats past expiry without the worker
+    // being dead. Refusing it would report a job that wrote its result as lost. A taken-over lease stays refused.
     async heartbeat(jobId, leaseId, leaseMs) {
       const timestamp = now();
       const changed = db.prepare(`UPDATE jobs SET lease_expires_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`)
-        .run(timestamp + leaseMs, timestamp, jobId, leaseId, timestamp).changes;
+        WHERE id = ? AND status = 'CLAIMED' AND lease_id = ?`)
+        .run(timestamp + leaseMs, timestamp, jobId, leaseId).changes;
       return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'LEASE_NOT_ACTIVE' };
     },
     async complete(jobId, leaseId, result) {
       const timestamp = now();
       const changed = db.prepare(`UPDATE jobs SET status = 'SUCCEEDED', progress = 1, result_json = ?, worker_id = NULL,
-        lease_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`)
-        .run(JSON.stringify(result ?? {}), timestamp, jobId, leaseId, timestamp).changes;
+        lease_id = NULL, lease_expires_at = NULL, updated_at = ? WHERE id = ? AND status = 'CLAIMED' AND lease_id = ?`)
+        .run(JSON.stringify(result ?? {}), timestamp, jobId, leaseId).changes;
       return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'LEASE_NOT_ACTIVE' };
     },
     async fail(jobId, leaseId, failure) {
       return transaction(() => {
         const timestamp = now();
-        const row = db.prepare(`SELECT * FROM jobs WHERE id = ? AND status = 'CLAIMED' AND lease_id = ? AND lease_expires_at > ?`).get(jobId, leaseId, timestamp);
+        const row = db.prepare(`SELECT * FROM jobs WHERE id = ? AND status = 'CLAIMED' AND lease_id = ?`).get(jobId, leaseId);
         if (!row) return { ok: false, error: 'LEASE_NOT_ACTIVE' };
         const terminal = failure?.retryable === false || row.attempts >= row.max_attempts;
         db.prepare(`UPDATE jobs SET status = ?, failure_json = ?, worker_id = NULL, lease_id = NULL,

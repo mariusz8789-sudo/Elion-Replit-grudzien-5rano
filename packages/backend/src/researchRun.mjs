@@ -35,6 +35,7 @@ import { buildProposalPrompt, parseProposalText, validateClaimProposal } from '.
 import { recordClaimProposal } from './knowledgeRegistry.mjs';
 import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningProvider.mjs';
 import { executorPromptLines, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
+import { researchRunProvenance } from './provenanceClass.mjs';
 
 export const RESEARCH_RUN_DOMAIN = 'genesis.research-run';
 export const RESEARCH_RUN_CONTRACT_VERSION = 'research-run@1';
@@ -137,14 +138,17 @@ function view(db, run) {
   const researchState = readResearchState(db, run.id);
   const last = (type) => researchState.events.filter((e) => e.type === type).at(-1)?.payload ?? null;
   const literatureSnapshots = researchState.events.filter((event) => event.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
+  const plan = last('HYPOTHESES_GENERATED');
+  const experiments = experimentsOf(researchState);
   return {
     researchRunId: run.id,
     run,
     question: last('PROBLEM_FORMALIZED')?.question ?? run.goal,
     problem: last('PROBLEM_FORMALIZED'),
-    plan: last('HYPOTHESES_GENERATED'),
+    plan,
     literatureSnapshots,
-    experiments: experimentsOf(researchState),
+    experiments,
+    provenance: researchRunProvenance({ plan, literatureSnapshots, experiments }),
     researchState,
     nextStep: nextStepOf(run, researchState),
   };

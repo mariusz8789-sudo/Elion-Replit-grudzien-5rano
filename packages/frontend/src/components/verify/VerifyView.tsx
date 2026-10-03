@@ -142,7 +142,7 @@ function Result({ locale, r, reportUrl, reportFileName }: { locale: Locale; r: R
   return (
     <section className="vf-result" aria-labelledby="vf-result-title" data-testid="vf-result">
       <h2 id="vf-result-title" className="vf-visually-hidden">{vText('resultTitle', locale)}</h2>
-      <div className={`vf-verdict vf-tone-${r.tone}`} data-testid="vf-verdict" data-verdict={r.verdict}>
+      <div className={`vf-verdict vf-tone-${r.tone}`} data-testid="vf-verdict" data-verdict={r.verdict} tabIndex={-1} role="status" aria-live="polite">
         <span className="vf-kicker">{vText('resultTitle', locale)}</span>
         <strong>{r.verdictWord}</strong>
         <p>{r.meaning}</p>

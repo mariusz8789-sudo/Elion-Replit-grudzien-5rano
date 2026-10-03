@@ -91,6 +91,14 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
   const exportedUrl = useBlobUrl(exported?.record ?? null, exported?.mimeType ?? 'application/json');
   const result = useMemo(() => (report ? explainReport(report, locale) : null), [report, locale]);
 
+  // The verdict lands below the form; on a phone that is off screen, so bring it into view (and to the reader).
+  useEffect(() => {
+    if (!report) return;
+    const el = document.querySelector<HTMLElement>('[data-testid="vf-verdict"]');
+    el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    el?.focus({ preventScroll: true });
+  }, [report]);
+
   const resetResult = () => { setReport(null); setHtml(null); setNotice(null); };
 
   const onRun = async (id: string) => {

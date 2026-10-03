@@ -51,11 +51,36 @@ describe('D-155 external published evidence', () => {
     assert.ok(fact.citations.some((c) => c.pubMedId));
   });
 
-  test('the cAMP step, absent from the fetched records, is reported missing rather than asserted', () => {
-    const camp = EV.pathway.notInFetchedSources.find((x) => /cAMP/.test(x.missingStep ?? ''));
-    assert.ok(camp, 'the missing cAMP step must be named');
-    assert.equal(camp.label, 'NOT_IN_FETCHED_SOURCES');
-    assert.ok(!EV.pathway.sourceFacts.some((f) => /cAMP/.test(f.claim)), 'no source fact may claim the cAMP step');
+  test('the cAMP step is claimed only because fetched records state it', () => {
+    const camp = EV.pathway.sourceFacts.find((f) => f.label === 'SOURCE_FACT' && /cyclic AMP/.test(f.claim));
+    if (!camp) {
+      // The earlier state of this decision: the downstream reactions had not been fetched, so the
+      // step was declared missing. Either state is honest; what is forbidden is claiming the step
+      // without a record behind it.
+      const gap = EV.pathway.notInFetchedSources.find((x) => /cAMP/.test(x.missingStep ?? ''));
+      assert.ok(gap, 'with no source for the cAMP step it must be named as missing');
+      assert.equal(gap.label, 'NOT_IN_FETCHED_SOURCES');
+      return;
+    }
+    const ids = new Set(EV.pathway.records.map((r) => r.stId));
+    for (const stId of ['R-HSA-422320', 'R-HSA-381704', 'R-HSA-381607']) {
+      assert.ok(ids.has(stId), `${stId} must be among the records this file read`);
+    }
+    assert.ok(EV.pathway.chain.complete, 'the chain must be marked complete');
+    assert.equal(EV.pathway.chain.links.length, EV.pathway.chain.ids.length - 1);
+    for (const link of EV.pathway.chain.links) {
+      assert.match(link.establishedBy, /precedingEvent field of R-HSA-/);
+    }
+    assert.ok(camp.verbatim.some((v) => /cyclic AMP \(cAMP\)/.test(v.text ?? '')), 'the claim must carry the source wording');
+    assert.ok(!EV.pathway.notInFetchedSources.some((x) => /cAMP/.test(x.missingStep ?? '')), 'the gap must not also be reported as open');
+  });
+
+  test('the completed chain never travels without Reactome\'s own caveats', () => {
+    if (!EV.pathway.sourceFacts.some((f) => /cyclic AMP/.test(f.claim ?? ''))) return;
+    const cuts = EV.pathway.sourceFacts.find((f) => f.label === 'SOURCE_FACT_THAT_CUTS_THE_OTHER_WAY');
+    assert.ok(cuts, 'the counterweight must be present once the chain is claimed complete');
+    assert.match(cuts.claim, /not observed to significantly dissociate/);
+    assert.match(cuts.claim, /rat beta cells/);
   });
 
   test('the RNA numbers never travel without HPA\'s own antibody result', () => {

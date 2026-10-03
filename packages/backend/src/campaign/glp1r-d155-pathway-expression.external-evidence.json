@@ -4,32 +4,73 @@
   "epistemicStatus": "EXTERNAL_PUBLISHED",
   "isGenesisResult": false,
   "statement": "Everything below was published by Reactome or the Human Protein Atlas. Genesis did not measure, model or compute any of it, and nothing here may be presented as a Genesis experimental result.",
-  "computedAt": "2026-10-03T02:50:29.094Z",
+  "computedAt": "2026-10-03T03:19:42.093Z",
   "sourceData": {
     "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
     "gitRef": "887c54cc",
-    "filesVerified": 4,
+    "campChainDir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+    "campChainGitRef": "4b2ba665",
+    "filesVerified": 9,
     "allHashesMatched": true,
     "files": [
       {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
         "path": "reactome/database-version.txt",
         "sourceUrl": "https://reactome.org/ContentService/data/database/version",
         "retrievedAt": "2026-10-03T02:17:55Z",
         "sha256": "d6d824abba4afde81129c71dea75b8100e96338da5f416d2f69088f1960cb091"
       },
       {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
         "path": "reactome/R-HSA-381684.enhanced.json",
         "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381684",
         "retrievedAt": "2026-10-03T02:17:55Z",
         "sha256": "4700cb0848a249c8429730676a156a8ec5d7b308aa7b7b66c06d220e240a0d9e"
       },
       {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
         "path": "reactome/R-HSA-381706.enhanced.json",
         "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381706",
         "retrievedAt": "2026-10-03T02:17:56Z",
         "sha256": "ced9581ad2851eaada65d07779a0c92fd28cf660528e726f0a799292cefea7e5"
       },
       {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+        "path": "reactome/database-version.txt",
+        "sourceUrl": "https://reactome.org/ContentService/data/database/version",
+        "retrievedAt": "2026-10-03T03:03:32Z",
+        "sha256": "d6d824abba4afde81129c71dea75b8100e96338da5f416d2f69088f1960cb091"
+      },
+      {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+        "path": "reactome/R-HSA-422320.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-422320",
+        "retrievedAt": "2026-10-03T03:03:33Z",
+        "sha256": "67539fb273b2cc3466f78f0f184276d5a502ca5113a3a02944836de09f7f2709"
+      },
+      {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+        "path": "reactome/R-HSA-381704.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381704",
+        "retrievedAt": "2026-10-03T03:03:33Z",
+        "sha256": "92bd8db3ed23a5cde78320833aa749e9e5796477811286fa756ae3bd398f508f"
+      },
+      {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+        "path": "reactome/R-HSA-381607.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381607",
+        "retrievedAt": "2026-10-03T03:03:34Z",
+        "sha256": "314040daea05975dac1944f2fedbdef153fc3d443251841c920c6f440d27337b"
+      },
+      {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/gscamp",
+        "path": "reactome/R-HSA-381676.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381676",
+        "retrievedAt": "2026-10-03T03:03:34Z",
+        "sha256": "b640d6f336cd1dfdb4834d5eb74760e8baf2ab523202ba7d4830c00d8315e847"
+      },
+      {
+        "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
         "path": "hpa/ENSG00000112164.json",
         "sourceUrl": "https://www.proteinatlas.org/ENSG00000112164.json",
         "retrievedAt": "2026-10-03T02:17:56Z",
@@ -103,8 +144,185 @@
             "year": 2009
           }
         ]
+      },
+      {
+        "stId": "R-HSA-422320",
+        "recordVersion": "R-HSA-422320.4",
+        "displayName": "Heterotrimeric G(s) complex dissociates",
+        "schemaClass": "Reaction",
+        "species": "Homo sapiens",
+        "releaseDate": "2010-06-15",
+        "reviewStatus": "five stars",
+        "reviewStatusMeaning": "externally reviewed",
+        "compartments": [
+          "plasma membrane"
+        ],
+        "input": [],
+        "output": [
+          "G-beta:G-gamma (candidates) [plasma membrane]",
+          "G alpha (s):GTP [plasma membrane]"
+        ],
+        "catalystActivity": [
+          "G protein activity of G-alpha(s):GTP:G-beta:G-gamma [plasma membrane]"
+        ],
+        "partOfPathway": [
+          "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
+        ],
+        "precedingEvent": [
+          "GLP1R:GLP1 activates G(s)",
+          "AVP:AVPR2:heterotrimeric G(s) complex exchanges GDP for GTP"
+        ],
+        "followingEvent": [
+          "G(s):GTP activates Adenylyl cyclase",
+          "G alpha (s) activates adenylate cyclase"
+        ],
+        "summationVerbatim": "The binding of GTP by G(s) alpha causes the heterotrimeric G-protein complex to reorientate, exposing previously bound faces of the G(s) alpha:GTP complex and the G-beta: G-gamma complex. Unlike the case with Gi/o heterotrimers, Gs heterotrimers are not observed to significantly dissociate in living cells.",
+        "literatureReferences": [
+          {
+            "pubMedId": 18577758,
+            "title": "Dissociation of heterotrimeric g proteins in cells",
+            "journal": "Sci Signal",
+            "year": 2008
+          },
+          {
+            "pubMedId": 17095603,
+            "title": "Some G protein heterotrimers physically dissociate in living cells",
+            "journal": "Proc Natl Acad Sci U S A",
+            "year": 2006
+          }
+        ]
+      },
+      {
+        "stId": "R-HSA-381704",
+        "recordVersion": "R-HSA-381704.3",
+        "displayName": "G(s):GTP activates Adenylyl cyclase",
+        "schemaClass": "Reaction",
+        "species": "Homo sapiens",
+        "releaseDate": "2009-06-24",
+        "reviewStatus": "five stars",
+        "reviewStatusMeaning": "externally reviewed",
+        "compartments": [
+          "plasma membrane"
+        ],
+        "input": [
+          "Adenylyl cyclase [plasma membrane]"
+        ],
+        "output": [
+          "ADCY5,6,8:G-alpha(s):GTP [plasma membrane]"
+        ],
+        "catalystActivity": [
+          "adenylate cyclase activator activity of G alpha (s):GTP [plasma membrane]"
+        ],
+        "partOfPathway": [
+          "Glucagon signaling in metabolic regulation",
+          "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
+        ],
+        "precedingEvent": [
+          "Heterotrimeric G(s) complex dissociates"
+        ],
+        "followingEvent": [
+          "Activated Adenylyl cyclase synthesizes cyclic AMP"
+        ],
+        "summationVerbatim": "By analogy with adenylyl cyclases I and II, adenylyl cyclase VIII is activated by G(s) alpha:GTP by protein-protein interaction between G(s) alpha and the C2 region of adenylyl cyclase VIII, forming a complex. Adenylyl cyclase VIII is present in beta cells of rat and is activated by both G(s) alpha:GTP and calcium:calmodulin, thus integrating signals from both GLP-1 via G(s) alpha and glucose via calcium. Human beta cells contain adenylyl cyclases V and VI, which are also activated by G(s) alpha:GTP, and may contain additional adenylyl cyclases.",
+        "literatureReferences": [
+          {
+            "pubMedId": 9920805,
+            "title": "Expression of adenylyl cyclase subtypes in pancreatic beta-cells",
+            "journal": "Biochem Biophys Res Commun",
+            "year": 1999
+          }
+        ]
+      },
+      {
+        "stId": "R-HSA-381607",
+        "recordVersion": "R-HSA-381607.3",
+        "displayName": "Activated Adenylyl cyclase synthesizes cyclic AMP",
+        "schemaClass": "Reaction",
+        "species": "Homo sapiens",
+        "releaseDate": "2009-06-24",
+        "reviewStatus": "five stars",
+        "reviewStatusMeaning": "externally reviewed",
+        "compartments": [
+          "cytosol",
+          "plasma membrane"
+        ],
+        "input": [
+          "ATP [cytosol]"
+        ],
+        "output": [
+          "PPi [cytosol]",
+          "cAMP [cytosol]"
+        ],
+        "catalystActivity": [
+          "adenylate cyclase activity of ADCY5,6,8:G-alpha(s):GTP [plasma membrane]"
+        ],
+        "partOfPathway": [
+          "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
+        ],
+        "precedingEvent": [
+          "G(s):GTP activates Adenylyl cyclase"
+        ],
+        "followingEvent": [
+          "cAMP activates EPAC2",
+          "cAMP activates EPAC1",
+          "PKA:AKAP79:IQGAP1 complex dissociates to active PKA subunits in response to cAMP"
+        ],
+        "summationVerbatim": "Activated adenylyl cyclase catalyzes the conversion of one molecule of ATP to one molecule of 3',5'-cyclic AMP (cAMP) and one molecule of pyrophosphate.",
+        "literatureReferences": [
+          {
+            "pubMedId": 7589461,
+            "title": "Stimulation of cloned human glucagon-like peptide 1 receptor expressed in HEK 293 cells induces cAMP-dependent activation of calcium-induced calcium release",
+            "journal": "FEBS Lett",
+            "year": 1995
+          },
+          {
+            "pubMedId": 10318832,
+            "title": "cAMP-dependent mobilization of intracellular Ca2+ stores by activation of ryanodine receptors in pancreatic beta-cells. A Ca2+ signaling system stimulated by the insulinotropic hormone glucagon-like peptide-1-(7-37)",
+            "journal": "J Biol Chem",
+            "year": 1999
+          }
+        ]
       }
     ],
+    "chain": {
+      "ids": [
+        "R-HSA-381706",
+        "R-HSA-422320",
+        "R-HSA-381704",
+        "R-HSA-381607"
+      ],
+      "complete": true,
+      "links": [
+        {
+          "from": "R-HSA-381706",
+          "fromName": "GLP1R:GLP1 activates G(s)",
+          "to": "R-HSA-422320",
+          "toName": "Heterotrimeric G(s) complex dissociates",
+          "establishedBy": "precedingEvent field of R-HSA-422320"
+        },
+        {
+          "from": "R-HSA-422320",
+          "fromName": "Heterotrimeric G(s) complex dissociates",
+          "to": "R-HSA-381704",
+          "toName": "G(s):GTP activates Adenylyl cyclase",
+          "establishedBy": "precedingEvent field of R-HSA-381704"
+        },
+        {
+          "from": "R-HSA-381704",
+          "fromName": "G(s):GTP activates Adenylyl cyclase",
+          "to": "R-HSA-381607",
+          "toName": "Activated Adenylyl cyclase synthesizes cyclic AMP",
+          "establishedBy": "precedingEvent field of R-HSA-381607"
+        }
+      ],
+      "howEstablished": "Each link was checked against the precedingEvent field of the downstream Reactome record. The chain is read out of the source; this file does not assert it.",
+      "containingPathway": {
+        "stId": "R-HSA-381676",
+        "recordVersion": "R-HSA-381676.9",
+        "displayName": "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion",
+        "summationVerbatim": "Glucagon-like Peptide-1 (GLP-1) is secreted by L-cells in the intestine in response to glucose and fatty acids. GLP-1 circulates to the beta cells of the pancreas where it binds a G-protein coupled receptor, GLP-1R, on the plasma membrane. The binding activates the heterotrimeric G-protein G(s), causing the alpha subunit of G(s) to exchange GDP for GTP and dissociate from the beta and gamma subunits.<br>The activated G(s) alpha subunit interacts with Adenylyl Cyclase VIII (Adenylate Cyclase VIII, AC VIII) and activates AC VIII to produce cyclic AMP (cAMP). cAMP then has two effects: 1) cAMP activates Protein Kinase A (PKA), and 2) cAMP activates Epac1 and Epac2, two guanyl nucleotide exchange factors.<br>Binding of cAMP to PKA causes the catalytic subunits of PKA to dissociate from the regulatory subunits and become an active kinase. PKA is known to enhance insulin secretion by closing ATP-sensitive potassium channels, closing voltage-gated potassium channels, releasing calcium from the endoplasmic reticulum, and affecting insulin secretory granules. The exact mechanisms for PKA's action are not fully known. After prolonged increases in cAMP, PKA  translocates to the nucleus where it regulates the PDX-1 and CREB transcription factors, activating transcription of the insulin gene.<br>cAMP produced by AC VIII also activates Epac1 and Epac2, which catalyze the exchange of GTP for GDP on G-proteins, notably Rap1A. Rap1A regulates insulin secretory granules and is believed to activate the Raf/MEK/ERK mitogenic pathway leading to proliferation of beta cells. The Epac proteins also interact with RYR calcium channels on the endoplasmic reticulum, the SUR1 subunits of ATP-sensitive potassium channels, and the Piccolo:Rim2 calcium sensor at the plasma membrane."
+      }
+    },
     "sourceFacts": [
       {
         "label": "SOURCE_FACT",
@@ -122,25 +340,111 @@
         "partOfPathway": [
           "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
         ]
-      }
-    ],
-    "notInFetchedSources": [
+      },
       {
-        "label": "NOT_IN_FETCHED_SOURCES",
-        "missingStep": "Gs -> adenylate cyclase -> cAMP",
-        "whatThisMeans": "The two Reactome records fetched cover GLP-1R binding GLP-1 and the activation of G(s). Neither of them states the cAMP step. So the \"-> cAMP\" half of the requested chain is NOT source-backed by what this repository holds, and it is not written down here as if it were. Closing it needs the downstream Reactome reaction fetched and hash-recorded like these two.",
-        "doNotInfer": "That G(s) canonically raises cAMP is textbook knowledge. Textbook knowledge recalled by a model is not a source, and this file does not carry it as one."
+        "label": "SOURCE_FACT",
+        "claim": "In human, activated G(s) alpha:GTP activates adenylyl cyclase, and the activated enzyme converts ATP to cyclic AMP. With the receptor-to-G(s) reaction above, that completes the GLP-1R -> Gs -> cAMP chain in Reactome's own records.",
+        "source": "Reactome R-HSA-422320 (R-HSA-422320.4) \"Heterotrimeric G(s) complex dissociates\"; R-HSA-381704 (R-HSA-381704.3) \"G(s):GTP activates Adenylyl cyclase\"; R-HSA-381607 (R-HSA-381607.3) \"Activated Adenylyl cyclase synthesizes cyclic AMP\", all Homo sapiens",
+        "verbatim": [
+          {
+            "stId": "R-HSA-422320",
+            "text": "The binding of GTP by G(s) alpha causes the heterotrimeric G-protein complex to reorientate, exposing previously bound faces of the G(s) alpha:GTP complex and the G-beta: G-gamma complex. Unlike the case with Gi/o heterotrimers, Gs heterotrimers are not observed to significantly dissociate in living cells."
+          },
+          {
+            "stId": "R-HSA-381704",
+            "text": "By analogy with adenylyl cyclases I and II, adenylyl cyclase VIII is activated by G(s) alpha:GTP by protein-protein interaction between G(s) alpha and the C2 region of adenylyl cyclase VIII, forming a complex. Adenylyl cyclase VIII is present in beta cells of rat and is activated by both G(s) alpha:GTP and calcium:calmodulin, thus integrating signals from both GLP-1 via G(s) alpha and glucose via calcium. Human beta cells contain adenylyl cyclases V and VI, which are also activated by G(s) alpha:GTP, and may contain additional adenylyl cyclases."
+          },
+          {
+            "stId": "R-HSA-381607",
+            "text": "Activated adenylyl cyclase catalyzes the conversion of one molecule of ATP to one molecule of 3',5'-cyclic AMP (cAMP) and one molecule of pyrophosphate."
+          }
+        ],
+        "citations": [
+          {
+            "pubMedId": 18577758,
+            "title": "Dissociation of heterotrimeric g proteins in cells",
+            "journal": "Sci Signal",
+            "year": 2008
+          },
+          {
+            "pubMedId": 17095603,
+            "title": "Some G protein heterotrimers physically dissociate in living cells",
+            "journal": "Proc Natl Acad Sci U S A",
+            "year": 2006
+          },
+          {
+            "pubMedId": 9920805,
+            "title": "Expression of adenylyl cyclase subtypes in pancreatic beta-cells",
+            "journal": "Biochem Biophys Res Commun",
+            "year": 1999
+          },
+          {
+            "pubMedId": 7589461,
+            "title": "Stimulation of cloned human glucagon-like peptide 1 receptor expressed in HEK 293 cells induces cAMP-dependent activation of calcium-induced calcium release",
+            "journal": "FEBS Lett",
+            "year": 1995
+          },
+          {
+            "pubMedId": 10318832,
+            "title": "cAMP-dependent mobilization of intracellular Ca2+ stores by activation of ryanodine receptors in pancreatic beta-cells. A Ca2+ signaling system stimulated by the insulinotropic hormone glucagon-like peptide-1-(7-37)",
+            "journal": "J Biol Chem",
+            "year": 1999
+          }
+        ],
+        "chainLinks": [
+          {
+            "from": "R-HSA-381706",
+            "fromName": "GLP1R:GLP1 activates G(s)",
+            "to": "R-HSA-422320",
+            "toName": "Heterotrimeric G(s) complex dissociates",
+            "establishedBy": "precedingEvent field of R-HSA-422320"
+          },
+          {
+            "from": "R-HSA-422320",
+            "fromName": "Heterotrimeric G(s) complex dissociates",
+            "to": "R-HSA-381704",
+            "toName": "G(s):GTP activates Adenylyl cyclase",
+            "establishedBy": "precedingEvent field of R-HSA-381704"
+          },
+          {
+            "from": "R-HSA-381704",
+            "fromName": "G(s):GTP activates Adenylyl cyclase",
+            "to": "R-HSA-381607",
+            "toName": "Activated Adenylyl cyclase synthesizes cyclic AMP",
+            "establishedBy": "precedingEvent field of R-HSA-381607"
+          }
+        ],
+        "output": [
+          "PPi [cytosol]",
+          "cAMP [cytosol]"
+        ]
+      },
+      {
+        "label": "SOURCE_FACT_THAT_CUTS_THE_OTHER_WAY",
+        "claim": "Reactome's own summation for the dissociation step says that, unlike Gi/o heterotrimers, Gs heterotrimers are not observed to significantly dissociate in living cells; and the adenylyl-cyclase step states that the AC VIII evidence is by analogy with AC I and II and comes from rat beta cells, with human beta cells carrying AC V and VI.",
+        "whyItIsHere": "The chain is complete as a Reactome pathway, which is not the same as every step being established in human cells by direct observation. Quoting the chain without these two sentences would overstate what the source says.",
+        "verbatim": [
+          {
+            "stId": "R-HSA-422320",
+            "text": "The binding of GTP by G(s) alpha causes the heterotrimeric G-protein complex to reorientate, exposing previously bound faces of the G(s) alpha:GTP complex and the G-beta: G-gamma complex. Unlike the case with Gi/o heterotrimers, Gs heterotrimers are not observed to significantly dissociate in living cells."
+          },
+          {
+            "stId": "R-HSA-381704",
+            "text": "By analogy with adenylyl cyclases I and II, adenylyl cyclase VIII is activated by G(s) alpha:GTP by protein-protein interaction between G(s) alpha and the C2 region of adenylyl cyclase VIII, forming a complex. Adenylyl cyclase VIII is present in beta cells of rat and is activated by both G(s) alpha:GTP and calcium:calmodulin, thus integrating signals from both GLP-1 via G(s) alpha and glucose via calcium. Human beta cells contain adenylyl cyclases V and VI, which are also activated by G(s) alpha:GTP, and may contain additional adenylyl cyclases."
+          }
+        ]
       }
     ],
+    "notInFetchedSources": [],
     "inferences": [
       {
         "label": "INFERENCE_BY_GENESIS",
         "statement": "A functional cAMP-arm agonism assay is a reasonable readout for GLP-1R activation, which is the endpoint role D-151/D-152 already classify on.",
         "restsOn": [
-          "the SOURCE_FACT above, for the receptor-to-G(s) step"
+          "the SOURCE_FACTs above, which now cover the whole receptor-to-cAMP chain in Reactome"
         ],
         "doesNotRestOn": [
-          "any fetched source for the G(s)-to-cAMP step, which is missing"
+          "any Genesis measurement; a pathway record says what the biology is held to do, not what any molecule does"
         ],
         "isNotEvidence": "This is Genesis joining records. It is reasoning, not a published finding, and it is not evidence that any molecule activates anything."
       }
@@ -241,5 +545,5 @@
     "Binding is not functional agonism; docking is not agonism; a heterologous-system response is not a native-tissue response.",
     "None of this changes any frozen gate, any sealed artefact, or D-144, D-151, D-152, D-153 or D-154."
   ],
-  "artifactHash": "54f8254027006cbb"
+  "artifactHash": "8d52beb52e0024e6"
 }

@@ -25,25 +25,32 @@ const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d155-pathw
 const argOf = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const SRC = argOf('--source-dir', path.join(ROOT, 'docs/evidence/source-data/glp1r-2026-10-03'));
 const SRC_REF = argOf('--source-ref', null);
+// The Gs -> adenylyl cyclase -> cAMP reactions were fetched separately, after this decision first
+// recorded that step as NOT_IN_FETCHED_SOURCES. Passing the directory closes the gap from a source;
+// leaving it out reproduces the earlier output, with the step still declared missing.
+const CAMP_SRC = argOf('--camp-source-dir', null);
+const CAMP_SRC_REF = argOf('--camp-source-ref', null);
 
-const sources = JSON.parse(fs.readFileSync(path.join(SRC, 'SOURCES.json'), 'utf8'));
-const declared = new Map((sources.files ?? []).map((f) => [f.path, f]));
 const verified = [];
-function readVerified(rel) {
-  const abs = path.join(SRC, rel);
-  const bytes = fs.readFileSync(abs);
-  const computed = createHash('sha256').update(bytes).digest('hex');
-  const rec = declared.get(rel);
-  if (!rec) { console.error(`SOURCE_NOT_IN_MANIFEST: ${rel}`); process.exit(1); }
-  if (rec.sha256 !== computed) { console.error(`SOURCE_HASH_MISMATCH: ${rel}`); process.exit(1); }
-  verified.push({ path: rel, sourceUrl: rec.sourceUrl, retrievedAt: rec.retrievedAt, sha256: computed });
-  return bytes.toString('utf8');
+function loaderFor(dir) {
+  const sources = JSON.parse(fs.readFileSync(path.join(dir, 'SOURCES.json'), 'utf8'));
+  const declared = new Map((sources.files ?? []).map((f) => [f.path, f]));
+  return function readVerified(rel) {
+    const bytes = fs.readFileSync(path.join(dir, rel));
+    const computed = createHash('sha256').update(bytes).digest('hex');
+    const rec = declared.get(rel);
+    if (!rec) { console.error(`SOURCE_NOT_IN_MANIFEST: ${rel}`); process.exit(1); }
+    if (rec.sha256 !== computed) { console.error(`SOURCE_HASH_MISMATCH: ${rel}`); process.exit(1); }
+    verified.push({ dir: path.relative(ROOT, dir) || dir, path: rel, sourceUrl: rec.sourceUrl, retrievedAt: rec.retrievedAt, sha256: computed });
+    return bytes.toString('utf8');
+  };
 }
+const readVerified = loaderFor(SRC);
+const readVerifiedCamp = CAMP_SRC ? loaderFor(CAMP_SRC) : null;
 
 /* --------------------------------- Reactome ----------------------------------- */
 const reactomeVersion = readVerified('reactome/database-version.txt').trim();
-const reactomeRecords = ['R-HSA-381684', 'R-HSA-381706'].map((stId) => {
-  const d = JSON.parse(readVerified(`reactome/${stId}.enhanced.json`));
+function shapeEvent(d) {
   const names = (v) => (Array.isArray(v) ? v.map((x) => (x && typeof x === 'object' ? x.displayName ?? null : x)).filter((x) => typeof x === 'string') : []);
   const refs = Array.isArray(d.literatureReference)
     ? d.literatureReference.filter((x) => x && typeof x === 'object')
@@ -68,10 +75,45 @@ const reactomeRecords = ['R-HSA-381684', 'R-HSA-381706'].map((stId) => {
     summationVerbatim: Array.isArray(d.summation) && d.summation[0]?.text ? d.summation[0].text : null,
     literatureReferences: refs,
   };
-});
+}
+const reactomeRecords = ['R-HSA-381684', 'R-HSA-381706']
+  .map((stId) => shapeEvent(JSON.parse(readVerified(`reactome/${stId}.enhanced.json`))));
+
+// The downstream half of the chain, when its directory is given. CHAIN_IDS are in the order the
+// chain runs; the link between consecutive steps is then checked against Reactome's OWN
+// precedingEvent field, so the chain is read out of the source rather than asserted here.
+const CHAIN_IDS = ['R-HSA-381706', 'R-HSA-422320', 'R-HSA-381704', 'R-HSA-381607'];
+let campRecords = [];
+let campPathway = null;
+let chainLinks = [];
+if (readVerifiedCamp) {
+  const campVersion = readVerifiedCamp('reactome/database-version.txt').trim();
+  if (campVersion !== reactomeVersion) {
+    console.error(`REACTOME_VERSION_MISMATCH: ${reactomeVersion} vs ${campVersion}`);
+    process.exit(1);
+  }
+  campRecords = ['R-HSA-422320', 'R-HSA-381704', 'R-HSA-381607']
+    .map((stId) => shapeEvent(JSON.parse(readVerifiedCamp(`reactome/${stId}.enhanced.json`))));
+  campPathway = shapeEvent(JSON.parse(readVerifiedCamp('reactome/R-HSA-381676.enhanced.json')));
+  const byId = new Map([...reactomeRecords, ...campRecords].map((r) => [r.stId, r]));
+  for (let i = 1; i < CHAIN_IDS.length; i += 1) {
+    const prev = byId.get(CHAIN_IDS[i - 1]);
+    const here = byId.get(CHAIN_IDS[i]);
+    if (!prev || !here) { console.error(`CHAIN_RECORD_MISSING: ${CHAIN_IDS[i - 1]} -> ${CHAIN_IDS[i]}`); process.exit(1); }
+    const linkedInSource = here.precedingEvent.includes(prev.displayName);
+    if (!linkedInSource) {
+      console.error(`CHAIN_NOT_LINKED_IN_SOURCE: ${here.stId} does not list "${prev.displayName}" as a preceding event`);
+      process.exit(1);
+    }
+    chainLinks.push({ from: prev.stId, fromName: prev.displayName, to: here.stId, toName: here.displayName, establishedBy: `precedingEvent field of ${here.stId}` });
+  }
+}
+
 const gsReaction = reactomeRecords.find((r) => r.stId === 'R-HSA-381706');
+const campReaction = campRecords.find((r) => r.stId === 'R-HSA-381607') ?? null;
 const mentionsCamp = (text) => /cAMP|adenylate cyclase|adenylyl cyclase/i.test(String(text ?? ''));
-const campInFetchedReactome = reactomeRecords.some((r) => mentionsCamp(r.summationVerbatim)
+const allRecords = [...reactomeRecords, ...campRecords];
+const campInFetchedReactome = allRecords.some((r) => mentionsCamp(r.summationVerbatim)
   || r.output.some(mentionsCamp) || r.followingEvent.some(mentionsCamp) || r.catalystActivity.some(mentionsCamp));
 
 /* ------------------------------ Human Protein Atlas ---------------------------- */
@@ -113,12 +155,27 @@ const out = {
   isGenesisResult: false,
   statement: 'Everything below was published by Reactome or the Human Protein Atlas. Genesis did not measure, model or compute any of it, and nothing here may be presented as a Genesis experimental result.',
   computedAt: new Date().toISOString(),
-  sourceData: { dir: path.relative(ROOT, SRC) || SRC, gitRef: SRC_REF, filesVerified: verified.length, allHashesMatched: true, files: verified },
+  sourceData: {
+    dir: path.relative(ROOT, SRC) || SRC,
+    gitRef: SRC_REF,
+    campChainDir: CAMP_SRC ? (path.relative(ROOT, CAMP_SRC) || CAMP_SRC) : null,
+    campChainGitRef: CAMP_SRC_REF,
+    filesVerified: verified.length,
+    allHashesMatched: true,
+    files: verified,
+  },
 
   pathway: {
     question: 'GLP-1R -> Gs -> cAMP',
     reactomeDatabaseVersion: reactomeVersion,
-    records: reactomeRecords,
+    records: allRecords,
+    chain: {
+      ids: CHAIN_IDS,
+      complete: chainLinks.length === CHAIN_IDS.length - 1,
+      links: chainLinks,
+      howEstablished: 'Each link was checked against the precedingEvent field of the downstream Reactome record. The chain is read out of the source; this file does not assert it.',
+      containingPathway: campPathway ? { stId: campPathway.stId, recordVersion: campPathway.recordVersion, displayName: campPathway.displayName, summationVerbatim: campPathway.summationVerbatim } : null,
+    },
     sourceFacts: [
       {
         label: 'SOURCE_FACT',
@@ -128,6 +185,23 @@ const out = {
         citations: gsReaction?.literatureReferences ?? [],
         partOfPathway: gsReaction?.partOfPathway ?? [],
       },
+      ...(campReaction ? [
+        {
+          label: 'SOURCE_FACT',
+          claim: 'In human, activated G(s) alpha:GTP activates adenylyl cyclase, and the activated enzyme converts ATP to cyclic AMP. With the receptor-to-G(s) reaction above, that completes the GLP-1R -> Gs -> cAMP chain in Reactome\'s own records.',
+          source: `Reactome ${campRecords.map((r) => `${r.stId} (${r.recordVersion}) "${r.displayName}"`).join('; ')}, all ${campReaction.species}`,
+          verbatim: campRecords.map((r) => ({ stId: r.stId, text: r.summationVerbatim })),
+          citations: campRecords.flatMap((r) => r.literatureReferences),
+          chainLinks,
+          output: campReaction.output,
+        },
+        {
+          label: 'SOURCE_FACT_THAT_CUTS_THE_OTHER_WAY',
+          claim: 'Reactome\'s own summation for the dissociation step says that, unlike Gi/o heterotrimers, Gs heterotrimers are not observed to significantly dissociate in living cells; and the adenylyl-cyclase step states that the AC VIII evidence is by analogy with AC I and II and comes from rat beta cells, with human beta cells carrying AC V and VI.',
+          whyItIsHere: 'The chain is complete as a Reactome pathway, which is not the same as every step being established in human cells by direct observation. Quoting the chain without these two sentences would overstate what the source says.',
+          verbatim: campRecords.filter((r) => ['R-HSA-422320', 'R-HSA-381704'].includes(r.stId)).map((r) => ({ stId: r.stId, text: r.summationVerbatim })),
+        },
+      ] : []),
     ],
     notInFetchedSources: campInFetchedReactome ? [] : [
       {
@@ -141,8 +215,12 @@ const out = {
       {
         label: 'INFERENCE_BY_GENESIS',
         statement: 'A functional cAMP-arm agonism assay is a reasonable readout for GLP-1R activation, which is the endpoint role D-151/D-152 already classify on.',
-        restsOn: ['the SOURCE_FACT above, for the receptor-to-G(s) step'],
-        doesNotRestOn: ['any fetched source for the G(s)-to-cAMP step, which is missing'],
+        restsOn: campReaction
+          ? ['the SOURCE_FACTs above, which now cover the whole receptor-to-cAMP chain in Reactome']
+          : ['the SOURCE_FACT above, for the receptor-to-G(s) step'],
+        doesNotRestOn: campReaction
+          ? ['any Genesis measurement; a pathway record says what the biology is held to do, not what any molecule does']
+          : ['any fetched source for the G(s)-to-cAMP step, which is missing'],
         isNotEvidence: 'This is Genesis joining records. It is reasoning, not a published finding, and it is not evidence that any molecule activates anything.',
       },
     ],
@@ -192,7 +270,8 @@ const out = {
 out.artifactHash = canonicalHash(out).slice(0, 16);
 fs.writeFileSync(OUT_PATH, `${JSON.stringify(out, null, 2)}\n`);
 
-console.log(`Reactome ${reactomeVersion}: ${reactomeRecords.map((r) => `${r.stId} ${r.displayName}`).join(' | ')}`);
+console.log(`Reactome ${reactomeVersion}: ${allRecords.map((r) => `${r.stId} ${r.displayName}`).join(' | ')}`);
 console.log(`cAMP step present in fetched Reactome records: ${campInFetchedReactome}`);
+console.log(`chain ${CHAIN_IDS.join(' -> ')}: ${chainLinks.length === CHAIN_IDS.length - 1 ? 'complete, every link verified against the downstream record own precedingEvent field' : 'INCOMPLETE'}`);
 console.log(`HPA RNA: ${JSON.stringify(hpaRecord.rna.tissueSpecificNtpm)}; HPA antibody protein detection: ${hpaRecord.proteinByAntibodyStaining.tissueSpecificity}`);
 console.log(`\nexternal evidence -> ${path.relative(ROOT, OUT_PATH)} (${out.artifactHash}), ${verified.length} files hash-verified`);

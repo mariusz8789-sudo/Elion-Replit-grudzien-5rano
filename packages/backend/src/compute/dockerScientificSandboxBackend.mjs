@@ -83,22 +83,32 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
     async attest() {
       const version = await processRunner(docker, ['version', '--format', '{{.Server.Version}}'], { timeoutMs: 10_000, maxOutputBytes: 16_384 });
       if (version.exitCode !== 0 || version.timedOut || version.outputLimitExceeded) return missingAttestation('DOCKER_RUNTIME_UNAVAILABLE');
+      // A reachable daemon alone proves nothing about isolation. Docker silently ignores --memory,
+      // --pids-limit and --cpus (with only a warning) when the kernel lacks the cgroup controller,
+      // and a non-Linux daemon does not run Linux containers. Ask the daemon what it can enforce.
+      const info = await processRunner(docker, ['info', '--format', '{{json .}}'], { timeoutMs: 10_000, maxOutputBytes: 1_000_000 });
+      if (info.exitCode !== 0 || info.timedOut || info.outputLimitExceeded) return missingAttestation('DOCKER_DAEMON_CAPABILITIES_UNAVAILABLE');
+      let daemon;
+      try { daemon = JSON.parse(info.stdout); } catch { daemon = null; }
+      if (!daemon || typeof daemon !== 'object' || Array.isArray(daemon)) return missingAttestation('DOCKER_DAEMON_CAPABILITIES_UNREADABLE');
+      const linux = daemon.OSType === 'linux';
       return {
-        containerIsolation: true,
-        networkDenyByDefault: true,
-        noHostFilesystem: true,
-        noSecrets: true,
-        readOnlyRoot: true,
-        packageAllowlist: true,
-        cpuLimit: true,
-        memoryLimit: true,
+        containerIsolation: linux,
+        // The following five are enforced by the fixed `docker run` arguments below on a Linux daemon.
+        networkDenyByDefault: linux,
+        noHostFilesystem: linux,
+        noSecrets: linux,
+        readOnlyRoot: linux,
+        packageAllowlist: linux,
+        cpuLimit: linux && daemon.CpuCfsQuota === true,
+        memoryLimit: linux && daemon.MemoryLimit === true && daemon.SwapLimit === true,
         wallClockLimit: true,
-        processLimit: true,
+        processLimit: linux && daemon.PidsLimit === true,
         outputLimit: true,
         available: true,
-        // Flags describe the hardened `docker run` arguments this backend always passes; no running container is inspected.
-        attestationBasis: 'DECLARED_POLICY_ENFORCED_BY_RUN_ARGUMENTS',
+        attestationBasis: 'RUN_ARGUMENTS_PLUS_DAEMON_REPORTED_CGROUP_SUPPORT',
         runtimeVersion: version.stdout.trim(),
+        daemonOsType: typeof daemon.OSType === 'string' ? daemon.OSType : null,
       };
     },
 

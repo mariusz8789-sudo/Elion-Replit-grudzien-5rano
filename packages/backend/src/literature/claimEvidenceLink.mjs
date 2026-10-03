@@ -1,4 +1,5 @@
 import { canonicalHash } from '../provenance.mjs';
+import { PROVENANCE_CLASS } from '../provenanceClass.mjs';
 
 export const CLAIM_EVIDENCE_RELATIONSHIP = Object.freeze({
   SUPPORTS: 'SUPPORTS',
@@ -30,6 +31,8 @@ export function proposeClaimEvidenceLink(input, admittedSourceIds) {
     extractionMethod,
     extractionConfidence,
     humanReviewed: false,
+    // A relationship someone proposed is a model proposal; one nobody has read yet is unknown.
+    provenanceClass: relationship === CLAIM_EVIDENCE_RELATIONSHIP.UNKNOWN ? PROVENANCE_CLASS.UNKNOWN : PROVENANCE_CLASS.MODEL_PROPOSAL,
     status: 'PROPOSED',
     epistemicStatus: 'NOT_EVIDENCE',
   };

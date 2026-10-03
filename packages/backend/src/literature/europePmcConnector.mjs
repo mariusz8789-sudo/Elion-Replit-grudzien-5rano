@@ -1,6 +1,7 @@
 /* global AbortSignal */
 import { canonicalHash } from '../provenance.mjs';
 import { sha256Hex } from '../determinism.mjs';
+import { PROVENANCE_CLASS } from '../provenanceClass.mjs';
 import {
   classifyLiteratureLicence,
   literatureMetadataHash,
@@ -64,6 +65,7 @@ function mapResult(result, context) {
     retrievalStatus: LITERATURE_RETRIEVAL_STATUS.METADATA_ONLY,
     fullTextAvailability: fullTextAvailability(result),
     retrievalTimestamp: context.retrievedAt,
+    provenanceClass: PROVENANCE_CLASS.SOURCE_FACT,
     provenance: {
       provider: PROVIDER,
       providerRecordId: String(providerId),

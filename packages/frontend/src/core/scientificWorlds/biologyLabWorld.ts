@@ -83,10 +83,22 @@ function toLabStation(s: BiologyPackStation): LabStation {
 export const BIOLOGY_STATIONS: readonly LabStation[] = GENESIS_LAB_STATIONS.map(toLabStation);
 
 /** The central Human Digital Twin chamber (platform + glass cylinder) is the island the agent walks around. */
-export const TWIN_CHAMBER: { readonly position: Vec2; readonly radius: number; readonly height: number } = { position: { x: 0, z: 0 }, radius: 1.15, height: 3.1 };
+/** Monumental on purpose: the lab's central machine, twice the human's height (reference: the Human Digital Twin lab). */
+export const TWIN_CHAMBER: { readonly position: Vec2; readonly radius: number; readonly height: number } = { position: { x: 0, z: 0 }, radius: 1.4, height: 3.8 };
+
+/**
+ * Operator consoles in a ring around the chamber (the reference's desks around the central machine). Scenery
+ * only: they run nothing and hold no station. Angles from the chamber's front (+z); none stands in the
+ * front third, so the camera's view of the human stays clear.
+ */
+export const CHAMBER_CONSOLES: readonly Vec2[] = [100, -100, 140, -140].map((deg) => {
+  const a = (deg * Math.PI) / 180; const r = TWIN_CHAMBER.radius + 1.75;
+  return { x: TWIN_CHAMBER.position.x + Math.sin(a) * r, z: TWIN_CHAMBER.position.z + Math.cos(a) * r };
+});
 
 export const BIOLOGY_OBSTACLES: readonly Obstacle[] = [
   ...BIOLOGY_STATIONS.map((s) => s.footprint),
+  ...CHAMBER_CONSOLES.map((c) => fp(c.x, c.z, 1.2, 1.2)),
   fp(TWIN_CHAMBER.position.x, TWIN_CHAMBER.position.z, TWIN_CHAMBER.radius * 2 + 0.5, TWIN_CHAMBER.radius * 2 + 0.5),
 ];
 

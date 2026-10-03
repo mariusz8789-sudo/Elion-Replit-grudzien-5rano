@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { HOME_ENGINES, liveLabel } from '../components/home/HomeEngines';
-import type { ToolchainEntry } from '../core/backend/client';
+import type { SelfModelEngine, ToolchainEntry } from '../core/backend/client';
 
 /** Start never paints an engine green on its own: the chip is the backend's word, or says it has none. */
 const entry = (toolId: string, status: ToolchainEntry['status'], version: string | null = null): ToolchainEntry => ({
   toolId, engineName: toolId, domain: 'chemistry', license: 'x', status, version, engine: null, modelDomain: '', assumptions: '', validation: null,
+});
+
+const self = (toolId: string, runtimeAvailableNow: boolean): SelfModelEngine => ({
+  toolId, engineName: toolId, capabilityId: null, capabilityExists: true, runtimeAvailableNow,
+  status: runtimeAvailableNow ? 'AVAILABLE' : 'BLOCKED', blockedBy: runtimeAvailableNow ? null : 'UNVALIDATED', reason: null, proof: null,
+  statement: runtimeAvailableNow ? `Mam adapter ${toolId} i działa.` : `Mam adapter ${toolId}, ale obecnie runtime jest niedostępny (UNVALIDATED).`,
 });
 
 describe('Start engines', () => {
@@ -16,15 +22,18 @@ describe('Start engines', () => {
     expect(gnina.note).toMatch(/benchmark only.*not in product/i);
   });
 
-  it('reports BLOCKED as blocked, AVAILABLE only when the server says so, and checking before it answers', () => {
+  it('reads the self model: AVAILABLE only when the runtime works now, BLOCKED with the backend sentence otherwise', () => {
     const rdkit = HOME_ENGINES.find((e) => e.toolId === 'rdkit')!;
     expect(liveLabel(rdkit, { phase: 'checking' })).toEqual({ text: 'checking…', tone: 'muted' });
     expect(liveLabel(rdkit, { phase: 'unreachable' }).tone).toBe('muted');
-    const blocked = new Map([['rdkit', entry('rdkit', 'BLOCKED_BY_RUNTIME')]]);
-    expect(liveLabel(rdkit, { phase: 'ready', byId: blocked })).toEqual({ text: 'BLOCKED_BY_RUNTIME', tone: 'warn' });
-    const ok = new Map([['rdkit', entry('rdkit', 'AVAILABLE', '2026.03.6')]]);
-    expect(liveLabel(rdkit, { phase: 'ready', byId: ok })).toEqual({ text: 'AVAILABLE · 2026.03.6', tone: 'ok' });
-    expect(liveLabel(rdkit, { phase: 'ready', byId: new Map() }).text).toBe('not reported');
+    // The toolchain probe alone says AVAILABLE, but the self model has no proof run: it stays BLOCKED.
+    const probeOnly = new Map([['rdkit', entry('rdkit', 'AVAILABLE', '2026.03.6')]]);
+    const blocked = liveLabel(rdkit, { phase: 'ready', self: new Map([['rdkit', self('rdkit', false)]]), byId: probeOnly });
+    expect(blocked).toMatchObject({ text: 'BLOCKED', tone: 'warn' });
+    expect(blocked.detail).toMatch(/runtime jest niedostępny/);
+    const ok = liveLabel(rdkit, { phase: 'ready', self: new Map([['rdkit', self('rdkit', true)]]), byId: probeOnly });
+    expect(ok).toMatchObject({ text: 'AVAILABLE · 2026.03.6', tone: 'ok' });
+    expect(liveLabel(rdkit, { phase: 'ready', self: new Map(), byId: probeOnly }).text).toBe('not reported');
   });
 
   it('every engine with a runtime id matches a tool the backend registry really declares', async () => {

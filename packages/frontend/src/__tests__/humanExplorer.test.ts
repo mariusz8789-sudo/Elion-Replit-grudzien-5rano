@@ -92,7 +92,7 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
   });
   it('level labels come from i18n with the visible-key fallback for the untranslated level', () => {
     expect(levelLabel('cell', 'es')).toBe('Célula');
-    expect(levelLabel('organ', 'ar')).toBe('Narząd'); expect(levelLabel('atom', 'en')).toBe('Atoms');
+    expect(levelLabel('organ', 'ar')).toBe('العضو'); expect(levelLabel('atom', 'en')).toBe('Atoms');
   });
 });
 

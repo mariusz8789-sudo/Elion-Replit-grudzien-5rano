@@ -1,5 +1,6 @@
 import type { FullAtlasPart } from './bodyParts3dFullAtlas';
 import { brainPartLabel, brainRegionOf } from './brainParts';
+import { anatomyNamePl, anatomyRolePl, anatomySideOf } from './anatomyNamesPl';
 
 /**
  * HUMAN EXPLORER — one continuous descent: BODY → REGION → ORGAN → STRUCTURE, then the existing
@@ -16,7 +17,50 @@ export interface ExploreState {
   readonly organId: string | null;
   /** Atlas name of the tapped structure (e.g. "Left hippocampus"). */
   readonly structure: string | null;
+  /** Atlas system of a structure tapped outside the named organs (a muscle, a bone, a vessel...). */
+  readonly system?: string | null;
 }
+
+export type ExploreHitData = { kind: 'region'; id: BodyRegionId } | { kind: 'organ'; id: string } | { kind: 'structure'; name: string } | { kind: 'part'; name: string; system: string };
+
+/** What a tap on the body can reach, outside in. Peeling a layer shows what lies under it. */
+export const EXPLORE_LAYERS: readonly { readonly id: string; readonly label: string; readonly systems: readonly string[] }[] = [
+  { id: 'muscles', label: 'Mięśnie', systems: ['muscular', 'connective'] },
+  { id: 'bones', label: 'Kości', systems: ['skeletal'] },
+  { id: 'vessels', label: 'Naczynia', systems: ['arterial', 'venous', 'lymphatic'] },
+  { id: 'nerves', label: 'Nerwy', systems: ['nervous', 'sensory'] },
+  { id: 'organs', label: 'Narządy', systems: ['cardiac', 'digestive', 'respiratory', 'urinary', 'endocrine', 'reproductive'] },
+];
+
+/** The body systems as a person names them (the reference's left menu), each mapped onto atlas systems. */
+export const BODY_SYSTEMS: readonly { readonly id: string; readonly label: string; readonly systems: readonly string[] }[] = [
+  { id: 'skin', label: 'Skórny', systems: ['integumentary'] },
+  { id: 'skeleton', label: 'Szkieletowy', systems: ['skeletal'] },
+  { id: 'muscles', label: 'Mięśniowy', systems: ['muscular', 'connective'] },
+  { id: 'nervous', label: 'Nerwowy', systems: ['nervous', 'sensory'] },
+  { id: 'circulatory', label: 'Krążenia', systems: ['cardiac', 'arterial', 'venous'] },
+  { id: 'respiratory', label: 'Oddechowy', systems: ['respiratory'] },
+  { id: 'digestive', label: 'Pokarmowy', systems: ['digestive'] },
+  { id: 'urinary', label: 'Moczowy', systems: ['urinary'] },
+  { id: 'reproductive', label: 'Rozrodczy', systems: ['reproductive'] },
+  { id: 'endocrine', label: 'Dokrewny', systems: ['endocrine'] },
+  { id: 'lymphatic', label: 'Limfatyczny', systems: ['lymphatic'] },
+];
+export const ALL_ATLAS_SYSTEMS: readonly string[] = [...new Set(BODY_SYSTEMS.flatMap((s) => s.systems))];
+
+/** Which atlas systems to take off the body for a chosen body system (only it stays) and peeled layers. */
+export function hiddenAtlasSystems(onlySystem: string | null, peeled: readonly string[]): { hidden: string[]; forceShow: string[] } {
+  const only = BODY_SYSTEMS.find((s) => s.id === onlySystem);
+  const peel = new Set(EXPLORE_LAYERS.filter((l) => peeled.includes(l.id)).flatMap((l) => l.systems));
+  const hidden = ALL_ATLAS_SYSTEMS.filter((sys) => (only ? !only.systems.includes(sys) : false) || peel.has(sys));
+  return { hidden, forceShow: only ? only.systems.filter((sys) => !peel.has(sys)) : [] };
+}
+
+export const SYSTEM_PL: Readonly<Record<string, string>> = {
+  skeletal: 'kość', muscular: 'mięsień', connective: 'tkanka łączna', arterial: 'tętnica', venous: 'żyła', lymphatic: 'układ chłonny',
+  nervous: 'układ nerwowy', sensory: 'narząd zmysłu', cardiac: 'serce', digestive: 'układ pokarmowy', respiratory: 'układ oddechowy',
+  urinary: 'układ moczowy', endocrine: 'gruczoł dokrewny', reproductive: 'układ rozrodczy', integumentary: 'skóra',
+};
 
 export const EXPLORE_BODY: ExploreState = Object.freeze({ level: 'BODY', regionId: null, organId: null, structure: null });
 
@@ -51,6 +95,23 @@ export interface ExploreOrgan {
   /** One line for a layperson, textbook level. */
   readonly role: string;
 }
+
+/** The body system each organ belongs to, and a few sentences about how it works (textbook level, for a layperson). */
+export const ORGAN_ABOUT: Readonly<Record<string, { readonly system: string; readonly about: string }>> = {
+  brain: { system: 'Układ nerwowy', about: 'Mózg odbiera sygnały ze zmysłów i wysyła polecenia do mięśni. Kora mózgu odpowiada za myślenie, mowę i ruch, móżdżek za równowagę, a pień mózgu za oddech i bicie serca.' },
+  eyes: { system: 'Narządy zmysłów', about: 'Rogówka i soczewka skupiają światło na siatkówce. Komórki siatkówki zamieniają je w sygnał, który nerw wzrokowy przekazuje do mózgu.' },
+  heart: { system: 'Układ krążenia', about: 'Serce to mięsień z czterema jamami: dwoma przedsionkami i dwiema komorami. Prawa strona tłoczy krew do płuc, lewa do całego ciała. Zastawki pilnują, żeby krew płynęła w jedną stronę.' },
+  airways: { system: 'Układ oddechowy', about: 'Tchawica dzieli się na dwa oskrzela główne, a te na coraz drobniejsze gałązki. Na ich końcach, w pęcherzykach płucnych, tlen przechodzi do krwi, a dwutlenek węgla z krwi do powietrza.' },
+  aorta: { system: 'Układ krążenia', about: 'Aorta wychodzi z lewej komory serca, zakręca łukiem i biegnie w dół wzdłuż kręgosłupa. Odchodzą od niej tętnice do głowy, rąk, narządów brzucha i nóg.' },
+  stomach: { system: 'Układ pokarmowy', about: 'Żołądek przyjmuje pokarm z przełyku, miesza go z kwasem solnym i enzymami, a potem porcjami przesuwa do dwunastnicy.' },
+  liver: { system: 'Układ pokarmowy', about: 'Wątroba to największy gruczoł ciała. Rozkłada leki i toksyny, magazynuje cukier jako glikogen i wytwarza żółć, która przez drogi żółciowe trafia do jelita i pomaga trawić tłuszcze.' },
+  pancreas: { system: 'Układ pokarmowy i dokrewny', about: 'Trzustka ma dwie role: wydziela do dwunastnicy enzymy trawienne, a jej wyspy wydzielają do krwi insulinę i glukagon, które regulują poziom cukru.' },
+  intestine: { system: 'Układ pokarmowy', about: 'Jelito cienkie (dwunastnica, jelito czcze i kręte) wchłania składniki pokarmu. Jelito grube odzyskuje wodę i formuje stolec.' },
+  spleen: { system: 'Układ chłonny', about: 'Śledziona usuwa z krwi stare czerwone krwinki i magazynuje część białych krwinek, które pomagają zwalczać zakażenia.' },
+  kidneys: { system: 'Układ moczowy', about: 'Nerki filtrują krew i usuwają nadmiar wody, soli i produkty przemiany materii jako mocz. Pomagają też regulować ciśnienie krwi. Na ich szczytach leżą nadnercza.' },
+  bladder: { system: 'Układ moczowy', about: 'Moczowody prowadzą mocz z nerek do pęcherza, który go gromadzi, a cewka moczowa wyprowadza go na zewnątrz.' },
+  rectum: { system: 'Układ pokarmowy', about: 'Odbytnica to ostatni odcinek jelita grubego. Gromadzi stolec przed jego wydaleniem.' },
+};
 
 const named = (re: RegExp, system?: string) => (p: FullAtlasPart) => (system === undefined || p.system === system) && re.test(p.name);
 const inSkull = (p: FullAtlasPart) => p.bounds[0]![1]! > 1.35;
@@ -106,22 +167,28 @@ const TERMS_PL: Readonly<Record<string, string>> = {
 export interface StructureLabel { readonly label: string; readonly detail: string | null }
 
 /** What a tapped structure is called, and one line about it (hemisphere and role for the brain). */
-export function structureLabel(organId: string | null, name: string): StructureLabel {
+export function structureLabel(organId: string | null, name: string, system?: string | null): StructureLabel {
   if (organId === 'brain') {
     const b = brainPartLabel(name); const r = brainRegionOf(name);
     return { label: b.label, detail: `${b.side ? `${b.side} półkula · ` : ''}${r.label}: ${r.role}` };
   }
   const pl = TERMS_PL[name.toLowerCase()];
-  if (pl) return { label: pl, detail: null };
+  if (pl) return { label: pl, detail: anatomyRolePl(name) };
   // Bronchial and biliary trees: many segment names, one readable family name.
   if (/bronchial tree/i.test(name)) return { label: `Drzewo oskrzelowe (${/^left|lingular/i.test(name) ? 'lewe płuco' : 'prawe płuco'})`, detail: name };
   if (/biliary tree|hepatic/i.test(name)) return { label: 'Drogi żółciowe wątroby', detail: name };
-  return { label: name, detail: null };
+  const side = anatomySideOf(name);
+  const kind = system ? SYSTEM_PL[system] : null;
+  const where = [side ? `${side} strona` : null, kind].filter(Boolean).join(' · ');
+  const role = anatomyRolePl(name);
+  const detail = [where, role].filter(Boolean).join('. ');
+  return { label: anatomyNamePl(name), detail: detail || null };
 }
 
 /** One level deeper. A tap on something already selected keeps the state. */
-export function exploreInto(state: ExploreState, hit: { kind: 'region'; id: BodyRegionId } | { kind: 'organ'; id: string } | { kind: 'structure'; name: string }): ExploreState {
+export function exploreInto(state: ExploreState, hit: ExploreHitData): ExploreState {
   if (hit.kind === 'region') return { level: 'REGION', regionId: hit.id, organId: null, structure: null };
+  if (hit.kind === 'part') return { level: 'STRUCTURE', regionId: state.regionId, organId: null, structure: hit.name, system: hit.system };
   if (hit.kind === 'organ') {
     const organ = exploreOrgan(hit.id);
     return organ ? { level: 'ORGAN', regionId: organ.region, organId: organ.id, structure: null } : state;
@@ -132,6 +199,7 @@ export function exploreInto(state: ExploreState, hit: { kind: 'region'; id: Body
 
 /** Back widens the focus by exactly one level: structure → organ → region → body. */
 export function exploreBack(state: ExploreState): ExploreState {
+  if (state.level === 'STRUCTURE' && !state.organId) return { level: 'REGION', regionId: state.regionId, organId: null, structure: null };
   if (state.level === 'STRUCTURE') return { ...state, level: 'ORGAN', structure: null };
   if (state.level === 'ORGAN') return { level: 'REGION', regionId: state.regionId, organId: null, structure: null };
   return EXPLORE_BODY;
@@ -143,6 +211,6 @@ export function exploreCrumbs(state: ExploreState): readonly string[] {
   if (state.regionId) out.push(REGION_LABEL[state.regionId]);
   const organ = exploreOrgan(state.organId);
   if (organ) out.push(organ.label);
-  if (state.structure) out.push(structureLabel(state.organId, state.structure).label);
+  if (state.structure) out.push(structureLabel(state.organId, state.structure, state.system).label);
   return out;
 }

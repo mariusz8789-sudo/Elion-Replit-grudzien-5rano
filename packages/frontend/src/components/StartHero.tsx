@@ -136,19 +136,18 @@ function HashStrip({ hash }: { readonly hash: string }): React.ReactElement {
   );
 }
 
-type View = 'molecule' | 'anatomy' | 'cms' | 'evidence';
+// Molecules live in the Drug Discovery card and under Life Sciences, not in the centre of Start (Mariusz, 30 Sep).
+type View = 'anatomy' | 'cms' | 'evidence';
 
 const VIEWS: readonly { id: View; label: string; icon: 'pill' | 'body' | 'atom' | 'hash' }[] = [
-  { id: 'molecule', label: 'Molecule', icon: 'pill' },
   { id: 'anatomy', label: 'Anatomy', icon: 'body' },
   { id: 'cms', label: 'CMS', icon: 'atom' },
   { id: 'evidence', label: 'Evidence', icon: 'hash' },
 ];
 
 function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
-  const [view, setView] = useState<View>('molecule');
+  const [view, setView] = useState<View>('anatomy');
   const meta: Record<View, { title: string; tag: string; cap: string; hash: string; open: string }> = {
-    molecule: { title: 'Drug Discovery', tag: 'MODEL', cap: 'Caffeine · 3D geometry from RDKit · Molecule World snapshot', hash: '#/molecule', open: 'Open Molecule World' },
     anatomy: { title: 'Human Biology', tag: 'EDUCATIONAL MODEL', cap: 'BodyParts3D atlas (CC BY 4.0) · Human Explorer snapshot', hash: '#/human-biology-lab', open: 'Open Human Explorer' },
     cms: { title: 'Physics · CERN', tag: 'REAL DATA', cap: 'Real CMS 2011 Z→μμ events · offline analysis, not a live detector', hash: '#/physics/cms-z', open: 'Open CMS data' },
     evidence: { title: 'Evidence & Replay', tag: `REPLAY ${IMATINIB.replay}`, cap: `Imatinib retrosynthesis · ${IMATINIB.retroEngine}`, hash: '#/evidence', open: 'Open Evidence & Replay' },
@@ -160,7 +159,6 @@ function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
         <ellipse cx="200" cy="185" rx="170" ry="60" transform="rotate(-14 200 185)" />
         <ellipse cx="200" cy="185" rx="150" ry="150" />
       </svg>
-      {view === 'molecule' && <img className="cc-live-mol" src={MOLECULE_IMG} alt="Caffeine molecule rendered by Molecule World" />}
       {view === 'anatomy' && <img className="cc-live-body" src={BODY_IMG} alt="Human body rendered by Human Explorer" />}
       {view === 'cms' && <div className="cc-live-panel"><Histogram cms={cms} tall /></div>}
       {view === 'evidence' && (
@@ -264,7 +262,7 @@ export function StartHero(): React.ReactElement {
           </form>
 
           <section className="cc-run" data-testid="home-running" aria-label="Running now">
-            <a className="cc-thumb" href="#/molecule" aria-hidden="true" tabIndex={-1}><img src={MOLECULE_IMG} alt="" /></a>
+            <a className="cc-thumb" href="#/drug" aria-hidden="true" tabIndex={-1}><img src={MOLECULE_IMG} alt="" /></a>
             <p className="cc-k"><i className="cc-dot" />{running ? 'RUNNING NOW' : 'LATEST BENCHMARK'}<span>started {utcStamp(RUN8.startedAt)}</span></p>
             <h2>{RUN8.title}</h2>
             <p className="cc-m">

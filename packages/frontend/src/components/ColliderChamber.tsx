@@ -6,6 +6,8 @@ import { PARTICLES, PHYS } from '@genesis/core/collider/QuantumColliderEngine.js
 import { createColliderLayer, type ColliderLayerHandle } from '../../../ui/src/collider/ColliderGpu';
 import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 
+import { SceneProvenanceBadge } from './SceneProvenanceBadge';
+
 /**
  * COLLIDER CHAMBER (`#/collider`) — the detector view of the Quantum
  * Collider Engine. A client of the single kernel's `particle-collision-sim`
@@ -111,6 +113,7 @@ export function ColliderChamber(): JSX.Element {
           <div className="gx-eyebrow">GENESIS · COLLIDER · pp @ 13 TeV</div>
           <h1>Komora detektora</h1>
           <p className="col-lede">Zderzenie proton–proton wygenerowane przez Quantum Collider Engine przez jedyny kernel. Tory naładowanych cząstek zakrzywione w polu {PHYS.B_FIELD} T, trafienia w kalorymetrze, jeden zapis w EvidenceLedger na zdarzenie. Model toy-MC: przekroje czynne i fragmentacja są znormalizowane orientacyjnie, nie z precyzją PDG.</p>
+          <SceneProvenanceBadge sceneId="world:cern-detector" />
         </div>
         <div className="col-controls">
           <label>Seed <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) >>> 0)} data-testid="col-seed" /></label>

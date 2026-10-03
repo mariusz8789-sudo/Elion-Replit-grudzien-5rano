@@ -307,3 +307,5 @@ body:has(.ax-hud) .context-guide-launch { display: none; }
 @media (max-width: 900px) {
   .human-hero:has(.human-reference-attribution[data-status]) .human-hero-tools { top: 216px; }
 }
+/* Microscope captions carry their honesty tag ("schemat podręcznikowy, nie skan tkanki") at the end; let them wrap so it is never cut off on a phone. */
+.ax-hud[data-micro]:not([data-micro=""]) .ax-name strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { ProvenancePanel, type ProvenanceItem } from './genesis-ui/ProvenancePanel';
 import { FingerprintChip } from './genesis-ui/FingerprintChip';
+import { SceneProvenanceBadge } from './SceneProvenanceBadge';
 import { renderLowerHarmLabel, isRtl, SUPPORTED_LOCALES } from '../core/agent/lowerHarmLabels';
 import type { SupportedLocale } from '../core/agent/phaseELabels';
 
@@ -103,6 +104,7 @@ export function PhysicsCmsZScreen(): React.ReactElement {
 
       <div className="gu-offline-banner" role="alert">{t('CERN_OFFLINE_BANNER')}</div>
       <p className="gu-hint">{t('CERN_SCREEN_HINT')}</p>
+      <SceneProvenanceBadge sceneId="physics:cms-z" />
 
       <section className="gu-whatis-grid">
         <div className="gu-whatis-col">

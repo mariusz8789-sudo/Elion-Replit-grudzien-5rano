@@ -165,7 +165,7 @@ export interface Specimen {
   readonly epistemic: EpistemicLabel;
 }
 
-export type TissueType = 'BLOOD' | 'EPITHELIUM' | 'MUSCLE' | 'NEURAL' | 'CONNECTIVE' | 'BONE' | 'LIVER' | 'LUNG' | 'CARDIAC' | 'GENERIC';
+export type TissueType = 'BLOOD' | 'EPITHELIUM' | 'MUSCLE' | 'NEURAL' | 'CONNECTIVE' | 'BONE' | 'LIVER' | 'LUNG' | 'CARDIAC' | 'PANCREAS' | 'GENERIC';
 
 export interface HistologySlide {
   readonly slideId: string;

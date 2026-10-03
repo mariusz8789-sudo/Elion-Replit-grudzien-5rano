@@ -1255,7 +1255,9 @@ export class AgentLabScene3D implements Sim3D {
       // The close-up is the subject: close enough that the organ fills the free middle of the screen.
       const dist = portrait ? (macroVisible ? 2.05 : tight ? 3.0 : 3.45) : (macroVisible ? 1.35 : tight ? 2.3 : 2.5);
       // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
-      const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
+      // The microscope stage stands at a fixed height, so it is framed the same whatever organ it came from
+      // (a low organ such as the pancreas would otherwise put the camera under the tissue tile).
+      const organFocus = this.isolatedCount > 0 && !macroVisible ? this.selectedOrganFocusY : null;
       const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : macroVisible ? 1.58 : tight ? 1.45 : 1.4;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
       const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.035;

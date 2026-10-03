@@ -83,7 +83,12 @@ const TEXT = {
   labHint: ['Człowiek stoi w szklanej komorze. Dotknij go, żeby podejść bliżej.', 'A human stands in the glass chamber. Tap it to walk closer.', 'يقف إنسان في الحجرة الزجاجية. المسه لتقترب.'],
   approach: ['Podejdź do człowieka', 'Walk up to the human', 'اقترب من الإنسان'],
   lab: ['Laboratorium', 'Laboratory', 'المختبر'],
-  genericSample: ['próbka ogólna, nie z tego narządu', 'generic sample, not from this organ', 'عينة عامة، ليست من هذا العضو'],
+  // NO_TISSUE_MODEL: the organ has no tissue model of its own; the generic tile is shown and named as such.
+  genericSample: ['brak modelu tkanki tego narządu (pokazana tkanka ogólna)', 'no tissue model for this organ (generic tissue shown)', 'لا يوجد نموذج نسيج لهذا العضو (يُعرض نسيج عام)'],
+  // The shared tissue tile (heart, liver, lung, brain…) reuses that tissue's cell model; only where the cells sit is drawn for the eye.
+  layoutIllustrative: ['rozmieszczenie komórek poglądowe', 'cell placement is illustrative', 'توزيع الخلايا توضيحي'],
+  textbookSchematic: ['schemat podręcznikowy, nie skan tkanki', 'textbook schematic, not a tissue scan', 'مخطط من كتاب دراسي، ليس مسحًا للنسيج'],
+  genericCell: ['model komórki ogólnej, nie komórki beta', 'generic cell model, not a beta cell', 'نموذج خلية عامة، ليس خلية بيتا'],
   surfaceSkin: ['Skóra', 'Skin', 'الجلد'],
   surfaceXray: ['RTG', 'X-ray', 'أشعة سينية'],
   surfaceGhost: ['Duch', 'Ghost', 'شفاف'],
@@ -135,6 +140,7 @@ export function ladderName(level: string, fallback: string): string { const t = 
 const TISSUE: Readonly<Record<string, Triple>> = {
   CARDIAC: ['mięsień sercowy', 'heart muscle', 'عضلة القلب'], NEURAL: ['tkanka nerwowa', 'nerve tissue', 'نسيج عصبي'],
   LUNG: ['pęcherzyki płucne', 'lung alveoli', 'الحويصلات الرئوية'], LIVER: ['zraziki wątroby', 'liver lobules', 'فصيصات الكبد'],
+  PANCREAS: ['trzustka · gronka i wysepka Langerhansa', 'pancreas · acini and an islet of Langerhans', 'البنكرياس · العنيبات وجزيرة لانغرهانس'],
   EPITHELIUM: ['nabłonek', 'epithelium', 'ظهارة'], GENERIC: ['tkanka ogólna', 'generic tissue', 'نسيج عام'], BLOOD: ['krew · rozmaz referencyjny', 'blood · reference smear', 'دم · لطاخة مرجعية'],
 };
 export function tissueName(type: string): string { const t = TISSUE[type]; return t ? pick(t) : type.toLowerCase(); }

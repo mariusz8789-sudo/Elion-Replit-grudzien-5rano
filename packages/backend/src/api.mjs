@@ -81,6 +81,7 @@ import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPl
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -816,10 +817,36 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        // Cancelling a parent reaches its children too; a run without children keeps the plain synchronous path.
+        if (seg[4] === 'cancel' && hasFanOutChildren(db, projectId, current.researchRunId)) {
+          return (async () => {
+            const cancelled = await cancelFanOut(db, projectId, current.researchRunId, { userId: user.id, reason: body?.reason ?? 'USER_REQUEST' });
+            if (cancelled.ok) return ok(cancelled);
+            return { status: cancelled.status === 'NOT_FOUND' ? 404 : 409, body: { error: cancelled.status, from: cancelled.from ?? null, action: cancelled.action ?? null } };
+          })();
+        }
         const result = controlResearchRun(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
         if (result.ok) return ok(result);
         const status = result.status === 'NOT_FOUND' ? 404 : 409;
         return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+      }
+      // Bounded fan-out: child ResearchRuns on the same queue, each with its own job and lineage.
+      if (seg[4] === 'fanout' && (seg.length === 5 || (seg.length === 6 && seg[5] === 'spawn') || (seg.length === 7 && seg[5] === 'retry'))) {
+        const failure = (r) => ({ status: { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, INVALID_FANOUT_REQUEST: 400 }[r.status] ?? 409, body: { error: r.status, reason: r.reason ?? null, limit: r.limit ?? null } });
+        if (seg.length === 5) {
+          if (method !== 'GET') return err(405, 'method_not_allowed');
+          const read = readFanOut(db, projectId, current.researchRunId);
+          return read.ok ? ok(read) : failure(read);
+        }
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const timeoutMs = Number.isFinite(body?.timeoutMs) ? body.timeoutMs : undefined;
+          const result = seg[5] === 'spawn'
+            ? await spawnChildRuns(db, projectId, current.researchRunId, { hypothesisIds: Array.isArray(body?.hypothesisIds) ? body.hypothesisIds : null, userId: user.id, timeoutMs })
+            : await retryChild(db, projectId, current.researchRunId, seg[6], { userId: user.id, timeoutMs });
+          return result.ok ? ok(result, result.deduped ? 200 : 202) : failure(result);
+        })();
       }
       if (seg.length === 5 && seg[4] === 'steering') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

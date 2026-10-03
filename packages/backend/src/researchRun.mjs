@@ -114,7 +114,11 @@ export function experimentsOf(researchState) {
     const id = e.payload?.experimentId;
     if (!key || !id) continue;
     if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null });
-    byId.get(id)[key] = e.payload;
+    const experiment = byId.get(id);
+    // The first record of a step is the record. A later second one (a changed criterion, a rewritten verdict) never
+    // replaces it; it is kept aside as a conflict that stops the run (nextStepOf) instead of silently changing history.
+    if (experiment[key]) { (experiment.conflicts ??= []).push({ step: key, seq: e.seq }); continue; }
+    experiment[key] = e.payload;
   }
   return [...byId.values()];
 }
@@ -127,6 +131,7 @@ export function nextStepOf(run, researchState) {
   if (!types.has('PROBLEM_FORMALIZED')) return 'FORMALIZE_PROBLEM';
   if (!types.has('HYPOTHESES_GENERATED')) return 'PROPOSE_PLAN';
   const experiments = experimentsOf(researchState);
+  if (experiments.some((x) => x.conflicts?.length)) return 'STATE_INTEGRITY_FAILURE';
   const open = experiments.find((x) => !x.next);
   if (open) return !open.execution ? 'EXECUTE_EXPERIMENT' : !open.evidence ? 'PROPOSE_EVIDENCE' : 'PROPOSE_NEXT_EXPERIMENT';
   const last = experiments.at(-1);

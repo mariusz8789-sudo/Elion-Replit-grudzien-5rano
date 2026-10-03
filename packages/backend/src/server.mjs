@@ -42,7 +42,7 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
-import { createResearchRunWorker } from './researchRunJobs.mjs';
+import { createFanOutAwareWorker } from './researchRunFanOut.mjs';
 import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
@@ -518,7 +518,7 @@ server.listen(PORT, () => {
 // ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
 // (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
 if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
-  const worker = createResearchRunWorker(db, { artifactStorage });
+  const worker = createFanOutAwareWorker(db, { artifactStorage });
   let busy = false;
   setInterval(async () => {
     if (busy) return;

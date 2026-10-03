@@ -9,8 +9,9 @@
  * typed in per row, so a status cannot be guessed or flattered.
  *
  * Engines are never products here: a row is a task or a capability a person
- * recognises ("Molecular dynamics"), and the engine name lives in `what` and in
- * Technical details. Rows reach their screen through what already exists: a
+ * recognises ("Molecular dynamics"), `what` says what a person gets in plain
+ * words, and the engine name lives only in `engine`, shown under Technical
+ * details (`customerFacingEngineNames.test.tsx`). Rows reach their screen through what already exists: a
  * route, the Ask field with the command filled in, or nothing (engine only,
  * listed so the system is not understated). There is no new router.
  *
@@ -88,6 +89,8 @@ export interface Capability {
   readonly note?: string;
   /** Where the evidence lives (repo path, record, test). */
   readonly source: string;
+  /** The exact engine behind it: shown only under Technical details, never in `name` or `what`. */
+  readonly engine?: string;
 }
 
 export type GroupIcon = 'pill' | 'replay' | 'shield' | 'atom' | 'grid' | 'flask' | 'cpu';
@@ -106,17 +109,17 @@ export const SCIENTIFIC_OS: readonly CapabilityGroup[] = [
   {
     id: 'ls', name: 'Life Sciences', icon: 'pill', line: 'Drug discovery, chemistry and human biology',
     items: [
-      { id: 'drug', name: 'Drug Discovery', what: 'Docking campaign: RDKit → Vina, with reasons and a discovery graph; commercial ADMET awaits licence review', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/campaign/*, docs/evidence/astex-*' },
+      { id: 'drug', name: 'Drug Discovery', what: 'Docking campaign: molecular analysis, then interaction modeling, with reasons and a discovery graph; commercial property & safety estimates await licence review', engine: 'RDKit, AutoDock Vina (Meeko preparation)', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/campaign/*, docs/evidence/astex-*' },
       { id: 'falsification', name: 'Self-falsification', what: '13 probes on imatinib in ABL1 with positive and negative controls', state: 'LIVE', hash: '#/reviewer', source: 'docs/evidence/finalist-falsification-2026-09-27.json' },
-      { id: 'retrosynthesis', name: 'Retrosynthesis', what: 'How a chemist would make it: AiZynthFinder route for imatinib, Replay MATCH', state: 'LIVE_INCOMPLETE', hash: '#/reviewer', source: 'docs/evidence/imatinib-retrosynthesis-2026-09-27.json' },
-      { id: 'admet', name: 'ADMET / toxicity', what: '52 TDC endpoint estimates; commercial execution is blocked pending weights and training-data licence review', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/compute/admetResearchRunExecutor.mjs' },
-      { id: 'openmm', name: 'Molecular dynamics', what: 'OpenMM on the protein 1VII (AMBER14 + OBC2)', state: 'ASK_ONLY', ask: 'Uruchom OpenMM na białku 1VII', source: 'core/experimentFabric/router.ts (biology-openmm-md-1vii-reference)' },
-      { id: 'pyscf', name: 'Quantum chemistry', what: 'PySCF Hartree–Fock for H₂, also computed in CI', state: 'ASK_ONLY', ask: 'Policz PySCF RHF dla H2', source: 'core/experimentFabric/router.ts (quantum-chemistry-pyscf-h2-rhf)' },
-      { id: 'biopython', name: 'Antibody structure', what: 'Biopython RMSD of the HIV antibody 10E8 / MPER; PDB files must be supplied', state: 'ASK_ONLY', ask: 'Porównaj RMSD struktur PDB HIV 10E8 5GHW i 4G6F', source: 'core/experimentFabric/router.ts (biology-hiv-10e8-pdb-structural-comparison)' },
+      { id: 'retrosynthesis', name: 'Retrosynthesis', what: 'How a chemist would make it: a planned route for imatinib, Replay MATCH', engine: 'AiZynthFinder', state: 'LIVE_INCOMPLETE', hash: '#/reviewer', source: 'docs/evidence/imatinib-retrosynthesis-2026-09-27.json' },
+      { id: 'admet', name: 'Property & safety (ADMET)', engine: 'ADMET-AI', what: '52 TDC endpoint estimates; commercial execution is blocked pending weights and training-data licence review', state: 'LIVE_INCOMPLETE', hash: '#/drug', source: 'backend/src/compute/admetResearchRunExecutor.mjs' },
+      { id: 'openmm', name: 'Molecular dynamics', what: 'How the protein 1VII moves in water (AMBER14 force field, implicit solvent)', engine: 'OpenMM', state: 'ASK_ONLY', ask: 'Uruchom dynamikę molekularną białka 1VII', source: 'core/experimentFabric/router.ts (biology-openmm-md-1vii-reference)' },
+      { id: 'pyscf', name: 'Quantum chemistry', what: 'Hartree–Fock energy of H₂, also computed in CI', engine: 'PySCF', state: 'ASK_ONLY', ask: 'Policz energię Hartree-Fock RHF dla H2', source: 'core/experimentFabric/router.ts (quantum-chemistry-pyscf-h2-rhf)' },
+      { id: 'biopython', name: 'Antibody structure', what: 'RMSD of the HIV antibody 10E8 / MPER; PDB files must be supplied', engine: 'Biopython', state: 'ASK_ONLY', ask: 'Porównaj RMSD struktur PDB HIV 10E8 5GHW i 4G6F', source: 'core/experimentFabric/router.ts (biology-hiv-10e8-pdb-structural-comparison)' },
       { id: 'depmap', name: 'Cancer and ageing genetics', what: 'DepMap 24Q2 CRISPR senescence panel p53 / p21 / p16 / RB; data supplied externally', state: 'ASK_ONLY', ask: 'Uruchom panel DepMap CRISPR p53/p21/p16/RB', source: 'core/experimentFabric/router.ts (biology-depmap-crispr-senescence-panel)' },
       { id: 'ingestion', name: 'Live data pull', what: 'PDB, ChEMBL, UniProt and ClinicalTrials.gov, each response hashed', state: 'LIVE', hash: '#/reviewer', source: 'backend/src/scientificIngestion.mjs' },
       { id: 'human-explorer', name: 'Human Explorer', what: 'Body → organ → tissue → cell on the BodyParts3D atlas (CC BY 4.0)', state: 'LIVE', hash: '#/human-biology-lab', source: 'public/assets/bodyparts3d/full' },
-      { id: 'molecule', name: 'Molecule World and chemistry lab', what: '3D molecules from RDKit, titration and reactions', state: 'LIVE', hash: '#/molecule', source: 'components/MoleculeLabScreen.tsx' },
+      { id: 'molecule', name: 'Molecule World and chemistry lab', what: '3D molecules, titration and reactions', engine: 'RDKit', state: 'LIVE', hash: '#/molecule', source: 'components/MoleculeLabScreen.tsx' },
       { id: 'run8', name: 'Unseen docking benchmark', what: '308 PoseBusters complexes, pre-registered, running on the research machine', state: 'LIVE_INCOMPLETE', note: 'Result appears when the run finishes', source: 'prereg 47c7239f (research branch)' },
       { id: 'glp1r', name: 'GLP-1R activity model', what: 'Frozen gate not passed (MAE 1.01 against 1.0); kept as a negative result', state: 'GATE_FAILED', hash: '#/reviewer', source: 'backend/src/campaign/glp1rQsar*.mjs' },
       { id: 'virtual-bio', name: 'Virtual Bio', what: 'Cell, PBPK, receptor and antibiotic-resistance teaching models', state: 'SYNTHETIC', hash: '#/virtual-bio', source: 'core/virtualBio/models.ts' },
@@ -170,7 +173,7 @@ export const SCIENTIFIC_OS: readonly CapabilityGroup[] = [
       { id: 'cern-complex', name: 'CERN Complex', what: 'Hall, tunnel and detector with a model collider', state: 'LIVE', hash: '#/cern-complex', source: 'CernComplexView.tsx' },
       { id: 'qe4', name: 'Rényi entropy (QE4)', what: 'Real Brydges data, pre-registered', state: 'LIVE', hash: '#/evidence', source: 'core/biotechData/qe4-brydges/*' },
       { id: 'nuclear', name: 'Nuclear masses', what: 'SEMF model against AME2020 measurements', state: 'LIVE', hash: '#/lab/nuclear', source: 'core/observation/nuclearAme2020.ts' },
-      { id: 'pymeep', name: 'Photonics', what: 'PyMeep Maxwell FDTD: Fresnel transmission and a perfect conductor', state: 'ASK_ONLY', ask: 'Uruchom Meep FDTD: transmisja Fresnela na granicy dielektrycznej', source: 'core/experimentFabric/router.ts (electrodynamics-maxwell-fdtd)' },
+      { id: 'pymeep', name: 'Photonics', what: 'Maxwell FDTD simulation: Fresnel transmission and a perfect conductor', engine: 'PyMeep', state: 'ASK_ONLY', ask: 'Uruchom symulację FDTD: transmisja Fresnela na granicy dielektrycznej', source: 'core/experimentFabric/router.ts (electrodynamics-maxwell-fdtd)' },
       { id: 'quantum', name: 'Quantum', what: 'Bloch sphere, CHSH, teleportation, tunnelling, entanglement', state: 'LIVE', hash: '#/lab/quantum', source: 'core/quantum/*' },
       { id: 'spacetime', name: 'Spacetime and black holes', what: 'Geodesics, Schwarzschild, Kerr, gravitational chirp', state: 'LIVE', hash: '#/lab/spacetime', source: 'labs/experiments/einstein-*' },
       { id: 'universe', name: 'Universe and three bodies', what: 'Kepler with a NASA anchor, Hubble tension, three-body integrator', state: 'LIVE', hash: '#/lab/universe', source: 'nssdcPlanetaryFactSheet.ts' },

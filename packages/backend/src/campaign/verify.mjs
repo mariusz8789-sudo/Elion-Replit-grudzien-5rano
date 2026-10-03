@@ -164,6 +164,23 @@ function replayAdmet(inputs, kind) {
 }
 
 /**
+ * Re-executes one capability on the given stored inputs through the SAME replayer the persisted
+ * Scientific Run verification uses. Pure: reads and writes nothing. Exposed so a record that arrives
+ * from outside the database (Genesis Verify, genesisVerify.mjs) is replayed by this code and no other.
+ * Returns the replayer result, or { ok:false, error:'REPLAY_UNSUPPORTED' } for an unwired capability.
+ */
+export function replayCapabilityInputs(capability, inputs) {
+  const replayer = REPLAYERS[capability];
+  if (!replayer) return { ok: false, error: 'REPLAY_UNSUPPORTED' };
+  return replayer(inputs);
+}
+
+/** The documented MATCH/DRIFT tolerance of a capability (0 = bit-exact). */
+export function replayToleranceOf(capability) {
+  return TOLERANCE[capability] ?? 0;
+}
+
+/**
  * Replays one Scientific Run and classifies the result. Does NOT persist —
  * see verifyScienceRun for the persisted, primary entry point. Exposed
  * separately so tests / dry-run tooling can inspect a verdict without
@@ -173,12 +190,11 @@ export function replayScienceRun(db, runId) {
   const run = getScienceRun(db, runId);
   if (!run) return { ok: false, error: 'run_not_found' };
 
-  const replayer = REPLAYERS[run.capability];
-  if (!replayer) {
+  if (!REPLAYERS[run.capability]) {
     return { ok: true, run, verdict: VERDICT.REPLAY_UNSUPPORTED, detail: { reason: `no replay path wired for capability '${run.capability}'` } };
   }
 
-  const replay = replayer(run.inputs);
+  const replay = replayCapabilityInputs(run.capability, run.inputs);
   if (!replay.ok) {
     const blocked = replay.error === 'BLOCKED_BY_RUNTIME';
     return {

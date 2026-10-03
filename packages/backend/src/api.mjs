@@ -59,6 +59,7 @@ import {
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 import { createHash } from 'node:crypto';
+import { sha256Hex } from './determinism.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
 import { listCapabilities, listCapabilitiesMetadata } from './compute/capabilities.mjs';
@@ -78,7 +79,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
-import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
+import { buildExecutionBundle, recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { controlResearchRunExecution, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
@@ -1058,6 +1059,32 @@ export function handleApi(db, ctx) {
           if (v.ok) return ok({ experimentId: seg[5], verified: true, artifactRef: v.artifactRef });
           const status = { NO_ARTIFACT_RECORDED: 404, NOT_EXECUTED: 409, BLOCKED_BY_CONFIGURATION: 503 }[v.status] ?? 409;
           return { status, body: { error: v.status, reason: v.reason ?? null, verified: false } };
+        })();
+      }
+      // Record export for Genesis Verify: the exact execution-bundle bytes researchRunArtifacts writes for this
+      // experiment, with their sha256. Built from the hash-chained state (the same bytes custody stores); when a
+      // custody artifact is recorded it is verified first and a failure is returned, never papered over.
+      if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'record') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        const experiment = current.experiments.find((e) => e.experimentId === seg[5]);
+        if (!experiment) return err(404, 'not_found');
+        if (!experiment.execution) return { status: 409, body: { error: 'NOT_EXECUTED' } };
+        if (!current.researchState.chain.ok) return { status: 409, body: { error: 'STATE_INTEGRITY_FAILURE' } };
+        return (async () => {
+          const bytes = buildExecutionBundle(current.researchRunId, experiment);
+          const sha256 = sha256Hex(bytes);
+          const custody = await verifyExperimentArtifact(db, ctx.artifactStorage ?? null, projectId, current.researchRunId, seg[5]);
+          if (!custody.ok && !['NO_ARTIFACT_RECORDED', 'NOT_EXECUTED', 'BLOCKED_BY_CONFIGURATION'].includes(custody.status)) {
+            return { status: 409, body: { error: custody.status, reason: custody.reason ?? null } };
+          }
+          if (custody.ok && custody.artifactRef.sha256 !== sha256) return { status: 409, body: { error: 'ARTIFACT_CHAIN_MISMATCH' } };
+          const safe = (v) => String(v).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
+          return ok({
+            researchRunId: current.researchRunId, experimentId: experiment.experimentId,
+            fileName: `genesis-record-${safe(current.researchRunId)}-${safe(experiment.experimentId)}.json`,
+            mimeType: 'application/json', record: bytes.toString('utf8'), sha256, size: bytes.byteLength,
+            custody: custody.ok ? { status: 'VERIFIED', artifactRef: custody.artifactRef } : { status: custody.status, artifactRef: null },
+          });
         })();
       }
       // Canonical Evidence Pack (docs/astra): a read-only projection of this run's records, every hash recomputable.

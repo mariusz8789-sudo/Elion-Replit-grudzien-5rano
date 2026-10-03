@@ -1,6 +1,6 @@
 /* global AbortSignal */
 import { canonicalHash } from '../provenance.mjs';
-import { sha256Hex } from '../determinism.mjs';
+import { canonicalJson, sha256Hex } from '../determinism.mjs';
 import { PROVENANCE_CLASS } from '../provenanceClass.mjs';
 import {
   classifyLiteratureLicence,
@@ -73,6 +73,8 @@ function mapResult(result, context) {
       responseStatus: context.responseStatus,
       responseHash: context.responseHash,
       responseBytes: context.responseBytes,
+      // SHA-256 of this one record exactly as the provider returned it (canonical JSON of its result entry).
+      recordHash: sha256Hex(canonicalJson(result)),
       retrievedAt: context.retrievedAt,
     },
   };
@@ -141,6 +143,10 @@ export async function queryEuropePmc(query, options = {}) {
     responseHash: sha256Hex(rawBody),
     responseBytes: Buffer.byteLength(rawBody, 'utf8'),
   };
+  options.rawResponseSink?.({
+    provider: PROVIDER, requestUrl: url.toString(), finalUrl: fetched.url.toString(), responseStatus: response.status,
+    sha256: bodyProvenance.responseHash, bytes: bodyProvenance.responseBytes, body: rawBody,
+  });
   let body;
   try { body = JSON.parse(rawBody); } catch {
     return blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'EUROPE_PMC_INVALID_JSON', 'Europe PMC returned invalid JSON.', bodyProvenance);

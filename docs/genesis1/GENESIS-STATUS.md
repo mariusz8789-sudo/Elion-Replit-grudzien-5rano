@@ -212,18 +212,61 @@ Edison 55 · Verified 74 (audit 70)
   run; no GPU.
 
 ### 6 · Literature / data
-Edison 35 · Verified 60 (audit 55)
-- Europe PMC + PubMed connectors (fail-closed,
-  one allowlisted origin), five provenance
-  classes; nothing assigns REAL_MEASUREMENT.
-  Live proof: 195 sources, metadata only, 2.0 s
+Edison 35 · Verified 60 (audit 55) → Edison 45 ·
+Verified 72 after branch `g1/literature`
+(local commits on 00cd5ccc, not pushed; counts
+only once merged with green CI)
+- Main: Europe PMC + PubMed connectors
+  (fail-closed, one allowlisted origin), five
+  provenance classes; nothing assigns
+  REAL_MEASUREMENT. Live proof: 195 sources,
+  metadata only, 2.0 s
   (`docs/evidence/literature-live-scale-44188bc2.json`).
+- `g1/literature` adds, in the canonical
+  ResearchRun (no second literature system):
+  every raw provider response body kept
+  byte-for-byte in `research_source_records`
+  (content-addressed, append-only, re-hashed on
+  every read) and named in KNOWLEDGE_SNAPSHOT@2;
+  each source carries DOI/PMID/PMCID, retrieval
+  time and `recordHash` (sha256 of its record as
+  fetched); offline replay from stored bodies
+  (LITERATURE_REPLAYED: MATCH / DRIFT /
+  TAMPERED, no network); plan hypotheses cite
+  retrieved sources (`literature.citations` with
+  hashes; contradicting sources and
+  contradiction-search candidates visible; any
+  other id stays UNKNOWN); datasets registered to
+  a run (DATASET_ATTACHED: sha256, licence,
+  declared origin URL) bound into a real RDKit
+  experiment's frozen protocol and carried in
+  provenance and the Evidence Pack
+  (`sources.events`, `sourceArtifactRefs`,
+  anchored `SOURCE_RECORD_MUTATED`). Unreachable
+  host → HTTP 503 `BLOCKED` with the connector
+  reason; the attempt is recorded and a retry is
+  not deduplicated away.
 - Evidence: `literatureFoundation.test.mjs`,
   `literaturePubmedProvenance.test.mjs`,
-  `researchRunLiteratureIntegration.test.mjs`.
-- Top gap: metadata only, no full text, no
-  source-quality scoring at scale; 8 GLP-1R
-  assays UNKNOWN.
+  `researchRunLiteratureIntegration.test.mjs`,
+  `researchRunLiteratureProvenance.test.mjs`
+  (handleApi, two DB reopens, tamper and
+  BLOCKED paths; the RDKit + Evidence Pack case
+  skips without RDKit).
+- Top gaps: the committed raw fixtures
+  (`src/fixtures/literature-raw/`) are
+  SYNTHETIC in provider format, not live
+  captures: this build host got proxy 403 from
+  both providers, and the live path returned
+  BLOCKED (ACCESS_DENIED) as designed. Run
+  `scripts/research-run-literature-live-proof.mjs`
+  on a networked host to record real bodies.
+  Still metadata only (no full text, no passage
+  review, no source-quality scoring at scale);
+  dataset origin is declared, not fetched
+  (provenance UNKNOWN); docker sandbox cannot
+  mount datasets (only engine inputs bind to a
+  dataset cell); 8 GLP-1R assays UNKNOWN.
 
 ### 7 · Engines / workflows
 Edison 70 · Verified 70 (audit 68)

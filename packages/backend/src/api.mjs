@@ -81,6 +81,7 @@ import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPl
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
@@ -829,6 +830,18 @@ export function handleApi(db, ctx) {
         if (result.ok) return ok(result);
         const status = result.status === 'NOT_FOUND' ? 404 : 409;
         return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+      }
+      // The next justified experiment: executes the choice the run's fixed rule recorded, never one the caller names.
+      if (seg.length === 5 && seg[4] === 'advance') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return runHeavyComputeAsync(db, ctx, `research-run:${current.researchRunId}`, async () => {
+          const result = await advanceResearchRun(db, projectId, current.researchRunId, {
+            maxSteps: body?.maxSteps, userId: user.id,
+            afterStep: ctx.artifactStorage ? (id) => recoverMissingArtifacts(db, ctx.artifactStorage, projectId, id) : null,
+          });
+          return result.ok ? ok(result, result.steps.some((x) => x.ok) ? 201 : 200) : { status: result.status === 'NOT_FOUND' ? 404 : 409, body: { error: result.status } };
+        });
       }
       // Bounded fan-out: child ResearchRuns on the same queue, each with its own job and lineage.
       if (seg[4] === 'fanout' && (seg.length === 5 || (seg.length === 6 && seg[5] === 'spawn') || (seg.length === 7 && seg[5] === 'retry'))) {

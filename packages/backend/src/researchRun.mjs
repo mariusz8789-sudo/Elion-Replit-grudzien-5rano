@@ -108,12 +108,12 @@ export function inWriteTransaction(db, fn) {
 /** The run's experiments, one entry per experiment id, in the order they were frozen. */
 export function experimentsOf(researchState) {
   const byId = new Map();
-  const slot = { PREDICTIONS_FROZEN: 'frozen', EXPERIMENT_HANDOFF: 'execution', SELF_FALSIFICATION: 'falsification', EVIDENCE_UPDATE: 'evidence', NEXT_EXPERIMENT: 'next' };
+  const slot = { PREDICTIONS_FROZEN: 'frozen', EXPERIMENT_HANDOFF: 'execution', SELF_FALSIFICATION: 'falsification', EVIDENCE_UPDATE: 'evidence', NEXT_EXPERIMENT: 'next', EXPERIMENT_CONTINUED: 'continuedFrom' };
   for (const e of researchState.events) {
     const key = slot[e.type];
     const id = e.payload?.experimentId;
     if (!key || !id) continue;
-    if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null });
+    if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null, continuedFrom: null });
     const experiment = byId.get(id);
     // The first record of a step is the record. A later second one (a changed criterion, a rewritten verdict) never
     // replaces it; it is kept aside as a conflict that stops the run (nextStepOf) instead of silently changing history.

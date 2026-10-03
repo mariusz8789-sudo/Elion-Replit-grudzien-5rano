@@ -556,6 +556,8 @@ export interface ResearchRunExperiment {
 
 export interface ResearchRunView {
   researchRunId: string;
+  /** The canonical AgentRun behind the research run; its `status` is what pause, resume and cancel change. */
+  run?: AgentRunSummary;
   question: string;
   plan: { hypotheses: Array<{ hypothesisId: string; claim: string; experimentProposal?: { kind: string; engineId?: string; decision?: string } }> } | null;
   experiments: ResearchRunExperiment[];
@@ -570,6 +572,74 @@ export function startResearchRun(token: string, projectId: string, question: str
 
 export function getResearchRun(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ researchRun: ResearchRunView }>> {
   return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}`, { token });
+}
+
+/** One row of `GET /research-runs`: the server's own summary, nothing derived on the client. */
+export interface ResearchRunSummary {
+  researchRunId: string;
+  question: string;
+  status: string;
+  nextStep: ResearchRunNextStep;
+  events: number;
+  createdAt: number;
+}
+
+export function listResearchRuns(token: string, projectId: string): Promise<ApiResult<{ researchRuns: ResearchRunSummary[] }>> {
+  return request('GET', `/projects/${projectId}/research-runs`, { token });
+}
+
+/**
+ * A ResearchRun experiment job in the durable lease queue (backend compute/workerInfrastructureContract.mjs).
+ * The queue clears `workerId`, `leaseId` and `leaseExpiresAt` when a job ends, so a finished job no longer names its worker.
+ */
+export type ResearchRunJobState = 'QUEUED' | 'CLAIMED' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'DEAD_LETTER';
+
+export interface ResearchRunQueueJob {
+  jobId: string;
+  researchRunId: string;
+  experimentId: string;
+  capabilityId: string;
+  state: string;
+  workerId: string | null;
+  leaseId: string | null;
+  leaseExpiresAt: number | null;
+  attempts: number;
+  maxAttempts: number;
+  timeoutMs: number;
+  payload: { projectId?: string; hypothesisId?: string | null; userId?: string | null };
+  result: unknown;
+  /** Set when the job ended badly, e.g. `{ code: 'LEASE_EXPIRED_AFTER_MAX_ATTEMPTS' }` or the worker's `{ code, status, retryable }`. */
+  failure: { code?: string; [key: string]: unknown } | null;
+  cancelReason: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ResearchRunControlAction = 'pause' | 'resume' | 'cancel';
+
+/**
+ * What a pause, resume or cancel did, as the server reports it. During a pause `queue.inFlight` lists the
+ * jobs a worker had already claimed: they are NOT interrupted and run to their end.
+ */
+export interface ResearchRunControlResult {
+  ok: true;
+  status: string;
+  researchRun: ResearchRunView;
+  queue: { withdrawn: string[]; inFlight: string[]; requeued: string[]; refused: string[] };
+}
+
+export function controlResearchRun(
+  token: string, projectId: string, researchRunId: string, action: ResearchRunControlAction, reason?: string,
+): Promise<ApiResult<ResearchRunControlResult>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/${action}`, { token, body: reason ? { reason } : {} });
+}
+
+export function getResearchRunJob(token: string, projectId: string, researchRunId: string, jobId: string): Promise<ApiResult<{ job: ResearchRunQueueJob }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiment-jobs/${encodeURIComponent(jobId)}`, { token });
+}
+
+export function cancelResearchRunJob(token: string, projectId: string, researchRunId: string, jobId: string): Promise<ApiResult<{ job: ResearchRunQueueJob }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiment-jobs/${encodeURIComponent(jobId)}/cancel`, { token });
 }
 
 /** The model PROPOSES hypotheses and experiments; nothing it says becomes evidence. */
@@ -1690,11 +1760,92 @@ export interface RegistryContradiction {
   resolution: { statement: string; evidenceRefs: string[]; resolvedBy: string | null; at: string } | null;
 }
 
+/* ---- Science Flight Control (backend campaign/scienceFlightControl.mjs), carried inside BYT ---- */
+
+export type ScienceFlightStatus = 'READY_TO_EXECUTE' | 'AWAITING_EVIDENCE' | 'AWAITING_REPLAY' | 'VERIFIED' | 'BLOCKED' | 'BLOCKED_RETRYABLE' | 'FAILED';
+export type ScienceFlightFailureLayer = 'PREFLIGHT' | 'RESEARCH_GATE' | 'CAPABILITY_BINDING' | 'RUNTIME' | 'WORKER_TRANSPORT' | 'ENGINE' | 'REPLAY';
+export interface ScienceFlightSourceRef { eventId: string; eventType: string; occurredAt: number | string }
+
+/** One flight: a frozen Virtual Lab plan and what the canonical campaign events say happened to it. */
+export interface ScienceFlight {
+  campaignId: string;
+  candidateId: string;
+  contractVersion: string;
+  executionId: string | null;
+  status: string;
+  preflight: {
+    decision: string;
+    inputFingerprint: string | null;
+    requestedCapability: string | null;
+    budget: { maxComputeSeconds?: number; [key: string]: unknown } | null;
+    expectation: unknown;
+    checks: { check: string; status: string; detail: unknown }[];
+    source: ScienceFlightSourceRef | null;
+  };
+  executionDelta: {
+    observed: boolean;
+    inputIntegrity: string;
+    plannedCapability: string | null;
+    selectedEngine: string | null;
+    scienceRunId?: string | null;
+    outputFingerprint?: string | null;
+    computeBudgetSeconds: number | null;
+    actualDurationMs: number | null;
+    budgetVerdict: string;
+    plannedExpectation: unknown;
+    observedClassification: string | null;
+    source?: ScienceFlightSourceRef | null;
+  };
+  failureAttribution: { layer: string; code: string; reason?: string | null; retryable: boolean; source: ScienceFlightSourceRef | null } | null;
+  evidenceUpdate: { status: string; proposalId: string | null; source: ScienceFlightSourceRef | null };
+  replay: { status: string; verificationId: string | null; source: ScienceFlightSourceRef | null };
+  bytUpdate: {
+    mode: 'DERIVED_READ_MODEL_ONLY'; persistence: 'NONE'; status: string; epistemicState: string; classification: string | null;
+    scienceRunRef: string | null; evidenceRef: string | null; replayRef: string | null; failureLayer: string | null; limitation: string;
+  };
+  flightFingerprint: string;
+}
+
+/** NOT_COMPUTED means the server did not rebuild Flight Control for this view; it never means "zero flights". */
+export type ScienceFlightControl =
+  | { status: 'AVAILABLE'; flights: ScienceFlight[]; verified: number; blocked: number; rejectedUntraceableRecords: number; limitation: string }
+  | { status: 'NOT_COMPUTED'; flights: ScienceFlight[]; verified: null; blocked: null; rejectedUntraceableRecords: null; limitation: string };
+
+/** BYT — the derived read model of Genesis' scientific self (backend bytProjection.mjs). Sections the UI does not read stay loose. */
+export interface BytProjection {
+  schemaVersion: number;
+  view: 'DERIVED_FROM_CANONICAL_STATE';
+  identity: unknown;
+  epistemicVocabulary: string[];
+  continuity: { researchRuns: number; verifiedRuns: number; brokenRuns: number };
+  knowledgeState: { openGaps: number; unresolvedContradictions: number; proposedClaims: number } | UnknownSection;
+  capabilities: { availableNow: unknown[]; blocked: unknown[]; missing: unknown[] } | UnknownSection;
+  predictionLedger: Array<Record<string, unknown>>;
+  calibration: Record<string, unknown>;
+  necropolis: Array<Record<string, unknown>>;
+  decisionTraces: Array<Record<string, unknown>>;
+  surprise: Record<string, unknown>;
+  scienceFlightControl: ScienceFlightControl;
+  integrity: { researchRuns: Array<{ researchRunId: string; ok: boolean; [key: string]: unknown }>; knowledgeRegistry: unknown };
+}
+
+/** A ResearchRun job of the lease queue as the cognitive state lists it: QUEUED in pending, CLAIMED (with worker and lease) in running. */
+export interface CognitiveResearchRunJob {
+  kind: 'RESEARCH_RUN_JOB';
+  id: string;
+  researchRunId: string;
+  hypothesisId: string | null;
+  workerId?: string | null;
+  leaseExpiresAt?: number | null;
+  attempts?: number;
+}
+
 export interface GenesisCognitiveState {
   schemaVersion: number;
   projectId: string;
   generatedAt: string;
   view: 'MATERIALIZED_VIEW';
+  byt: BytProjection;
   currentGoals: { kind: string; id: string; goal: string; domain: string; status: string }[];
   activeQuestions: { kind: string; [key: string]: unknown }[];
   activeHypotheses: { source: string; status: string; [key: string]: unknown }[];

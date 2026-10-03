@@ -12,6 +12,10 @@ on:
         description: Commit production should be serving (40 characters); empty skips the commit check
         required: false
         default: ''
+      attempts:
+        description: Health attempts, 15 s apart
+        required: false
+        default: '20'
 
 permissions:
   contents: read
@@ -24,12 +28,13 @@ jobs:
     env:
       BASE: https://genesis-physics.com
       EXPECTED_SHA: ${{ github.event.deployment.sha || inputs.expected_sha }}
+      ATTEMPTS: ${{ inputs.attempts || '20' }}
     steps:
       - name: Health reports the deployed commit and a persistent database
         run: |
           last=''
-          for i in $(seq 1 20); do
-            code=$(curl -s -o health.json -w '%{http_code}' --max-time 20 "$BASE/api/health" || echo 000)
+          for i in $(seq 1 "$ATTEMPTS"); do
+            code=$(curl -sS -o health.json -w '%{http_code}' --max-time 20 "$BASE/api/health" 2>curl.err) || code="000 $(tr '\n' ' ' < curl.err) dns=$(getent hosts "${BASE#https://}" | head -1)"
             if [ "$code" = 200 ]; then
               if last=$(node -e "
                 const h = require('./health.json');

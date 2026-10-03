@@ -26,6 +26,7 @@ const alive = (pid) => {
 const strays = (pattern) => { try { return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).length; } catch { return 0; } };
 // Anchored at the start of the command line so a shell whose text merely mentions the script is not counted.
 const ENGINE_PROCESS = '^\\S*python\\S* \\S*qm_worker\\.py';
+const CHILD_PROCESS = '^\\S*node\\S* --no-warnings \\S*researchRunChild\\.mjs';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test('isolated process: a timeout or abort kills the child AND what it started, and the loop stays free', { skip: skipProcess }, async () => {
@@ -56,11 +57,11 @@ test('isolated process: a timeout or abort kills the child AND what it started, 
 });
 
 const pyscfPlan = {
-  subProblems: [{ question: 'Does acetone converge?', whyItMatters: 'Timeout proof.' }],
+  subProblems: [{ question: 'Does isopropanol converge?', whyItMatters: 'Timeout proof.' }],
   hypotheses: [{
-    claim: 'Acetone RHF/6-31G converges.', claimType: 'PREDICTION', assumptions: [], supportingEvidenceRefs: [], contradictingEvidenceRefs: [], missingEvidence: [],
+    claim: 'Isopropanol RHF/6-31G converges.', claimType: 'PREDICTION', assumptions: [], supportingEvidenceRefs: [], contradictingEvidenceRefs: [], missingEvidence: [],
     uncertainty: { level: 'UNKNOWN', statement: 'No probability calibration is claimed.' }, falsificationProposal: 'The SCF does not converge.',
-    experimentProposal: { kind: 'COMPUTATIONAL', engineId: 'pyscf', description: 'Real PySCF single point (about 2 s).', parameters: { smiles: 'CC(C)=O', basis: '6-31g', predictions: [{ observable: 'converged', operator: '==', value: true, critical: true }] }, parameterChanges: [] },
+    experimentProposal: { kind: 'COMPUTATIONAL', engineId: 'pyscf', description: 'Real PySCF single point (about 2 s).', parameters: { smiles: 'CC(C)O', basis: '6-31g', predictions: [{ observable: 'converged', operator: '==', value: true, critical: true }] }, parameterChanges: [] },
   }],
   nextActions: ['Human review'],
 };
@@ -96,6 +97,7 @@ test('a real PySCF job that outlives its timeout is killed (not ignored); the re
     assert.ok(elapsed < 1_900, `stopped at the deadline, not after the ~2 s engine run (${elapsed} ms)`);
     assert.ok(ticks >= 20, `the server's event loop stayed free while the engine ran (${ticks} ticks)`);
     await sleep(300);
+    assert.equal(strays(CHILD_PROCESS), 0, 'no job child outlived the killed job');
     assert.equal(strays(ENGINE_PROCESS), 0, 'no engine process outlived the killed job');
     let run = getResearchRun(ctx.db, ctx.projectId, ctx.runId);
     assert.equal(run.experiments.filter((e) => e.execution).length, 0, 'nothing was executed or sealed by the killed attempt');
@@ -116,19 +118,22 @@ test('a real PySCF job that outlives its timeout is killed (not ignored); the re
 test('a job cancelled while its real engine runs loses its lease, the engine is killed and no result is written', { skip: skipPyscf || skipProcess }, async () => {
   const ctx = await setup(pyscfPlan, 'iso-cancel@genesis.test');
   try {
-    const worker = createResearchRunWorker(ctx.db, { workerId: 'worker-iso-cancel', leaseMs: 3_000 });
+    const worker = createResearchRunWorker(ctx.db, { workerId: 'worker-iso-cancel', leaseMs: 1_500 });
     const queued = await enqueueResearchExperiment(ctx.db, ctx.projectId, ctx.runId, { timeoutMs: 120_000 });
     const running = worker.runOnce();
-    // Cancel only once the real engine process exists (the child needs a moment to boot, longer on a loaded runner).
+    // Cancel only once the job's child process exists and has had a moment to start the real engine
+    // (the child needs time to boot, longer on a loaded runner; the engine then runs for about two seconds).
     const deadline = Date.now() + 15_000;
-    while (strays(ENGINE_PROCESS) === 0 && Date.now() < deadline) await sleep(50);
-    assert.ok(strays(ENGINE_PROCESS) >= 1, 'the engine is running in a child');
+    while (strays(CHILD_PROCESS) === 0 && Date.now() < deadline) await sleep(25);
+    assert.ok(strays(CHILD_PROCESS) >= 1, 'the job runs in a child process');
+    await sleep(300);
     assert.equal((await queueFor(ctx.db).cancel(queued.job.jobId, 'OPERATOR')).ok, true);
     const t0 = Date.now();
     const out = await running;
     assert.equal(out.state, 'LEASE_LOST');
     assert.ok(Date.now() - t0 < 2_500, 'the worker noticed the cancel at its next heartbeat');
     await sleep(500);
+    assert.equal(strays(CHILD_PROCESS), 0, 'the job child was killed');
     assert.equal(strays(ENGINE_PROCESS), 0, 'the engine process was killed');
     const run = getResearchRun(ctx.db, ctx.projectId, ctx.runId);
     assert.equal(run.experiments.filter((e) => e.execution).length, 0, 'a cancelled job produced no result');

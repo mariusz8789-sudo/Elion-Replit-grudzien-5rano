@@ -1,0 +1,245 @@
+{
+  "decisionId": "D-155",
+  "kind": "EXTERNAL_PUBLISHED_EVIDENCE",
+  "epistemicStatus": "EXTERNAL_PUBLISHED",
+  "isGenesisResult": false,
+  "statement": "Everything below was published by Reactome or the Human Protein Atlas. Genesis did not measure, model or compute any of it, and nothing here may be presented as a Genesis experimental result.",
+  "computedAt": "2026-10-03T02:50:29.094Z",
+  "sourceData": {
+    "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
+    "gitRef": "887c54cc",
+    "filesVerified": 4,
+    "allHashesMatched": true,
+    "files": [
+      {
+        "path": "reactome/database-version.txt",
+        "sourceUrl": "https://reactome.org/ContentService/data/database/version",
+        "retrievedAt": "2026-10-03T02:17:55Z",
+        "sha256": "d6d824abba4afde81129c71dea75b8100e96338da5f416d2f69088f1960cb091"
+      },
+      {
+        "path": "reactome/R-HSA-381684.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381684",
+        "retrievedAt": "2026-10-03T02:17:55Z",
+        "sha256": "4700cb0848a249c8429730676a156a8ec5d7b308aa7b7b66c06d220e240a0d9e"
+      },
+      {
+        "path": "reactome/R-HSA-381706.enhanced.json",
+        "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381706",
+        "retrievedAt": "2026-10-03T02:17:56Z",
+        "sha256": "ced9581ad2851eaada65d07779a0c92fd28cf660528e726f0a799292cefea7e5"
+      },
+      {
+        "path": "hpa/ENSG00000112164.json",
+        "sourceUrl": "https://www.proteinatlas.org/ENSG00000112164.json",
+        "retrievedAt": "2026-10-03T02:17:56Z",
+        "sha256": "ba3c1e0328b6511195114fcd96eee13b8918bc6f0cbb3bedd0c33ea64b76c130"
+      }
+    ]
+  },
+  "pathway": {
+    "question": "GLP-1R -> Gs -> cAMP",
+    "reactomeDatabaseVersion": "97",
+    "records": [
+      {
+        "stId": "R-HSA-381684",
+        "recordVersion": "R-HSA-381684.1",
+        "displayName": "GLP1R [plasma membrane]",
+        "schemaClass": "EntityWithAccessionedSequence",
+        "species": "Homo sapiens",
+        "releaseDate": null,
+        "reviewStatus": null,
+        "reviewStatusMeaning": null,
+        "compartments": [
+          "plasma membrane"
+        ],
+        "input": [],
+        "output": [],
+        "catalystActivity": [],
+        "partOfPathway": [],
+        "precedingEvent": [],
+        "followingEvent": [],
+        "summationVerbatim": null,
+        "literatureReferences": []
+      },
+      {
+        "stId": "R-HSA-381706",
+        "recordVersion": "R-HSA-381706.4",
+        "displayName": "GLP1R:GLP1 activates G(s)",
+        "schemaClass": "Reaction",
+        "species": "Homo sapiens",
+        "releaseDate": "2009-06-24",
+        "reviewStatus": "five stars",
+        "reviewStatusMeaning": "externally reviewed",
+        "compartments": [
+          "plasma membrane",
+          "cytosol"
+        ],
+        "input": [
+          "GTP [cytosol]"
+        ],
+        "output": [
+          "GDP [cytosol]",
+          "GLP-1:GLP-1R:Heterotrimeric G(s):GTP [plasma membrane]"
+        ],
+        "catalystActivity": [
+          "G protein-coupled receptor activity of GLP1:GLP1R:Heterotrimeric G(s):GDP [plasma membrane]"
+        ],
+        "partOfPathway": [
+          "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
+        ],
+        "precedingEvent": [
+          "GLP1R binds GLP1"
+        ],
+        "followingEvent": [
+          "Heterotrimeric G(s) complex dissociates"
+        ],
+        "summationVerbatim": "GLP-1R that has bound GLP-1 activates the alpha subunit of the heterotrimeric G-protein G(s) by protein-protein interaction between intracellular loop 3 of GLP-1R and G(s). The activation causes exchange of GDP for GTP by the alpha subunit of G(s).",
+        "literatureReferences": [
+          {
+            "pubMedId": 19859570,
+            "title": "Functional Characterization of N-Terminally GFP-Tagged GLP-1 Receptor",
+            "journal": "J Biomed Biotechnol",
+            "year": 2009
+          }
+        ]
+      }
+    ],
+    "sourceFacts": [
+      {
+        "label": "SOURCE_FACT",
+        "claim": "In human, GLP-1R with GLP-1 bound activates the alpha subunit of the heterotrimeric G protein G(s), causing GDP/GTP exchange.",
+        "source": "Reactome R-HSA-381706 (R-HSA-381706.4), \"GLP1R:GLP1 activates G(s)\", Homo sapiens, review status \"five stars\" (externally reviewed)",
+        "verbatim": "GLP-1R that has bound GLP-1 activates the alpha subunit of the heterotrimeric G-protein G(s) by protein-protein interaction between intracellular loop 3 of GLP-1R and G(s). The activation causes exchange of GDP for GTP by the alpha subunit of G(s).",
+        "citations": [
+          {
+            "pubMedId": 19859570,
+            "title": "Functional Characterization of N-Terminally GFP-Tagged GLP-1 Receptor",
+            "journal": "J Biomed Biotechnol",
+            "year": 2009
+          }
+        ],
+        "partOfPathway": [
+          "Glucagon-like Peptide-1 (GLP1) regulates insulin secretion"
+        ]
+      }
+    ],
+    "notInFetchedSources": [
+      {
+        "label": "NOT_IN_FETCHED_SOURCES",
+        "missingStep": "Gs -> adenylate cyclase -> cAMP",
+        "whatThisMeans": "The two Reactome records fetched cover GLP-1R binding GLP-1 and the activation of G(s). Neither of them states the cAMP step. So the \"-> cAMP\" half of the requested chain is NOT source-backed by what this repository holds, and it is not written down here as if it were. Closing it needs the downstream Reactome reaction fetched and hash-recorded like these two.",
+        "doNotInfer": "That G(s) canonically raises cAMP is textbook knowledge. Textbook knowledge recalled by a model is not a source, and this file does not carry it as one."
+      }
+    ],
+    "inferences": [
+      {
+        "label": "INFERENCE_BY_GENESIS",
+        "statement": "A functional cAMP-arm agonism assay is a reasonable readout for GLP-1R activation, which is the endpoint role D-151/D-152 already classify on.",
+        "restsOn": [
+          "the SOURCE_FACT above, for the receptor-to-G(s) step"
+        ],
+        "doesNotRestOn": [
+          "any fetched source for the G(s)-to-cAMP step, which is missing"
+        ],
+        "isNotEvidence": "This is Genesis joining records. It is reasoning, not a published finding, and it is not evidence that any molecule activates anything."
+      }
+    ]
+  },
+  "expression": {
+    "question": "Where is GLP1R expressed?",
+    "source": "Human Protein Atlas, gene ENSG00000112164",
+    "record": {
+      "gene": "GLP1R",
+      "ensemblId": "ENSG00000112164",
+      "uniprot": [
+        "P43220"
+      ],
+      "geneDescription": "Glucagon like peptide 1 receptor",
+      "overallEvidenceLevel": "Evidence at protein level",
+      "hpaOwnEvidenceLevel": "Evidence at transcript level",
+      "uniprotEvidenceLevel": "Evidence at protein level",
+      "rna": {
+        "tissueSpecificity": "Tissue enhanced",
+        "tissueDistribution": "Detected in some",
+        "tissueSpecificNtpm": {
+          "heart muscle": "2.6",
+          "pancreas": "8.6"
+        },
+        "singleCellTypeSpecificity": "Cell type enhanced",
+        "singleCellTypeSpecificNcpm": {
+          "Lacrimal acinar cells": "19.0",
+          "Neuroendocrine cells": "8.0",
+          "Other brain neurons": "10.8",
+          "Pancreatic acinar cells": "15.5",
+          "Pancreatic islet cells": "23.3",
+          "Proximal tubule cells": "5.7",
+          "Salivary acinar cells": "4.8",
+          "Tuft cells": "46.1"
+        },
+        "tissueCellTypeEnrichment": [
+          "Heart muscle - Cardiomyocytes",
+          "Skin - Eccrine sweat gland cells",
+          "Testis - Early spermatids",
+          "Testis - Late spermatids"
+        ],
+        "unit": "nTPM for tissues, nCPM for single-cell types, as HPA reports them"
+      },
+      "proteinByAntibodyStaining": {
+        "tissueSpecificity": "Not detected",
+        "tissueDistribution": "Not detected",
+        "tissueSpecificIntensity": null,
+        "cellTypeSpecificity": "Not detected",
+        "reliabilityIH": null,
+        "antibodies": [
+          "CAB080541"
+        ]
+      },
+      "subcellularMainLocation": [
+        "Nuclear bodies",
+        "Plasma membrane"
+      ]
+    },
+    "sourceFacts": [
+      {
+        "label": "SOURCE_FACT",
+        "claim": "HPA reports GLP1R RNA as \"Tissue enhanced\" and \"Detected in some\", with tissue-specific values {\"heart muscle\":\"2.6\",\"pancreas\":\"8.6\"} nTPM.",
+        "level": "RNA (transcript), not protein"
+      },
+      {
+        "label": "SOURCE_FACT",
+        "claim": "At single-cell level HPA reports \"Cell type enhanced\", highest in Tuft cells 46.1, Pancreatic islet cells 23.3, Lacrimal acinar cells 19.0 nCPM.",
+        "level": "RNA (transcript), not protein"
+      },
+      {
+        "label": "SOURCE_FACT_THAT_CUTS_THE_OTHER_WAY",
+        "claim": "HPA's OWN antibody staining does not support tissue expression: protein tissue specificity \"Not detected\", distribution \"Not detected\", immunohistochemistry reliability null, antibody [\"CAB080541\"].",
+        "whyItIsHere": "HPA's headline \"Evidence at protein level\" comes from UniProt and neXtProt (\"Evidence at protein level\"); HPA's own evidence level for this gene is \"Evidence at transcript level\". Quoting the RNA numbers without this line would overstate what HPA actually shows."
+      }
+    ],
+    "inferences": [
+      {
+        "label": "INFERENCE_BY_GENESIS",
+        "statement": "Pancreas is the tissue with the highest reported GLP1R transcript level among those HPA calls specific, and pancreatic islet cells the highest among pancreatic cell types.",
+        "restsOn": [
+          "the two RNA SOURCE_FACTs above, read as reported"
+        ],
+        "isNotEvidence": "A transcript level is not a protein level, a protein level is not a functional receptor, and none of this is a measurement Genesis made."
+      }
+    ],
+    "notInFetchedSources": [
+      {
+        "label": "NOT_IN_FETCHED_SOURCES",
+        "missing": "GTEx tissue-level expression",
+        "whatThisMeans": "Not fetched, so not reported. The HPA record is the only expression source this repository holds."
+      }
+    ]
+  },
+  "whatThisDoesNotLicense": [
+    "A pathway record is not evidence that any molecule activates the receptor.",
+    "An expression record is not evidence that a molecule reaches that tissue or does anything there.",
+    "Binding is not functional agonism; docking is not agonism; a heterologous-system response is not a native-tissue response.",
+    "None of this changes any frozen gate, any sealed artefact, or D-144, D-151, D-152, D-153 or D-154."
+  ],
+  "artifactHash": "54f8254027006cbb"
+}

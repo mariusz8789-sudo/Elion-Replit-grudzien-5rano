@@ -178,7 +178,8 @@ case "$1" in
 esac
 `);
     chmodSync(docker, 0o755);
-    const plan = buildSandboxExecutionPlan(request(), { image: IMAGE, policy: { ...SCIENTIFIC_SANDBOX_POLICY, wallClockMs: 700 } }).plan;
+    const plan = buildSandboxExecutionPlan(request(), { image: IMAGE, policy: { ...SCIENTIFIC_SANDBOX_POLICY, wallClockMs: 3000 } }).plan;
+    // 3 s leaves the fake `docker run` time to log and create its container under a loaded machine; the 30 s sleep still far outlives it.
     const containerName = sandboxContainerNameOf(plan.sandboxRunId);
     return { dir, docker, plan, alive: () => existsSync(path.join(state, containerName)), calls: () => readFileSync(log, 'utf8').trim().split('\n'), containerName };
   };

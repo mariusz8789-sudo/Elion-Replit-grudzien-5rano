@@ -4,6 +4,8 @@
    Phone: a tab bar of four places + More, which opens a full-screen explorer.
    Own `gn-` class names so none of the older shell rules (HUD rail, neon
    active beams) reach the new navigation.
+   Logical properties (inline-start/end) throughout: with Arabic the shell
+   carries dir="rtl" and the sidebar, tab bar and explorer mirror.
    ========================================================================== */
 :root {
   --gn-w: 16rem;
@@ -34,6 +36,8 @@
 }
 .gn-chev { display: inline-flex; flex: none; width: 0.9rem; height: 0.9rem; transition: transform 160ms ease; }
 .gn-chev.is-open { transform: rotate(90deg); }
+/* RTL (Arabic): a closed chevron points toward the reading direction. */
+[dir='rtl'] .gn-chev:not(.is-open) { transform: scaleX(-1); }
 .gn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .gn-list[hidden] { display: none; }
 
@@ -41,7 +45,7 @@
 .gn-place {
   display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 2.875rem;
   padding: 0.5rem 0.7rem; border: 0; border-radius: var(--gn-radius);
-  background: transparent; color: var(--gn-dim); text-align: left; text-decoration: none;
+  background: transparent; color: var(--gn-dim); text-align: start; text-decoration: none;
   font: inherit; font-size: 0.9rem; font-weight: 520; line-height: 1.25; cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
 }
@@ -54,7 +58,7 @@
 .gn-label { overflow-wrap: anywhere; }
 .gn-desc { margin-top: 0.15rem; font-size: 0.76rem; font-weight: 400; color: var(--gn-faint); line-height: 1.35; }
 .gn-badge {
-  flex: none; margin-left: auto; padding: 0.1rem 0.45rem; border-radius: 999px;
+  flex: none; margin-inline-start: auto; padding: 0.1rem 0.45rem; border-radius: 999px;
   border: 1px solid var(--gn-line-strong); color: var(--gn-faint);
   font-size: 0.66rem; font-weight: 600; letter-spacing: 0.06em;
 }
@@ -66,19 +70,20 @@
 
 @media (min-width: 901px) {
   .shell[data-nav] { display: block !important; }
-  .shell[data-nav] > .shell-main { margin-left: var(--gn-w); min-height: 100vh; transition: margin-left 180ms ease; }
-  .shell[data-nav='collapsed'] > .shell-main { margin-left: var(--gn-w-collapsed); }
+  /* margin-left/right reset first: older shell rules set a physical margin-left that must not survive in RTL. */
+  .shell[data-nav] > .shell-main { margin-left: 0; margin-right: 0; margin-inline-start: var(--gn-w); min-height: 100vh; transition: margin 180ms ease; }
+  .shell[data-nav='collapsed'] > .shell-main { margin-inline-start: var(--gn-w-collapsed); }
 
   .gn-side {
-    position: fixed; z-index: 30; left: 0; top: 0; bottom: 0; width: var(--gn-w);
+    position: fixed; z-index: 30; inset-inline-start: 0; top: 0; bottom: 0; width: var(--gn-w);
     display: flex; flex-direction: column; gap: 0.5rem;
     padding: 0.85rem 0.7rem 0.75rem;
-    background: var(--gn-bg); border-right: 1px solid var(--gn-line);
+    background: var(--gn-bg); border-inline-end: 1px solid var(--gn-line);
     transition: width 180ms ease;
   }
   .gn-side.is-collapsed { width: var(--gn-w-collapsed); padding-inline: 0.55rem; }
 
-  .gn-side-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; min-height: 2.75rem; padding-left: 0.3rem; }
+  .gn-side-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; min-height: 2.75rem; padding-inline-start: 0.3rem; }
   .gn-brand { display: flex; align-items: center; min-width: 0; color: var(--gn-text); text-decoration: none; border-radius: var(--gn-radius); }
   .gn-brand .genesis-wordmark-text strong { font-size: 0.78rem; letter-spacing: 0.16em; }
   .gn-brand .genesis-wordmark-text small { color: var(--gn-faint); }
@@ -94,7 +99,7 @@
     background: var(--gn-panel); color: var(--gn-faint); font: inherit; font-size: 0.88rem; cursor: pointer;
   }
   .gn-search:hover { color: var(--gn-text); border-color: rgba(143, 211, 220, 0.35); }
-  .gn-search .gn-label { flex: 1; text-align: left; }
+  .gn-search .gn-label { flex: 1; text-align: start; }
   .gn-kbd { flex: none; padding: 0.05rem 0.4rem; border: 1px solid var(--gn-line-strong); border-radius: 6px; font-family: var(--font-mono, monospace); font-size: 0.7rem; }
 
   .gn-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: -0.2rem; padding-inline: 0.2rem; scrollbar-width: thin; }
@@ -129,7 +134,7 @@
   .gn-side.is-collapsed .gn-domain {
     position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
   }
-  .gn-side.is-collapsed .gn-side-head { flex-direction: column; padding-left: 0; }
+  .gn-side.is-collapsed .gn-side-head { flex-direction: column; padding-inline-start: 0; }
   .gn-side.is-collapsed .gn-place, .gn-side.is-collapsed .gn-search, .gn-side.is-collapsed .gn-account { justify-content: center; padding-inline: 0; }
   .gn-side.is-collapsed .gn-group { padding-top: 0.35rem; }
 }
@@ -147,11 +152,11 @@
 
 /* ---------------------------------------------------------------- phone */
 @media (max-width: 900px) {
-  .shell[data-nav] > .shell-main { margin-left: 0; padding-bottom: calc(var(--gn-tab-h) + env(safe-area-inset-bottom, 0px)); }
+  .shell[data-nav] > .shell-main { margin-left: 0; margin-right: 0; margin-inline-start: 0; padding-bottom: calc(var(--gn-tab-h) + env(safe-area-inset-bottom, 0px)); }
   .shell .topbar-logo { display: inline-flex !important; }
 
   .gn-tabbar {
-    position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
+    position: fixed; z-index: 40; inset-inline: 0; bottom: 0;
     display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
     padding: 0.3rem 0.35rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
     background: rgba(7, 11, 17, 0.97); border-top: 1px solid var(--gn-line);
@@ -207,7 +212,7 @@
 .gn-x-search {
   display: flex; align-items: center; gap: 0.7rem; width: 100%; min-height: 3rem; padding: 0 1rem;
   border: 1px solid var(--gn-line-strong); border-radius: 999px; background: var(--gn-panel);
-  color: var(--gn-faint); font: inherit; font-size: 0.92rem; text-align: left; cursor: pointer;
+  color: var(--gn-faint); font: inherit; font-size: 0.92rem; text-align: start; cursor: pointer;
 }
 .gn-x-search:hover { color: var(--gn-text); border-color: rgba(143, 211, 220, 0.35); }
 .gn-x-mobile-only { display: grid; gap: 0.6rem; }
@@ -230,20 +235,21 @@
 .gn-x-cap { display: grid; }
 .gn-variants-toggle {
   justify-self: start; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2.75rem;
-  margin-left: 0.25rem; padding: 0 0.5rem; border: 0; border-radius: 8px; background: transparent;
+  margin-inline-start: 0.25rem; padding: 0 0.5rem; border: 0; border-radius: 8px; background: transparent;
   color: var(--gn-faint); font: inherit; font-size: 0.76rem; cursor: pointer;
 }
 .gn-variants-toggle:hover { color: var(--gn-dim); }
-.gn-variants { margin-left: 1rem; padding-left: 0.5rem; border-left: 1px solid var(--gn-line); }
+.gn-variants { margin-inline-start: 1rem; padding-inline-start: 0.5rem; border-inline-start: 1px solid var(--gn-line); }
 
 @media (min-width: 901px) {
-  .gn-x-backdrop { left: var(--gn-w); }
+  .gn-x-backdrop { inset-inline-start: var(--gn-w); }
   .gn-x {
-    inset: 0 auto 0 var(--gn-w); width: min(60rem, calc(100vw - var(--gn-w)));
-    border-right: 1px solid var(--gn-line); box-shadow: 24px 0 64px rgba(0, 0, 0, 0.45);
+    inset-block: 0; inset-inline: var(--gn-w) auto; width: min(60rem, calc(100vw - var(--gn-w)));
+    border-inline-end: 1px solid var(--gn-line); box-shadow: 24px 0 64px rgba(0, 0, 0, 0.45);
   }
-  .shell[data-nav='collapsed'] .gn-x-backdrop { left: var(--gn-w-collapsed); }
-  .shell[data-nav='collapsed'] .gn-x { left: var(--gn-w-collapsed); width: min(60rem, calc(100vw - var(--gn-w-collapsed))); }
+  [dir='rtl'] .gn-x { box-shadow: -24px 0 64px rgba(0, 0, 0, 0.45); }
+  .shell[data-nav='collapsed'] .gn-x-backdrop { inset-inline-start: var(--gn-w-collapsed); }
+  .shell[data-nav='collapsed'] .gn-x { inset-inline-start: var(--gn-w-collapsed); width: min(60rem, calc(100vw - var(--gn-w-collapsed))); }
   .gn-x-head { padding: 1.1rem 1.5rem 0.9rem; }
   .gn-x-body { padding: 1.2rem 1.5rem 2rem; }
   .gn-x-search { max-width: 32rem; }
@@ -254,4 +260,4 @@
   .gn-x-section-title { margin-top: 0; }
 }
 
-@media print { .gn-side, .gn-tabbar, .gn-x, .gn-x-backdrop { display: none !important; } .shell[data-nav] > .shell-main { margin-left: 0 !important; } }
+@media print { .gn-side, .gn-tabbar, .gn-x, .gn-x-backdrop { display: none !important; } .shell[data-nav] > .shell-main { margin-inline-start: 0 !important; } }

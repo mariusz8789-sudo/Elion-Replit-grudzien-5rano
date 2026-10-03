@@ -46,3 +46,13 @@ export const ENGINE_NAME_PATTERN = /\b(?:RDKit|AutoDock|Vina|Meeko|GNINA|PySCF|O
 
 /** Text under `data-technical-details` is where exact engine identity belongs. */
 export const TECHNICAL_DETAILS_ATTR = 'data-technical-details';
+
+/** Pick the Polish or the English wording; every other language reads English. */
+export function plEn(pl: string, en: string, locale: Locale = getLocale()): string {
+  return locale === 'pl' ? pl : en;
+}
+
+/** The summary of a collapsed technical-details section. */
+export function technicalDetailsLabel(locale: Locale = getLocale()): string {
+  return plEn('Szczegóły techniczne', 'Technical details', locale);
+}

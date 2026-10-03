@@ -179,6 +179,7 @@ function SignedInFlightControl({ token, locale }: { token: string; locale: Local
       notices={notices}
       confirmingCancel={confirmingCancel}
       projectBar={projectBar}
+      projectId={projectId}
       onRefresh={() => { void refresh(); }}
       onControl={(runId, action) => { void onControl(runId, action); }}
       onAskCancel={setConfirmingCancel}

@@ -22,6 +22,8 @@ export interface ExporterProps {
   exported: GenesisRecordExport | null;
   /** Object URL of the exported record Blob, made by the container. */
   exportedUrl: string | null;
+  /** A result screen asked to verify this run ("Verify this result"): the section opens with it picked. */
+  preselected?: boolean;
   onRun: (runId: string) => void;
   onExperiment: (experimentId: string) => void;
   onGetRecord: () => void;
@@ -125,9 +127,9 @@ function Exporter({ locale, x }: { locale: Locale; x: ExporterProps }) {
     );
   }
   return (
-    <details className="vf-from-run" data-testid="vf-from-run">
+    <details className="vf-from-run" data-testid="vf-from-run" open={x.preselected || undefined} data-preselected={x.preselected ? 'true' : undefined}>
       <summary>{vText('fromRunTitle', locale)}</summary>
-      <p className="vf-muted">{vText('fromRunLead', locale)}</p>
+      <p className="vf-muted">{vText(x.preselected ? 'preselected' : 'fromRunLead', locale)}</p>
       {body}
     </details>
   );

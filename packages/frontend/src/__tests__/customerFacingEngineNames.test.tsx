@@ -143,3 +143,77 @@ describe('Start (the dashboard)', () => {
     });
   }
 });
+
+describe('specialist screens name capabilities; engines only under Technical details', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const toolchain = () => [
+    { toolId: 'rdkit', engineName: 'RDKit', domain: 'chemistry', license: 'BSD', status: 'BLOCKED_BY_RUNTIME' as const, version: null, engine: null, modelDomain: '', assumptions: '', validation: null, reason: 'worker down' },
+    { toolId: 'vina', engineName: 'AutoDock Vina', domain: 'docking', license: 'Apache-2.0', status: 'AVAILABLE' as const, version: '1.2.7', engine: null, modelDomain: '', assumptions: '', validation: [{ id: 'redock', pass: true }] },
+  ];
+
+  for (const locale of ['pl', 'en'] as const) {
+    it(`Advanced campaign: lede, compute readiness and the blocked banner in ${locale.toUpperCase()}`, async () => {
+      stubWindow();
+      const { setLocale } = await import('../core/i18n');
+      setLocale(locale);
+      try {
+        const { CampaignScreen, ComputeReadiness, pipelineText } = await import('../components/CampaignScreen');
+        const locked = renderToStaticMarkup(<CampaignScreen />);
+        expect(customerText(locked).match(ENGINE_NAME_PATTERN)).toBeNull();
+        expect(locked.replace(/&amp;/g, '&')).toContain(pipelineText());
+        const readiness = renderToStaticMarkup(<ComputeReadiness toolchain={toolchain()} />);
+        expect(customerText(readiness).match(ENGINE_NAME_PATTERN)).toBeNull();
+        expect(readiness).toContain(locale === 'pl' ? 'Modelowanie oddziaływań' : 'Interaction Modeling');
+        expect(readiness).toContain('data-testid="campaign-molecular-blocked"');
+        // The registry is kept, one click away.
+        expect(readiness).toMatch(/data-technical-details[\s\S]*AutoDock Vina/);
+        expect(readiness).toMatch(/data-technical-details[\s\S]*pip install rdkit/);
+      } finally {
+        setLocale('pl');
+      }
+    });
+  }
+
+  it('Virtual Lab: capability options and result row; engines under Technical details', async () => {
+    const { VirtualLabPanel, virtualLabCapabilityLabel } = await import('../components/VirtualLabPanel');
+    const html = renderToStaticMarkup(<VirtualLabPanel projectId="p" campaignId="c" candidates={[]} />);
+    expect(customerText(html).match(ENGINE_NAME_PATTERN)).toBeNull();
+    expect(html).toMatch(/data-technical-details[\s\S]*PySCF/);
+    for (const id of ['molecular-descriptors', 'admet-estimation', 'toxicity-risk-estimation', 'molecular-docking', 'quantum-chemistry', 'molecular-dynamics', 'protein-structure-ingestion'] as const) {
+      expect(offenders([virtualLabCapabilityLabel(id)]), id).toEqual([]);
+    }
+  });
+
+  it('Laboratory drug bench readout', async () => {
+    const { projectDrugRun } = await import('../core/liveExperiment/drugRunState');
+    const { benchLayoutOf, focusCandidate } = await import('../core/liveExperiment/drugBenchLayout');
+    const { DrugBenchNote, DrugBenchReadout, DOCKING_SHORT, DOCKING_STEP_LABEL } = await import('../components/DrugBenchReadout');
+    const candidate = { id: 'c1', generation: 1, parentSmiles: null, transformation: null, canonicalSmiles: 'CCO', valid: true, descriptors: {}, objectiveVector: {}, constraintViolations: [], pareto: true, status: 'retained', rejectedReason: null, runIds: [] };
+    const events = [
+      { seq: 1, id: 'e1', generation: 1, type: 'STAGE_RESULT', payload: { stage: 'docking', candidateId: 'c1', reason: 'DOCKING_RESULT_RETAINED', bestAffinityKcalMol: -7.5, runId: 'r-dock', poseSha256: 'e'.repeat(64) }, createdAt: 1 },
+    ];
+    const dockingRuns = [{ id: 'r-dock', outputs: { poseSha256: 'e'.repeat(64), pose: { atoms: [['C', 1, 2, 3]], bonds: [] }, pocket: { residues: ['THR315:A'], atoms: [] } }, provenance: { engine: 'AutoDock Vina 1.2.7' } }];
+    const state = projectDrugRun({ events, candidates: [candidate], maxGenerations: 1, jobRunning: false, dockingRuns });
+    const focus = focusCandidate(state);
+    const html = renderToStaticMarkup(<><DrugBenchReadout state={state} focus={focus} layout={benchLayoutOf(state)} /><DrugBenchNote focus={focus} /></>);
+    expect(customerText(html).match(ENGINE_NAME_PATTERN)).toBeNull();
+    expect(html).toContain('<dt>Modelowanie oddziaływań</dt>');
+    expect(html).toContain('<dt>Chemia kwantowa</dt>');
+    expect(html).toMatch(/data-technical-details[\s\S]*AutoDock Vina 1\.2\.7/);
+    expect(offenders([DOCKING_SHORT, ...Object.values(DOCKING_STEP_LABEL)])).toEqual([]);
+  });
+
+  it('the chat names the capability in a natural-discovery answer and keeps the engine for Technical details', async () => {
+    const { formatNaturalDiscoveryResult, naturalDiscoveryTechnical } = await import('../components/ScienceChat');
+    type Result = Parameters<typeof formatNaturalDiscoveryResult>[0];
+    const result = {
+      status: 'RESOLVED', reason: 'ok', reports: [], candidateWhy: [], cheapCompute: [], heavyCompute: [],
+      admetCompute: [{ pubchemCid: 2519, status: 'EXECUTED', resultOrigin: 'MODEL_ESTIMATE', summary: 'hERG 0.12', runId: 'r-admet' }],
+    } as unknown as Result;
+    const text = formatNaturalDiscoveryResult(result);
+    expect(text.match(ENGINE_NAME_PATTERN)).toBeNull();
+    expect(text).toContain('(MODEL_ESTIMATE):');
+    expect(naturalDiscoveryTechnical(result).map((r) => r.value).join(' ')).toContain('ADMET-AI');
+  });
+});

@@ -15,6 +15,9 @@ type Pair = readonly [pl: string, en: string];
 
 const TEXT = {
   kicker: ['Genesis Verify', 'Genesis Verify'],
+  verifyThisResult: ['Zweryfikuj ten wynik', 'Verify this result'],
+  verifyThisResultHint: ['Otwiera Genesis Verify z wybranym projektem, przebiegiem i eksperymentem.', 'Opens Genesis Verify with this project, research run and experiment already picked.'],
+  preselected: ['Wybrano wynik, który chcesz zweryfikować. Pobierz jego zapis i sprawdź go.', 'The result you want to verify is picked. Get its record and check it.'],
   title: ['Sprawdź zapis wyniku', 'Check a result record'],
   lead: [
     'Wgraj zapis wyniku z Genesis. Sprawdzimy jego odciski (sha256), porównamy z kopią w rejestrze Genesis i powtórzymy obliczenie. Dostaniesz jeden werdykt i raport do pobrania.',

@@ -43,6 +43,9 @@ import { UnifiedResearchJourney } from './UnifiedResearchJourney';
 import { CHAT_ENGINES, chatEngineLine, type ChatEngine } from '../core/scienceChat/engines';
 import { capabilityLabel } from '../core/capabilityNames';
 import { TechnicalDetails, engineRowsFor, type TechnicalRow } from './TechnicalDetails';
+import { VerifyResultLink } from './verify/VerifyResultLink';
+import { noteLatestResult, type VerifyTarget } from '../core/verifyTarget';
+import { getLocale } from '../core/i18n';
 import {
   drugDiscoveryRequestFromMessage,
   resolveResearchProject,
@@ -89,7 +92,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * atrap; funkcje niegotowe są jawnie oznaczone w odpowiedzi jako VERIFY_REQUIRED.
  */
 
-interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData; technical?: TechnicalRow[] }
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData; technical?: TechnicalRow[]; verify?: VerifyTarget }
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
 
@@ -566,7 +569,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       const project = token ? (activeKnowledgeProject ?? await resolveResearchProject(token).then((r) => (r.ok ? r.data : null))) : null;
       const turn = await runResearchRunAction(action, { token, projectId: project?.id ?? null, researchRunId });
       if (turn.researchRunId !== researchRunId) setResearchRunId(turn.researchRunId);
-      setTurns((t) => [...t, { role: 'genesis', text: turn.text, tag: turn.tag }]);
+      if (turn.verify) noteLatestResult(turn.verify);
+      setTurns((t) => [...t, { role: 'genesis', text: turn.text, tag: turn.tag, verify: turn.verify }]);
       track('ask_ai_used', { via: 'science-chat-research-run', op: action.op });
       return;
     }
@@ -1066,6 +1070,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
             <div className="sc-text"><TurnText turn={t} /></div>
             {t.quantum && <QuantumHistogram data={t.quantum} />}
             {t.technical && t.technical.length > 0 && <TechnicalDetails rows={t.technical} />}
+            {t.verify && <VerifyResultLink target={t.verify} locale={getLocale()} testId="chat-verify-this-result" />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
             )}

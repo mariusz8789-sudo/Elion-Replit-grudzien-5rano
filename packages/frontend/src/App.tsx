@@ -286,7 +286,7 @@ export function parseHash(): Route {
   if (h === '#/mirror') return { kind: 'mirror' };
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
   if (h === '#/flight-control') return { kind: 'flight-control' };
-  if (h === '#/verify') return { kind: 'verify' };
+  if (h === '#/verify' || h.startsWith('#/verify?')) return { kind: 'verify' };
   // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
   if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };

@@ -6131,3 +6131,8 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .tech-details dl > div { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .tech-details dt { min-width: 10rem; font-weight: 600; }
 .tech-details dd { margin: 0; overflow-wrap: anywhere; }
+
+/* "Verify this result" (components/verify/VerifyResultLink.tsx): a quiet link to Genesis Verify, never a neon call to action. */
+.verify-result-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; margin-block: 6px; border: 1px solid rgba(214, 229, 240, 0.18); border-radius: 8px; color: inherit; font-size: 13px; text-decoration: none; }
+.verify-result-link:hover { border-color: rgba(214, 229, 240, 0.36); }
+.verify-result-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

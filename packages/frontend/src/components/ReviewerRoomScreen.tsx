@@ -11,6 +11,8 @@ import {
   type EvidenceVerification,
 } from '../core/reviewer/signedEvidence';
 import { ScientificIngestionPanel } from './ScientificIngestionPanel';
+import { VerifyResultLink } from './verify/VerifyResultLink';
+import { latestResult } from '../core/verifyTarget';
 import './reviewerRoom.css';
 
 /**
@@ -382,6 +384,33 @@ function Boundaries(): React.ReactElement {
   );
 }
 
+/**
+ * The challenges above check committed evidence. This card turns to the reviewer's own result: the
+ * latest executed experiment shown in this visit (a research run in the chat or Flight Control) goes
+ * to Genesis Verify already picked. Without one, Verify opens on its own picker; nothing is guessed.
+ */
+function VerifyYourResult(): React.ReactElement {
+  const target = latestResult();
+  return (
+    <section className="rv-card" aria-labelledby="rv-c5" data-testid="rv-verify">
+      <p className="rv-kicker">Your own result</p>
+      <h2 id="rv-c5">Verify a result of your own research run.</h2>
+      <p>
+        Genesis Verify takes the record of one executed experiment, compares its fingerprints with the Genesis ledger and replays the
+        computation. You get one verdict and an HTML report you can send on.
+      </p>
+      {target
+        ? <VerifyResultLink target={target} locale="en" testId="rv-verify-this-result" />
+        : (
+          <>
+            <p className="rv-note" data-testid="rv-verify-none">No executed experiment in this visit yet. Pick a research run and an experiment in Genesis Verify.</p>
+            <a className="verify-result-link" href="#/verify" data-testid="rv-open-verify">Open Genesis Verify</a>
+          </>
+        )}
+    </section>
+  );
+}
+
 function Reproduce(): React.ReactElement {
   return (
     <section className="rv-card" aria-labelledby="rv-c4">
@@ -417,6 +446,7 @@ export function ReviewerRoomScreen(): React.ReactElement {
       <SignedEvidenceChallenge />
       <DockingBenchmark />
       <ScientificIngestionPanel />
+      <VerifyYourResult />
       <Boundaries />
       <Reproduce />
     </main>

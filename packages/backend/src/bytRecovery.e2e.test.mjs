@@ -464,7 +464,19 @@ describe('BYT shared durable storage: several OS processes on one SQLite file', 
         const v2 = (await s2.api('GET', `${base}/research-runs/${id}`, { token: t2 })).body.researchRun;
         assert.equal(v1.researchState.chain.ok, true);
         assert.deepEqual(v2.researchState, v1.researchState, 'both instances read one state');
+        // The evidence proposal written by whichever instance ran the job is in the ONE ledger, once, on both.
+        const proposalId = v1.experiments[0].evidence.evidenceProposalId;
+        for (const s of [s1, s2]) {
+          const ledger = (await s.api('GET', '/api/knowledge/proposals')).body;
+          assert.equal(ledger.ledgerOk, true);
+          assert.equal(ledger.proposals.filter((p) => p.proposalId === proposalId).length, 1, 'evidence proposal present exactly once');
+        }
       }
+      const ledgerDb = new DatabaseSync(dbPath);
+      try {
+        assert.equal(ledgerDb.prepare("SELECT COUNT(*) n FROM evidence_ledger_entries WHERE kind = 'PROPOSE'").get().n, runIds.length, 'one proposal per run, none lost');
+      } finally { ledgerDb.close(); }
+      assert.deepEqual((await s1.api('GET', '/api/knowledge/proposals')).body, (await s2.api('GET', '/api/knowledge/proposals')).body, 'both instances serve one ledger');
     } finally {
       await Promise.all(servers.map((s) => s.kill()));
       await model.close();

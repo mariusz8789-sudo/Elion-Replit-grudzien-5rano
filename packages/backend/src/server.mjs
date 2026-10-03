@@ -110,10 +110,12 @@ try {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
 }
-// Evidence ledger of the knowledge channel (proposals, published records): a JSON snapshot beside the DB,
+// Evidence ledger of the knowledge channel (proposals, published records): append-only rows in genesis.db (V16), shared
+// by every process on the file; the JSON file beside the DB is imported once if the table is empty, then kept as an export.
+// Without a database it is the legacy single-process JSON snapshot,
 // restored at boot and rewritten after every appended entry (D-130). ':memory:' keeps it ephemeral, and says so.
 const LEDGER_PATH = process.env.GENESIS_LEDGER_PATH ?? (DB_PATH === ':memory:' ? ':memory:' : path.join(path.dirname(DB_PATH), 'evidence-ledger.json'));
-const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH);
+const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH, { db });
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
@@ -459,7 +461,7 @@ const server = http.createServer(async (req, res) => {
       // Operator i tak dostaje ścieżkę w logu startowym.
       db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
       persistence: dbState.state,
-      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, entries: LEDGER_PERSISTENCE.entries },
+      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, store: LEDGER_PERSISTENCE.store, entries: LEDGER_PERSISTENCE.entries },
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health

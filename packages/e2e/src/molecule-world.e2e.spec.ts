@@ -148,7 +148,7 @@ test.describe('Molecule World — Smart UI (D-133): WORLD VIEW -> hover -> popup
     await expect(drawer).toBeVisible();
     const box = await drawer.boundingBox();
     // The drawer is `position: absolute` inside `.gx-world-first-shell`, not the raw viewport — on
-    // this route that shell sits below `TopBar` and above the mobile tab bar (`.shell-mobilebar`,
+    // this route that shell sits below `TopBar` and above the mobile tab bar (`data-testid="mobile-navigation"`,
     // the same real chrome `scientific-worlds.e2e.spec.ts`'s own mobile test already accounts for),
     // so "pinned to the bottom" means the bottom of THAT container, not `window.innerHeight`.
     const shellBox = await page.locator('.gx-world-first-shell').boundingBox();

@@ -8,6 +8,8 @@ import {
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
+import { ProfileLockedScreen } from './ProfileLockedScreen';
+import { CAPABILITIES, canUseCapability, profileOfUser } from '../core/accountProfiles';
 import { LabValidationPanel } from './LabValidationPanel';
 import { ScientificResultInspector } from './ScientificResultInspector';
 import { VirtualLabPanel } from './VirtualLabPanel';
@@ -40,6 +42,10 @@ export function CampaignScreen() {
         note="To walidacja oprogramowania, nie odkrycie terapeutyczne — silnik nie zmyśla wyników i nie deklaruje „leku”."
       />
     );
+  }
+  const profile = profileOfUser(session.user)!;
+  if (!canUseCapability(profile, CAPABILITIES.DRUG_DISCOVERY)) {
+    return <ProfileLockedScreen icon="⚡" title="Kampania naukowa" profile={profile} capability={CAPABILITIES.DRUG_DISCOVERY} />;
   }
   return <CampaignWorkspace />;
 }

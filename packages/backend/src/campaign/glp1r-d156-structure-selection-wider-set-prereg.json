@@ -1,0 +1,70 @@
+{
+  "decisionId": "D-156",
+  "title": "GLP-1R docking target, second attempt — the same frozen rule, a wider candidate set, named before anything was fetched",
+  "question": "Applying D-154's rule UNCHANGED, does any of 6X18, 6B3J, 6LN2 or 5VEW qualify as the canonical GLP-1R docking target?",
+  "frozenAt": "2026-10-03T02:55:00Z",
+  "author": "Claude, for Mariusz (mariusz8789-sudo)",
+  "authorisation": "Mariusz, 2026-10-03 02:52Z, verbatim: \"WYBIERAM OPCJĘ B. Nie zmieniaj progu 4.0 Å. Zachowaj obecny wynik NO_SUITABLE_STRUCTURE dla 7C2E i 7S15 jako finalny wynik pierwszej prerejestracji. Przygotuj nową, osobną prerejestrację obejmującą dokładnie: 6X18, 6B3J, 6LN2, 5VEW. Zamroź listę kandydatów przed analizą. Następnie zastosuj do wszystkich czterech struktur dokładnie tę samą zamrożoną regułę wyboru, bez zmiany jakiegokolwiek kryterium.\"",
+
+  "whyThisIsASeparateDecision": {
+    "d154Stands": "D-154's verdict NO_STRUCTURE_SELECTED for 7C2E and 7S15 is FINAL and is not revisited, reopened or recomputed. 7C2E failed on resolution 4.2 A against the 4.0 A ceiling; 7S15 failed on absent active-state evidence and 8 engineered mutations inside its transmembrane region. Those two candidates are closed.",
+    "whyNotJustRerunD154": "Widening a candidate set AFTER seeing a result is choosing by result unless the widening is itself frozen first. This file is that freeze: the candidate list is fixed here, before any of the four entries has been fetched, let alone read.",
+    "whatIsNotAllowedToChange": "Not one criterion, threshold, ranking position or definition. The rule is reused by reference, not restated, so it cannot drift by transcription."
+  },
+
+  "candidateSet": {
+    "frozenList": ["5VEW", "6B3J", "6LN2", "6X18"],
+    "listedInTheOwnersMessageAs": ["6X18", "6B3J", "6LN2", "5VEW"],
+    "orderIsIrrelevant": "Sorted here only so the list has one canonical form. The rule's own R6 tie-break is what decides between equals, not this order.",
+    "exactlyFour": "No fifth candidate may be added to this decision, whatever the outcome. A further widening needs a further frozen decision.",
+    "stateAtFreezeTime": "None of the four has been fetched into this repository. Nothing about any of them has been read: not a resolution, not a method, not a ligand, not a chain composition. What is known is only that all four answered HTTP 200 on a reachability probe on 2026-10-03.",
+    "whyTheseFour": "They are the GLP-1R entries the owner named, and they were named because a reachability probe had listed them. The probe read no scientific content."
+  },
+
+  "theRule": {
+    "reusedFrom": "packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json",
+    "ruleFileSha256": "80639b5add7ba9e50dbc593ddf1f7c9067adbbb259a8dbac69b46a5b78610506",
+    "ruleFrozenAtCommit": "4252acf7",
+    "appliedBy": "scripts/glp1r-d154-structure-selection.mjs — the SAME runner, which reads its constants from that same preregistration. The runner is parameterised by the candidate list only.",
+    "criteriaUnchanged": {
+      "E1_isHumanGlp1r": "a polymer entity maps to UniProt P43220, organism Homo sapiens",
+      "E2_resolution": "reported resolution <= 4.0 Angstrom — NOT relaxed, on the owner's explicit instruction",
+      "E3_activeState": "a G protein or G-protein mimetic in the deposited record",
+      "E4_pocketIntegrity": "no missing backbone residue inside the transmembrane region, as that structure's own Pfam annotation defines it",
+      "E5_noPocketMutation": "no engineered construct mutation inside that same region",
+      "ranking": "R1 missing backbone residues, R2 non-peptidic ligand of 10-60 heavy atoms, R3 resolution, R4 construct mutations, R5 clashscore, R6 lower PDB id",
+      "unknownIsFailure": "any field that cannot be read from the raw artefacts counts as a failure, never as a pass"
+    },
+    "ifTheRunnerNeedsAnyChangeAtAll": "Only a change that lets it read a field it already names, for a file layout it has not met before — a decoding fix, never a criterion. Any such fix is recorded in the decision entry with what it did and why it could not change a verdict, exactly as D-154 recorded its heavy-atom counting fix."
+  },
+
+  "sourceDataRequirement": {
+    "mustBeFetchedFirst": "RCSB mmCIF, the core entry record, every polymer and non-polymer entity record, the deposited assembly, and the wwPDB validation report, for each of the four — the same artefact set D-154 used, from the same official source.",
+    "fetchedBy": "The ingest thread's scripts/fetch-glp1r-sources.py, into docs/evidence/source-data/, raw and unmodified, with a per-file sha256 in its SOURCES.json. This session's own egress still refuses files.rcsb.org and data.rcsb.org because it started before the project's cloud environment existed, so it cannot fetch them itself.",
+    "verifiedHere": "The runner recomputes the sha256 of every file it reads and aborts with SOURCE_HASH_MISMATCH on any disagreement. A hash recorded by another thread is a claim, and it is checked first-hand.",
+    "noSubstituteSource": "Only RCSB. No mirror, no GPCRdb copy, no reconstruction from a different deposition. If a required artefact cannot be fetched, the outcome is BLOCKED_BY_SOURCE_DATA for that candidate and UNKNOWN counts against it."
+  },
+
+  "allowedOutcomes": {
+    "STRUCTURE_SELECTED": "Exactly one eligible candidate won the frozen ranking. It is registered in compute/dockingTargets.mjs with full provenance and any mandatory limitation. DEFAULT_DOCKING_TARGET stays ABL1_1IEP.",
+    "NO_SUITABLE_STRUCTURE": "No candidate passed every hard filter. Nothing is registered. Reported as the headline. Together with D-154 this would mean six authoritative GLP-1R structures examined and none fit for small-molecule docking under criteria frozen in advance — which is a finding about the available structural evidence, not a failure of the method.",
+    "BLOCKED_BY_SOURCE_DATA": "A required artefact could not be fetched or a hash did not match. Named per candidate.",
+    "noFourthOption": "No 'best available', no provisional registration, no near miss described as a pass."
+  },
+
+  "forbidden": [
+    "running any docking, or reading any docking result, under this decision",
+    "changing the 4.0 Angstrom ceiling or any other criterion, before or after seeing any value",
+    "adding a fifth candidate to this decision",
+    "editing, recomputing or reinterpreting D-144, D-151, D-152, D-153 or D-154, or any sealed artefact",
+    "modelling in a missing residue or reverting a construct mutation to make a candidate eligible",
+    "touching DEFAULT_DOCKING_TARGET",
+    "treating a selected target as evidence that any molecule binds or works"
+  ],
+
+  "outputs": [
+    "packages/backend/src/campaign/glp1r-d156-structure-selection-wider-set.sealed.json — every field read per candidate, every eligibility verdict, the ranking trace, the outcome, and the recomputed sha256 of every file read"
+  ],
+
+  "boundary": "A comparison of four RCSB structures against criteria frozen in D-154 and not touched here. No docking, no biological claim, no candidate, no change to any default. STOP after the result is sealed and pushed."
+}

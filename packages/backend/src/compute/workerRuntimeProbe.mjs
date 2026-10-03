@@ -145,14 +145,15 @@ export async function probeWorker({
   { observed: health.body ? { workerGroup: health.body.workerGroup, executionAuth: health.body.executionAuth, executableCapabilities: health.body.executableCapabilities, node: health.body.node } : { status: health.status } });
 
   // 2. Engine inventory — exactly this group's engines, each READY only after its real reference case.
-  const engines = await getJson(`${base}/engines`);
+  const workerAuthHeaders = { authorization: `Bearer ${token}` };
+  const engines = await getJson(`${base}/engines`, { headers: workerAuthHeaders });
   transcripts.push(engines.text);
   const inventory = (engines.body?.engines ?? []).map((e) => ({ toolId: e.toolId, status: e.status, version: e.version }));
   record('engine-inventory', engines.status === 200 && JSON.stringify(inventory.map((e) => e.toolId).sort()) === JSON.stringify([...toolIds].sort()), { observed: inventory });
 
   const references = [];
   for (const toolId of toolIds) {
-    const ref = await getJson(`${base}/engines/${toolId}/reference-case`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const ref = await getJson(`${base}/engines/${toolId}/reference-case`, { method: 'POST', headers: { ...workerAuthHeaders, 'content-type': 'application/json' }, body: '{}' });
     transcripts.push(ref.text);
     references.push({ toolId, status: ref.body?.status ?? null, version: ref.body?.version ?? null, durationMs: ref.body?.durationMs ?? null, outputHash: ref.body?.outputHash ?? null, validation: ref.body?.validation ?? null, reason: ref.body?.reason ?? null });
     if (requireEngines) record(`reference-case:${toolId}`, ref.status === 200 && ref.body?.status === 'AVAILABLE' && Boolean(ref.body?.outputHash), { status: ref.body?.status ?? ref.status });

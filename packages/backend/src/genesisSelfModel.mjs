@@ -22,8 +22,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENESIS_IDENTITY, IDENTITY_REFERENCES } from './genesisIdentity.mjs';
-import { listToolchain, TOOL_STATUS } from './campaign/toolchain.mjs';
-import { listCapabilities, CAPABILITY_STATUS } from './compute/capabilities.mjs';
+import { listToolchainMetadata, TOOL_STATUS } from './campaign/toolchain.mjs';
+import { listCapabilitiesMetadata, CAPABILITY_STATUS } from './compute/capabilities.mjs';
 import { ingestionStatus } from './scientificIngestion.mjs';
 import { watchGates } from './security/scientificIntegrity.mjs';
 import { GLP1R_GATE_PATH } from './campaign/glp1rQsar.mjs';
@@ -150,8 +150,8 @@ export function buildSelfModel({
   environment = {},
   runtime = null,
   reasoningModel = { configured: false, model: null },
-  toolchain = listToolchain(),
-  capabilities = listCapabilities(),
+  toolchain = listToolchainMetadata(),
+  capabilities = listCapabilitiesMetadata(),
   ingestion = ingestionStatus(),
   gatePaths = { GLP1R: GLP1R_GATE_PATH, GIPR: GIPR_GATE_PATH },
   sealedDir = CAMPAIGN_DIR,

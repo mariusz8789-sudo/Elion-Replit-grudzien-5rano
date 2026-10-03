@@ -238,9 +238,11 @@ function validateToxicity() {
 /* ---------------- Cache walidacji (walidacja bywa kosztowna: MD/docking ~kilka s) ---------------- */
 
 const validationCache = new Map();
+let validationRunCount = 0;
 
 function runValidation(tool) {
   if (validationCache.has(tool.toolId)) return validationCache.get(tool.toolId);
+  validationRunCount += 1;
   let v;
   try {
     v = tool.validate();
@@ -252,15 +254,17 @@ function runValidation(tool) {
 }
 
 /** Do testów / odświeżenia: czyści cache walidacji. */
-export function _resetValidation() { validationCache.clear(); admetReferenceCache = null; }
+export function _resetValidation() { validationCache.clear(); admetReferenceCache = null; validationRunCount = 0; }
+
+/** Test/audit diagnostic: public metadata reads must leave this at zero on a cold cache. */
+export function _validationRunCount() { return validationRunCount; }
 
 const PACKAGE_NAMES = {
   rdkit: 'rdkit', pyscf: 'pyscf', openmm: 'openmm', vina: 'vina + meeko', biopython: 'biopython',
   pymeep: 'meep', admet: 'admet-ai', toxicity: 'admet-ai',
 };
 
-function present(tool) {
-  const v = runValidation(tool);
+function presentWithValidation(tool, v) {
   const environment = `linux/${process.arch}; node=${process.versions.node}; python=${process.env.GENESIS_RDKIT_PYTHON ?? 'python3'}`;
   const provenance = {
     source: tool.engineName,
@@ -287,8 +291,39 @@ function present(tool) {
   };
 }
 
+function present(tool) {
+  return presentWithValidation(tool, runValidation(tool));
+}
+
+function presentPassive(tool) {
+  const cached = validationCache.get(tool.toolId);
+  if (cached) return presentWithValidation(tool, cached);
+  const provenance = { source: tool.engineName, validationCaseIds: [], evidenceClass: tool.evidenceClass };
+  const fingerprint = createHash('sha256').update(JSON.stringify({
+    toolId: tool.toolId,
+    capabilityId: tool.capabilityId,
+    package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
+    presentation: 'passive-metadata',
+    provenance,
+  })).digest('hex').slice(0, 16);
+  return {
+    toolId: tool.toolId, capabilityId: tool.capabilityId, domain: tool.domain,
+    engineName: tool.engineName, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
+    license: tool.license, modelDomain: tool.modelDomain, assumptions: tool.assumptions,
+    evidenceClass: tool.evidenceClass, status: TOOL_STATUS.UNVALIDATED, availability: false,
+    executionStatus: 'NOT_EXECUTED', version: null, engine: null, environment: null,
+    provenance, fingerprint, validation: null, reason: 'REFERENCE_CASE_NOT_EXECUTED',
+    failureReason: 'REFERENCE_CASE_NOT_EXECUTED',
+  };
+}
+
 export function listToolchain() {
   return TOOLS.map(present);
+}
+
+/** Public/read-only snapshot. It may expose an already cached result but never starts validation. */
+export function listToolchainMetadata() {
+  return TOOLS.map(presentPassive);
 }
 
 /** Canonical ids without triggering any reference-case execution. */
@@ -299,6 +334,12 @@ export function listToolIds() {
 export function getTool(toolId) {
   const t = TOOLS.find((x) => x.toolId === toolId);
   return t ? present(t) : null;
+}
+
+/** Public/read-only lookup. It never starts a reference case on a cold cache. */
+export function getToolMetadata(toolId) {
+  const t = TOOLS.find((x) => x.toolId === toolId);
+  return t ? presentPassive(t) : null;
 }
 
 /** Skrót: czy zdolność (po capabilityId) jest AVAILABLE (do decyzji orchestratora). */

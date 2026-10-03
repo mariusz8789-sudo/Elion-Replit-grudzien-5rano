@@ -17,7 +17,7 @@ describe('AppShell — chrome mounts without breaking the frame', () => {
 
   it('keeps the existing navigation contract intact (labels, planned badge, more-disclosure)', () => {
     const html = renderToStaticMarkup(<AppShell>x</AppShell>);
-    expect(html).toContain('More · Scientific OS');
+    expect(html).toContain('Więcej · wszystkie moduły');
     expect(html).toContain('genesis-physics.com');
     expect(html).toContain('aria-current="page"');
   });

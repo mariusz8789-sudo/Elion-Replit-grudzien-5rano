@@ -1,0 +1,104 @@
+{
+  "decisionId": "D-153",
+  "preregFingerprint": "c8c8663557524aa7",
+  "preregFrozenAtCommit": "ee70daa5",
+  "gateRuleFingerprint": "d2f77a7e6042f0fc",
+  "gateUnchanged": true,
+  "baseCommit": "122ef7dad760812922b9368c24357f244170ffc0",
+  "computedAt": "2026-10-03T02:01:52.136Z",
+  "engine": {
+    "rdkitVersion": "2026.03.6",
+    "algorithm": "ridge-ecfp4-morgan-r2-512bit",
+    "lambda": 1,
+    "conformalAlpha": 0.1,
+    "splitMethod": "scaffold-hash-mod10"
+  },
+  "rolesFrom": {
+    "decisionId": "D-152",
+    "preregFingerprint": "a42f4cb9ee04f2d1",
+    "note": "roles READ from the sealed D-152 artefact, never recomputed here"
+  },
+  "dataset": {
+    "combinedSetRows": 638,
+    "functionalRows": 320,
+    "functionalCompounds": 206,
+    "featurizedRows": 320,
+    "unfingerprintable": 0,
+    "trainingDataHash": "c7afb32398abade9",
+    "distinctScaffolds": 89,
+    "distinctAssays": 39
+  },
+  "split": {
+    "nTrain": 193,
+    "nCalib": 74,
+    "nTest": 53,
+    "trainMeetsMin": true,
+    "testMeetsMin": true
+  },
+  "leakageControls": {
+    "compoundDisjointness": {
+      "sharedCompounds": 0,
+      "required": 0,
+      "ok": true
+    },
+    "scaffoldDisjointness": {
+      "sharedScaffolds": 0,
+      "required": 0,
+      "ok": true
+    },
+    "assayConcentration": {
+      "largestTestAssayShare": 0.3962,
+      "threshold": 0.5,
+      "ok": true
+    },
+    "testAssayCoverage": {
+      "distinctTestAssays": 7,
+      "minimum": 3,
+      "ok": true
+    },
+    "assaysSharedBetweenTrainAndTest": 7
+  },
+  "independenceOk": true,
+  "replicates": {
+    "groupsWithReplicates": 89,
+    "totalGroups": 206,
+    "medianReplicateSd": 0.8726,
+    "note": "Replicates are NOT averaged. Aggregating them would change the data contract the gate was frozen against, so they are reported and left in place."
+  },
+  "validation": {
+    "gateMet": true,
+    "reasons": [],
+    "metrics": {
+      "mae": 0.6557232653324978,
+      "rmse": 0.7853902168769671,
+      "r2": 0.7827000712278589,
+      "n": 53
+    },
+    "modelFingerprint": "8ab87bd5f7565c1c",
+    "conformalHalfWidth": 2.1941377433964915,
+    "trainScaffoldCount": 56
+  },
+  "outcome": "MODEL_GATE_PASS",
+  "frozenPrediction": {
+    "primary": "MODEL_GATE_FAILED.",
+    "intervals": {
+      "mae": [
+        0.9,
+        1.25
+      ],
+      "r2": [
+        0.15,
+        0.55
+      ]
+    }
+  },
+  "limitations": [
+    "This validates a model of ASSAY POTENCY on the cAMP-arm functional agonism rows this repository holds. It is not a measurement of any molecule and not a claim that any molecule works.",
+    "The gate names ridge-ecfp4-morgan-r2-512bit. D-144 refuted that representation on this target's small molecules, so a failure here is a joint statement about the representation and the data, not about the endpoint split alone.",
+    "Train and test may share assays; the split is scaffold-disjoint and compound-disjoint, which is what the gate asks for, and the shared-assay count is recorded above rather than treated as a defect.",
+    "Replicate rows are present and not averaged; the median replicate SD above is the floor any model on this data has to beat.",
+    "Sixteen of the assays in the combined set still have no description, so their rows sit in UNKNOWN and are absent from this arm. That remains BLOCKED_EXTERNAL_DATA_ACCESS on www.ebi.ac.uk."
+  ],
+  "boundary": "No gate was edited, no sealed artefact was modified, no role was reclassified, no candidate was ranked and no docking target was changed.",
+  "artifactHash": "efe1e0325f74bf5e"
+}

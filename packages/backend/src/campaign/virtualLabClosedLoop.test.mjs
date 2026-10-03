@@ -512,6 +512,11 @@ describe('Test: scientific execution timeline is a projection of real campaign r
     assert.equal(types.includes('ENGINE_PROGRESS'), false, 'no progress is fabricated when the adapter exposes none');
     assert.equal(types.includes('ENGINE_STEP'), false, 'no solver steps are fabricated when the adapter exposes none');
     assert.ok(dossier.executionTimeline.every((event) => event.sourceEventId && event.sourceEventType));
+    assert.equal(dossier.flightControl.flights[0].status, 'VERIFIED');
+    assert.equal(dossier.flightControl.flights[0].preflight.decision, 'CLEARED');
+    assert.equal(dossier.flightControl.flights[0].executionDelta.inputIntegrity, 'MATCH');
+    assert.equal(dossier.flightControl.flights[0].evidenceUpdate.proposalId, 'proposal-timeline-1');
+    assert.equal(dossier.flightControl.flights[0].bytUpdate.status, 'ELIGIBLE_FOR_SELF_MODEL_PROJECTION');
   });
 
   test('a blocked registered capability produces EXECUTION_BLOCKED and never completion', () => {
@@ -523,6 +528,9 @@ describe('Test: scientific execution timeline is a projection of real campaign r
     const timeline = buildVirtualLabDossier(db, campaignId, candidateId).dossier.executionTimeline;
     assert.ok(timeline.some((event) => event.type === 'EXECUTION_BLOCKED' && event.status === 'BLOCKED'));
     assert.equal(timeline.some((event) => event.type === 'EXECUTION_COMPLETED'), false);
+    const flight = buildVirtualLabDossier(db, campaignId, candidateId).dossier.flightControl.flights[0];
+    assert.equal(flight.status, 'BLOCKED');
+    assert.equal(flight.failureAttribution.layer, 'RUNTIME');
   });
 
   test('the projector is deterministic and does not mutate its append-only inputs', () => {

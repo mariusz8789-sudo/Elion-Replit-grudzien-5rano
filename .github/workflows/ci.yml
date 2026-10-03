@@ -9,6 +9,39 @@ permissions:
   contents: read
 
 jobs:
+  scientific-sandbox-runtime:
+    name: Real scientific sandbox — isolation, limits and generated-analysis Replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Docker Official Image `python:3.12.3-slim-bookworm`, resolved and frozen by
+      # manifest-list digest. This is a CI security/runtime candidate, not an assertion
+      # that every transitive component has passed commercial licence approval.
+      GENESIS_SCIENTIFIC_SANDBOX_IMAGE: python@sha256:afc139a0a640942491ec481ad8dda10f2c5b753f5c969393b12480155fe15a63
+      GENESIS_SANDBOX_RUNTIME_REPORT_DIR: artifacts/scientific-sandbox-runtime
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Pull the exact immutable sandbox image
+        run: |
+          docker pull "$GENESIS_SCIENTIFIC_SANDBOX_IMAGE"
+          docker image inspect "$GENESIS_SCIENTIFIC_SANDBOX_IMAGE" --format '{{json .RepoDigests}}'
+      - name: Execute real isolation, resource and canonical Replay proofs
+        run: node --test packages/backend/src/scientificSandboxRuntime.test.mjs
+      - name: Upload sandbox runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scientific-sandbox-runtime-${{ github.sha }}
+          path: artifacts/scientific-sandbox-runtime
+          if-no-files-found: warn
+          retention-days: 30
+
   verify:
     runs-on: ubuntu-latest
     # Frontend tests alone take ~8 min on a single worker; with the RDKit install,
@@ -76,6 +109,53 @@ jobs:
           # normalization) -- must be absolute, from ${{ github.workspace }}.
           GENESIS_CERN_OPEN_DATA_DIR: ${{ github.workspace }}/packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
+
+      - name: Science Flight Control — real preflight, execution delta, failure attribution, Evidence, Replay and BYT proof
+        env:
+          GENESIS_RDKIT_PYTHON: python
+        run: |
+          node scripts/science-flight-control-proof.mjs \
+            --out artifacts/science-flight-control/science-flight-control-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload Science Flight Control evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: science-flight-control-proof-${{ github.sha }}
+          path: artifacts/science-flight-control
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Customer products — onboarding, real RDKit, Evidence, Replay and authorised exports
+        env:
+          GENESIS_RDKIT_PYTHON: python
+          GENESIS_CUSTOMER_PRODUCTS_PROOF_DIR: artifacts/customer-products
+        run: node scripts/customer-products-proof.mjs
+
+      - name: Upload customer product evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: customer-products-proof-${{ github.sha }}
+          path: artifacts/customer-products
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Worker infrastructure — single-node queue and external artifact custody proof
+        run: |
+          node scripts/worker-infrastructure-proof.mjs \
+            --out artifacts/worker-infrastructure/worker-infrastructure-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload worker infrastructure evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: worker-infrastructure-proof-${{ github.sha }}
+          path: artifacts/worker-infrastructure
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Testy packages/core + packages/ui (source-only pakiety, vitest.core.config.ts)
         run: npm run test:core
@@ -499,3 +579,29 @@ jobs:
         env:
           GENESIS_PYSCF_PYTHON: python
         run: node --test packages/backend/src/pyscfFabricApi.test.mjs
+
+  engines-researchrun:
+    name: Real engines through ResearchRun and the durable queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.3'
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Install the real engines (RDKit, PySCF, Vina/Meeko, OpenMM, ADMET-AI on CPU torch)
+        run: |
+          python -m pip install --disable-pip-version-check -r packages/backend/requirements-rdkit.txt -r packages/backend/requirements-pyscf.txt
+          python -m pip install --disable-pip-version-check vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 scipy OpenMM==8.6.1
+          python -m pip install --disable-pip-version-check torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check -r packages/backend/requirements-admet.txt
+      - name: Each engine executes through ResearchRun and the queue (frozen prediction, falsification, Replay, restart)
+        env:
+          GENESIS_REQUIRE_ENGINES: rdkit,pyscf,vina,openmm,admet
+        run: node --test packages/backend/src/researchRunEngines.real.test.mjs packages/backend/src/goldenResearchRun.e2e.test.mjs packages/backend/src/researchRunArtifacts.test.mjs packages/backend/src/researchRunJobs.test.mjs

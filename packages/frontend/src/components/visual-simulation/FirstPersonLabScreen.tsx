@@ -459,7 +459,7 @@ export function FirstPersonLabScreen() {
       <WorldChrome
         glyph="⌬"
         domain="Virtual Lab"
-        title="Wirtualne laboratorium"
+        title="Laboratorium — scenariusze"
         purpose="Hipoteza → eksperyment → obserwacja → dowód → wynik. Kamera naukowa reaguje na realne zdarzenia przebiegu."
         badges={[{ label: 'SCENARIO ENGINE · REAL RUN', tone: 'real' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
       />

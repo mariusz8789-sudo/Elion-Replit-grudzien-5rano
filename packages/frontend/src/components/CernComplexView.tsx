@@ -14,6 +14,7 @@ import { createColliderLayer, type ColliderLayerHandle } from '../../../ui/src/c
 import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 import { buildCharacter, type Character } from '../core/three/characterRig';
 import { captureRoomEnvironment } from '../core/three/graphics/lighting';
+import { SceneProvenanceBadge } from './SceneProvenanceBadge';
 
 /**
  * CERN COMPLEX (`#/cern-complex`) — the full-viewport walk-through of the
@@ -437,7 +438,7 @@ export function CernComplexView(): JSX.Element {
           <span className="cern-badge" data-testid="cern-badge-mode">MODE: {mode}</span>
           <span className="cern-badge">√s: 13 TeV · batch: {batch ? batch.events.length : 0}</span>
           <span className={`cern-badge${collisionViewState === 'PLAYING' ? ' is-hot' : ''}`} data-testid="cern-live-collision-state">
-            {collisionViewState === 'IDLE' ? 'WIĄZKI: GOTOWE' : collisionViewState === 'PLAYING' ? 'LIVE: ZDERZENIE PROTONÓW' : 'ZDARZENIE: WIDOCZNE'}
+            {collisionViewState === 'IDLE' ? 'WIĄZKI: GOTOWE' : collisionViewState === 'PLAYING' ? 'MODEL: ZDERZENIE PROTONÓW' : 'ZDARZENIE: WIDOCZNE'}
           </span>
           <span className={`cern-badge${r?.formed ? ' is-hot' : ''}`} data-testid="cern-badge-horizon">HORIZON: {r?.formed ? `FORMED (${bh?.label.toUpperCase()})` : 'NONE'} · r_s: {r?.bh ? `${r.bh.rsM.toExponential(3)} m` : '—'}</span>
           <span className="cern-badge">RENDER: {quality.toUpperCase()}</span>
@@ -469,6 +470,7 @@ export function CernComplexView(): JSX.Element {
         )}
         <p className="cern-faint cw-mono">FPV: {fpv} · {fps} FPS · KERNEL: /cyber (single)</p>
         <p className="cern-faint">Etykiety: COLLIDE — TOY_MC_MODEL (nie PYTHIA/Geant4); mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). REAL CMS DATA otwiera osobną analizę opublikowanych danych CMS 2011. Obraz 3D jest wizualizacją, nie pomiarem.</p>
+        <SceneProvenanceBadge sceneId="world:cern-complex" />
       </div>
       <aside className="cern-hud cern-hud-right" aria-label="Sterownia" onKeyDown={stop} onKeyUp={stop}>
         {batch && selectedEvent && (

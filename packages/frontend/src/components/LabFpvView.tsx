@@ -115,7 +115,7 @@ export function LabFpvView(): JSX.Element {
 
   const r = analysis?.result ?? null;
   return (
-    <main id="main-content" className="lab" aria-label="Quantum Lab FPV" data-testid="lab-fpv">
+    <main id="main-content" className="lab" aria-label="Laboratorium — Kwantowy FPV" data-testid="lab-fpv">
       <header className="col-head">
         <div>
           <div className="gx-eyebrow">GENESIS · QUANTUM LAB · FPV</div>

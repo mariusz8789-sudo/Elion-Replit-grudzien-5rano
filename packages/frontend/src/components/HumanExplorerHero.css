@@ -146,34 +146,166 @@
   .human-brain-card { left: 14px; right: 14px; width: auto; bottom: calc(172px + env(safe-area-inset-bottom, 0px)); padding: 8px 10px; }
 }
 
-/* Human Explorer descent: while the body is explored the small selection HUD takes over; the hero steps aside. */
-.human-hero.is-exploring :is(.human-hero-heading, .human-hero-path, .human-hero-action, .human-hero-tools, .human-subject-target, .human-context, .human-brain-card) { display: none; }
+/* Human Explorer descent: one anatomy HUD over the body (reference: left systems menu, organ card,
+   macro → micro ladder). Phone: everything stacks at the bottom above the tab bar; nothing covers the human. */
+.human-hero.is-exploring :is(.human-hero-heading, .human-subject-target, .human-context, .human-brain-card) { display: none; }
+.human-hero:is(.is-exploring, .has-hud) :is(.human-hero-path, .human-hero-action, .human-touch-hint, .human-hero-tools) { display: none; }
 .human-touch-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 160px; margin: 0; padding: 7px 14px; border-radius: 999px; background: #04101acc; border: 1px solid #7fdce655; color: #cfeef2; font-size: 12px; white-space: nowrap; pointer-events: none; }
-.ax-hud, .ax-labels { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
-.ax-labels { z-index: 5; }
-.ax-crumbs { position: absolute; top: 76px; left: calc(12.5rem + 20px); right: 20px; display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+body:has(.ax-hud) .context-guide-launch { display: none; }
+.ax-labels { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.ax-hud { position: absolute; inset: 0; pointer-events: none; z-index: 6; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 0 10px calc(60px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+.ax-hud > * { pointer-events: auto; }
+.ax-crumbs { position: absolute; top: calc(62px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; display: flex; align-items: center; gap: 10px; }
 .ax-back { min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid #7fdce688; background: #06101de8; color: #eaffff; font-size: 13px; cursor: pointer; flex: none; }
-.ax-crumbs ol { display: flex; gap: 0; margin: 0; padding: 6px 12px; list-style: none; min-width: 0; overflow: hidden; border-radius: 16px; background: #04101acc; color: #9fb6c0; font-size: 12px; white-space: nowrap; }
+.ax-crumbs ol { display: flex; margin: 0; padding: 6px 12px; list-style: none; min-width: 0; overflow: hidden; border-radius: 16px; background: #04101acc; color: #9fb6c0; font-size: 12px; white-space: nowrap; }
 .ax-crumbs li { overflow: hidden; text-overflow: ellipsis; }
 .ax-crumbs li + li::before { content: '›'; margin: 0 6px; opacity: .6; }
 .ax-crumbs li[aria-current] { color: #eaffff; font-weight: 600; }
-.ax-sheet { position: absolute; overflow: visible; left: calc(12.5rem + 20px); bottom: 24px; width: min(460px, calc(100% - 12.5rem - 40px)); max-height: 130px; box-sizing: border-box; padding: 10px 12px; border-radius: 16px; background: #06101deb; border: 1px solid #54748566; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
-.ax-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ax-name strong { color: #f0f8fc; font-size: 16px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ax-name span { color: #a9bcc6; font-size: 12px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ax-rail { display: flex; flex-direction: column-reverse; gap: 6px; min-width: 0; }
+.ax-tabs { display: flex; gap: 6px; }
+.ax-tab { flex: 1; min-width: 0; min-height: 36px; padding: 0 10px; border-radius: 18px; border: 1px solid #54748588; background: #06101de8; color: #d6ebf0; font-size: 12.5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-tab.is-on { background: #173940; border-color: #8ce0d6; color: #fff; }
+.ax-pop { display: none; flex-direction: column; gap: 4px; max-height: 44vh; overflow-y: auto; padding: 10px; border-radius: 16px; background: #06101df2; border: 1px solid #54748566; }
+.ax-pop.is-open { display: flex; }
+.ax-pop h3 { margin: 4px 2px 2px; color: #8fb3bf; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.ax-note { margin: 0 2px 4px; color: #9fb6c0; font-size: 12px; line-height: 1.4; }
+.ax-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 38px; padding: 7px 12px; border-radius: 12px; border: 1px solid transparent; background: #0b1d28; color: #e2f3f7; font-size: 13.5px; text-align: left; cursor: pointer; }
+.ax-item small { color: #8fa9b3; font-size: 11.5px; }
+.ax-item.is-on { background: #173940; border-color: #8ce0d6; }
+.ax-item.is-off { background: #20161a; border-color: #8a5a5a88; }
+.ax-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ax-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid #54748588; background: #04101a; color: #eaffff; font-size: 15px; }
+.ax-ladder { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 4px; border-radius: 14px; background: #04101ae6; border: 1px solid #54748555; }
+.ax-rung { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 64px; padding: 5px 8px; border: 0; border-radius: 10px; background: none; color: #98aab5; cursor: pointer; }
+.ax-rung strong { font-size: 12px; font-weight: 600; }
+.ax-rung small { font-size: 10px; opacity: .75; }
+.ax-rung.is-on { background: #14353e; color: #e6ffff; box-shadow: inset 0 -2px #80dbd1; }
+.ax-rung:disabled { opacity: .5; cursor: wait; }
+.ax-sheet { box-sizing: border-box; padding: 10px 12px; border-radius: 16px; background: #06101deb; border: 1px solid #54748566; display: flex; flex-direction: column; gap: 8px; }
+.ax-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ax-name strong { color: #f0f8fc; font-size: 17px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-name span { color: #b4c6ce; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ax-row { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
 .ax-act { flex: none; min-height: 36px; padding: 0 13px; border-radius: 18px; border: 1px solid #5d849488; background: #0b1d28; color: #e2f3f7; font-size: 12.5px; cursor: pointer; }
 .ax-act.is-primary { background: #d6eee9; border-color: #d6eee9; color: #07232b; font-weight: 600; }
 .ax-act.is-on { background: #173940; border-color: #8ce0d6; }
 .ax-act:disabled { opacity: .55; cursor: wait; }
-.ax-surfaces { position: absolute; right: 0; top: -42px; display: inline-flex; gap: 2px; padding: 2px; border-radius: 16px; background: #04101a; border: 1px solid #54748555; flex: none; }
-.ax-surf { min-height: 30px; padding: 0 9px; border: 0; border-radius: 14px; background: none; color: #98aab5; font-size: 11px; cursor: pointer; }
+.ax-surfaces { display: inline-flex; gap: 2px; padding: 2px; border-radius: 16px; background: #04101a; border: 1px solid #54748555; align-self: flex-start; }
+.ax-surf { min-height: 32px; padding: 0 12px; border: 0; border-radius: 14px; background: none; color: #98aab5; font-size: 12px; cursor: pointer; }
 .ax-surf.is-on { background: #173940; color: #e6ffff; }
 .ax-label { position: absolute; transform: translate(12px, -50%); pointer-events: auto; min-height: 28px; padding: 0 10px; border-radius: 14px; background: #041019d9; border: 1px solid #7fdce6aa; color: #eaffff; font-size: 12px; white-space: nowrap; cursor: pointer; }
 .ax-label i { position: absolute; left: -12px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: #7fe3ff; box-shadow: 0 0 8px #7fe3ff; }
-@media (max-width: 720px) {
-  .ax-crumbs { top: calc(62px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; }
-  .ax-sheet { left: 10px; right: 10px; width: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
-  .human-touch-hint { bottom: calc(172px + env(safe-area-inset-bottom, 0px)); }
+/* Desktop: the reference layout — systems menu on the left, the card on the right, the ladder along the bottom. */
+@media (min-width: 900px) {
+  .ax-hud { display: block; padding: 0; }
+  .ax-crumbs { top: 76px; left: calc(12.5rem + 20px); right: 400px; }
+  .ax-rail { position: absolute; top: 124px; left: calc(12.5rem + 20px); width: 240px; bottom: 24px; flex-direction: column; overflow-y: auto; scrollbar-width: thin; }
+  .ax-tabs { display: none; }
+  .ax-pop, .ax-pop.is-open { display: flex; max-height: none; overflow: visible; }
+  .ax-sheet { position: absolute; top: 124px; right: 24px; width: 340px; padding: 16px; }
+  .ax-name strong { font-size: 22px; letter-spacing: .02em; text-transform: uppercase; white-space: normal; }
+  .ax-name span { -webkit-line-clamp: 6; font-size: 13px; }
+  .ax-row { flex-wrap: wrap; }
+  .ax-ladder { position: absolute; left: calc(12.5rem + 280px); right: 24px; bottom: 24px; justify-content: space-between; }
+  .ax-rung { flex: 1; min-width: 0; }
+}
+/* Organ card subtitle ("Układ krążenia"), notes and saved views of the reference picture. */
+.ax-name em { color: #8ce0d6; font-style: normal; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; }
+.ax-note-input { box-sizing: border-box; width: 100%; min-height: 64px; padding: 8px 10px; border-radius: 10px; border: 1px solid #54748588; background: #081621; color: #e2f3f7; font: inherit; font-size: 13px; resize: vertical; }
+.ax-photo { display: flex; flex-direction: column; gap: 4px; color: #8ce0d6; font-size: 12.5px; }
+.ax-photo img { width: 100%; max-height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #54748566; }
+.ax-view { display: flex; gap: 4px; align-items: stretch; }
+.ax-view .ax-item { flex: 1; min-width: 0; }
+.ax-x { flex: none; width: 34px; border-radius: 10px; border: 1px solid #54748566; background: transparent; color: #b4c6ce; font-size: 16px; cursor: pointer; }
+/* Desktop with the anatomy menu open: the big title would sit under the left menu, so only the model and
+   atlas credit stay, as one small line at the top centre. */
+@media (min-width: 900px) {
+  .human-hero.has-hud .human-hero-heading { top: 14px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center; background: none; display: flex; flex-direction: column; gap: 2px; }
+  .human-hero.has-hud .human-hero-heading :is(.human-eyebrow, h1, p) { display: none; }
+}
+
+/* Where the view comes from, beside its name: one small tag, never a banner. */
+.ax-epi { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border: 1px solid rgba(125, 211, 252, 0.55); border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #bae6fd; vertical-align: middle; }
+.ax-section { display: grid; gap: 6px; margin-top: 8px; }
+.ax-slider { display: grid; gap: 4px; font-size: 12px; color: rgba(226, 232, 240, 0.8); }
+.ax-slider input { width: 100%; accent-color: #7dd3fc; }
+.ax-discovery { margin-top: 8px; font-size: 12px; color: rgba(226, 232, 240, 0.85); }
+.ax-discovery summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.ax-discovery dl { display: grid; gap: 2px; margin: 4px 0; }
+.ax-discovery dl div { display: flex; justify-content: space-between; gap: 12px; }
+.ax-discovery dt { margin: 0; }
+.ax-discovery dd { margin: 0; color: #fcd34d; text-align: end; }
+
+/* LAB_WIDE is the whole hall: no model-info "+" over the tiny figure. Past it, on a phone, the big
+   heading gives the top of the screen to the "Wstecz" path. */
+body:has(.ax-hud) .human-subject-target { display: none; }
+@media (max-width: 899px) {
+  body:has(.ax-hud:not([data-focus="LAB_WIDE"])) .human-hero .human-hero-heading { display: none; }
+}
+@media (max-width: 899px) {
+  body:has(.ax-hud[data-focus="LAB_WIDE"]) .human-hero .human-hero-heading :is(h1, p:first-of-type) { display: none; }
+}
+
+/* Phone: the controls give the body more room — one-line level chips, slimmer tabs, a two-line description. */
+@media (max-width: 899px) {
+  .ax-hud { gap: 5px; }
+  .ax-tab { min-height: 32px; font-size: 12px; }
+  .ax-ladder { padding: 3px; border-radius: 12px; }
+  .ax-rung { flex-direction: row; gap: 4px; min-width: 0; padding: 5px 10px; align-items: baseline; }
+  .ax-rung small { display: none; }
+  .ax-rung.is-on small { display: inline; }
+  .ax-sheet { padding: 8px 12px; gap: 6px; }
+  .ax-name strong { font-size: 16px; }
+  .ax-name span { -webkit-line-clamp: 2; font-size: 12px; }
+  .ax-act { min-height: 34px; padding: 0 12px; }
+  .ax-discovery { margin-top: 2px; }
+  .ax-discovery summary { min-height: 26px; }
 }
 body:has(.ax-hud) .context-guide-launch { display: none; }
+
+
+/* Existing atlas instruments: readable glass panels, touch-sized controls. */
+.human-hero-heading { padding: 14px 18px; left: 3%; max-width: 350px; border-left: 1px solid #9bdded70; border-radius: 0 12px 12px 0; background: linear-gradient(100deg, #03101bea, #03101b30); }
+.human-hero-heading p { color: #d0dfe5; }
+.human-eyebrow, .human-model-label { font-size: 12px; line-height: 1.5; }
+.human-model-label { color: #bdcdd7; }
+.human-hero-tools .sw-chip { min-height: 44px; font-size: 12px; }
+.human-hero-path { border-color: #84cfe55c; box-shadow: 0 16px 44px #0005; }
+.human-hero-path button { min-height: 54px; }
+.human-hero-path button span { font-size: 11px; opacity: .9; }
+.human-hero-path button strong { font-size: 13px; }
+.human-subject-target { width: 44px; height: 44px; }
+.human-context-close { width: 44px; height: 44px; }
+.human-context-action { min-height: 44px; font-size: 14px; }
+.human-inspector { border-color: #84cfe566; background: #07131ef5; }
+.human-inspector :is(.human-twin-tag, .human-twin-source, .human-twin-caveat, .human-depth-ticks) { font-size: 12px; line-height: 1.5; }
+.human-inspector-tabs button { min-height: 44px; font-size: 12px; }
+@media (max-width: 900px) {
+  .human-hero-heading { top: 74px; left: 14px; right: 14px; padding: 8px 12px; max-width: none; }
+  .human-hero-heading h1 { font-size: 28px; margin: 3px 0; }
+  .human-hero-heading p { font-size: 12px; margin-bottom: 3px; }
+  .human-hero-tools { top: 228px; gap: 4px; }
+  .human-hero-tools .sw-chip { padding: 8px; font-size: 12px; }
+  .human-hero-path button strong { font-size: 12px; }
+  .human-hero-path button span { font-size: 11px; }
+  .human-inspector { height: 30dvh; max-height: 30dvh; }
+}
+
+.sw .human-inspector .sw-ex-rungs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sw .human-inspector :is(button, summary) { min-height: 44px; }
+@media (max-width: 900px) {
+  .human-hero-heading { top: 62px; padding-block: 6px; }
+  .human-hero-heading h1 { font-size: 26px; }
+  .human-hero-tools { top: 192px; }
+  .human-touch-hint { bottom: calc(202px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 28px); white-space: normal; text-align: center; }
+}
+
+@media (max-width: 900px) {
+  .human-hero.has-inspector :is(.human-hero-path, .human-hero-action, .human-touch-hint) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .human-hero:has(.human-reference-attribution[data-status]) .human-hero-tools { top: 216px; }
+}
+/* Microscope captions carry their honesty tag ("schemat podręcznikowy, nie skan tkanki") at the end; let them wrap so it is never cut off on a phone. */
+.ax-hud[data-micro]:not([data-micro=""]) .ax-name strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }

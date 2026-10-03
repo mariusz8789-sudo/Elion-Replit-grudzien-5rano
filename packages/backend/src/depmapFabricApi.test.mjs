@@ -7,6 +7,7 @@ import { _resetDetect, detect } from './compute/depmapAdapter.mjs';
 const DATA_ENV = 'GENESIS_DEPMAP_24Q2_DATA_DIR';
 const configuredDataDir = process.env[DATA_ENV];
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'depmap-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0',
   modelId: 'biology-depmap-crispr-senescence-panel',
@@ -30,7 +31,7 @@ test('Fabric API returns a source-data rejection instead of a fabricated DepMap 
   const original = process.env[DATA_ENV];
   delete process.env[DATA_ENV];
   _resetDetect();
-  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
   assert.equal(response.status, 400);
   assert.equal(response.body.run.status, 'rejected');
   assert.equal(response.body.run.error, 'data_required');
@@ -41,7 +42,7 @@ test('Fabric API returns a source-data rejection instead of a fabricated DepMap 
 test('Fabric API runs the checksum-verified DepMap panel through the canonical compute registry', { skip: !configuredDataDir }, () => {
   _resetDetect();
   assert.equal(detect().available, true);
-  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
   assert.equal(response.status, 200);
   assert.equal(response.body.contractVersion, '1.0.0');
   assert.equal(response.body.run.status, 'ok');

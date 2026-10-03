@@ -6,6 +6,8 @@ import { ASTEX, ASTEX_TRAINING_OVERLAP, CSRN_KEY, IMATINIB, RUN8 } from '../core
 import { DASHBOARD_STRIP, LABEL_ORDER, groupById, labelCounts, type CapabilityGroup } from '../core/scientificOs/catalogue';
 import { HOME_ENGINES, liveLabel, useLiveToolchain } from './home/HomeEngines';
 import { Icon } from './home/Icon';
+import { startDay, startName, startText, type StartTextKey } from './home/startText';
+import { useLocale, type Locale } from '../core/i18n';
 import '../styles-command-center.css';
 
 /**
@@ -39,22 +41,23 @@ interface CmsBin { readonly lowerGeV: number; readonly upperGeV: number; readonl
 type Cms = { phase: 'loading' } | { phase: 'ready'; bins: readonly CmsBin[]; events: number } | { phase: 'unavailable' };
 
 /** "3 min ago", from the record's own timestamp. Never a made-up time. */
-export function relativeTime(iso: string, now: number = Date.now()): string {
+export function relativeTime(iso: string, now: number = Date.now(), locale: Locale = 'en'): string {
+  const T = (k: StartTextKey): string => startText(k, locale);
   const t = Date.parse(iso);
-  if (Number.isNaN(t)) return 'unknown time';
+  if (Number.isNaN(t)) return T('unknownTime');
   const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 60) return T('justNow');
+  if (s < 3600) return `${Math.floor(s / 60)} ${T('minAgo')}`;
+  if (s < 86400) return `${Math.floor(s / 3600)} ${T('hAgo')}`;
   const d = Math.floor(s / 86400);
-  return d === 1 ? 'yesterday' : `${d} days ago`;
+  return d === 1 ? T('yesterday') : `${d} ${T('daysAgo')}`;
 }
 
 /** "Mon 21:00 UTC" — a record's own time, in UTC so every reader sees the same thing. */
-export function utcStamp(iso: string): string {
+export function utcStamp(iso: string, locale: Locale = 'en'): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'unknown time';
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
+  if (Number.isNaN(d.getTime())) return startText('unknownTime', locale);
+  const day = startDay(d.getUTCDay(), locale);
   return `${day} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
 }
 
@@ -99,9 +102,10 @@ function useCms(): Cms {
 }
 
 /** The real CMS invariant-mass histogram; the fullest bin is the Z peak. */
-function Histogram({ cms, tall }: { readonly cms: Cms; readonly tall?: boolean }): React.ReactElement {
+function Histogram({ cms, tall, locale }: { readonly cms: Cms; readonly tall?: boolean; readonly locale: Locale }): React.ReactElement {
+  const T = (k: StartTextKey): string => startText(k, locale);
   if (cms.phase !== 'ready') {
-    return <p className="cc-empty" data-testid="home-cms-empty">{cms.phase === 'loading' ? 'Reading CMS data from the server…' : 'CMS data is not reachable on this server right now.'}</p>;
+    return <p className="cc-empty" data-testid="home-cms-empty">{cms.phase === 'loading' ? T('cmsLoading') : T('cmsUnavailable')}</p>;
   }
   const max = Math.max(1, ...cms.bins.map((b) => b.eventCount));
   const peak = cms.bins.reduce((a, b) => (b.eventCount > a.eventCount ? b : a));
@@ -111,14 +115,14 @@ function Histogram({ cms, tall }: { readonly cms: Cms; readonly tall?: boolean }
   const last = cms.bins[cms.bins.length - 1]!;
   return (
     <div data-testid="home-cms-histogram">
-      <svg className="cc-hist" viewBox={`0 0 360 ${h}`} preserveAspectRatio="none" role="img" aria-label={`Invariant mass of ${cms.events} CMS muon pairs, peak ${peak.lowerGeV}–${peak.upperGeV} GeV`}>
+      <svg className="cc-hist" viewBox={`0 0 360 ${h}`} preserveAspectRatio="none" role="img" aria-label={`${T('histAria')}: ${cms.events}, ${T('peak')} ${peak.lowerGeV}–${peak.upperGeV} GeV`}>
         {cms.bins.map((b, i) => {
           const bh = Math.max(2, (b.eventCount / max) * (h - 4));
           const hot = b.eventCount >= peak.eventCount * 0.5;
           return <rect key={b.lowerGeV} x={i * w + 3} y={h - bh} width={w - 6} height={bh} rx={2} className={hot ? 'cc-hist-peak' : undefined} />;
         })}
       </svg>
-      <p className="cc-hist-axis"><span>{first.lowerGeV} GeV</span><b>peak {peak.lowerGeV}–{peak.upperGeV} GeV</b><span>{last.upperGeV} GeV</span></p>
+      <p className="cc-hist-axis"><span>{first.lowerGeV} GeV</span><b>{T('peak')} {peak.lowerGeV}–{peak.upperGeV} GeV</b><span>{last.upperGeV} GeV</span></p>
     </div>
   );
 }
@@ -136,22 +140,23 @@ function HashStrip({ hash }: { readonly hash: string }): React.ReactElement {
   );
 }
 
-type View = 'molecule' | 'anatomy' | 'cms' | 'evidence';
+// Molecules live in the Drug Discovery card and under Life Sciences, not in the centre of Start (Mariusz, 30 Sep).
+type View = 'anatomy' | 'cms' | 'evidence';
 
-const VIEWS: readonly { id: View; label: string; icon: 'pill' | 'body' | 'atom' | 'hash' }[] = [
-  { id: 'molecule', label: 'Molecule', icon: 'pill' },
-  { id: 'anatomy', label: 'Anatomy', icon: 'body' },
-  { id: 'cms', label: 'CMS', icon: 'atom' },
-  { id: 'evidence', label: 'Evidence', icon: 'hash' },
+const VIEWS: readonly { id: View; label: StartTextKey | null; icon: 'pill' | 'body' | 'atom' | 'hash' }[] = [
+  { id: 'anatomy', label: 'anatomy', icon: 'body' },
+  { id: 'cms', label: null, icon: 'atom' },
+  { id: 'evidence', label: 'evidence', icon: 'hash' },
 ];
 
-function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
-  const [view, setView] = useState<View>('molecule');
-  const meta: Record<View, { title: string; tag: string; cap: string; hash: string; open: string }> = {
-    molecule: { title: 'Drug Discovery', tag: 'MODEL', cap: 'Caffeine · 3D geometry from RDKit · Molecule World snapshot', hash: '#/molecule', open: 'Open Molecule World' },
-    anatomy: { title: 'Human Biology', tag: 'EDUCATIONAL MODEL', cap: 'BodyParts3D atlas (CC BY 4.0) · Human Explorer snapshot', hash: '#/human-biology-lab', open: 'Open Human Explorer' },
-    cms: { title: 'Physics · CERN', tag: 'REAL DATA', cap: 'Real CMS 2011 Z→μμ events · offline analysis, not a live detector', hash: '#/physics/cms-z', open: 'Open CMS data' },
-    evidence: { title: 'Evidence & Replay', tag: `REPLAY ${IMATINIB.replay}`, cap: `Imatinib retrosynthesis · ${IMATINIB.retroEngine}`, hash: '#/evidence', open: 'Open Evidence & Replay' },
+function LiveView({ cms, locale }: { readonly cms: Cms; readonly locale: Locale }): React.ReactElement {
+  const T = (k: StartTextKey): string => startText(k, locale);
+  const [view, setView] = useState<View>('anatomy');
+  // `ok` marks a tag backed by real data or a matched replay, so the pill colour never depends on the wording.
+  const meta: Record<View, { title: string; tag: string; ok: boolean; cap: string; hash: string; open: string }> = {
+    anatomy: { title: T('humanBiology'), tag: T('educationalModel'), ok: false, cap: T('capAnatomy'), hash: '#/human-biology-lab', open: T('openExplorer') },
+    cms: { title: T('physicsCern'), tag: T('realData'), ok: true, cap: T('capCms'), hash: '#/physics/cms-z', open: T('openCms') },
+    evidence: { title: T('evidenceReplay'), tag: `REPLAY ${IMATINIB.replay}`, ok: IMATINIB.replay === 'MATCH', cap: `${T('capEvidence')} · ${IMATINIB.retroEngine}`, hash: '#/evidence', open: T('openEvidence') },
   };
   const m = meta[view];
   return (
@@ -160,9 +165,8 @@ function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
         <ellipse cx="200" cy="185" rx="170" ry="60" transform="rotate(-14 200 185)" />
         <ellipse cx="200" cy="185" rx="150" ry="150" />
       </svg>
-      {view === 'molecule' && <img className="cc-live-mol" src={MOLECULE_IMG} alt="Caffeine molecule rendered by Molecule World" />}
-      {view === 'anatomy' && <img className="cc-live-body" src={BODY_IMG} alt="Human body rendered by Human Explorer" />}
-      {view === 'cms' && <div className="cc-live-panel"><Histogram cms={cms} tall /></div>}
+      {view === 'anatomy' && <img className="cc-live-body" src={BODY_IMG} alt={T('bodyAlt')} />}
+      {view === 'cms' && <div className="cc-live-panel"><Histogram cms={cms} tall locale={locale} /></div>}
       {view === 'evidence' && (
         <div className="cc-live-panel cc-trace cc-trace-big">
           <b>INPUT</b><HashStrip hash={IMATINIB.inputHash} />
@@ -170,13 +174,13 @@ function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
           <b>REPLAY</b><span className={IMATINIB.replay === 'MATCH' ? 'cc-ok' : 'cc-warn'}>{IMATINIB.replay}</span>
         </div>
       )}
-      <p className="cc-live-tl"><i className="cc-dot" />LIVE VIEW · {m.title.toUpperCase()}</p>
-      <p className="cc-live-tr"><span className={`cc-pill ${m.tag === 'REAL DATA' || m.tag.startsWith('REPLAY MATCH') ? 'cc-pill-ok' : 'cc-pill-warn'}`}>{m.tag}</span></p>
+      <p className="cc-live-tl"><i className="cc-dot" />{T('liveView')} · {m.title.toUpperCase()}</p>
+      <p className="cc-live-tr"><span className={`cc-pill ${m.ok ? 'cc-pill-ok' : 'cc-pill-warn'}`}>{m.tag}</span></p>
       <p className="cc-live-cap">{m.cap} · <a href={m.hash}>{m.open}</a></p>
-      <div className="cc-live-sw" role="group" aria-label="Live view">
+      <div className="cc-live-sw" role="group" aria-label={T('liveViewAria')}>
         {VIEWS.map((v) => (
           <button key={v.id} type="button" aria-pressed={view === v.id} onClick={() => setView(v.id)}>
-            <Icon name={v.icon} />{v.label}
+            <Icon name={v.icon} />{v.label ? T(v.label) : 'CMS'}
           </button>
         ))}
       </div>
@@ -184,39 +188,40 @@ function LiveView({ cms }: { readonly cms: Cms }): React.ReactElement {
   );
 }
 
-function StripTile({ group }: { readonly group: CapabilityGroup }): React.ReactElement {
+function StripTile({ group, locale }: { readonly group: CapabilityGroup; readonly locale: Locale }): React.ReactElement {
   const counts = labelCounts(group);
   return (
     <a className={`cc-ot${group.id === 'gov' ? ' cc-ot-gov' : ''}`} href={`#/more?group=${group.id}`} data-testid={`home-group-${group.id}`}>
       <Icon name={group.icon} />
-      <b>{group.name}</b>
+      <b>{startName(group.name, locale)}</b>
       <span className="cc-mix" aria-hidden="true">
         {LABEL_ORDER.filter((l) => counts[l] > 0).map((l) => <i key={l} className={`os-mix-${l}`} style={{ flex: counts[l] }} />)}
       </span>
-      <small>{group.items.length} capabilities · {counts.AVAILABLE} available</small>
+      <small>{group.items.length} {startText('capabilities', locale)} · {counts.AVAILABLE} {startText('available', locale)}</small>
     </a>
   );
 }
 
-function Compute(): React.ReactElement {
+function Compute({ locale }: { readonly locale: Locale }): React.ReactElement {
+  const T = (k: StartTextKey): string => startText(k, locale);
   const live = useLiveToolchain();
   const runtimes = HOME_ENGINES.filter((e) => e.toolId !== null);
-  const labels = runtimes.map((e) => ({ e, s: liveLabel(e, live) }));
+  const labels = runtimes.map((e) => ({ e, s: liveLabel(e, live, locale === 'pl' ? 'pl' : 'en') }));
   const ok = labels.filter((x) => x.s.tone === 'ok').length;
   return (
     <article className="cc-c cc-comp" data-testid="home-engines">
-      <h2><Icon name="cpu" />Compute</h2>
+      <h2><Icon name="cpu" />{T('compute')}</h2>
       {live.phase === 'ready' ? (
-        <p className="cc-big">{ok}<small> of {runtimes.length} engines available on this server</small></p>
+        <p className="cc-big">{ok}<small> {T('enginesOf')} {runtimes.length} {T('enginesAvailable')}</small></p>
       ) : (
-        <p className="cc-empty">{live.phase === 'checking' ? 'Checking this server…' : 'Server unreachable, engine status unknown.'}</p>
+        <p className="cc-empty">{live.phase === 'checking' ? T('checkingServer') : T('serverUnreachable')}</p>
       )}
       <span className="cc-dots" aria-hidden="true">{labels.map((x) => <i key={x.e.name} className={x.s.tone === 'ok' ? 'cc-dot-ok' : undefined} />)}</span>
       <details className="cc-engines">
-        <summary>Show engines</summary>
+        <summary>{T('showEngines')}</summary>
         <ul>
           {labels.map(({ e, s }) => (
-            <li key={e.name} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}><b>{e.name}</b><span className={`cc-tone-${s.tone}`}>{s.text}</span></li>
+            <li key={e.name} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}><b>{e.name}</b><span className={`cc-tone-${s.tone}`} title={s.detail}>{s.text}</span></li>
           ))}
         </ul>
       </details>
@@ -225,6 +230,8 @@ function Compute(): React.ReactElement {
 }
 
 export function StartHero(): React.ReactElement {
+  const locale = useLocale();
+  const T = (k: StartTextKey): string => startText(k, locale);
   const health = useHealth();
   const cms = useCms();
   const [query, setQuery] = useState('');
@@ -242,7 +249,7 @@ export function StartHero(): React.ReactElement {
   const pct = (n: number) => `${Math.round((n / ASTEX.denominator) * 100)}%`;
 
   return (
-    <div className="cc" data-testid="start-hero" lang="en" dir="ltr">
+    <div className="cc" data-testid="start-hero" lang={locale === 'pl' ? 'pl' : 'en'} dir="ltr">
       <section className="cc-hero">
         <div className="cc-hl">
           <p className="cc-eyebrow">
@@ -252,78 +259,77 @@ export function StartHero(): React.ReactElement {
             </span>
             Genesis · Scientific OS
             <span className={`cc-health cc-health-${health}`} data-testid="home-backend">
-              <i aria-hidden="true" />{health === 'checking' ? 'checking backend…' : health === 'online' ? 'backend online' : 'backend offline'}
+              <i aria-hidden="true" />{health === 'checking' ? T('backendChecking') : health === 'online' ? T('backendOnline') : T('backendOffline')}
             </span>
           </p>
-          <h1 className="cc-title"><em>Verifiable</em> computational drug discovery.</h1>
-          <p className="cc-sub">Run an experiment, see the result, verify it with Evidence and Replay.</p>
+          <h1 className="cc-title"><em>{T('titleEm')}</em>{T('titleRest')}</h1>
+          <p className="cc-sub">{T('sub')}</p>
           <form className="cc-cmd" onSubmit={submit} role="search" data-testid="home-command">
             <Icon name="spark" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="What do you want to investigate?" aria-label="What do you want to investigate?" />
-            <button type="submit" aria-label="Ask Genesis"><Icon name="arrow" /></button>
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={T('askPlaceholder')} aria-label={T('askPlaceholder')} />
+            <button type="submit" aria-label={T('askButton')}><Icon name="arrow" /></button>
           </form>
 
-          <section className="cc-run" data-testid="home-running" aria-label="Running now">
-            <a className="cc-thumb" href="#/molecule" aria-hidden="true" tabIndex={-1}><img src={MOLECULE_IMG} alt="" /></a>
-            <p className="cc-k"><i className="cc-dot" />{running ? 'RUNNING NOW' : 'LATEST BENCHMARK'}<span>started {utcStamp(RUN8.startedAt)}</span></p>
-            <h2>{RUN8.title}</h2>
+          <section className="cc-run" data-testid="home-running" aria-label={T('runningAria')}>
+            <p className="cc-k"><i className="cc-dot" />{running ? T('runningNow') : T('latestBenchmark')}<span>{T('started')} {utcStamp(RUN8.startedAt, locale)}</span></p>
+            <h2>{startName(RUN8.title, locale)}</h2>
             <p className="cc-m">
-              <span><b>{RUN8.complexes}</b> unseen {RUN8.dataset} complexes · {RUN8.seeds} seeds · pre-registered</span>
-              <span>{running ? 'Pass or fail is published when the run finishes' : `Status: ${RUN8.status}`} · recorded {relativeTime(RUN8.recordedAt)}</span>
+              <span><b>{RUN8.complexes}</b> {T('unseenComplexes')} {RUN8.dataset}{locale === 'pl' ? '' : ` ${T('complexes')}`} · {RUN8.seeds} {T('seeds')} · {T('preregistered')}</span>
+              <span>{running ? T('passOrFail') : `${T('status')}: ${startName(RUN8.status, locale)}`} · {T('recorded')} {relativeTime(RUN8.recordedAt, Date.now(), locale)}</span>
             </p>
             <a className="cc-latest" href="#/evidence" data-testid="home-latest">
               <Icon name="replay" />
-              <span>Latest verified: <strong>Imatinib route re-run</strong></span>
+              <span>{T('latestVerified')} <strong>{T('imatinibRerun')}</strong></span>
               <span className={`cc-pill ${IMATINIB.replay === 'MATCH' ? 'cc-pill-ok' : 'cc-pill-warn'}`}>REPLAY {IMATINIB.replay}</span>
             </a>
           </section>
         </div>
-        <LiveView cms={cms} />
+        <LiveView cms={cms} locale={locale} />
       </section>
 
-      <section className="cc-bento" aria-label="Overview">
+      <section className="cc-bento" aria-label={T('overview')}>
         <article className="cc-c cc-drug" data-testid="home-area-drug">
           <div>
-            <h2><Icon name="pill" />Drug Discovery<span className="cc-pill cc-pill-cy">MAIN FOCUS</span></h2>
-            <p className="cc-card-sub">Docking benchmark · Astex Diverse Set, {ASTEX.denominator} known drug–protein complexes</p>
+            <h2><Icon name="pill" />{T('drugDiscovery')}<span className="cc-pill cc-pill-cy">{T('mainFocus')}</span></h2>
+            <p className="cc-card-sub">{T('dockingSub')} {ASTEX.denominator} {T('knownComplexes')}</p>
             <div className="cc-kpis">
               <div className="cc-kpi">
                 <p className="cc-n">{ASTEX.vinaPreregisteredTop1}<small>/{ASTEX.denominator}</small></p>
-                <p className="cc-l">Vina baseline · pre-registered</p>
+                <p className="cc-l">{T('vinaBaseline')}</p>
                 <span className="cc-bar"><i style={{ width: pct(ASTEX.vinaPreregisteredTop1) }} /></span>
               </div>
               <div className="cc-kpi cc-kpi-hi">
                 <p className="cc-n">{ASTEX.gninaTop1}<small>/{ASTEX.denominator}</small></p>
-                <p className="cc-l">GNINA rescoring · development</p>
+                <p className="cc-l">{T('gninaRescoring')}</p>
                 <span className="cc-bar"><i style={{ width: pct(ASTEX.gninaTop1) }} /></span>
               </div>
             </div>
-            <p className="cc-caveat">{ASTEX_TRAINING_OVERLAP.inTrainingLists} of these {ASTEX_TRAINING_OVERLAP.of} complexes are in GNINA&apos;s training data. This is development, not independent validation.</p>
-            <p className="cc-r8"><i className="cc-dot" /><span><b>{RUN8.title}</b> · {RUN8.complexes} unseen complexes · {running ? 'running' : RUN8.status.toLowerCase()}</span></p>
+            <p className="cc-caveat">{ASTEX_TRAINING_OVERLAP.inTrainingLists} {T('overlapOf')} {ASTEX_TRAINING_OVERLAP.of} {T('overlapRest')}</p>
+            <p className="cc-r8"><i className="cc-dot" /><span><b>{startName(RUN8.title, locale)}</b> · {RUN8.complexes} {T('unseenComplexes')}{locale === 'pl' ? '' : ` ${T('complexes')}`} · {running ? T('running') : startName(RUN8.status, locale).toLowerCase()}</span></p>
             <p className="cc-actions">
-              <a className="cc-cta" href="#/drug">Open Drug Discovery <Icon name="arrow" /></a>
-              <a className="cc-link" href="#/discovery-track">Verified example: imatinib</a>
+              <a className="cc-cta" href="#/drug">{T('openDrug')} <Icon name="arrow" /></a>
+              <a className="cc-link" href="#/discovery-track">{T('verifiedExample')}</a>
             </p>
           </div>
-          <a className="cc-dvis" href="#/molecule" aria-label="Open Molecule World">
+          <a className="cc-dvis" href="#/molecule" aria-label={T('openMolecule')}>
             <img src={MOLECULE_IMG} alt="" />
             <span>Molecule World · RDKit 3D</span>
           </a>
         </article>
 
         <article className="cc-c cc-human" data-testid="home-area-biology">
-          <div className="cc-human-img"><img src={BODY_IMG} alt="Human Explorer atlas render" /></div>
-          <div className="cc-human-top"><h2><Icon name="body" />Human Biology</h2><p className="cc-card-sub">Interactive anatomy atlas</p></div>
+          <div className="cc-human-img"><img src={BODY_IMG} alt={T('atlasAlt')} /></div>
+          <div className="cc-human-top"><h2><Icon name="body" />{T('humanBiology')}</h2><p className="cc-card-sub">{T('atlasSub')}</p></div>
           <div className="cc-human-in">
-            <p className="cc-chain"><span className="on">Body</span>→<span>Organ</span>→<span>Tissue</span>→<span>Cell</span></p>
-            <p className="cc-fine">Educational model · no patient data</p>
-            <a className="cc-cta" href="#/human-biology-lab">Explore the body <Icon name="arrow" /></a>
+            <p className="cc-chain"><span className="on">{T('body')}</span>→<span>{T('organ')}</span>→<span>{T('tissue')}</span>→<span>{T('cell')}</span></p>
+            <p className="cc-fine">{T('noPatientData')}</p>
+            <a className="cc-cta" href="#/human-biology-lab">{T('exploreBody')} <Icon name="arrow" /></a>
           </div>
         </article>
 
         <article className="cc-c cc-ev" data-testid="home-area-evidence">
-          <h2><Icon name="replay" />Evidence &amp; Replay<span className={`cc-pill ${IMATINIB.replay === 'MATCH' ? 'cc-pill-ok' : 'cc-pill-warn'}`}>{IMATINIB.replay}</span></h2>
-          <p className="cc-card-sub"><span className="cc-hide-m">Re-running the imatinib retrosynthesis reproduced the recorded route.</span><span className="cc-only-m">Imatinib route re-run matched the record.</span></p>
+          <h2><Icon name="replay" />{T('evidenceReplay')}<span className={`cc-pill ${IMATINIB.replay === 'MATCH' ? 'cc-pill-ok' : 'cc-pill-warn'}`}>{IMATINIB.replay}</span></h2>
+          <p className="cc-card-sub"><span className="cc-hide-m">{T('evidenceLong')}</span><span className="cc-only-m">{T('evidenceShort')}</span></p>
           <div className="cc-trace">
             <b>INPUT</b><HashStrip hash={IMATINIB.inputHash} />
             <b>OUTPUT</b><HashStrip hash={IMATINIB.outputHash} />
@@ -331,49 +337,49 @@ export function StartHero(): React.ReactElement {
           <p className="cc-match" data-testid="home-csrn">
             {CSRN_KEY.generated
               ? <span className="cc-pill cc-pill-ok">CSRN SIGNED · {CSRN_KEY.keyId}</span>
-              : <span className="cc-pill cc-pill-warn">CSRN KEY PENDING</span>}
-            <span className="cc-fine">no lab test yet</span>
+              : <span className="cc-pill cc-pill-warn">{T('csrnPending')}</span>}
+            <span className="cc-fine">{T('noLabTest')}</span>
           </p>
-          <a className="cc-cta" href="#/reviewer"><span className="cc-hide-m">Try to break it in the Reviewer Room</span><span className="cc-only-m">Reviewer Room</span> <Icon name="arrow" /></a>
+          <a className="cc-cta" href="#/reviewer"><span className="cc-hide-m">{T('breakItLong')}</span><span className="cc-only-m">{T('breakItShort')}</span> <Icon name="arrow" /></a>
         </article>
 
         <article className="cc-c cc-cern" data-testid="home-area-physics">
-          <h2><Icon name="atom" />Physics · CERN / CMS<span className="cc-pill cc-pill-mu">REAL DATA</span></h2>
-          <p className="cc-card-sub">{cms.phase === 'ready' ? `${cms.events.toLocaleString('en-US')} real` : 'Real'} Z→μμ events, CMS 2011 open data. Offline analysis.</p>
-          <Histogram cms={cms} />
-          <a className="cc-cta" href="#/physics/cms-z">Open CMS data <Icon name="arrow" /></a>
+          <h2><Icon name="atom" />{T('cernTitle')}<span className="cc-pill cc-pill-mu">{T('realData')}</span></h2>
+          <p className="cc-card-sub">{cms.phase === 'ready' ? `${cms.events.toLocaleString(locale === 'pl' ? 'pl-PL' : 'en-US')} ${T('realEvents')}` : T('realEventsNone')}{T('cmsSub')}</p>
+          <Histogram cms={cms} locale={locale} />
+          <a className="cc-cta" href="#/physics/cms-z">{T('openCms')} <Icon name="arrow" /></a>
         </article>
 
         <article className="cc-c cc-recent" data-testid="home-recent">
-          <h2><Icon name="console" />Recent research<span className="cc-card-meta">Scientific Memory · this browser</span></h2>
+          <h2><Icon name="console" />{T('recentResearch')}<span className="cc-card-meta">{T('recentMeta')}</span></h2>
           {recent.rows.length === 0 ? (
-            <p className="cc-empty" data-testid="home-recent-empty">No runs saved in this browser yet. Ask a question above or open Drug Discovery to start one.</p>
+            <p className="cc-empty" data-testid="home-recent-empty">{T('recentEmpty')}</p>
           ) : (
             <ul className="cc-list">
               {recent.rows.map((r) => (
                 <li key={r.id}>
                   <a href="#/memory">
                     <span className="cc-ic"><Icon name="flask" /></span>
-                    <span><strong>{r.experimentName}</strong><small>{relativeTime(r.createdAt)}</small></span>
+                    <span><strong>{r.experimentName}</strong><small>{relativeTime(r.createdAt, Date.now(), locale)}</small></span>
                     <span className="cc-pill cc-pill-cy">{r.epistemicStatus}</span>
                   </a>
                 </li>
               ))}
             </ul>
           )}
-          {recent.total > 0 && <a className="cc-link" href="#/memory">All {recent.total} saved runs</a>}
+          {recent.total > 0 && <a className="cc-link" href="#/memory">{T('allSaved')} {recent.total}</a>}
         </article>
 
-        <Compute />
+        <Compute locale={locale} />
       </section>
 
       <section className="cc-os" aria-labelledby="cc-os-title" data-testid="home-more">
         <header className="cc-os-head">
-          <h2 id="cc-os-title"><Icon name="grid" />More · Scientific OS</h2>
-          <span>Everything else Genesis can do, grouped</span>
-          <a href="#/more">Open all <Icon name="arrow" /></a>
+          <h2 id="cc-os-title"><Icon name="grid" />{T('moreTitle')}</h2>
+          <span>{T('moreSub')}</span>
+          <a href="#/more">{T('openAll')} <Icon name="arrow" /></a>
         </header>
-        <div className="cc-os-grid">{strip.map((g) => <StripTile key={g.id} group={g} />)}</div>
+        <div className="cc-os-grid">{strip.map((g) => <StripTile key={g.id} group={g} locale={locale} />)}</div>
       </section>
     </div>
   );

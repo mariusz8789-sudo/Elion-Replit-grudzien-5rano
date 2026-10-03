@@ -14,7 +14,7 @@
  */
 
 import { detect as rdkitDetect } from './rdkitAdapter.mjs';
-import { getTool } from '../campaign/toolchain.mjs';
+import { getTool, getToolMetadata } from '../campaign/toolchain.mjs';
 
 export const CAPABILITY_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -22,6 +22,7 @@ export const CAPABILITY_STATUS = {
   EXTERNAL_ENGINE_REQUIRED: 'EXTERNAL_ENGINE_REQUIRED',
   MODEL_NOT_VALID_FOR_DOMAIN: 'MODEL_NOT_VALID_FOR_DOMAIN',
   BLOCKED_BY_RUNTIME: 'BLOCKED_BY_RUNTIME',
+  UNVALIDATED: 'UNVALIDATED',
 };
 
 /**
@@ -132,10 +133,10 @@ const TOOL_BACKED_CAPABILITIES = Object.freeze({
   retrosynthesis: 'aizynthfinder',
 });
 
-function withCanonicalToolStatus(capability) {
+function withCanonicalToolStatus(capability, lookup = getTool) {
   const toolId = TOOL_BACKED_CAPABILITIES[capability.id];
   if (!toolId) return capability;
-  const tool = getTool(toolId);
+  const tool = lookup(toolId);
   if (!tool) return capability;
   if (tool.status === 'AVAILABLE') {
     return {
@@ -147,6 +148,16 @@ function withCanonicalToolStatus(capability) {
       fingerprint: tool.fingerprint,
       executionStatus: tool.executionStatus,
       note: `${tool.engineName}; realny przypadek referencyjny przeszedł. ${tool.assumptions}`,
+    };
+  }
+  if (tool.status === 'UNVALIDATED') {
+    return {
+      ...capability,
+      status: CAPABILITY_STATUS.UNVALIDATED,
+      fingerprint: tool.fingerprint,
+      executionStatus: tool.executionStatus,
+      requires: tool.reason,
+      note: `Kanoniczny toolchain nie uruchomił przypadku referencyjnego podczas pasywnego odczytu. ${tool.assumptions}`,
     };
   }
   return {
@@ -163,7 +174,22 @@ function withCanonicalToolStatus(capability) {
 
 /** Pełna lista zdolności: statyczne + RDKit-owe z LIVE statusem runtime. */
 export function listCapabilities() {
-  return [...CAPABILITIES.map(withCanonicalToolStatus), ...rdkitCapabilityEntries()];
+  return [...CAPABILITIES.map((capability) => withCanonicalToolStatus(capability)), ...rdkitCapabilityEntries()];
+}
+
+/** Public metadata view: never probes RDKit or runs a canonical reference case. */
+export function listCapabilitiesMetadata() {
+  const rdkit = getToolMetadata('rdkit');
+  const rdkitEntries = RDKIT_CAPABILITIES.map((capability) => ({
+    ...capability,
+    status: rdkit?.status === 'AVAILABLE' ? CAPABILITY_STATUS.AVAILABLE : CAPABILITY_STATUS.UNVALIDATED,
+    engine: rdkit?.status === 'AVAILABLE' ? rdkit.engine : undefined,
+    fingerprint: rdkit?.fingerprint ?? null,
+    executionStatus: rdkit?.executionStatus ?? 'NOT_EXECUTED',
+    requires: rdkit?.status === 'AVAILABLE' ? undefined : 'REFERENCE_CASE_NOT_EXECUTED',
+    note: rdkit?.status === 'AVAILABLE' ? 'Realne obliczenie przez RDKit.' : 'Pasywny odczyt metadanych nie uruchamia sondy RDKit.',
+  }));
+  return [...CAPABILITIES.map((capability) => withCanonicalToolStatus(capability, getToolMetadata)), ...rdkitEntries];
 }
 
 export function getCapability(id) {

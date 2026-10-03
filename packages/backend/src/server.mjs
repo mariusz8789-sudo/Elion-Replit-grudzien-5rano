@@ -20,7 +20,8 @@
  */
 
 import http from 'node:http';
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -41,9 +42,13 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { createResearchRunWorker } from './researchRunJobs.mjs';
+import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
+import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
+import { createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
-import { listToolchain } from './campaign/toolchain.mjs';
+import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
@@ -77,6 +82,10 @@ const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
 // ENTITY-3: the one backend adapter to an external reasoning model. The key stays in this process's environment.
 const reasoningProvider = createReasoningProvider(process.env);
+const scientificSandboxImage = process.env.GENESIS_SCIENTIFIC_SANDBOX_IMAGE?.trim() || null;
+const scientificSandboxPort = scientificSandboxImage
+  ? createScientificSandboxPort({ backend: createDockerScientificSandboxBackend() })
+  : null;
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -86,6 +95,8 @@ const DB_PATH = process.env.GENESIS_DB_PATH ?? path.join(__dirname, '../data/gen
 // startowym, i w /api/health — operator nie musi zgadywać, a komisja nie musi
 // wierzyć na słowo. Sama diagnoza NIE blokuje startu: wdrożenie świadomie
 // efemeryczne (demo, :memory:) jest legalne, o ile jest NAZWANE.
+// Single-node content-addressed artifact custody next to the database (GENESIS_ARTIFACT_DIR overrides).
+const artifactStorage = createLocalContentAddressedArtifactStorage({ rootDir: path.resolve(process.env.GENESIS_ARTIFACT_DIR ?? (DB_PATH === ':memory:' ? mkdtempSync(path.join(tmpdir(), 'genesis-artifacts-')) : path.join(path.dirname(DB_PATH), 'artifacts'))) });
 const DB_DURABILITY = classifyDbPath({ dbPath: DB_PATH, appDir: path.resolve(__dirname, '..') });
 let db = null;
 try {
@@ -347,7 +358,7 @@ function handlePersistApi(req, res, url) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
   // ENTITY-3: each claim proposal is one paid call to the external reasoning model — same budget as /api/ask.
-  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/proposals)\/?$/.test(url.pathname) && !limiter.allow(ip)) {
+  if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments(\/[^/]+\/replays)?))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
   }
   const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
@@ -374,7 +385,17 @@ function handlePersistApi(req, res, url) {
       try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
     }
     try {
-      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query, reasoningProvider });
+      const result = await handleApi(db, {
+        method: req.method,
+        pathname: url.pathname,
+        token,
+        body,
+        query,
+        reasoningProvider,
+        artifactStorage,
+        scientificSandboxPort,
+        scientificSandboxImage,
+      });
       return json(res, result.status, result.body);
     } catch (err) {
       log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
@@ -440,7 +461,7 @@ const server = http.createServer(async (req, res) => {
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => {
+      toolchain: listToolchainMetadata().map((tool) => {
         const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
         const remote = effectiveByTool.get(id);
         return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };
@@ -492,6 +513,21 @@ server.listen(PORT, () => {
   if (LEDGER_PERSISTENCE.status === 'REJECTED_IN_MEMORY') log('error', 'knowledge_ledger_snapshot_rejected', { path: LEDGER_PERSISTENCE.path, reason: LEDGER_PERSISTENCE.reason });
   if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
+
+// Jeden lokalny worker opróżnia trwałą kolejkę zadań ResearchRun (research-run:experiment-jobs). To ta sama
+// ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
+// (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
+if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
+  const worker = createResearchRunWorker(db, { artifactStorage });
+  let busy = false;
+  setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      for (let i = 0; i < 8; i += 1) if ((await worker.runOnce()).state === 'IDLE') break;
+    } catch (error) { log('error', 'research_worker_failed', { error: String(error?.message ?? error) }); } finally { busy = false; }
+  }, 500).unref();
+}
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.
 for (const sig of ['SIGTERM', 'SIGINT']) {

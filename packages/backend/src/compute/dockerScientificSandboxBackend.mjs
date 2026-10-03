@@ -36,6 +36,8 @@ function defaultProcessRunner(executable, args, { stdin = '', timeoutMs = 10_000
       clearTimeout(timer);
       resolve({ exitCode, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8'), timedOut, outputLimitExceeded });
     });
+    // A child that exits without reading stdin (docker refusing early) breaks the pipe; its exit is reported through 'close'.
+    child.stdin.on('error', () => {});
     child.stdin.end(stdin);
   });
 }

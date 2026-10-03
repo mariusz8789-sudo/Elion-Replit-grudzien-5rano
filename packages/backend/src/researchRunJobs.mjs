@@ -30,11 +30,13 @@ export async function enqueueResearchExperiment(db, projectId, runId, { hypothes
   if (!view) return { ok: false, status: 'NOT_FOUND' };
   // A cancelled or dead-lettered job is history, never revived: the next request opens a new generation.
   const backend = jobBackendFor(db);
+  // The ordinal counts COMPLETED experiments (those with a next step), so a frozen-but-unfinished one resumes under its own slot.
+  const ordinal = view.experiments.filter((e) => e.next).length;
   let generation = 0;
-  let identity = researchJobIdentity(runId, view.experiments.length, hypothesisId, generation);
+  let identity = researchJobIdentity(runId, ordinal, hypothesisId, generation);
   for (let prior = backend.get(identity.jobId); prior && ['CANCELLED', 'DEAD_LETTER', 'FAILED'].includes(prior.state); prior = backend.get(identity.jobId)) {
     generation += 1;
-    identity = researchJobIdentity(runId, view.experiments.length, hypothesisId, generation);
+    identity = researchJobIdentity(runId, ordinal, hypothesisId, generation);
   }
   const queued = await queueFor(db).enqueue({
     ...identity,

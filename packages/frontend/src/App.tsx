@@ -1211,7 +1211,7 @@ export default function App() {
 
     return (
       <div className="app">
-        <TopBar title={profileDashboard ? 'Twój pulpit' : 'Dashboard'} onSearch={() => setSearchOpen(true)} ask={false} />
+        <TopBar title={profileDashboard ? 'Twój pulpit' : 'Start'} onSearch={() => setSearchOpen(true)} ask={false} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)

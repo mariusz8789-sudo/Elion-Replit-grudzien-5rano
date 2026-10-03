@@ -44,15 +44,20 @@ export type Live =
 
 export interface LiveLabel { text: string; tone: 'ok' | 'warn' | 'bad' | 'muted'; detail?: string }
 
-export function liveLabel(engine: HomeEngine, live: Live): LiveLabel {
+/** Polish chip words for `pl`; every other language keeps the English ones (no unchecked translation). */
+const CHIP_PL = { checking: 'sprawdzam…', unreachable: 'serwer nie odpowiada', notReported: 'brak zgłoszenia', blocked: 'ZABLOKOWANY', available: 'DOSTĘPNY' } as const;
+const CHIP_EN = { checking: 'checking…', unreachable: 'server unreachable', notReported: 'not reported', blocked: 'BLOCKED', available: 'AVAILABLE' } as const;
+
+export function liveLabel(engine: HomeEngine, live: Live, locale: 'pl' | 'en' = 'en'): LiveLabel {
+  const w = locale === 'pl' ? CHIP_PL : CHIP_EN;
   if (engine.toolId === null) return { text: engine.note ?? 'Not a registered runtime', tone: 'muted' };
-  if (live.phase === 'checking') return { text: 'checking…', tone: 'muted' };
-  if (live.phase === 'unreachable') return { text: 'server unreachable', tone: 'muted' };
+  if (live.phase === 'checking') return { text: w.checking, tone: 'muted' };
+  if (live.phase === 'unreachable') return { text: w.unreachable, tone: 'muted' };
   const self = live.self.get(engine.toolId);
-  if (!self) return { text: 'not reported', tone: 'muted' };
-  if (!self.runtimeAvailableNow) return { text: 'BLOCKED', tone: 'warn', detail: self.statement };
+  if (!self) return { text: w.notReported, tone: 'muted' };
+  if (!self.runtimeAvailableNow) return { text: w.blocked, tone: 'warn', detail: self.statement };
   const version = live.byId.get(engine.toolId)?.version;
-  return { text: `AVAILABLE${version ? ` · ${version}` : ''}`, tone: 'ok', detail: self.statement };
+  return { text: `${w.available}${version ? ` · ${version}` : ''}`, tone: 'ok', detail: self.statement };
 }
 
 export function HomeEngines(): React.ReactElement {

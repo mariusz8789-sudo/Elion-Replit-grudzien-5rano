@@ -10402,3 +10402,15 @@ Note the shape of the evidence here, because it is the honest summary of all six
 **Why the ruling is right on the science.** 6X18 holds no non-peptidic component at all: its orthosteric site is occupied by the 30-residue GLP-1 peptide. A box drawn around a peptide is not a small-molecule pocket, and a score produced in it would be a number without a meaning. Among all six structures examined in D-154 and D-156, none is simultaneously clean, active-state and small-molecule-bound: the two with a small molecule in the pocket (7S15, 5VEW) are heavily mutated thermostabilised constructs without G protein, and the two clean active-state complexes (6X18, 6B3J) hold a peptide. That is a property of the published structural record for this receptor, not of the selection rule.
 
 **What this leaves open.** Genesis still has no GLP-1R docking target. Closing that needs a separate decision that establishes where a small-molecule site is, and it is not closed by reinterpreting this one.
+
+## D-160 — Run 9 phase D selects C1(0.7) by seal A's rule, and seal B freezes everything before the final run
+
+**Date:** 2026-10-03. **Requested by:** Mariusz, 2026-10-03 02:24Z: development phase only, on the Run 8 poses, no docking, no access to the 300 fresh cases, select the ranker exactly as preregistered, prove determinism, freeze the configuration, prepare seal B, STOP before Run 9.
+
+**Numbering.** D-153 to D-159 are taken or reserved by the GLP-1R line; this is the next free number.
+
+**Decision.** `scripts/run9-phase-d.py` reproduces Run 8 first (C0 204/308, Vina 202/308, identical to the published numbers, or it stops) and then applies seal A's nine candidates and its mechanical selection rule (`scripts/run9_rankers.py::select`). The winner is **C1(0.7)**, rank-sum consensus with GNINA weight 0.7, **217/308, +4.22 pp over C0**, above the +2.0 pp floor. Two full runs with different worker counts were byte-identical. Seal B (`docs/evidence/run9/run9-seal-b.json`) pins the selection, the phase D result, the 300-case list, the Zenodo 18366081 files, the similarity thirds, every Run 9 script, the Run 8 pinned code, the GNINA binary and the library versions; `scripts/run9-final.py` refuses to run if any of them changes.
+
+**What this is not.** Not a result. +4.22 pp is in-sample: the candidates were measured on the set they were chosen on. Seal A's prediction for the fresh set (+1.5 to +4.0 pp, most likely PARTIAL) and every threshold are unchanged. C1(0.7) uses GNINA, so it cannot enter the product whatever Run 9 shows until GNINA's licensing is resolved. The one gap filled before sealing is how to cut seal A's similarity thirds (15 cases have no value and are reported apart); it is descriptive and decides nothing.
+
+**Evidence.** `docs/evidence/run9/run9-phase-d-report.md`, `docs/evidence/run9/run9-phase-d-result.json`, `docs/evidence/run9/run9-seal-b.json`, `docs/evidence/run9/run9-similarity-bins.json`; tests `scripts/test-run9-rankers.py`. Run 9 itself runs only on the owner's explicit GO.

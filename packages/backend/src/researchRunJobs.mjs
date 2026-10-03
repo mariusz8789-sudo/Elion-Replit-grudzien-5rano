@@ -8,6 +8,7 @@ import { controlResearchRun, getResearchRun } from './researchRun.mjs';
 import { advanceResearchRun, MAX_ADVANCE_STEPS } from './researchRunAdvance.mjs';
 import { databaseFile } from './compute/heavyJobThread.mjs';
 import { CHILD_RESULT_MARKER, runIsolatedProcess } from './compute/isolatedProcess.mjs';
+import { knowledgeLedgerPersistenceStatus } from './knowledgeApi.mjs';
 
 /**
  * Asynchronous front door to the ONE ResearchRun execution path. A queued job owns no scientific state:
@@ -149,14 +150,18 @@ async function runInChild(db, kind, request, { signal, processTimeoutMs }) {
  * otherwise (":memory:" tests, injected tools) the same function runs in-process, as before.
  */
 export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now, artifactStorage = null, isolation = 'auto', processTimeoutMs } = {}) {
-  const inChild = isolation !== 'in-process' && Boolean(databaseFile(db)) && !tools && !proposeEvidence && !now;
+  const isolatable = isolation !== 'in-process' && Boolean(databaseFile(db)) && !tools && !proposeEvidence && !now;
   return Object.freeze({
     async execute(request, { signal } = {}) {
+      // The child proposes Evidence on the ledger too. That ledger is shared between processes only when SQLite is its
+      // source of truth; with a process-local ledger a child's proposal would exist nowhere the parent can see it.
+      const ledger = isolatable ? knowledgeLedgerPersistenceStatus() : null;
+      const inChild = isolatable && ledger.store === 'SQLITE' && ledger.status !== 'REJECTED_IN_MEMORY';
       const { projectId, hypothesisId, userId, maxSteps } = request.input ?? {};
       const advancing = request.capabilityId === RESEARCH_ADVANCE_CAPABILITY;
       let result;
       if (inChild) {
-        result = await runInChild(db, advancing ? 'advance' : 'experiment', { projectId, runId: request.researchRunId, hypothesisId: hypothesisId ?? null, userId: userId ?? null, maxSteps }, { signal, processTimeoutMs });
+        result = await runInChild(db, advancing ? 'advance' : 'experiment', { projectId, runId: request.researchRunId, hypothesisId: hypothesisId ?? null, userId: userId ?? null, maxSteps, ledgerPath: ledger.path }, { signal, processTimeoutMs });
         if (result.status === 'CHILD_KILLED' || result.status === 'CHILD_FAILED') {
           return { record: { status: result.reason === 'CHILD_TIMEOUT' ? ENGINE_EXECUTION_STATUS.TIMEOUT : ENGINE_EXECUTION_STATUS.FAILED, failureCode: result.reason } };
         }

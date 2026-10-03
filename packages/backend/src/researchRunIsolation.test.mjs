@@ -6,6 +6,7 @@ import { setInterval, clearInterval } from 'node:timers';
 import test from 'node:test';
 import { handleApi } from './api.mjs';
 import { openDatabase } from './store.mjs';
+import { openKnowledgeLedgerPersistence, listProposals } from './knowledgeApi.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { detect as pyscfDetect } from './compute/qmAdapter.mjs';
 import { runIsolatedProcess } from './compute/isolatedProcess.mjs';
@@ -88,6 +89,8 @@ const provider = (plan) => ({
 async function setup(plan, email) {
   const dir = mkdtempSync(path.join(tmpdir(), 'genesis-iso-'));
   const db = openDatabase(path.join(dir, 'genesis.db'));
+  // The server binds the evidence ledger to the database; only then do jobs run in a child process (see createResearchRunExecutionPort).
+  openKnowledgeLedgerPersistence(path.join(dir, 'evidence-ledger.json'), { db });
   const call = (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {}, reasoningProvider: provider(plan) });
   const owner = call('POST', '/api/auth/register', { body: { email, password: 'password123' } }).body;
   const project = call('POST', '/api/projects', { token: owner.token, body: { name: 'Isolation proof' } }).body.project;
@@ -127,6 +130,8 @@ test('a real PySCF job that outlives its timeout is killed (not ignored); the re
     assert.equal(run.experiments[0].execution.status, 'EXECUTED');
     assert.equal(run.experiments[0].falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
     assert.equal(run.researchState.chain.ok, true);
+    // The Evidence proposed inside the child process is on the ledger this process reads (a process-local ledger would lose it).
+    assert.ok(listProposals().proposals.some((p) => p.proposalId === run.experiments[0].evidence.evidenceProposalId), 'the child-made Evidence proposal is visible to the parent');
   } finally { clearInterval(ticker); ctx.db.close(); }
 });
 

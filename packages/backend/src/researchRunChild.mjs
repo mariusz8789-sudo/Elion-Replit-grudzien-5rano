@@ -6,6 +6,7 @@
  * stdin: one JSON request. stdout: the line CHILD_RESULT_MARKER + JSON.
  */
 import { openDatabase } from './store.mjs';
+import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { executeResearchExperiment } from './researchRunExecution.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { CHILD_RESULT_MARKER } from './compute/isolatedProcess.mjs';
@@ -19,6 +20,8 @@ async function readStdin() {
 
 const request = JSON.parse(await readStdin());
 const db = openDatabase(request.dbPath);
+// Same evidence ledger as the server: SQLite is its source of truth, so an Evidence proposal made here is the one the parent reads.
+openKnowledgeLedgerPersistence(request.ledgerPath ?? null, { db });
 try {
   const full = request.kind === 'advance'
     ? await advanceResearchRun(db, request.projectId, request.runId, { maxSteps: request.maxSteps, userId: request.userId ?? null })

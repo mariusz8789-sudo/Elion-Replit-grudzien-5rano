@@ -16,13 +16,13 @@ function createFixture(db) {
 }
 
 describe('ResearchRun durable operator control', () => {
-  test('pause → restart → resume → cancel uses one run and one verified event chain', () => {
+  test('pause → restart → resume → cancel uses one run and one verified event chain', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'genesis-run-control-'));
     const dbPath = path.join(dir, 'genesis.sqlite');
     try {
       let db = openDatabase(dbPath);
       let fixture = createFixture(db);
-      const paused = fixture.api('POST', `${fixture.base}/${fixture.runId}/pause`, {
+      const paused = await fixture.api('POST', `${fixture.base}/${fixture.runId}/pause`, {
         token: fixture.owner.token,
         body: { reason: 'Operator budget review' },
       });
@@ -36,11 +36,11 @@ describe('ResearchRun durable operator control', () => {
       fixture = { ...fixture, api: (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {} }) };
       const recovered = fixture.api('GET', `${fixture.base}/${fixture.runId}`, { token: fixture.owner.token });
       assert.equal(recovered.body.researchRun.run.status, 'PAUSED');
-      const resumed = fixture.api('POST', `${fixture.base}/${fixture.runId}/resume`, { token: fixture.owner.token });
+      const resumed = await fixture.api('POST', `${fixture.base}/${fixture.runId}/resume`, { token: fixture.owner.token });
       assert.equal(resumed.status, 200);
       assert.equal(resumed.body.researchRun.run.status, 'RUNNING');
       assert.equal(resumed.body.researchRun.nextStep, 'PROPOSE_PLAN');
-      const cancelled = fixture.api('POST', `${fixture.base}/${fixture.runId}/cancel`, { token: fixture.owner.token });
+      const cancelled = await fixture.api('POST', `${fixture.base}/${fixture.runId}/cancel`, { token: fixture.owner.token });
       assert.equal(cancelled.status, 200);
       assert.equal(cancelled.body.researchRun.run.status, 'CANCELLED');
       assert.equal(cancelled.body.researchRun.nextStep, 'NONE');
@@ -49,7 +49,7 @@ describe('ResearchRun durable operator control', () => {
         ['PAUSE', 'RESUME', 'CANCEL'],
       );
       assert.equal(cancelled.body.researchRun.researchState.chain.ok, true);
-      assert.equal(fixture.api('POST', `${fixture.base}/${fixture.runId}/resume`, { token: fixture.owner.token }).status, 409);
+      assert.equal((await fixture.api('POST', `${fixture.base}/${fixture.runId}/resume`, { token: fixture.owner.token })).status, 409);
       db.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });

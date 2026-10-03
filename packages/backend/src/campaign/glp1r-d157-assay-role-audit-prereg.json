@@ -1,0 +1,44 @@
+{
+  "decisionId": "D-157",
+  "title": "GLP-1R assay roles — the 16 assays that had no description, classified by the UNCHANGED D-152 rule as a new audit layer",
+  "question": "Now that ChEMBL 37 descriptions exist for the 16 assays D-152 filed as UNKNOWN / BLOCKED_BY_DATA_ACCESS, which role does the frozen rule give each of them, and what would that change?",
+  "frozenAt": "2026-10-03T03:00:00Z",
+  "author": "Claude, for Mariusz (mariusz8789-sudo)",
+  "authorisation": "Mariusz, 2026-10-03 02:35Z: use the 16 missing assay descriptions to update the assay-role classification; do not change D-151/D-152 historically; if the new information changes the interpretation of any assayId, record it as a new audit/decision layer, never by rewriting sealed evidence.",
+
+  "orderOfWork": "Committed alone, before any of the 16 descriptions is passed through the classifier. The author has seen ONE of the 16 descriptions (CHEMBL1246709) while inspecting the file format; no classifier has been run on any of them.",
+
+  "theRule": {
+    "classifier": "packages/backend/src/campaign/glp1rEndpointScope.mjs::classifyAssayRoleScoped — the D-152 rule, imported, not copied, not edited",
+    "inputConstruction": "Exactly as scripts/glp1r-d152-endpoint-scope.mjs builds it: record = { assayType, description, bao, format } from the assay record; actionType = the A1 action type recorded for that assay, or '' when none.",
+    "fieldMapping": "ChEMBL's assay_type -> assayType, description -> description, bao_format -> bao, bao_label -> format. These are the same four fields the D-151/D-152 transcriptions carry.",
+    "noRuleChange": "No regular expression, threshold, role, ordering or ambiguity rule is touched. If any of the 16 descriptions does not fit the rule cleanly, the rule's own answer — including UNKNOWN / CONFLICTING_SIGNALS — is the answer."
+  },
+
+  "sourceData": {
+    "files": "docs/evidence/source-data/glp1r-2026-10-03/chembl/assay/<id>.json, fetched from www.ebi.ac.uk ChEMBL 37 (release 2026-05-01) on 2026-10-03 by the ingest thread, raw",
+    "verification": "Every file's sha256 is recomputed and compared with SOURCES.json before use; a mismatch aborts.",
+    "expectedSet": ["CHEMBL1246709", "CHEMBL1648248", "CHEMBL1924543", "CHEMBL1925821", "CHEMBL1937452", "CHEMBL829559", "CHEMBL874550", "CHEMBL884187", "CHEMBL911100", "CHEMBL923946", "CHEMBL937687", "CHEMBL972348", "CHEMBL972349", "CHEMBL977343", "CHEMBL991608", "CHEMBL991609"],
+    "expectedSetIsD152sBlockedList": "Identical to glp1r-d152-endpoint-scope.sealed.json -> assays.blockedByDataAccess. If the fetched set differs, the run aborts with ASSAY_SET_MISMATCH."
+  },
+
+  "whatIsReported": [
+    "per assay: the new role, the rule's reason, the endpoint sentences it read, species and heterologous-system flags, row count in the combined set, standard types",
+    "per role: how many of the 16 went where",
+    "the counterfactual totals of the FUNCTIONAL_AGONISM arm if these 16 were added to D-152's 320 rows / 206 compounds — REPORTED, not adopted"
+  ],
+
+  "whatIsNotChanged": {
+    "D151_D152": "Their sealed artefacts and per-assay role files are not edited. This layer sits beside them.",
+    "D153": "D-153's sealed MODEL_GATE_PASS on the 320-row arm stands exactly as sealed. If this audit moves rows into FUNCTIONAL_AGONISM, the enlarged arm is NOT validated here: re-validating on it needs its own preregistered decision, written before that run. Changing the training set of a sealed model after the fact is what this clause forbids.",
+    "gate": "glp1r-validation-gate.json is not read for any purpose other than confirming it is unchanged."
+  },
+
+  "allowedOutcomes": {
+    "NO_INTERPRETATION_CHANGE": "All 16 stay outside FUNCTIONAL_AGONISM (UNKNOWN for a new reason, OTHER_FUNCTIONAL or BINDING_AFFINITY). D-152's functional arm is unaffected.",
+    "INTERPRETATION_CHANGED": "One or more of the 16 classify as FUNCTIONAL_AGONISM. The audit records which, and how many rows and compounds that would add, and says plainly that D-153 is not re-run under this decision.",
+    "BLOCKED_BY_SOURCE_DATA": "A description is missing or a hash does not match."
+  },
+
+  "boundary": "A classification of 16 assays with a rule frozen on 2026-09-30. No model is trained, no gate is read for thresholds, no candidate is touched, nothing sealed is edited."
+}

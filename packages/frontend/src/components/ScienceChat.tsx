@@ -436,7 +436,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     }).catch(() => { if (!cancelled) setResearchAccessLoading(false); });
     return () => { cancelled = true; };
   }, [activeKnowledgeProject]);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
+  // The engine chooser starts at its heading; only conversations follow the newest turn.
+  useEffect(() => { scrollRef.current?.scrollTo({ top: turns.length ? scrollRef.current.scrollHeight : 0 }); }, [turns, open]);
 
   const appendProjectKnowledgeSources = async (query: string) => {
     const token = getToken();

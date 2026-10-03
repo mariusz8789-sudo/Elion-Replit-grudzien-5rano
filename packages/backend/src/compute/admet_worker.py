@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """ADMET + Toxicity worker — REAL predictions via ADMET-AI (Swanson et al. 2024,
-Bioinformatics, MIT license). Chemprop D-MPNN ensembles trained on the
-Therapeutics Data Commons (TDC) ADMET Benchmark Group; pretrained weights are
+Bioinformatics). The ADMET-AI code/package is MIT-licensed. Chemprop D-MPNN
+ensembles are trained on Therapeutics Data Commons (TDC) datasets whose
+individual licences require separate commercial review; pretrained weights are
 bundled in the installed package (no network at inference). Short-lived
 subprocess. Protocol: argv[1] is a JSON request {"cmd": ...}. Output is one
 JSON line: {"ok": true, ...} or {"ok": false, "error": ...}. No admet-ai ->

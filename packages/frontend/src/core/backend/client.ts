@@ -591,6 +591,42 @@ export function replayResearchExperiment(
   return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/replays`, { token });
 }
 
+export interface GeneratedScientificAnalysis {
+  analysisId: string;
+  proposal: {
+    analysisId: string; objective: string; methodSummary: string; expectedOutputKeys: string[];
+    sourceHash: string; environmentFingerprint: string; status: 'PROPOSED'; epistemicStatus: 'NOT_EVIDENCE';
+  } | null;
+  execution: {
+    analysisId: string; status: string; failureCode?: string | null; output?: Record<string, unknown>;
+    outputHash?: string | null; sourceHash: string; environmentFingerprint: string;
+    stdoutHash?: string | null; stderrHash?: string | null; epistemicStatus: 'NOT_EVIDENCE';
+    evidenceEligibility?: 'REQUIRES_SEPARATE_REVIEW';
+  } | null;
+  replays: Array<{
+    analysisId: string; verdict: 'MATCH' | 'DRIFT'; outputHash: string | null;
+    sourceHash: string; environmentFingerprint: string; epistemicStatus: 'NOT_EVIDENCE';
+  }>;
+}
+
+export function listGeneratedScientificAnalyses(
+  token: string, projectId: string, researchRunId: string,
+): Promise<ApiResult<{ generatedAnalyses: GeneratedScientificAnalysis[] }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses`, { token });
+}
+
+export function generateScientificAnalysis(
+  token: string, projectId: string, researchRunId: string, objective: string,
+): Promise<ApiResult<{ deduped: boolean; execution: NonNullable<GeneratedScientificAnalysis['execution']>; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses`, { token, body: { objective } });
+}
+
+export function replayGeneratedScientificAnalysis(
+  token: string, projectId: string, researchRunId: string, analysisId: string,
+): Promise<ApiResult<{ status: 'REPLAYED'; verdict: 'MATCH' | 'DRIFT'; replay: GeneratedScientificAnalysis['replays'][number]; researchRun: ResearchRunView }>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/generated-analyses/${encodeURIComponent(analysisId)}/replay`, { token });
+}
+
 export type ComputeValue = string | number | boolean;
 
 export interface ComputeRun {

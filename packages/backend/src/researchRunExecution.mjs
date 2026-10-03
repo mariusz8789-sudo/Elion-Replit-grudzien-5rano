@@ -28,10 +28,11 @@
  * losing or repeating it.
  */
 import { canonicalJson, fnv1a, sha256Hex } from './determinism.mjs';
+import { buildDecisionTrace } from './decisionTrace.mjs';
 import { appendServerResearchStateEvent } from './agentRun.mjs';
 import { deriveVerdict, preregisterExperiment, sealExperimentSession } from './experimentMemory.mjs';
 import { proposeStructuredEvidence } from './knowledgeApi.mjs';
-import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION } from './researchRun.mjs';
+import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION, researchSteeringOf } from './researchRun.mjs';
 import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 import { getScienceRun, listScienceRunVerifications, saveScienceRun } from './store.mjs';
 import { sha256Hex16 } from './provenance.mjs';
@@ -69,6 +70,12 @@ export function parsePredictions(raw, executor) {
     if (!PREDICTION_OPERATORS.includes(p.operator)) { reject('operator_invalid'); continue; }
     if (type === 'number' && !(typeof p.value === 'number' && Number.isFinite(p.value))) { reject('value_not_a_number'); continue; }
     if (type === 'boolean' && (typeof p.value !== 'boolean' || !['==', '!='].includes(p.operator))) { reject('boolean_needs_==_or_!='); continue; }
+    const hasExpected = p.expectedValue !== undefined;
+    const hasTolerance = p.surpriseTolerance !== undefined;
+    if (hasExpected !== hasTolerance) { reject('surprise_rule_requires_expected_value_and_tolerance'); continue; }
+    if (hasExpected && type !== 'number') { reject('surprise_rule_requires_numeric_observable'); continue; }
+    if (hasExpected && !(typeof p.expectedValue === 'number' && Number.isFinite(p.expectedValue))) { reject('surprise_expected_value_invalid'); continue; }
+    if (hasTolerance && !(typeof p.surpriseTolerance === 'number' && Number.isFinite(p.surpriseTolerance) && p.surpriseTolerance > 0)) { reject('surprise_tolerance_invalid'); continue; }
     if (criteria.length >= MAX_PREDICTIONS) { reject('over_limit'); continue; }
     criteria.push({
       id: `c${criteria.length}-${observable}`,
@@ -79,6 +86,13 @@ export function parsePredictions(raw, executor) {
       critical: p.critical !== false,
       threshold: typeof p.value === 'number' ? p.value : null,
       evidence: 'MODEL_ESTIMATE',
+      ...(hasExpected ? {
+        surpriseRule: {
+          kind: 'ABSOLUTE_ERROR_EXCEEDS',
+          expectedValue: p.expectedValue,
+          tolerance: p.surpriseTolerance,
+        },
+      } : {}),
     });
   }
   return { criteria, rejected };
@@ -116,21 +130,60 @@ export function judgeCriteria(criteria, execution, executor) {
     const observed = execution.status === 'EXECUTED' ? execution.output?.[c.observable] : undefined;
     const typed = observed !== undefined && typeof observed === executor.observables[c.observable];
     const met = typed ? compare(observed, c.operator, c.value) : null;
-    return { id: c.id, label: c.label, observable: c.observable, operator: c.operator, value: c.value, critical: c.critical, observed: typed ? observed : null, status: met === null ? 'UNRESOLVED' : met ? 'MET' : 'NOT_MET' };
+    return {
+      id: c.id, label: c.label, observable: c.observable, operator: c.operator, value: c.value,
+      critical: c.critical, observed: typed ? observed : null,
+      status: met === null ? 'UNRESOLVED' : met ? 'MET' : 'NOT_MET',
+      ...(c.surpriseRule ? { surpriseRule: c.surpriseRule } : {}),
+    };
+  });
+}
+
+/** A deterministic anomaly derived only from a frozen numeric expectation and a real observation. */
+export function deriveSurpriseItems(criteria) {
+  return criteria.flatMap((criterion) => {
+    const rule = criterion.surpriseRule;
+    if (rule?.kind !== 'ABSOLUTE_ERROR_EXCEEDS' || typeof criterion.observed !== 'number') return [];
+    const absoluteError = Math.abs(criterion.observed - rule.expectedValue);
+    if (!(absoluteError > rule.tolerance)) return [];
+    return [{
+      criterionId: criterion.id,
+      observable: criterion.observable,
+      rule,
+      observedValue: criterion.observed,
+      absoluteError,
+    }];
   });
 }
 
 /* ---------------- the next experiment (a fixed rule, no model) ---------------- */
 
-export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null) {
+export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, executors, replayVerdict = null, steering = {}, lastHypothesisId = null) {
   if (replayVerdict && replayVerdict !== REPLAY_VERDICT.MATCH && replayVerdict !== REPLAY_NOT_APPLICABLE) {
     return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
   }
-  for (const h of plan?.hypotheses ?? []) {
+  const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const challengeIsAdmissible = lastVerdict === PROTOCOL_VERDICT.SUPPORTED && replayVerdict === REPLAY_VERDICT.MATCH;
+  const priority = (hypothesis) => {
+    if (hypothesis.hypothesisId === steering.focusedHypothesisId) return 0;
+    if (challengeIsAdmissible && hypothesis.challengesHypothesisId === lastHypothesisId) return 1;
+    return 2;
+  };
+  const hypotheses = [...(plan?.hypotheses ?? [])].sort((a, b) => priority(a) - priority(b));
+  for (const h of hypotheses) {
     if (doneHypothesisIds.has(h.hypothesisId)) continue;
+    if (abandoned.has(h.hypothesisId)) continue;
     const x = executabilityOf(h, executors);
     if (x.executable) {
-      return { action: 'EXECUTE_NEXT_HYPOTHESIS', hypothesisId: h.hypothesisId, engineId: x.engineId, reason: 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN' };
+      const isFocused = h.hypothesisId === steering.focusedHypothesisId;
+      const isChallenge = challengeIsAdmissible && h.challengesHypothesisId === lastHypothesisId;
+      return {
+        action: 'EXECUTE_NEXT_HYPOTHESIS',
+        hypothesisId: h.hypothesisId,
+        engineId: x.engineId,
+        reason: isFocused ? 'USER_FOCUSED_HYPOTHESIS' : isChallenge ? 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN' : 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN',
+        ...(isChallenge ? { challengesHypothesisId: lastHypothesisId } : {}),
+      };
     }
   }
   return {
@@ -291,6 +344,26 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
       scope: VERDICT_SCOPE,
     });
     if (!falsified.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: falsified.error };
+    const surpriseItems = execution.status === 'EXECUTED' ? deriveSurpriseItems(results) : [];
+    if (surpriseItems.length) {
+      const surprised = appendServerResearchStateEvent(db, runId, 'SURPRISE_DETECTED', {
+        contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+        researchRunId: runId,
+        experimentId: frozen.experimentId,
+        hypothesisId: frozen.hypothesisId,
+        protocolId: frozen.protocolId,
+        predictionFingerprint: frozen.predictionFingerprint,
+        preregistrationFingerprint: frozen.preregistrationFingerprint,
+        sealRecordId: sealed.record.id,
+        scienceRunId,
+        outputHash: execution.outputHash,
+        status: 'DETECTED',
+        epistemicStatus: 'NOT_EVIDENCE',
+        items: surpriseItems,
+        scope: 'Deterministic computational anomaly under the frozen expectation and tolerance. It is not scientific evidence or a statement of truth.',
+      });
+      if (!surprised.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: surprised.error };
+    }
     return { ok: true, deduped: false };
   });
 }
@@ -329,6 +402,62 @@ function firstReplayOf(db, x) {
   return v.ok ? replaySummary(v.verification) : { verdict: REPLAY_VERDICT.REPLAY_UNSUPPORTED, reason: v.error };
 }
 
+function reasonCode(value) {
+  return String(value ?? 'NOT_SELECTED').toUpperCase().replace(/[^A-Z0-9_:-]/g, '_').slice(0, 160);
+}
+
+function decisionEvidenceRefs(experiment, evidence, replay) {
+  const candidates = [
+    { id: `preregistration:${experiment.frozen.preregistrationRecordId}`, contentHash: experiment.frozen.preregistrationFingerprint },
+    { id: `execution:${experiment.execution.scienceRunId ?? experiment.experimentId}`, contentHash: experiment.execution.outputHash },
+    { id: `falsification:${experiment.falsification.sealRecordId}`, contentHash: experiment.falsification.outputHash },
+    { id: `evidence:${evidence.evidenceProposalId}`, contentHash: evidence.evidenceContentHash },
+    { id: `replay:${replay?.verificationId ?? experiment.experimentId}`, contentHash: replay?.replayOutputHash },
+  ];
+  return candidates.filter((reference, index, all) => (
+    typeof reference.id === 'string'
+    && typeof reference.contentHash === 'string'
+    && reference.contentHash.length > 0
+    && all.findIndex((candidate) => candidate.id === reference.id) === index
+  ));
+}
+
+export function nextExperimentDecisionTrace({
+  researchRunId, experiment, plan, completedHypothesisIds, proposal, executors, replay, evidence, steering = {},
+}) {
+  const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const alternatives = (plan?.hypotheses ?? []).map((hypothesis) => {
+    if (proposal.action === 'EXECUTE_NEXT_HYPOTHESIS' && proposal.hypothesisId === hypothesis.hypothesisId) {
+      return { id: hypothesis.hypothesisId, status: 'SELECTED' };
+    }
+    if (completedHypothesisIds.has(hypothesis.hypothesisId)) {
+      return { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: 'ALREADY_EXECUTED' };
+    }
+    if (abandoned.has(hypothesis.hypothesisId)) {
+      return { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: 'HYPOTHESIS_ABANDONED' };
+    }
+    const executable = executabilityOf(hypothesis, executors);
+    return executable.executable
+      ? { id: hypothesis.hypothesisId, status: 'NOT_EVALUATED' }
+      : { id: hypothesis.hypothesisId, status: 'REJECTED', rejectedReasonCode: reasonCode(executable.reason) };
+  });
+  if (proposal.action === 'HUMAN_REVIEW') alternatives.push({ id: 'HUMAN_REVIEW', status: 'SELECTED' });
+  const replayVerdict = replay?.verdict ?? 'UNAVAILABLE';
+  return buildDecisionTrace({
+    decisionId: `decision:${researchRunId}:${experiment.experimentId}:next`,
+    summary: `NEXT_EXPERIMENT ${proposal.action}; protocol verdict ${experiment.falsification.verdict}; replay ${replayVerdict}; selection ${proposal.reason}.`,
+    evidenceRefs: decisionEvidenceRefs(experiment, evidence, replay),
+    alternatives,
+    selectedCapability: proposal.engineId ?? proposal.action,
+    inputClassification: 'COMPUTATIONAL_RESULT',
+    outputClassification: proposal.action === 'EXECUTE_NEXT_HYPOTHESIS' ? 'PROPOSED' : 'REQUIRES_HUMAN_APPROVAL',
+    solverId: 'GENESIS_FIXED_RULE',
+    solverVersion: 'research-run-next-experiment@1',
+    ...(proposal.action === 'HUMAN_REVIEW' ? { blockedReason: proposal.reason } : {}),
+    suggestedNextExperiment: proposal.hypothesisId ?? proposal.action,
+  });
+}
+
 function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, proposeEvidence) {
   const before = getResearchRun(db, projectId, runId);
   const x = before.experiments.find((e) => e.experimentId === experimentId);
@@ -361,12 +490,32 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
     }
     if (!now.next) {
       const done = new Set(current.experiments.map((e) => e.frozen.hypothesisId));
+      const steering = researchSteeringOf(current.researchState);
+      const proposal = nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, steering, now.frozen.hypothesisId);
+      const evidence = now.evidence ?? {
+        evidenceProposalId: proposed.proposalId,
+        evidenceContentHash: proposed.record?.contentHash ?? null,
+        status: 'PROPOSED',
+        publication: 'REQUIRES_HUMAN_APPROVAL',
+      };
+      const decisionTrace = nextExperimentDecisionTrace({
+        researchRunId: runId,
+        experiment: { ...now, evidence },
+        plan: current.plan,
+        completedHypothesisIds: done,
+        proposal,
+        executors: tools.executors,
+        replay,
+        evidence,
+        steering,
+      });
       const next = appendServerResearchStateEvent(db, runId, 'NEXT_EXPERIMENT', {
         contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
         researchRunId: runId,
         experimentId,
         replay,
-        proposal: nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict),
+        proposal,
+        decisionTrace,
         decidedBy: 'GENESIS_FIXED_RULE',
         status: 'PROPOSED',
       });
@@ -397,11 +546,14 @@ export function executeResearchExperiment(db, projectId, runId, {
     experimentId = open.experimentId;
   } else {
     const done = new Set(view.experiments.map((e) => e.frozen.hypothesisId));
+    const steering = researchSteeringOf(view.researchState);
+    const abandoned = new Set(steering.abandonedHypothesisIds);
     let chosen = null;
     const skipped = [];
     if (hypothesisId) {
       const h = view.plan.hypotheses.find((x) => x.hypothesisId === hypothesisId);
       if (!h) return { ok: false, status: 'HYPOTHESIS_NOT_FOUND' };
+      if (abandoned.has(hypothesisId)) return { ok: false, status: 'EXPERIMENT_NOT_EXECUTABLE', reason: 'HYPOTHESIS_ABANDONED' };
       if (done.has(hypothesisId)) {
         return { ok: true, status: 'ALREADY_EXECUTED', deduped: true, experimentId: experimentIdOf(runId, hypothesisId), researchRun: view };
       }
@@ -409,8 +561,10 @@ export function executeResearchExperiment(db, projectId, runId, {
       if (!x.executable) return { ok: false, status: x.blocked ? 'BLOCKED' : 'EXPERIMENT_NOT_EXECUTABLE', engineId: x.engineId ?? null, reason: x.reason };
       chosen = { h, x };
     } else {
-      for (const h of view.plan.hypotheses) {
+      const ordered = [...view.plan.hypotheses].sort((a, b) => (a.hypothesisId === steering.focusedHypothesisId ? -1 : b.hypothesisId === steering.focusedHypothesisId ? 1 : 0));
+      for (const h of ordered) {
         if (done.has(h.hypothesisId)) continue;
+        if (abandoned.has(h.hypothesisId)) { skipped.push({ hypothesisId: h.hypothesisId, reason: 'HYPOTHESIS_ABANDONED' }); continue; }
         const x = executabilityOf(h, tools.executors);
         if (x.executable) { chosen = { h, x }; break; }
         skipped.push({ hypothesisId: h.hypothesisId, reason: x.reason });

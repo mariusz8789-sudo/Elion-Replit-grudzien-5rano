@@ -24,6 +24,8 @@ import { listAgentRuns, readResearchState } from './agentRun.mjs';
 import { readKnowledgeRegistry, KNOWLEDGE_REGISTRY_DOMAIN } from './knowledgeRegistry.mjs';
 import { verifyExperimentRecordChain } from './store.mjs';
 import { LAB_EVENT } from './campaign/labClosedLoop.mjs';
+import { buildBytProjection } from './bytProjection.mjs';
+import { buildVirtualLabDossier, VIRTUAL_EVENT } from './campaign/virtualLabClosedLoop.mjs';
 
 export const COGNITIVE_STATE_SCHEMA_VERSION = 1;
 const TERMINAL_CAMPAIGN = new Set(['completed', 'cancelled', 'failed', 'rejected', 'stopped']);
@@ -40,9 +42,10 @@ function researchRuns(db, projectId) {
     .filter((run) => run.domain !== KNOWLEDGE_REGISTRY_DOMAIN)
     .map((run) => {
       const { events, chain } = readResearchState(db, run.id);
-      if (!chain.ok) return { run, integrity: { ok: false, reason: 'STATE_INTEGRITY_FAILURE', brokenAt: chain.brokenAt, detail: chain.reason } };
+      if (!chain.ok) return { run, researchStateEvents: [], integrity: { ok: false, reason: 'STATE_INTEGRITY_FAILURE', brokenAt: chain.brokenAt, detail: chain.reason } };
       return {
         run,
+        researchStateEvents: events,
         integrity: { ok: true, head: chain.head, events: events.length },
         problem: lastPayload(events, 'PROBLEM_FORMALIZED'),
         hypotheses: lastPayload(events, 'HYPOTHESES_GENERATED'),
@@ -96,6 +99,25 @@ function awaiting(db, projectId) {
   return [...requests.entries()].filter(([key]) => !observed.has(key)).map(([, value]) => value);
 }
 
+/** Rebuild Flight Control from canonical append-only campaign events; no state is stored here. */
+function scienceFlightControlOf(db, projectId) {
+  const rows = db.prepare(
+    `SELECT e.campaign_id, e.payload_json FROM campaign_events e JOIN campaigns c ON c.id = e.campaign_id
+     WHERE c.project_id = ? AND e.type = ? ORDER BY e.rowid ASC`,
+  ).all(projectId, VIRTUAL_EVENT.PLANNED);
+  const keys = new Map();
+  for (const row of rows) {
+    const payload = P(row.payload_json, {});
+    if (typeof payload.candidateId !== 'string' || !payload.candidateId) continue;
+    keys.set(`${row.campaign_id}\u0000${payload.candidateId}`, { campaignId: row.campaign_id, candidateId: payload.candidateId });
+  }
+  return [...keys.values()].flatMap(({ campaignId, candidateId }) => {
+    const dossier = buildVirtualLabDossier(db, campaignId, candidateId);
+    if (!dossier.ok) return [];
+    return dossier.dossier.flightControl.flights.map((flight) => ({ campaignId, candidateId, ...flight }));
+  });
+}
+
 /**
  * Rebuilds the cognitive state of one project. `selfModel` is the ENTITY-1 self model (or null when it
  * could not be built, in which case blocked capabilities are UNKNOWN, not "none").
@@ -120,6 +142,7 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
 
   const engineByCapability = new Map((selfModel?.engines ?? []).map((e) => [e.capabilityId, e]));
   const awaitingList = awaiting(db, projectId);
+  const flightControl = scienceFlightControlOf(db, projectId);
   const proposedNextActions = [
     ...openRuns.filter((r) => r.nextExperiment?.continue === true).map((r) => ({
       status: 'PROPOSED', kind: 'CONTINUE_RESEARCH', runId: r.run.id, reason: r.nextExperiment.reason ?? null, from: 'research-state',
@@ -146,11 +169,14 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     ...db.prepare("SELECT id, created_at FROM science_runs WHERE project_id = ? AND status = 'ok' ORDER BY created_at DESC LIMIT ?").all(projectId, RECENT_LIMIT).map((r) => ({ ref: `science_run:${r.id}`, at: r.created_at })),
   ].sort((a, b) => b.at - a.at).slice(0, RECENT_LIMIT).map((r) => r.ref);
 
+  const byt = buildBytProjection({ runs, registry, selfModel, flightControl });
+
   return {
     schemaVersion: COGNITIVE_STATE_SCHEMA_VERSION,
     projectId,
     generatedAt: now().toISOString(),
     view: 'MATERIALIZED_VIEW',
+    byt,
     currentGoals: [
       ...campaigns.filter((c) => !TERMINAL_CAMPAIGN.has(c.status)).map((c) => ({ kind: 'CAMPAIGN', id: c.id, goal: c.objective, domain: c.domain, status: c.status })),
       ...openRuns.map((r) => ({ kind: 'RESEARCH_RUN', id: r.run.id, goal: r.run.goal, domain: r.run.domain, status: r.run.status })),

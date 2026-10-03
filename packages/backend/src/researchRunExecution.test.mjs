@@ -9,10 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { openDatabase, getScienceRun, listExperimentRecords, verifyExperimentRecordChain } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
+import { buildDecisionTrace } from './decisionTrace.mjs';
 import { listProposals } from './knowledgeApi.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
-import { executeResearchExperiment, VERDICT_SCOPE } from './researchRunExecution.mjs';
+import { deriveSurpriseItems, executeResearchExperiment, parsePredictions, VERDICT_SCOPE } from './researchRunExecution.mjs';
 import { DEFAULT_RESEARCH_TOOLS } from './researchRunEngines.mjs';
+import { createComputeAdmission } from './compute/computeAdmission.mjs';
 
 /**
  * R1-b — one proposed experiment goes plan → frozen prediction → real engine → falsification →
@@ -65,9 +67,9 @@ function fakeProvider(answer) {
   };
 }
 
-async function planned(email) {
+async function planned(email, plan = PLAN) {
   const db = openDatabase();
-  const call = (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {}, reasoningProvider: fakeProvider(PLAN) });
+  const call = (method, pathname, { token, body } = {}) => handleApi(db, { method, pathname, token, body, query: {}, reasoningProvider: fakeProvider(plan) });
   const owner = call('POST', '/api/auth/register', { body: { email, password: 'password123' } }).body;
   const project = call('POST', '/api/projects', { token: owner.token, body: { name: email } }).body.project;
   const base = `/api/projects/${project.id}`;
@@ -80,6 +82,93 @@ async function planned(email) {
 const types = (rr) => rr.researchState.events.map((e) => e.type);
 
 describe('R1-b research run execution', () => {
+  test('surprise rules are numeric, complete and frozen independently from falsification criteria', () => {
+    const executor = { observables: { value: 'number', flag: 'boolean' } };
+    const parsed = parsePredictions([
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10, surpriseTolerance: 2, critical: true },
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10 },
+      { observable: 'flag', operator: '==', value: true, expectedValue: 1, surpriseTolerance: 1 },
+      { observable: 'value', operator: '<', value: 20, expectedValue: 10, surpriseTolerance: 0 },
+    ], executor);
+    assert.equal(parsed.criteria.length, 1);
+    assert.deepEqual(parsed.criteria[0].surpriseRule, { kind: 'ABSOLUTE_ERROR_EXCEEDS', expectedValue: 10, tolerance: 2 });
+    assert.deepEqual(parsed.rejected.map((item) => item.reason), [
+      'surprise_rule_requires_expected_value_and_tolerance',
+      'surprise_rule_requires_numeric_observable',
+      'surprise_tolerance_invalid',
+    ]);
+    assert.deepEqual(deriveSurpriseItems([{ ...parsed.criteria[0], observed: 12 }]), []);
+    assert.deepEqual(deriveSurpriseItems([{ ...parsed.criteria[0], observed: 12.01 }]), [{
+      criterionId: 'c0-value', observable: 'value', rule: parsed.criteria[0].surpriseRule,
+      observedValue: 12.01, absoluteError: 2.01,
+    }]);
+  });
+
+  test('a supported result prioritizes and executes its preregistered self-falsification challenge', needsRdkit, async () => {
+    const challengePlan = {
+      subProblems: [{ question: 'Can the bounded descriptor claim survive its null challenge?' }],
+      hypotheses: [
+        {
+          claim: 'Aspirin has molecular weight below 200 Da.',
+          claimType: 'PREDICTION',
+          falsificationProposal: 'RDKit molecular weight is at least 200 Da.',
+          experimentProposal: rdkitExperiment(ASPIRIN, [{ observable: 'molWt', operator: '<', value: 200, critical: true }]),
+        },
+        {
+          claim: 'Null challenge: aspirin has molecular weight at least 200 Da.',
+          claimType: 'PREDICTION',
+          falsificationProposal: 'RDKit molecular weight is below 200 Da.',
+          challengesHypothesisIndex: 0,
+          experimentProposal: rdkitExperiment(ASPIRIN, [{ observable: 'molWt', operator: '>=', value: 200, critical: true }]),
+        },
+      ],
+      nextActions: ['Require human review after the challenge.'],
+    };
+    const { call, owner, base, runId, plan } = await planned('rb-self-falsification@lab.org', challengePlan);
+    const first = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.equal(first.body.experiment.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
+    assert.equal(plan.hypotheses[1].challengesHypothesisId, plan.hypotheses[0].hypothesisId);
+    assert.deepEqual(first.body.experiment.next.proposal, {
+      action: 'EXECUTE_NEXT_HYPOTHESIS',
+      hypothesisId: plan.hypotheses[1].hypothesisId,
+      engineId: 'rdkit',
+      reason: 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN',
+      challengesHypothesisId: plan.hypotheses[0].hypothesisId,
+    });
+    assert.match(first.body.experiment.next.decisionTrace.summary, /SELF_FALSIFICATION_CHALLENGE_IN_PLAN/);
+    assert.ok(first.body.experiment.next.decisionTrace.evidenceRefs.some((ref) => ref.id.startsWith('execution:')));
+
+    const challenge = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
+    assert.equal(challenge.status, 201, JSON.stringify(challenge.body));
+    assert.equal(challenge.body.experiment.frozen.hypothesisId, plan.hypotheses[1].hypothesisId);
+    assert.equal(challenge.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
+    assert.equal(challenge.body.experiment.next.replay.verdict, 'MATCH');
+    assert.equal(challenge.body.researchRun.researchState.chain.ok, true);
+  });
+
+  test('authenticated ResearchRun execution uses the shared heavy-compute admission before mutating the run', needsRdkit, async () => {
+    const { db, owner, base, runId } = await planned('rb-admission@lab.org');
+    const admission = createComputeAdmission({ limit: 2, maxActive: 1 });
+    const held = admission.acquire('another-principal');
+    assert.equal(held.ok, true);
+
+    const blocked = handleApi(db, {
+      method: 'POST',
+      pathname: `${base}/research-runs/${runId}/experiments`,
+      token: owner.token,
+      body: {},
+      query: {},
+      computeAdmission: admission,
+    });
+    assert.equal(blocked.status, 503);
+    assert.equal(blocked.body.error, 'compute_busy');
+    assert.equal(handleApi(db, {
+      method: 'GET', pathname: `${base}/research-runs/${runId}`, token: owner.token, body: null, query: {},
+    }).body.researchRun.experiments.length, 0);
+    held.release();
+  });
+
   test('plan → frozen prediction → RDKit → falsification → evidence PROPOSED → next experiment, three times', needsRdkit, async () => {
     const { db, call, owner, project, base, runId, plan } = await planned('rb1@lab.org');
     assert.deepEqual(plan.hypotheses.map((h) => h.experimentProposal.decision), ['PROPOSED', 'PROPOSED', 'HUMAN_APPROVAL_REQUIRED', 'PROPOSED']);
@@ -146,6 +235,15 @@ describe('R1-b research run execution', () => {
     // The next experiment comes from a fixed rule over the plan.
     assert.equal(x.next.decidedBy, 'GENESIS_FIXED_RULE');
     assert.deepEqual([x.next.proposal.action, x.next.proposal.hypothesisId], ['EXECUTE_NEXT_HYPOTHESIS', plan.hypotheses[1].hypothesisId]);
+    const trace = x.next.decisionTrace;
+    assert.equal(trace.contractVersion, '1.0.0');
+    assert.equal(trace.solverId, 'GENESIS_FIXED_RULE');
+    assert.equal(trace.suggestedNextExperiment, plan.hypotheses[1].hypothesisId);
+    assert.equal(trace.alternatives.find((alternative) => alternative.status === 'SELECTED').id, plan.hypotheses[1].hypothesisId);
+    assert.ok(trace.evidenceRefs.some((reference) => reference.id === `execution:${e.scienceRunId}` && reference.contentHash === e.outputHash));
+    assert.ok(trace.evidenceRefs.some((reference) => reference.id === `evidence:${x.evidence.evidenceProposalId}`));
+    const { traceFingerprint, ...traceInput } = trace;
+    assert.equal(buildDecisionTrace(traceInput).traceFingerprint, traceFingerprint);
     assert.equal(rr.nextStep, 'AWAITING_EXECUTION');
 
     // R1-c: the engine output is a canonical Scientific Run, replayed once by the existing verifier before
@@ -180,6 +278,9 @@ describe('R1-b research run execution', () => {
     assert.equal(nothing.body.error, 'NOTHING_TO_REPLAY');
     assert.equal(third.body.experiment.falsification.verdict, 'INCONCLUSIVE');
     assert.equal(third.body.experiment.next.proposal.action, 'HUMAN_REVIEW');
+    assert.equal(third.body.experiment.next.decisionTrace.outputClassification, 'REQUIRES_HUMAN_APPROVAL');
+    assert.equal(third.body.experiment.next.decisionTrace.alternatives.find((alternative) => alternative.status === 'SELECTED').id, 'HUMAN_REVIEW');
+    assert.equal(third.body.experiment.next.decisionTrace.blockedReason, third.body.experiment.next.proposal.reason);
     assert.equal(third.body.researchRun.nextStep, 'AWAITING_HUMAN_REVIEW');
 
     const none = await call('POST', `${base}/research-runs/${runId}/experiments`, { token: owner.token });
@@ -336,6 +437,12 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       const x = executed.body.experiment;
       assert.equal(x.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
       assert.equal(x.execution.engine.version, RDKIT.version);
+      const bytBeforeRestart = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.equal(bytBeforeRestart.view, 'DERIVED_FROM_CANONICAL_STATE');
+      assert.equal(bytBeforeRestart.predictionLedger.length, 1);
+      assert.equal(bytBeforeRestart.predictionLedger[0].researchRunId, id);
+      assert.equal(bytBeforeRestart.predictionLedger[0].replay.verdict, 'MATCH');
+      assert.equal(bytBeforeRestart.necropolis.length, 0);
 
       // After a restart: the recovered run is identical, event for event, and says what comes next.
       const before = (await server.api('GET', `${base}/research-runs/${id}`, { token: owner.token })).body.researchRun;
@@ -349,6 +456,11 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       assert.equal(after.experiments.length, 1);
       assert.equal(after.experiments[0].execution.outputHash, x.execution.outputHash);
       assert.equal(after.nextStep, 'AWAITING_EXECUTION');
+      const bytAfterRestart = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.deepEqual(bytAfterRestart.predictionLedger, bytBeforeRestart.predictionLedger);
+      assert.deepEqual(bytAfterRestart.calibration, bytBeforeRestart.calibration);
+      assert.deepEqual(bytAfterRestart.necropolis, bytBeforeRestart.necropolis);
+      assert.equal(bytAfterRestart.continuity.brokenRuns, 0);
       const proposals = (await server.api('GET', '/api/knowledge/proposals')).body.proposals;
       assert.equal(proposals.filter((p) => p.proposalId === x.evidence.evidenceProposalId && p.status === 'pending').length, 1);
       // R1-c after the restart: the replay recorded in the chain still stands, a fresh replay of the
@@ -366,6 +478,11 @@ describe('R1-b definition of done (real server, real database, real RDKit, resta
       const next = await server.api('POST', `${base}/research-runs/${id}/experiments`, { token: owner.token });
       assert.equal(next.status, 201);
       assert.equal(next.body.experiment.falsification.verdict, 'FALSIFIED_WITHIN_PROTOCOL');
+      const bytWithFalsification = (await server.api('GET', `${base}/cognitive-state`, { token: owner.token })).body.cognitiveState.byt;
+      assert.equal(bytWithFalsification.predictionLedger.length, 2);
+      assert.equal(bytWithFalsification.necropolis.length, 1);
+      assert.equal(bytWithFalsification.necropolis[0].hypothesisId, next.body.experiment.frozen.hypothesisId);
+      assert.equal(bytWithFalsification.necropolis[0].reopening, 'REQUIRES_NEW_EVIDENCE_AND_HUMAN_APPROVAL');
     } finally {
       await server?.kill();
       await new Promise((r) => model.close(r));

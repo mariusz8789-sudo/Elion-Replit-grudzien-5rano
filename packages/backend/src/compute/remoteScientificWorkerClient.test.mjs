@@ -304,8 +304,12 @@ describe('real chem-light worker (PySCF + Biopython) over HTTP', () => {
     assert.equal(worker.calls.length, calls, 'no invalid request reached an engine');
   });
 
-  test('the reference-case route is unchanged and still unauthenticated', { skip: !PROT_ON && skipReason('Biopython') }, async () => {
-    const res = await fetch(`${worker.url}/engines/biopython/reference-case`, { method: 'POST', body: '{}' });
+  test('the reference-case route requires the same service token as execution', { skip: !PROT_ON && skipReason('Biopython') }, async () => {
+    const denied = await fetch(`${worker.url}/engines/biopython/reference-case`, { method: 'POST', body: '{}' });
+    assert.equal(denied.status, 401);
+    const res = await fetch(`${worker.url}/engines/biopython/reference-case`, {
+      method: 'POST', headers: { authorization: `Bearer ${TEST_WORKER_TOKEN}` }, body: '{}',
+    });
     const body = await res.json();
     assert.equal(res.status, 200);
     assert.equal(body.toolId, 'biopython');

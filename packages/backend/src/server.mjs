@@ -42,8 +42,10 @@ import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
+import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
+import { createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
-import { listToolchain } from './campaign/toolchain.mjs';
+import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
@@ -77,6 +79,10 @@ const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
 // ENTITY-3: the one backend adapter to an external reasoning model. The key stays in this process's environment.
 const reasoningProvider = createReasoningProvider(process.env);
+const scientificSandboxImage = process.env.GENESIS_SCIENTIFIC_SANDBOX_IMAGE?.trim() || null;
+const scientificSandboxPort = scientificSandboxImage
+  ? createScientificSandboxPort({ backend: createDockerScientificSandboxBackend() })
+  : null;
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -374,7 +380,16 @@ function handlePersistApi(req, res, url) {
       try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
     }
     try {
-      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query, reasoningProvider });
+      const result = await handleApi(db, {
+        method: req.method,
+        pathname: url.pathname,
+        token,
+        body,
+        query,
+        reasoningProvider,
+        scientificSandboxPort,
+        scientificSandboxImage,
+      });
       return json(res, result.status, result.body);
     } catch (err) {
       log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
@@ -440,7 +455,7 @@ const server = http.createServer(async (req, res) => {
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => {
+      toolchain: listToolchainMetadata().map((tool) => {
         const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
         const remote = effectiveByTool.get(id);
         return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };

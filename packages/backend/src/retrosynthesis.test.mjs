@@ -8,6 +8,7 @@ import { openDatabase, createUser, createProject, listScienceRuns } from './stor
 import { hashPassword } from './auth.mjs';
 import { createCampaign, listEvents, addCandidate } from './campaign/persistence.mjs';
 import * as retro from './compute/retroAdapter.mjs';
+import { RETROSYNTHESIS_USE_PURPOSE } from './compute/retrosynthesisAdmission.mjs';
 import { planCandidateRoute, retrosynthesisOutputHash, routeArtefactFromRun } from './campaign/retrosynthesis.mjs';
 import { getTool } from './campaign/toolchain.mjs';
 import { getCapability } from './compute/capabilities.mjs';
@@ -100,20 +101,17 @@ describe('the registry tells the truth about it', () => {
 });
 
 describe('a route search is an experiment like any other', () => {
-  test('a blocked engine writes STAGE_BLOCKED with the missing files and persists NO run', () => {
-    if (ENGINE_READY) return;
+  test('the product path blocks on unverified model/template/stock licences and persists NO run', () => {
     const ctx = seed();
     const r = planCandidateRoute(ctx.db, { projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: ctx.candidateId });
     assert.equal(r.ok, false);
-    assert.equal(r.error, 'BLOCKED_BY_RUNTIME');
+    assert.equal(r.error, 'BLOCKED_BY_LICENSE');
+    assert.equal(r.reason, 'RETRO_MODEL_TEMPLATE_OR_STOCK_LICENSE_UNVERIFIED');
     assert.equal(listScienceRuns(ctx.db, ctx.campaignId).length, 0);
     const blocked = listEvents(ctx.db, ctx.campaignId).filter((e) => e.type === 'STAGE_BLOCKED');
     assert.equal(blocked.length, 1);
     assert.equal(blocked[0].payload.stage, 'retrosynthesis');
-    assert.equal(blocked[0].payload.blocker, 'BLOCKED_BY_RUNTIME');
-    // Three legitimate blocked states: no interpreter, no package, or no model data. Any other reason
-    // would mean the adapter invented one.
-    assert.match(blocked[0].payload.reason, /MODEL_FILES_MISSING|AIZYNTHFINDER_NOT_INSTALLED|not usable/i);
+    assert.equal(blocked[0].payload.blocker, 'BLOCKED_BY_LICENSE');
   });
 
   test('a candidate that does not exist is refused before anything is written', () => {
@@ -167,7 +165,7 @@ describe('with the engine’s model data present (skipped without it)', () => {
     assert.ok(reference.startingMaterials.length > 0);
 
     const ctx = seed();
-    const r = planCandidateRoute(ctx.db, { projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: ctx.candidateId, options: { iterationLimit: 50, maxRoutes: 3 } });
+    const r = planCandidateRoute(ctx.db, { projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: ctx.candidateId, options: { iterationLimit: 50, maxRoutes: 3 }, usePurpose: RETROSYNTHESIS_USE_PURPOSE.TECHNICAL_VALIDATION });
     assert.equal(r.ok, true);
     assert.equal(r.run.capability, 'retrosynthesis-route-search');
     assert.equal(r.run.evidenceClass, 'MODEL_ESTIMATE');

@@ -339,3 +339,23 @@
   .cc-hide-m { display: none; }
 }
 @media (max-width: 720px) { .cc-card-meta { display: none; } }
+
+
+/* Reference-led finish: fine cyan glass edges and readable instrument captions. */
+.cc { --cc-faint: #9aabbe; --cc-line: rgba(135, 206, 232, .2); }
+.cc .cc-c { background: radial-gradient(ellipse at 100% 0, #31789114, transparent 65%), var(--cc-card); }
+.cc .cc-live { border-color: #84cfe54d; }
+.cc :is(.cc-pill, .cc-l, .cc-k, .cc-live-tl, .cc-live-cap, .cc-fine, .cc-dvis span) { font-size: 12px; letter-spacing: .035em; }
+.cc .cc-live-sw button { min-height: 44px; }
+.cc .cc-live-cap { bottom: 66px; line-height: 1.5; }
+.cc .cc-cmd { min-height: 58px; }
+.cc .cc-cmd button { width: 44px; height: 44px; flex-shrink: 0; }
+.cc :is(.cc-cta, .cc-link) { display: inline-flex; align-items: center; min-height: 44px; }
+.cc .cc-latest { min-height: 44px; }
+@media (min-width: 1600px) { .cc { max-width: 1520px; padding: 24px 40px 40px; } .cc-hero { gap: 28px; } .cc-title { font-size: 48px; } }
+@media (max-width: 720px) {
+  .cc .cc-l { font-size: 11px; line-height: 1.5; }
+  .cc .cc-latest > span:nth-child(2) { white-space: normal; overflow: visible; }
+  .cc .cc-latest .cc-pill { font-size: 11px; }
+  .cc .cc-k { flex-wrap: wrap; line-height: 1.5; }
+}

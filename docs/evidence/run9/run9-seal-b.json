@@ -1,0 +1,109 @@
+{
+ "fingerprintRecipe": "sha256(json.dumps(seal, sort_keys=True))",
+ "seal": {
+  "caseList": {
+   "cases": 300,
+   "file": "docs/evidence/run9/seal-b-draft/fresh-set-cases.json",
+   "sha256": "92bf6db77c89e4aaf405838554735a3fdf9824e6fe9fa0d8ab0921bb0fedad89"
+  },
+  "drawManifest": {
+   "file": "docs/evidence/run9/seal-b-draft/seal-b-draft-manifest.json",
+   "sha256": "2f067c48ae63db4e7914b24bf364c6714a6affcc7d744bc30847bffa422b8450"
+  },
+  "freshData": {
+   "annotations": {
+    "file": "docs/evidence/source-data/zenodo-14794785-runs-n-poses/v18366081/annotations.csv",
+    "sha256": "259aa0a8f5ea6008d4036886f1ad5ae255689c223eb839fa1a2e7cb54adae609"
+   },
+   "download": "docs/evidence/source-data/zenodo-14794785-runs-n-poses/DOWNLOAD.json",
+   "downloadSha256": "8c26c05a387d2276ea0e4ad935df4e27884fb2a513971da4283e19476596f3ed",
+   "groundTruthTarGzSha256": "1b9f778bc3150f246c0f37b48215588c48369e39e6603c2b15975f0ec1b18d51",
+   "zenodoConcept": "14794785",
+   "zenodoRecord": "18366081"
+  },
+  "gninaBinarySha256": "c7e40b0258ff55941b0a0716d28ec9661b2917d809a04bcbab20c20a13b4beb9",
+  "kind": "run9-seal-b",
+  "phaseD": {
+   "determinism": "two independent runs with different worker counts, byte-identical output",
+   "path": "docs/evidence/run9/run9-phase-d-result.json",
+   "run8Reproduction": {
+    "C0": {
+     "phaseD": 204,
+     "run8Published": 204
+    },
+    "VINA": {
+     "phaseD": 202,
+     "run8Published": 202
+    }
+   },
+   "selection": {
+    "floorPp": 2.0,
+    "gainOverC0pp": 4.2208,
+    "selected": "C1(0.7)",
+    "winner": "C1(0.7)",
+    "winnerTop1": 217
+   },
+   "sha256": "0c0757459d294940d18a73d843eea6f7b5c991e884d63d355a769004d99bd02e",
+   "top1": {
+    "C0": 204,
+    "C1(0.3)": 216,
+    "C1(0.5)": 215,
+    "C1(0.7)": 217,
+    "C2(0.3)": 214,
+    "C2(0.5)": 213,
+    "C2(0.7)": 215,
+    "C3(0.3)": 185,
+    "C3(0.5)": 187,
+    "C3(0.7)": 191,
+    "C4": 167,
+    "VINA": 202
+   }
+  },
+  "pinnedFileSha256": {
+   "packages/backend/src/compute/dock_worker.py": "859d07316c92f853c95cdb0df1ee4049e35c8e4166012065e293cc2b3aa7398e",
+   "scripts/astex-gnina-rescore.py": "ac6bfa53f3011b6776515661771be4416b5a03d108b22578d276b534ffa5d352",
+   "scripts/astex-multiseed-ensemble.py": "9fa303b0dd252ae2ed92a0455068e9223b312dfcdf5d5b1ae65db53bda911137",
+   "scripts/astex-phase2-redock.py": "1c9c76b516f8b57e42bdedcd7b4e577a84d5f3e8866bc501c90dbc30a333a416",
+   "scripts/astex_phase2_prep.py": "8cf5e3dc2ce92d0ff05808896782efc527e89678548a5873f0c036e5203b8d67",
+   "scripts/posebusters-unseen-benchmark.py": "64ce487d7be33e8f54359aa302c504289242aec2c9bf49aaedfe8d9e5838f693",
+   "scripts/run9-final.py": "ee866ad322eacea7c8a7bad3d20f816f919c71211ecb47b53bc3223033596950",
+   "scripts/run9-phase-d.py": "7093f8bde1a2d2bb2622896789ae6c685d15a6a466121094cfe377c1fe74101a",
+   "scripts/run9_fresh_inputs.py": "fb47735b8feb08e9d926417f4bbc22d451c4cd7e03ca9316ba4e5eef4ad8abe5",
+   "scripts/run9_gnina_receptor.py": "b22be0aaf510b351f79d46c0e25340ef119b7bd9f1431a4fcf77848468cd67bf",
+   "scripts/run9_rankers.py": "ce787e81367c27506ce0489c7006d9373df2d78f111b5844a1342daa174e5e75",
+   "scripts/run9_similarity_bins.py": "9c191dfbf2c1fc11d73b433092b33d070baf26ebc3c6461fec1359808a098b0e",
+   "scripts/test-run9-rankers.py": "545bd61c480196a8c7b90d30af7f28d439c692bc398cd13b6fd2f836d7114c17"
+  },
+  "rule": "Run 9 phase F runs once, only on the owner's explicit GO, with scripts/run9-final.py, which refuses if anything above has changed.",
+  "run8Inputs": {
+   "prereg": {
+    "file": "docs/evidence/posebusters-unseen-benchmark-prereg.json",
+    "sha256": "ba55b3fa11606de24676b847cfc882f75feba6620bd0382deb5a8d1a15a66b63"
+   },
+   "result": {
+    "file": "docs/evidence/posebusters-run8-unseen-benchmark.json",
+    "sha256": "cf81ec27c05a9a507b70cdbf74e10a59c9c81155981e3d5be9ed8af920dbc584"
+   }
+  },
+  "sealA": {
+   "path": "docs/evidence/run9/run9-ranking-prereg.json",
+   "protocolFingerprintSha256": "7f9981173699aa917fa3299c904c23a8749a656b0720200a48caee0d2c017762",
+   "sha256": "8e854537647033c3f25ed56e39ee693710403554fac77b231f0f37857bc83c30"
+  },
+  "selectedRanker": "C1(0.7)",
+  "similarityBins": {
+   "file": "docs/evidence/run9/run9-similarity-bins.json",
+   "sha256": "a228e4cc480f0c9ea1fec81f93b0e7fa7215a33ef6f55a58f3a2bbef399e8894"
+  },
+  "unchangedFromSealA": "candidates, weights, selection rule, +2.0 pp floor, fresh-set rule, 300-case size, success definition, verdict thresholds and prediction",
+  "versions": {
+   "biotite": "1.6.0",
+   "meeko": "0.8.0",
+   "posebusters": "0.6.5",
+   "python": "3.11.15",
+   "rdkit": "2026.03.6",
+   "vina": "1.2.7"
+  }
+ },
+ "sealFingerprintSha256": "036497a2935614eb247be9d5b15c0d8b5c1173318645c60a8eab968b467906a0"
+}

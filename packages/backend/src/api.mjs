@@ -85,6 +85,9 @@ import { executeResearchExperiment, listResearchExperimentReplays, replayResearc
 import { controlResearchRunExecution, enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
+import {
+  compareModelToMeasurement, exportLabPackage, ingestLabObservation, prepareLabRequest, proposeLabEvidence, readLabLoop, reviewLabObservation, verifyLabPackage,
+} from './researchRunLab.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { renderVerifyReportHtml, verifySubmittedRecord } from './genesisVerify.mjs';
@@ -1107,6 +1110,49 @@ export function handleApi(db, ctx) {
             custody: custody.ok ? { status: 'VERIFIED', artifactRef: custody.artifactRef } : { status: custody.status, artifactRef: null },
           });
         })();
+      }
+      // Candidate -> laboratory loop (researchRunLab.mjs): request, UNSIGNED package, REAL MEASUREMENT intake, human review,
+      // model-vs-measurement comparison, Evidence PROPOSAL. Every step is an event on this run's own verified chain.
+      if (seg[4] === 'lab') {
+        const labStatus = { NOT_FOUND: 404, EXPERIMENT_NOT_FOUND: 404, REQUEST_NOT_FOUND: 404, OBSERVATION_NOT_FOUND: 404, STATE_INTEGRITY_FAILURE: 409, BLOCKED: 409, RUN_NOT_ACTIVE: 409, OBSERVATION_NOT_ACCEPTED: 409, EXTERNAL_OBSERVATION_CONFLICT: 409, MODEL_VALUE_CHANGED: 409, REVIEWER_CANNOT_BE_INGESTER: 409 };
+        const labFail = (r) => ({ status: labStatus[r.status] ?? 422, body: { error: r.status, reason: r.reason ?? null, ...(r.blockers ? { blockers: r.blockers } : {}), ...(r.declaredSha256 ? { declaredSha256: r.declaredSha256, computedSha256: r.computedSha256 } : {}) } });
+        if (seg.length === 5 && method === 'GET') {
+          const r = readLabLoop(db, projectId, current.researchRunId);
+          return r.ok ? ok({ lab: r.lab }) : labFail(r);
+        }
+        if (seg.length === 6 && seg[5] === 'package' && method === 'POST') {
+          return (async () => ok({ verification: await verifyLabPackage(body?.package) }))();
+        }
+        if (method !== 'POST' && !(method === 'GET' && seg.length === 8 && seg[5] === 'requests' && seg[7] === 'package')) return err(405, 'method_not_allowed');
+        if (method === 'GET') {
+          return (async () => {
+            const r = await exportLabPackage(db, projectId, current.researchRunId, seg[6], { artifactStorage: ctx.artifactStorage ?? null });
+            return r.ok ? ok({ package: r.package }) : labFail(r);
+          })();
+        }
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (seg.length === 6 && seg[5] === 'requests') {
+          const r = prepareLabRequest(db, projectId, current.researchRunId, { ...body, requestedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, request: r.request }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 6 && seg[5] === 'observations') {
+          const r = ingestLabObservation(db, projectId, current.researchRunId, { requestId: body?.requestId, observation: body?.observation, ingestedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, observation: r.observation }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 7 && seg[5] === 'observations') {
+          // The reviewer is always the authenticated person, never a name taken from the body.
+          const r = reviewLabObservation(db, projectId, current.researchRunId, { observationId: seg[6], verdict: body?.verdict, reviewerId: user.id, note: body?.note });
+          return r.ok ? ok({ deduped: r.deduped, review: r.review }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 8 && seg[5] === 'observations' && seg[7] === 'compare') {
+          const r = compareModelToMeasurement(db, projectId, current.researchRunId, { observationId: seg[6], comparedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, comparison: r.comparison }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 8 && seg[5] === 'observations' && seg[7] === 'evidence') {
+          const r = proposeLabEvidence(db, projectId, current.researchRunId, { observationId: seg[6] });
+          return r.ok ? ok({ deduped: r.deduped, link: r.link }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        return err(404, 'not_found');
       }
       // Canonical Evidence Pack (docs/astra): a read-only projection of this run's records, every hash recomputable.
       // No executed experiment (e.g. engine unavailable) gives 409 BLOCKED; nothing is assembled from anything else.

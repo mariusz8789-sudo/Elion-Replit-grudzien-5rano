@@ -268,7 +268,7 @@ Outstanding valuable unintegrated work (exact list):
 
 ## 7. Reconciliation: `packages/core/src/evidence/evidenceContainer.ts` vs Genesis Verify
 
-Checked 2026-10-03 on g1/recovery-b (read-only comparison, one small hardening).
+Checked 2026-10-03 — **CLOSED on g1/recovery-b 0a070ad9** (read-only comparison, one small hardening).
 
 | | `core/evidence/evidenceContainer.ts` + `verifyContainer.cli.ts` | `backend/src/genesisVerify.mjs` (Genesis Verify) |
 |---|---|---|

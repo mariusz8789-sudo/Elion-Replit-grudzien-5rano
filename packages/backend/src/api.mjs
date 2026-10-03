@@ -78,6 +78,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
+import { verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
@@ -986,6 +987,17 @@ export function handleApi(db, ctx) {
         return (async () => {
           const cancelled = await queueFor(db).cancel(job.jobId, 'USER_REQUEST');
           return cancelled.ok ? ok({ job: cancelled.job }) : { status: 409, body: { error: cancelled.error } };
+        })();
+      }
+      // Artifact custody of an executed experiment: the recorded ArtifactRef, read back and verified fail-closed.
+      if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'artifact') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        if (!current.experiments.some((e) => e.experimentId === seg[5])) return err(404, 'not_found');
+        return (async () => {
+          const v = await verifyExperimentArtifact(db, ctx.artifactStorage ?? null, projectId, current.researchRunId, seg[5]);
+          if (v.ok) return ok({ experimentId: seg[5], verified: true, artifactRef: v.artifactRef });
+          const status = { NO_ARTIFACT_RECORDED: 404, NOT_EXECUTED: 409, BLOCKED_BY_CONFIGURATION: 503 }[v.status] ?? 409;
+          return { status, body: { error: v.status, reason: v.reason ?? null, verified: false } };
         })();
       }
       // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).

@@ -1,0 +1,106 @@
+{
+ "kind": "reactome-fetch",
+ "rawFilesUnmodified": true,
+ "howFound": "Read from Reactome's own data, not from memory: R-HSA-381706 sits in pathway R-HSA-381676 (ContentService /data/event/R-HSA-381706/ancestors). Within that pathway, Reactome's precedingEvent fields link R-HSA-381706 -> R-HSA-422320 -> R-HSA-381704 -> R-HSA-381607. The step-by-step reading of those links belongs to the GLP-1R thread.",
+ "files": [
+  {
+   "sourceId": "reactome-version",
+   "kind": "reactome-version",
+   "sourceUrl": "https://reactome.org/ContentService/data/database/version",
+   "finalUrl": "https://reactome.org/ContentService/data/database/version",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:32Z",
+   "path": "reactome/database-version.txt",
+   "bytes": 2,
+   "sha256": "d6d824abba4afde81129c71dea75b8100e96338da5f416d2f69088f1960cb091"
+  },
+  {
+   "sourceId": "R-HSA-422320",
+   "kind": "reactome-event",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-422320",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-422320",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:33Z",
+   "path": "reactome/R-HSA-422320.enhanced.json",
+   "bytes": 16529,
+   "sha256": "67539fb273b2cc3466f78f0f184276d5a502ca5113a3a02944836de09f7f2709"
+  },
+  {
+   "sourceId": "R-HSA-422320",
+   "kind": "reactome-participants",
+   "sourceUrl": "https://reactome.org/ContentService/data/participants/R-HSA-422320",
+   "finalUrl": "https://reactome.org/ContentService/data/participants/R-HSA-422320",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:33Z",
+   "path": "reactome/R-HSA-422320.participants.json",
+   "bytes": 9169,
+   "sha256": "a2105b22b9387c20fa3c2fce4ba6795e4ca3ce6cbc80f3f04f2935fbd35f2f99"
+  },
+  {
+   "sourceId": "R-HSA-381704",
+   "kind": "reactome-event",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381704",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381704",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:33Z",
+   "path": "reactome/R-HSA-381704.enhanced.json",
+   "bytes": 16067,
+   "sha256": "92bd8db3ed23a5cde78320833aa749e9e5796477811286fa756ae3bd398f508f"
+  },
+  {
+   "sourceId": "R-HSA-381704",
+   "kind": "reactome-participants",
+   "sourceUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381704",
+   "finalUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381704",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:33Z",
+   "path": "reactome/R-HSA-381704.participants.json",
+   "bytes": 2990,
+   "sha256": "ca034e0caf26c50fb3ad124ccae18df158fe0045c40eb17829266caea4df85d6"
+  },
+  {
+   "sourceId": "R-HSA-381607",
+   "kind": "reactome-event",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381607",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381607",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:34Z",
+   "path": "reactome/R-HSA-381607.enhanced.json",
+   "bytes": 21352,
+   "sha256": "314040daea05975dac1944f2fedbdef153fc3d443251841c920c6f440d27337b"
+  },
+  {
+   "sourceId": "R-HSA-381607",
+   "kind": "reactome-participants",
+   "sourceUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381607",
+   "finalUrl": "https://reactome.org/ContentService/data/participants/R-HSA-381607",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:34Z",
+   "path": "reactome/R-HSA-381607.participants.json",
+   "bytes": 2406,
+   "sha256": "a396f06c13b7d777d57b97e219bf5748c3d1ef6814b3467787756681eee4c5d7"
+  },
+  {
+   "sourceId": "R-HSA-381676",
+   "kind": "reactome-pathway",
+   "sourceUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381676",
+   "finalUrl": "https://reactome.org/ContentService/data/query/enhanced/R-HSA-381676",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:34Z",
+   "path": "reactome/R-HSA-381676.enhanced.json",
+   "bytes": 41115,
+   "sha256": "b640d6f336cd1dfdb4834d5eb74760e8baf2ab523202ba7d4830c00d8315e847"
+  },
+  {
+   "sourceId": "R-HSA-381676",
+   "kind": "reactome-pathway-contained-events",
+   "sourceUrl": "https://reactome.org/ContentService/data/pathway/R-HSA-381676/containedEvents",
+   "finalUrl": "https://reactome.org/ContentService/data/pathway/R-HSA-381676/containedEvents",
+   "httpStatus": 200,
+   "retrievedAt": "2026-10-03T03:03:34Z",
+   "path": "reactome/R-HSA-381676.containedEvents.json",
+   "bytes": 5151,
+   "sha256": "b34e5093faa00965f26d832a8d56a0fcaad839d1a3b88f82019fb61dafde1229"
+  }
+ ]
+}

@@ -1,5 +1,5 @@
 import { getLocale, type Locale } from './i18n';
-import type { NavItem, NavSection } from './navigation';
+import { NAV_ITEMS, activeNavId, type NavItem, type NavSection } from './navigation';
 
 /**
  * Menu words in English and Arabic. Polish lives in navigation.ts itself (the source); an entry
@@ -10,65 +10,77 @@ import type { NavItem, NavSection } from './navigation';
 type Pair = readonly [en: string, ar?: string];
 
 const ITEMS: Readonly<Record<string, { label: Pair; short?: Pair; description?: Pair }>> = {
-  home: { label: ['Start', 'البداية'], short: ['Start', 'البداية'], description: ['Overview: areas, recent research, evidence and engines', 'نظرة عامة: المجالات والأبحاث الأخيرة والأدلة والمحركات'] },
-  science: { label: ['Drug discovery', 'اكتشاف الأدوية'], description: ['Docking, retrosynthesis, Evidence and Replay', 'الالتحام الجزيئي والتخليق الرجعي والأدلة وإعادة التشغيل'] },
-  'human-biology-lab': { label: ['Human · Human Explorer', 'الإنسان · مستكشف الجسم'], short: ['Human', 'الإنسان'], description: ['Human atlas: skin, skeleton, organs, brain, cell', 'أطلس الإنسان: الجلد والهيكل والأعضاء والدماغ والخلية'] },
-  reviewer: { label: ['Reviewer Room', 'غرفة المراجع'], description: ['Check the evidence and the CSRN signature', 'تحقق من الأدلة وتوقيع CSRN'] },
-  evidence: { label: ['Evidence & Replay', 'الأدلة وإعادة التشغيل'], description: ['Where results come from, and re-running them', 'مصدر النتائج وإعادة تشغيلها'] },
-  'scientific-worlds': { label: ['Laboratory', 'المختبر'], short: ['Lab', 'المختبر'], description: ['One space for Genesis experiments', 'مساحة واحدة لتجارب Genesis'] },
-  'cms-open-data': { label: ['CERN · CMS data', 'سيرن · بيانات CMS'], description: ['Real CMS Z→μμ events; offline analysis, not the live LHC', 'أحداث CMS حقيقية Z→μμ؛ تحليل غير متصل، وليس مصادم LHC مباشرًا'] },
-  discover: { label: ['Research console', 'وحدة البحث'], description: ['Candidates, evidence, falsification and the Winner Gate', 'المرشحون والأدلة والتفنيد وبوابة الفائز'] },
-  chat: { label: ['Ask', 'اسأل'], short: ['Ask', 'اسأل'] },
-  'scientific-os': { label: ['All capabilities', 'كل الإمكانات'], description: ['Everything in 7 groups, with its audited status', 'كل شيء في 7 مجموعات مع حالته المدققة'] },
-  account: { label: ['Account: sign in or sign up', 'الحساب: تسجيل الدخول أو إنشاء حساب'] },
-  settings: { label: ['Settings', 'الإعدادات'] },
-  projects: { label: ['Projects (cloud)', 'المشاريع (السحابة)'] },
-  campaign: { label: ['Advanced scientific campaign'] },
-  'gov-campaign': { label: ['Government drug discovery: public-sector demo'] },
-  cde: { label: ['Discovery engine (CDE)'] },
-  pilot: { label: ['Experiment pilot'] },
-  chemistry: { label: ['Chemistry: titration station'] },
-  'chemistry-classic': { label: ['Chemistry: classic laboratory'] },
-  physics: { label: ['Physics: light in curved spacetime'] },
-  'black-hole': { label: ['Black hole: Schwarzschild'] },
-  geodesics: { label: ['Photons around a black hole'] },
-  universe: { label: ['Universe: the three-body problem'] },
-  'cern-complex': { label: ['CERN complex'] },
-  collider: { label: ['CERN: detector chamber'] },
-  entanglement: { label: ['Entanglement measures'] },
-  'myths-theories': { label: ['Myths and theories'] },
-  'virtual-bio': { label: ['Virtual Lab: biology'] },
-  memory: { label: ['Evidence and memory'] },
+  home: { label: ['Start', 'البداية'], short: ['Start', 'البداية'], description: ['Overview: areas, recent research and evidence', 'نظرة عامة: المجالات والأبحاث الأخيرة والأدلة'] },
+  chat: { label: ['Ask Genesis', 'اسأل Genesis'], short: ['Ask', 'اسأل'], description: ['Describe a research task; Genesis routes it to a model or the right screen'] },
+  discover: { label: ['Research runs', 'عمليات البحث'], short: ['Runs', 'العمليات'], description: ['Start a run: candidates, evidence, falsification and the Winner Gate'] },
+  inquiry: { label: ['Hypotheses', 'الفرضيات'], description: ['Genesis proposes hypotheses and drops the ones the computation contradicts'] },
+  science: { label: ['Drug discovery', 'اكتشاف الأدوية'], description: ['Drug candidates for a protein: docking, synthesis route, evidence', 'مرشحو الأدوية لبروتين: الالتحام وطريق التخليق والأدلة'] },
+  'human-biology-lab': { label: ['Human biology', 'بيولوجيا الإنسان'], short: ['Human', 'الإنسان'], description: ['Human atlas: body, organ, tissue, cell', 'أطلس الإنسان: الجسم والعضو والنسيج والخلية'] },
+  molecule: { label: ['Molecules', 'الجزيئات'], description: ['A molecule in 3D: geometry, bonds and properties'] },
+  'cms-open-data': { label: ['Physics & CERN', 'الفيزياء وسيرن'], description: ['Real CMS Z→μμ events; offline analysis, not a live detector', 'أحداث CMS حقيقية Z→μμ؛ تحليل غير متصل، وليس كاشفًا مباشرًا'] },
+  'scientific-worlds': { label: ['Laboratory & simulations', 'المختبر والمحاكاة'], short: ['Lab', 'المختبر'], description: ['One space for Genesis experiments and simulations', 'مساحة واحدة لتجارب Genesis ومحاكاتها'] },
+  evidence: { label: ['Evidence & Replay', 'الأدلة وإعادة التشغيل'], short: ['Evidence', 'الأدلة'], description: ['Where a result comes from, and whether a re-run gives the same', 'مصدر النتيجة وهل تعطي إعادة التشغيل النتيجة نفسها'] },
+  reviewer: { label: ['Reviewer Room', 'غرفة المراجع'], description: ['Try to break a result: inputs, tests, negative results', 'حاول نقض النتيجة: المدخلات والاختبارات والنتائج السلبية'] },
+  memory: { label: ['Scientific Memory', 'الذاكرة العلمية'], description: ['Saved runs, plans registered before the result, provenance'] },
+  verify: { label: ['Genesis Verify', 'Genesis Verify'], description: ['Upload a Genesis record: fingerprints, the ledger and a replay of the computation, HTML report'] },
   'flight-control': { label: ['Science Flight Control'], description: ['Research runs, the job queue and experiment flights; pause, resume, cancel'] },
-  'discovery-log': { label: ['Discovery log'] },
-  'knowledge-sources': { label: ['Knowledge and public sources'] },
-  verify: { label: ['Genesis Verify: check a result record'], description: ['Upload a Genesis record: sha256 fingerprints, the ledger and a replay of the computation, HTML report'] },
-  worlds: { label: ['Visualisations and worlds'] },
-  simulation: { label: ['Simulation generator'] },
-  'world-proposal': { label: ['Propose a world'] },
-  city3d: { label: ['3D city (WebGL)'] },
-  reality: { label: ['Reality Navigator: an orbit and its variants', 'مستكشف الواقع: مدار ومتغيراته'], description: ['Change the star’s mass or the orbit, compare variants, save the scene and compute it again', 'غيّر كتلة النجم أو المدار، وقارن المتغيرات، واحفظ المشهد وأعد حسابه'] },
-  'first-person-lab': { label: ['First-person laboratory'] },
-  mirror: { label: ['Genesis Mirror: experimental'] },
-  'matrix-map': { label: ['Matrix: system map'] },
-  whatif: { label: ['What if?'] },
+  dossier: { label: ['Candidates', 'المرشحون'], description: ['Saved candidates with their evidence; download the dossier'] },
+  pilot: { label: ['Evidence packs & exports', 'حزم الأدلة والتصدير'], description: ['Plan → result → an evidence pack to download and replay'] },
+  'scientific-os': { label: ['All capabilities', 'كل الإمكانات'], description: ['The full catalogue, each entry with its audited status', 'الكتالوج الكامل، لكل بند حالته المدققة'] },
+  account: { label: ['Account: sign in or sign up', 'الحساب: تسجيل الدخول أو إنشاء حساب'], description: ['Sign in, register and your account profile'] },
+  settings: { label: ['Settings', 'الإعدادات'], description: ['Account, projects, research mode'] },
+  projects: { label: ['Projects (cloud)', 'المشاريع (السحابة)'] },
+  campaign: { label: ['Advanced scientific campaign'], description: ['Specialist view: candidates, plans, evidence and replay'] },
+  'gov-campaign': { label: ['Drug discovery for the public sector'], description: ['A full campaign on a real candidate pool: screening, falsification, safety gate, verdict'] },
+  cde: { label: ['Discovery engine'] },
+  precision: { label: ['Molecule reference analysis'] },
+  chemistry: { label: ['Chemistry: titration station'], description: ['Charge balance in the main Laboratory'] },
+  'chemistry-classic': { label: ['Chemistry: classic laboratory'] },
+  'virtual-bio': { label: ['Virtual biology lab'], description: ['Teaching models: cell, pharmacokinetics, receptor, antibiotic resistance'] },
+  'cell-lab': { label: ['Virtual cell'] },
+  physics: { label: ['Physics: light in curved spacetime'], description: ['The Laboratory observation window: Shapiro delay and light bending (model)'] },
+  'black-hole': { label: ['Black hole: Schwarzschild'], description: ['Horizon radius and light paths around a black hole'] },
+  geodesics: { label: ['Photons around a black hole'] },
+  universe: { label: ['Universe: the three-body problem'], description: ['Three bodies moving, computed step by step'] },
+  'cern-complex': { label: ['CERN complex'], description: ['Walk the hall, tunnel and detector chamber: a collision model, separate from the CMS data'] },
+  collider: { label: ['CERN: detector chamber'] },
+  'lab-fpv': { label: ['Quantum laboratory'] },
+  entanglement: { label: ['Entanglement measures'] },
+  clockwork: { label: ['CLOCKWORK: office deadlines'], description: ['Statutory deadlines of an office, computed deterministically'] },
+  whatif: { label: ['What if?'], description: ['Branch at the moment of decision and compare the outcomes'] },
+  'decision-explorer': { label: ['Decision explorer'] },
   conflict: { label: ['Model conflict'] },
-  inquiry: { label: ['Autonomous inquiry'] },
-  calibration: { label: ['How long is the infectious period?'] },
-  'dome-world': { label: ['Dome vs globe'] },
   'protection-priority': { label: ['Who to protect first?'] },
-  decipherment: { label: ['Decipherment'] },
+  'investor-demo': { label: ['Guided demo'], description: ['Experiment, result and evidence in one run'] },
+  tour: { label: ['Voice guide'] },
   glossary: { label: ['Glossary', 'المسرد'] },
-  clockwork: { label: ['CLOCKWORK: office deadlines'] },
-  'investor-demo': { label: ['Guided demo'] },
-  tour: { label: ['Genesis Tour: voice guide'] },
+  'dome-world': { label: ['Dome vs globe'] },
+  calibration: { label: ['How long is the infectious period?'] },
+  'knowledge-sources': { label: ['Knowledge and public sources'], description: ['Proposed sources; a person publishes or rejects each one'] },
+  'meta-cognition': { label: ['Genesis self-audit'], description: ['What Genesis knows, where it contradicts itself and what it lacks'] },
+  'discovery-log': { label: ['Discovery log'] },
+  worlds: { label: ['Worlds and crisis simulations'], description: ['Synthetic worlds: city, flood, wildfire, epidemic. Scenarios, not forecasts'] },
+  simulation: { label: ['Simulation generator'] },
+  'world-director': { label: ['World Director'], description: ['Text description → 3D world'] },
+  'world-proposal': { label: ['Propose a world'] },
+  city3d: { label: ['3D city'] },
+  'first-person-lab': { label: ['Laboratory: scenarios'] },
+  reality: { label: ['Reality Navigator: an orbit and its variants', 'مستكشف الواقع: مدار ومتغيراته'], description: ['Change the star’s mass or the orbit, compare variants, save the scene and compute it again', 'غيّر كتلة النجم أو المدار، وقارن المتغيرات، واحفظ المشهد وأعد حسابه'] },
+  mirror: { label: ['Genesis Mirror'], description: ['Synthetic skeleton, no camera'] },
+  'matrix-map': { label: ['Matrix: system map'], description: ['Every run and how it connects'] },
+  matrix: { label: ['Matrix: HUD'] },
+  'myths-theories': { label: ['Myths and theories'], description: ['Speculative spacetime models: an openly labelled sandbox'] },
+  decipherment: { label: ['Decipherment'] },
+  cyber: { label: ['Cyber'], description: ['Incident investigation on a toy application: hypotheses and evidence, no accusations'] },
 };
 
+/** Main groups and More groups. */
 const GROUPS: Readonly<Record<string, Pair>> = {
-  'more-ls': ['Life sciences', 'علوم الحياة'], 'more-evidence': ['Evidence and verification', 'الأدلة والتحقق'],
-  'more-public': ['Government and public sector', 'الحكومة والقطاع العام'], 'more-physics': ['Physics, quantum and CERN', 'الفيزياء والكم وسيرن'],
-  'more-worlds': ['World and digital twin', 'العالم والتوأم الرقمي'], 'more-learning': ['Education', 'التعليم'],
-  'more-system': ['Platform', 'المنصة'], 'more-showcase': ['Showcases (experiments)', 'عروض (تجارب)'],
+  research: ['Research', 'البحث'], explore: ['Explore', 'استكشاف'], proof: ['Proof', 'الإثبات'],
+  operations: ['Operations', 'العمليات'], deliver: ['Deliver', 'التسليم'],
+  'more-ls': ['Life sciences', 'علوم الحياة'], 'more-physics': ['Physics and space', 'الفيزياء والفضاء'],
+  'more-public': ['Decisions and public sector', 'القرارات والقطاع العام'], 'more-learning': ['Learning and knowledge', 'التعلم والمعرفة'],
+  'more-system': ['Account and platform', 'الحساب والمنصة'], 'more-showcase': ['DEMO · showcases and experiments', 'عرض تجريبي · عروض وتجارب'],
 };
 
 const SHELL = {
@@ -87,6 +99,16 @@ const SHELL = {
   navigation: ['Nawigacja Genesis', 'Genesis navigation', 'تنقل Genesis'],
   language: ['Język', 'Language', 'اللغة'],
   profileMenu: ['Menu dla profilu', 'Menu for profile', 'قائمة الملف الشخصي'],
+  search: ['Szukaj', 'Search', 'بحث'],
+  searchHint: ['Szukaj celu, miejsca albo możliwości…', 'Search a goal, a place or a capability…', 'ابحث عن هدف أو مكان أو إمكانية…'],
+  collapse: ['Zwiń menu', 'Collapse menu', 'طي القائمة'],
+  expand: ['Rozwiń menu', 'Expand menu', 'توسيع القائمة'],
+  explorer: ['Wszystko w Genesis', 'Everything in Genesis', 'كل شيء في Genesis'],
+  moreModules: ['Więcej modułów', 'More modules', 'وحدات أخرى'],
+  demo: ['DEMO', 'DEMO', 'DEMO'],
+  demoNote: ['Syntetyczne pokazy i eksperymenty wewnętrzne. Działają, ale nie są dowodem ani produktem.', 'Synthetic showcases and internal experiments. They run, but they are not evidence and not a product.', 'عروض اصطناعية وتجارب داخلية. تعمل، لكنها ليست دليلًا ولا منتجًا.'],
+  soon: ['wkrótce', 'soon', 'قريبًا'],
+  serverStatus: ['Stan serwera', 'Server status', 'حالة الخادم'],
 } as const satisfies Record<string, readonly [string, string, string]>;
 
 export function shellText(key: keyof typeof SHELL, locale: Locale = getLocale()): string {
@@ -118,4 +140,19 @@ export function navDescription(item: NavItem, locale: Locale = getLocale()): str
 export function navGroupLabel(section: NavSection, locale: Locale = getLocale()): string {
   if (locale === 'pl') return section.label;
   return pickPair(GROUPS[section.id], locale) ?? section.label;
+}
+
+/** Every id with an English label: a test keeps the English menu complete. */
+export const TRANSLATED_NAV_IDS: readonly string[] = Object.keys(ITEMS);
+
+/**
+ * The title a screen's top bar shows: the navigation name of the place the hash
+ * belongs to, in the chosen language (Arabic falls back to English), so the
+ * title always matches the menu. A route with no menu entry (a deep link) keeps
+ * the title its screen passed.
+ */
+export function screenTitle(hash: string, fallback: string, locale: Locale = getLocale()): string {
+  const id = activeNavId(hash);
+  const item = id === null ? undefined : NAV_ITEMS.find((entry) => entry.id === id);
+  return item ? navLabel(item, locale) : fallback;
 }

@@ -27,6 +27,7 @@
  * one re-reads the persisted chain, so a restart at any point resumes the same experiment instead of
  * losing or repeating it.
  */
+import { verifyDatasetBytes } from './datasets/runDatasets.mjs';
 import { canonicalJson, fnv1a, sha256Hex } from './determinism.mjs';
 import { buildDecisionTrace } from './decisionTrace.mjs';
 import { appendServerResearchStateEvent } from './agentRun.mjs';
@@ -250,6 +251,8 @@ function freeze(db, projectId, runId, hypothesis, x, userId) {
       predictionFingerprint: prereg.record.fingerprint,
       frozenBefore: 'ENGINE_EXECUTION',
       scope: VERDICT_SCOPE,
+      // The registered dataset cell this input came from (null when the model gave the value itself).
+      datasetBinding: hypothesis.experimentProposal?.datasetBinding ?? null,
     });
     if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
     return { ok: true, deduped: false, experimentId };
@@ -259,6 +262,11 @@ function freeze(db, projectId, runId, hypothesis, x, userId) {
 function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
   const executor = tools.executors[frozen.engineId];
   if (!executor) return { ok: false, status: 'BLOCKED', engineId: frozen.engineId, reason: 'NO_RESEARCH_RUN_ADAPTER' };
+  if (frozen.datasetBinding) {
+    // The dataset bytes are re-read and re-hashed before the engine runs; altered or missing data blocks it.
+    const custody = verifyDatasetBytes(db, frozen.datasetBinding);
+    if (!custody.ok) return { ok: false, status: 'BLOCKED', engineId: frozen.engineId, reason: `DATASET_${custody.status}` };
+  }
   const engine = tools.engineStatus(frozen.engineId);
   if (!engine.available) return { ok: false, status: 'BLOCKED', engineId: frozen.engineId, reason: engine.reason };
 

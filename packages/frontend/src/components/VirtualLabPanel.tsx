@@ -10,6 +10,9 @@ import {
 } from '../core/backend/client';
 import { getToken } from '../core/backend/session';
 import { ComputationalExperimentPlayback, type ExperimentPresentationLevel } from './ComputationalExperimentPlayback';
+import { capabilityLabel, plEn, type CapabilityKey } from '../core/capabilityNames';
+import { useLocale } from '../core/i18n';
+import { TechnicalDetails, type TechnicalRow } from './TechnicalDetails';
 
 interface Props {
   projectId: string;
@@ -18,18 +21,31 @@ interface Props {
   onChanged?: () => void;
 }
 
-const CAPABILITIES: readonly { id: VirtualLabCapability; label: string }[] = [
-  { id: 'molecular-descriptors', label: 'RDKit descriptors' },
-  { id: 'admet-estimation', label: 'ADMET estimation' },
-  { id: 'toxicity-risk-estimation', label: 'Toxicity risk estimation' },
-  { id: 'molecular-docking', label: 'Docking (Vina/Meeko)' },
-  { id: 'quantum-chemistry', label: 'Quantum chemistry (PySCF)' },
-  { id: 'molecular-dynamics', label: 'Molecular dynamics (OpenMM bounded reference)' },
-  { id: 'protein-structure-ingestion', label: 'Protein structure ingestion (Biopython)' },
+/**
+ * What each backend capability is called on screen. The option names the
+ * capability; the engine behind it (and the adapter detail) is listed under
+ * technical details.
+ */
+const CAPABILITIES: readonly { id: VirtualLabCapability; capability: CapabilityKey; detail?: readonly [pl: string, en: string]; engine: string }[] = [
+  { id: 'molecular-descriptors', capability: 'molecular-analysis', detail: ['deskryptory', 'descriptors'], engine: 'RDKit' },
+  { id: 'admet-estimation', capability: 'property-safety', detail: ['ADMET', 'ADMET'], engine: 'ADMET-AI' },
+  { id: 'toxicity-risk-estimation', capability: 'property-safety', detail: ['ryzyko toksyczności', 'toxicity risk'], engine: 'ADMET-AI' },
+  { id: 'molecular-docking', capability: 'interaction-modeling', detail: ['dokowanie', 'docking'], engine: 'AutoDock Vina, Meeko' },
+  { id: 'quantum-chemistry', capability: 'quantum-chemistry', engine: 'PySCF' },
+  { id: 'molecular-dynamics', capability: 'molecular-dynamics', detail: ['ograniczony przebieg referencyjny', 'bounded reference'], engine: 'OpenMM' },
+  { id: 'protein-structure-ingestion', capability: 'structural-analysis', detail: ['wczytanie struktury białka', 'protein structure ingestion'], engine: 'Biopython' },
 ];
+
+export function virtualLabCapabilityLabel(id: VirtualLabCapability): string {
+  const entry = CAPABILITIES.find((c) => c.id === id);
+  if (!entry) return id;
+  const base = capabilityLabel(entry.capability);
+  return entry.detail ? `${base} (${plEn(entry.detail[0], entry.detail[1])})` : base;
+}
 
 /** Product UI over the canonical backend Virtual Lab loop. It never computes scientific values in the browser. */
 export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }: Props): JSX.Element {
+  useLocale();
   const retained = useMemo(() => candidates.filter((candidate) => candidate.status === 'retained'), [candidates]);
   const [candidateId, setCandidateId] = useState(retained[0]?.id ?? candidates[0]?.id ?? '');
   const [hypothesis, setHypothesis] = useState('The candidate has a computational descriptor profile suitable for further research prioritization.');
@@ -124,7 +140,7 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
       <div className="account-form">
         <label className="account-field"><span>Candidate</span><select value={candidateId} onChange={(event) => setCandidateId(event.target.value)} data-testid="virtual-lab-candidate">{candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.canonicalSmiles} · {candidate.id}</option>)}</select></label>
         <label className="account-field"><span>Hypothesis</span><textarea value={hypothesis} onChange={(event) => setHypothesis(event.target.value)} data-testid="virtual-lab-hypothesis" /></label>
-        <label className="account-field"><span>Engine capability</span><select value={capability} onChange={(event) => setCapability(event.target.value as VirtualLabCapability)} data-testid="virtual-lab-capability">{CAPABILITIES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
+        <label className="account-field"><span>{plEn('Możliwość obliczeniowa', 'Capability')}</span><select value={capability} onChange={(event) => setCapability(event.target.value as VirtualLabCapability)} data-testid="virtual-lab-capability">{CAPABILITIES.map((entry) => <option key={entry.id} value={entry.id}>{virtualLabCapabilityLabel(entry.id)}</option>)}</select></label>
         <label className="account-field"><span>Expected numeric output key (optional)</span><input value={outputKey} onChange={(event) => setOutputKey(event.target.value)} /></label>
         <label className="account-field"><span>Expected maximum (optional)</span><input value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>
         {capability === 'protein-structure-ingestion' && (
@@ -139,11 +155,12 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
       {dossier && (
         <div className="cde-results" data-testid="virtual-lab-dossier">
           <div className="cde-result"><span className="cde-result-label">State</span><span className="cde-result-actual">{latestResult?.status ?? 'PLANNED/NOT_STARTED'}</span><span className="cde-result-bound">{latestResult?.epistemicClassification ?? 'UNKNOWN'}</span></div>
-          <div className="cde-result"><span className="cde-result-label">Engine / result</span><span className="cde-result-actual">{latestResult?.selectedEngine?.engineName ?? latestResult?.reason ?? 'No execution result'}</span><span className="cde-result-bound">output: {latestResult?.outputFingerprint ?? 'UNAVAILABLE'}</span></div>
+          <div className="cde-result"><span className="cde-result-label">{plEn('Możliwość / wynik', 'Capability / result')}</span><span className="cde-result-actual">{latestResult ? `${virtualLabCapabilityLabel(latestResult.requestedCapability)}${latestResult.reason ? ` · ${latestResult.reason}` : ''}` : 'No execution result'}</span><span className="cde-result-bound">output: {latestResult?.outputFingerprint ?? 'UNAVAILABLE'}</span></div>
           <div className="cde-result"><span className="cde-result-label">Evidence / replay</span><span className="cde-result-actual">{dossier.evidenceLinks.length} pending proposal(s) · {latestReplay?.replayStatus ?? 'NOT_YET_REPLAYED'}</span><span className="cde-result-bound">dossier: {dossier.dossierFingerprint}</span></div>
           <div className="cde-result"><span className="cde-result-label">Next action</span><span className="cde-result-actual">{dossier.nextAction.action}</span><span className="cde-result-bound">{dossier.nextAction.reason}</span></div>
         </div>
       )}
+      <TechnicalDetails rows={technicalRows(latestResult?.selectedEngine ? [latestResult.selectedEngine.engineName, latestResult.selectedEngine.engineVersion].filter(Boolean).join(' ') : undefined)} testId="virtual-lab-tech" />
       <ComputationalExperimentPlayback
         plan={dossier?.plans.at(-1)?.payload ?? null}
         result={latestResult}
@@ -163,4 +180,10 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
       <p className="dossier-boundary">Clinical efficacy: UNKNOWN. The browser displays persisted backend state and performs no scientific derivation.</p>
     </section>
   );
+}
+
+/** Engine identity: the engine that ran the latest result, then the engine behind every capability. */
+function technicalRows(executedEngine: string | undefined): TechnicalRow[] {
+  const rows: TechnicalRow[] = CAPABILITIES.map((entry) => ({ label: virtualLabCapabilityLabel(entry.id), value: entry.engine }));
+  return executedEngine ? [{ label: plEn('Silnik ostatniego wyniku', 'Engine of the latest result'), value: executedEngine }, ...rows] : rows;
 }

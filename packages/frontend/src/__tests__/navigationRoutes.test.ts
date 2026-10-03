@@ -110,14 +110,17 @@ describe('research mode shows one entry per capability; alternative screens fold
 
   it('the known duplicate families collapse to one visible entry each', () => {
     const family = (id: string) => [id, ...navVariants(id).map((v) => v.id)];
-    expect(family('campaign')).toEqual(expect.arrayContaining(['campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
-    expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'discovery-log']));
-    expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-map', 'first-person-lab', 'world-director']));
+    // IA of 3 Oct 2026: Candidates (#/dossier) and Evidence packs (#/pilot) moved to Deliver,
+    // Scientific Memory to Proof; Matrix is a DEMO entry of its own with the HUD folded under the map.
+    expect(family('campaign')).toEqual(expect.arrayContaining(['campaign', 'gov-campaign', 'cde', 'precision']));
+    expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'first-person-lab', 'world-director', 'reality', 'city3d']));
+    expect(family('matrix-map')).toEqual(['matrix-map', 'matrix']);
     // CMS Open Data (an offline analysis of one checksummed event file) and the CERN complex (a
     // walk-through world) are two capabilities, not one with a spare view. Only the detector chamber
     // is a view OF the complex, so only it folds.
     expect(family('cern-complex')).toEqual(['cern-complex', 'collider']);
-    expect(top.length).toBeLessThanOrEqual(26);
+    // 28 since the 3 Oct IA: demos (Mirror, Matrix) are listed openly in DEMO instead of hidden as world views.
+    expect(top.length).toBeLessThanOrEqual(28);
   });
 
   it('chemistry and physics open the one main Laboratory at their station', () => {
@@ -128,23 +131,47 @@ describe('research mode shows one entry per capability; alternative screens fold
   });
 });
 
-describe('the main menu is the owner\'s list, in his order', () => {
-  it('lists the eight destinations first, navigation only; everything else sits under "Więcej"', () => {
-    expect(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.label))).toEqual([
-      'Start', 'Odkrywanie leków', 'Człowiek · Human Explorer', 'Pokój recenzenta', 'Dowody i powtórzenie',
-      'Laboratorium', 'CERN · dane CMS', 'Konsola badań',
-    ]);
-    const main = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.hash)));
-    expect(MORE_ITEMS.filter((item) => item.hash !== undefined && main.has(item.hash))).toEqual([]);
+describe('the main menu is the owner\'s capability IA (3 Oct 2026), two levels at most', () => {
+  it('Home, then Research, Explore, Proof, Operations and Deliver, each with its places in order', () => {
+    expect(NAV_SECTIONS.map((section) => section.id)).toEqual(['home', 'research', 'explore', 'proof', 'operations', 'deliver']);
+    const ids = (id: string) => NAV_SECTIONS.find((s) => s.id === id)!.items.map((item) => item.id);
+    expect(ids('home')).toEqual(['home']);
+    expect(ids('research')).toEqual(['chat', 'discover', 'inquiry']);
+    expect(ids('explore')).toEqual(['science', 'human-biology-lab', 'molecule', 'cms-open-data', 'scientific-worlds']);
+    expect(ids('proof')).toEqual(['evidence', 'reviewer', 'memory', 'verify']);
+    expect(ids('operations')).toEqual(['flight-control']);
+    expect(ids('deliver')).toEqual(['dossier', 'pilot']);
+  });
+
+  it('no main place is also listed in More, and no main place has folded views (two levels)', () => {
+    const main = NAV_SECTIONS.flatMap((section) => section.items);
+    const mainHashes = new Set(main.map((item) => item.hash).filter(Boolean));
+    expect(MORE_ITEMS.filter((item) => item.hash !== undefined && mainHashes.has(item.hash))).toEqual([]);
+    for (const item of main) expect(navVariants(item.id), item.id).toEqual([]);
+  });
+
+  it('every main and More place has an English label', async () => {
+    const { TRANSLATED_NAV_IDS } = await import('../core/navigationText');
+    const missing = NAV_ITEMS.filter((item) => !item.variantOf && item.id !== 'sovereign' && !TRANSLATED_NAV_IDS.includes(item.id)).map((item) => item.id);
+    expect(missing).toEqual([]);
+  });
+
+  it('demo entries only ever sit in the DEMO group', async () => {
+    const { DEMO_SECTION_ID } = await import('../core/navigation');
+    for (const section of MORE_SECTIONS) {
+      for (const item of section.items) expect(item.demo === true, item.id).toBe(section.id === DEMO_SECTION_ID);
+    }
+    expect(NAV_SECTIONS.flatMap((s) => s.items).some((item) => item.demo)).toBe(false);
   });
 });
 
-describe('Ask is an action in the bottom bar, not a menu entry', () => {
-  it('bottom bar reads Start, Ask, Człowiek, Lab; the menu has no chat item', async () => {
+describe('Ask Genesis heads Research and the mobile tab bar', () => {
+  it('tab bar reads Start, Zapytaj, Przebiegi, Dowody (the shell adds More)', async () => {
     const { ASK_ITEM, PRIMARY_NAV_ITEMS } = await import('../core/navigation');
-    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Człowiek', 'Lab']);
+    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Przebiegi', 'Dowody']);
     expect(ASK_ITEM.kind).toBe('chat');
-    expect(NAV_SECTIONS.flatMap((section) => section.items).some((item) => item.kind === 'chat')).toBe(false);
+    expect(ASK_ITEM.hash).toBeUndefined();
+    expect(NAV_SECTIONS.find((s) => s.id === 'research')!.items[0]).toBe(ASK_ITEM);
   });
 });
 

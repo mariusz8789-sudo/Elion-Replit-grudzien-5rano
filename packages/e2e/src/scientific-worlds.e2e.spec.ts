@@ -147,8 +147,12 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     const input = page.getByTestId('sw-input');
     await expect(input).toBeVisible();
     const box = await input.boundingBox();
-    const bar = await page.locator('.shell-mobilebar').boundingBox();
-    expect(box && bar ? box.y + box.height <= bar.y + 1 : true).toBe(true);
+    // The phone tab bar of the capability navigation (AppShell `gn-tabbar`); the old `.shell-mobilebar`
+    // no longer renders, and a missing bar must fail here instead of passing silently.
+    const bar = await page.getByTestId('mobile-navigation').boundingBox();
+    expect(box, 'command input box').not.toBeNull();
+    expect(bar, 'mobile tab bar box').not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(bar!.y + 1);
     await page.getByTestId('sw-quick-okno').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem 1 polecenie: NAVIGATE');
     await settled(page, 2);

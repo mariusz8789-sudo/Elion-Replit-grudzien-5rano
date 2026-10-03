@@ -111,7 +111,7 @@ describe('HERO → Human Digital Twin: the finalist reaches the twin with its id
     if (ctx.status !== 'RESOLVED') throw new Error('expected RESOLVED');
     const lines = twinContextLines(ctx);
     const byLabel = Object.fromEntries(lines.map((l) => [l.label, l]));
-    expect(byLabel['Docking (Vina)']).toMatchObject({ value: '-12.83 kcal/mol', tag: 'MODEL_PREDICTION', source: 'science run r-dock' });
+    expect(byLabel['Modelowanie oddziaływań']).toMatchObject({ value: '-12.83 kcal/mol', tag: 'MODEL_PREDICTION', source: 'science run r-dock' });
     expect(byLabel['ADMET'].tag).toBe('MODEL_PREDICTION');
     expect(byLabel['Powiązanie z celem'].tag).toBe('TARGET_ASSOCIATION');
     expect(byLabel['Kontekst anatomiczny'].tag).toBe('ANATOMICAL_CONTEXT');

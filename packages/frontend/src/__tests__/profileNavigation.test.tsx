@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MORE_SECTIONS, NAV_SECTIONS, NAV_ITEMS, navVariants } from '../core/navigation';
-import { ITEM_CAPABILITY, PROFILE_MENU_TABLE, menuForProfile, visibleMenuIds } from '../core/profileNavigation';
+import { ITEM_CAPABILITY, PROFILE_MENU_TABLE, menuForProfile, primaryForMenu, visibleMenuIds } from '../core/profileNavigation';
 import { canUseCapability, type AccountProfile } from '../core/accountProfiles';
 import { FULL_DASHBOARD_HASH, PROFILE_DASHBOARDS, ProfileDashboard } from '../components/ProfileDashboard';
 import { AppShell } from '../components/AppShell';
@@ -28,20 +28,27 @@ describe('menu per account profile', () => {
     }
   });
 
-  it('UCZEN: Start, Człowiek, Laboratorium and only education-friendly More entries', () => {
+  it('UCZEN: Start, Zapytaj, Człowiek, Laboratorium and only education-friendly More entries', () => {
     const v = visibleMenuIds('UCZEN');
-    expect(v.main).toEqual(['home', 'human-biology-lab', 'scientific-worlds']);
+    expect(v.main).toEqual(['home', 'chat', 'human-biology-lab', 'scientific-worlds']);
     expect([...v.more].sort()).toEqual(
       ['glossary', 'dome-world', 'black-hole', 'universe', 'investor-demo', 'chemistry', 'virtual-bio', 'account', 'settings'].sort(),
     );
     expect(menuForProfile('UCZEN').showOverview).toBe(false);
   });
 
-  it('STUDENT: pupil set plus evidence, CERN data, reviewer room, physics group and memory', () => {
+  it('STUDENT: pupil set plus evidence, CERN data, reviewer room, Scientific Memory and the physics group', () => {
     const v = visibleMenuIds('STUDENT');
-    expect(v.main).toEqual(['home', 'human-biology-lab', 'reviewer', 'evidence', 'scientific-worlds', 'cms-open-data']);
+    // Order follows the main IA (Research, Explore, Proof); memory is a Proof place since 3 Oct.
+    expect(v.main).toEqual(['home', 'chat', 'human-biology-lab', 'cms-open-data', 'scientific-worlds', 'evidence', 'reviewer', 'memory']);
     const physics = MORE_SECTIONS.find((s) => s.id === 'more-physics')!.items.map((i) => i.id);
-    for (const id of [...visibleMenuIds('UCZEN').more, ...physics, 'memory']) expect(v.more).toContain(id);
+    for (const id of [...visibleMenuIds('UCZEN').more, ...physics]) expect(v.more).toContain(id);
+  });
+
+  it('the mobile tab bar never leads a profile to a locked place', () => {
+    expect(primaryForMenu(menuForProfile(null)).map((i) => i.id)).toEqual(['home', 'chat', 'discover', 'evidence']);
+    expect(primaryForMenu(menuForProfile('UCZEN')).map((i) => i.id)).toEqual(['home', 'chat', 'human-biology-lab', 'scientific-worlds']);
+    expect(primaryForMenu(menuForProfile('STUDENT')).map((i) => i.id)).toEqual(['home', 'chat', 'evidence', 'human-biology-lab']);
   });
 
   it('NAUCZYCIEL: at least the student set, account always there', () => {
@@ -76,14 +83,15 @@ describe('menu per account profile', () => {
   it('the shell renders the short menu for a pupil and the full one for a guest', () => {
     const guest = renderToStaticMarkup(<AppShell><div /></AppShell>);
     expect(guest).toContain('Odkrywanie leków');
-    expect(guest).toContain('Konsola badań');
+    expect(guest).toContain('Przebiegi badań');
     signIn('UCZEN');
     const pupil = renderToStaticMarkup(<AppShell><div /></AppShell>);
     expect(pupil).not.toContain('Odkrywanie leków');
-    expect(pupil).not.toContain('Konsola badań');
-    expect(pupil).toContain('Człowiek · Human Explorer');
+    expect(pupil).not.toContain('Przebiegi badań');
+    expect(pupil).not.toContain('href="#/research-console"');
+    expect(pupil).toContain('Biologia człowieka');
     expect(pupil).toContain('Laboratorium');
-    // Bottom bar unchanged: Start · Zapytaj · Człowiek + Konto + Więcej.
+    // Tab bar for a pupil: Start · Zapytaj · Człowiek · Lab + Więcej.
     expect(pupil).toContain('data-testid="mobile-navigation"');
     expect(pupil).toContain('Zapytaj');
   });

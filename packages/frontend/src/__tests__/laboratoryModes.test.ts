@@ -3,9 +3,10 @@ import { LABORATORY_MODES, laboratoryModeOf } from '../core/laboratoryModes';
 import { NAV_SECTIONS } from '../core/navigation';
 
 describe('one Laboratory with modes', () => {
-  it('has exactly one primary Laboratory entry', () => {
-    const primary = NAV_SECTIONS.flatMap((s) => s.items).filter((i) => i.primary && /lab/i.test(i.label));
-    expect(primary.map((i) => i.id)).toEqual(['scientific-worlds']);
+  it('has exactly one Laboratory entry in the main navigation', () => {
+    // Since the 3 Oct IA the Laboratory is a place in Explore, no longer a mobile tab.
+    const main = NAV_SECTIONS.flatMap((s) => s.items).filter((i) => /lab/i.test(i.label));
+    expect(main.map((i) => i.id)).toEqual(['scientific-worlds']);
   });
   it('every mode resolves back to itself and the first mode is the canonical entry', () => {
     for (const mode of LABORATORY_MODES) expect(laboratoryModeOf(mode.hash)).toBe(mode.id);

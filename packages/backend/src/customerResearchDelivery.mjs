@@ -99,6 +99,16 @@ export function requiredCommercialItemsOf(run) {
     });
   }
 
+  for (const dataset of run.datasets ?? []) {
+    items.push({
+      itemId: `dataset:${dataset.sha256}`,
+      category: 'SCIENTIFIC_SOURCE',
+      identity: { sha256: dataset.sha256, accession: dataset.originUrl ?? dataset.datasetId },
+      observedLicenceStatus: dataset.licenceStatus ?? 'UNKNOWN',
+      evidenceRef: `dataset:${dataset.datasetId}`,
+    });
+  }
+
   for (const experiment of completedExperiments(run)) {
     const engine = experiment.execution.engine ?? {};
     items.push({

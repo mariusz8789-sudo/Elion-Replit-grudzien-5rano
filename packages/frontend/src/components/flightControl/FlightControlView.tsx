@@ -8,6 +8,7 @@ import {
   type FlightControlSnapshot, type Notice,
 } from './flightControlModel';
 import { fcCode, fcText, toneOf, type CodeGroup, type Tone } from './flightControlText';
+import { VerifyResultLink } from '../verify/VerifyResultLink';
 
 /**
  * #/flight-control — the pure view. It renders only what it is given (the container fetches), so a
@@ -29,6 +30,8 @@ export interface FlightControlViewProps {
   notices: Readonly<Record<string, Notice>>;
   confirmingCancel: string | null;
   projectBar?: ReactNode;
+  /** The project the runs belong to; "Verify this result" carries it to Genesis Verify. */
+  projectId?: string | null;
   onRefresh: () => void;
   onControl: (researchRunId: string, action: ResearchRunControlAction) => void;
   onAskCancel: (researchRunId: string | null) => void;
@@ -94,7 +97,7 @@ function Summary({ snapshot, locale }: { snapshot: FlightControlSnapshot; locale
 
 /* ---------------- runs ---------------- */
 
-function RunDetail({ state, locale }: { state: RunDetailState | undefined; locale: Locale }) {
+export function RunDetail({ state, locale, projectId }: { state: RunDetailState | undefined; locale: Locale; projectId: string | null }) {
   if (!state || state.status === 'loading') return <p className="fc-muted" role="status">{fcText('detailLoading', locale)}</p>;
   if (state.status === 'error') return <NoticeBox notice={state.notice} locale={locale} testId="fc-run-detail-error" />;
   const { view } = state;
@@ -129,6 +132,11 @@ function RunDetail({ state, locale }: { state: RunDetailState | undefined; local
                   <div><dt>{fcText('evidence', locale)}</dt><dd>{x.evidence ? fcText('evidenceProposed', locale) : fcText('noEvidence', locale)}</dd></div>
                   <div><dt>{fcText('replay', locale)}</dt><dd>{x.next?.replay ? <Pill code={x.next.replay.verdict} group="replayStatus" locale={locale} /> : fcText('noReplay', locale)}</dd></div>
                 </dl>
+                {/* Only an executed experiment has a record Genesis Verify can check. */}
+                {x.execution && (
+                  <VerifyResultLink locale={locale} className="verify-result-link fc-verify-link" testId={`fc-verify-${x.experimentId}`}
+                    target={{ projectId, researchRunId: view.researchRunId, experimentId: x.experimentId }} />
+                )}
                 <Technical locale={locale} rows={[
                   `experimentId: ${x.experimentId}`,
                   x.frozen && `inputHash: ${x.frozen.inputHash}`,
@@ -190,7 +198,7 @@ function RunRow({ run, props }: { run: ResearchRunSummary; props: FlightControlV
       <button type="button" className="fc-disclose" aria-expanded={open} onClick={() => props.onToggleDetails(run.researchRunId)}>
         {open ? fcText('hideDetails', locale) : fcText('showDetails', locale)}
       </button>
-      {open && <RunDetail state={details[run.researchRunId]} locale={locale} />}
+      {open && <RunDetail state={details[run.researchRunId]} locale={locale} projectId={props.projectId ?? null} />}
       <Technical locale={locale} rows={[`researchRunId: ${run.researchRunId}`, `status: ${run.status}`, `nextStep: ${run.nextStep}`]} />
     </li>
   );

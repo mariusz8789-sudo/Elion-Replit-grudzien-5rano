@@ -51,7 +51,7 @@ export function DrugDiscoveryScreen() {
         title="Drug Discovery"
         lede="Projektuj cele biologiczne i oceniaj kandydatów obliczeniowych na realnych silnikach naukowych. Platforma liczy realną chemię (masa molowa, skład) i JAWNIE oznacza brakujące zdolności — niczego nie zmyśla."
         capabilities={[
-          'Paszport kandydata z realnych deskryptorów RDKit',
+          'Paszport kandydata z realnych deskryptorów analizy molekularnej',
           'Substitution investigation na przypiętym zbiorze referencyjnym',
           'Real-evidence rerank: pomiar zmienia ranking, nie tylko Pamięć',
           'Każdy wynik oznaczony jako MODEL_ESTIMATE, nie odkrycie terapeutyczne',

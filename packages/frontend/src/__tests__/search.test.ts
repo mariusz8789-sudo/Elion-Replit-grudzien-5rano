@@ -37,9 +37,20 @@ describe('search index', () => {
 
   it('finds CERN, drugs and the human atlas, which are screens, not plugin labs', () => {
     const index = buildDestinationIndex();
-    expect(filterSearchIndex(index, 'cern').map((e) => e.hash)).toEqual(['#/cern-complex', '#/physics/cms-z']);
+    // Order follows the navigation (main places first) since destinations derive from core/navigation.ts.
+    expect(filterSearchIndex(index, 'cern').map((e) => e.hash).sort()).toEqual(['#/cern-complex', '#/physics/cms-z']);
     expect(filterSearchIndex(index, 'leki').map((e) => e.hash)).toContain('#/drug');
     expect(filterSearchIndex(index, 'mózg').map((e) => e.hash)).toContain('#/human-biology-lab');
+  });
+
+  it('every main navigation place with a route is a search destination, with its menu name', async () => {
+    const { NAV_SECTIONS } = await import('../core/navigation');
+    const hashes = buildDestinationIndex().map((e) => e.hash);
+    for (const item of NAV_SECTIONS.flatMap((s) => s.items)) {
+      if (item.hash && item.hash !== '#/') expect(hashes, item.id).toContain(item.hash);
+    }
+    expect(buildDestinationIndex('en').find((e) => e.hash === '#/flight-control')?.labName).toBe('Science Flight Control');
+    expect(filterSearchIndex(buildDestinationIndex(), 'hypothesis').map((e) => e.hash)).toContain('#/inquiry');
   });
 
   it('finds the Reality Navigator by plain words in Polish and English', () => {

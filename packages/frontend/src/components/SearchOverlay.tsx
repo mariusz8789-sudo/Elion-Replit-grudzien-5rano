@@ -3,6 +3,7 @@ import { buildCapabilityIndex, buildDestinationIndex, buildGoalIndex, buildSearc
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { track } from '../core/analytics';
 import { useFocusTrap } from '../core/useFocusTrap';
+import { shellText } from '../core/navigationText';
 
 /**
  * Paleta poleceń (Ctrl/Cmd+K lub „/"): szuka po nazwach i tagline'ach
@@ -50,7 +51,8 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
           ref={inputRef}
           type="search"
           className="glossary-search"
-          placeholder="Search a goal, a workflow or a capability…"
+          placeholder={shellText('searchHint')}
+          aria-label={shellText('search')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {

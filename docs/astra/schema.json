@@ -108,6 +108,21 @@
         "$ref": "#/$defs/artifactId"
       }
     },
+    "sources": {
+      "description": "Run-level source events embedded verbatim with their chain positions: literature retrievals (KNOWLEDGE_SNAPSHOT, naming each raw response by sha256), offline literature replays (LITERATURE_REPLAYED, MATCH/DRIFT/TAMPERED) and registered datasets (DATASET_ATTACHED, file sha256, licence, origin URL). sourceArtifactRefs lists the artifact:<sha256> of every raw record they name.",
+      "type": "object",
+      "required": [
+        "events"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceEvent"
+          }
+        }
+      }
+    },
     "verification": {
       "type": "object",
       "additionalProperties": false,
@@ -218,7 +233,9 @@
             "ARTIFACT_PERSISTED",
             "GENERATED_ANALYSIS_PROPOSED",
             "GENERATED_ANALYSIS_EXECUTED",
-            "GENERATED_ANALYSIS_REPLAYED"
+            "GENERATED_ANALYSIS_REPLAYED",
+            "LITERATURE_REPLAYED",
+            "DATASET_ATTACHED"
           ]
         },
         "payloadFingerprint": {
@@ -700,6 +717,30 @@
         "experiments",
         "packHash"
       ]
+    },
+    "sourceEvent": {
+      "type": "object",
+      "required": [
+        "seq",
+        "type",
+        "payload"
+      ],
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "enum": [
+            "KNOWLEDGE_SNAPSHOT",
+            "LITERATURE_REPLAYED",
+            "DATASET_ATTACHED"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
     }
   },
   "allOf": [

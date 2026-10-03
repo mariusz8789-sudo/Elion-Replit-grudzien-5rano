@@ -8,10 +8,11 @@ import { getActiveKnowledgeProject } from '../core/backend/knowledgeProjectConte
 import { useLocale, type Locale } from '../core/i18n';
 import { VerifyView, NoticeBox, UnsignedNotice, type Loadable } from './verify/VerifyView';
 import {
-  describeVerifyFailure, downloadBlob, explainReport, exportableExperiments, normaliseSha256, readRecordFile, reportFileName, sha256State,
-  type Notice,
+  describeVerifyFailure, downloadBlob, explainReport, exportableExperiments, normaliseSha256, preselectExperiment, preselectProject, preselectRun,
+  readRecordFile, reportFileName, sha256State, type Notice,
 } from './verify/verifyModel';
 import { vText } from './verify/verifyText';
+import { takeVerifyTarget, type VerifyTarget } from '../core/verifyTarget';
 import './verify/verify.css';
 
 /**
@@ -60,6 +61,10 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
   const [exportNotice, setExportNotice] = useState<Notice | null>(null);
   const [exported, setExported] = useState<GenesisRecordExport | null>(null);
   const generation = useRef(0);
+  // "Verify this result" from Flight Control, the chat or the Reviewer Room: picked once, never guessed.
+  const [target] = useState<VerifyTarget | null>(() => takeVerifyTarget(typeof window === 'undefined' ? '' : window.location.hash));
+  const [preselected, setPreselected] = useState(false);
+  const targetApplied = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -68,7 +73,7 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
       if (!r.ok) { setProjects({ status: 'error', notice: describeVerifyFailure(r, locale) }); return; }
       setProjects({ status: 'ready', projects: r.data });
       const preferred = getActiveKnowledgeProject();
-      setProjectId(r.data.find((p) => p.id === preferred?.id)?.id ?? r.data[0]?.id ?? null);
+      setProjectId(preselectProject(r.data.map((p) => p.id), target, preferred?.id));
     });
     return () => { alive = false; };
     // The locale only words the error; a language switch does not need a second request.
@@ -83,6 +88,13 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
     void listResearchRuns(token, projectId).then((r) => {
       if (!alive) return;
       setRuns(r.ok ? { status: 'ready', value: r.data.researchRuns } : { status: 'error', notice: describeVerifyFailure(r, locale) });
+      // Preselect the asked run only when the server lists it in this project.
+      const asked = r.ok && !targetApplied.current ? preselectRun(target, r.data.researchRuns) : null;
+      if (asked) {
+        targetApplied.current = true;
+        setPreselected(true);
+        void onRun(asked, target);
+      }
     });
     return () => { alive = false; };
   }, [projectId, token]);
@@ -101,12 +113,15 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
 
   const resetResult = () => { setReport(null); setHtml(null); setNotice(null); };
 
-  const onRun = async (id: string) => {
+  const onRun = async (id: string, asked: VerifyTarget | null = null) => {
     setRunId(id); setExperimentId(''); setExported(null); setExportNotice(null);
     if (!id || !projectId) { setExperiments({ status: 'idle' }); return; }
     setExperiments({ status: 'loading' });
     const r = await getResearchRun(token, projectId, id);
-    setExperiments(r.ok ? { status: 'ready', value: exportableExperiments(r.data.researchRun.experiments) } : { status: 'error', notice: describeVerifyFailure(r, locale) });
+    const exportable = r.ok ? exportableExperiments(r.data.researchRun.experiments) : [];
+    setExperiments(r.ok ? { status: 'ready', value: exportable } : { status: 'error', notice: describeVerifyFailure(r, locale) });
+    const experiment = preselectExperiment(asked, exportable);
+    if (experiment) setExperimentId(experiment);
   };
 
   const onGetRecord = async () => {
@@ -188,7 +203,7 @@ function SignedInVerify({ token, locale }: { token: string; locale: Locale }) {
       reportUrl={reportUrl}
       reportFileName={report ? reportFileName(report) : null}
       exporter={{
-        runs, runId, experiments, experimentId, exporting, exportNotice, exported, exportedUrl,
+        runs, runId, experiments, experimentId, exporting, exportNotice, exported, exportedUrl, preselected,
         onRun: (id) => { void onRun(id); },
         onExperiment: setExperimentId,
         onGetRecord: () => { void onGetRecord(); },

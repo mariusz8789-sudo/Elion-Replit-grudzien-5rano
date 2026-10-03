@@ -1,4 +1,5 @@
 import type { ChatAction, EpistemicTag } from './resolveCommand';
+import type { VerifyTarget } from '../verifyTarget';
 import type {
   ApiResult, GeneratedScientificAnalysis, ResearchRunExperiment, ResearchRunReplay, ResearchRunVerdict, ResearchRunView,
 } from '../backend/client';
@@ -40,6 +41,13 @@ export interface ResearchRunTurn {
   readonly tag: EpistemicTag;
   /** The run this chat continues with `/eksperyment` and `/powtórz`; unchanged when the step failed. */
   readonly researchRunId: string | null;
+  /** Set when the turn shows an executed experiment: the chat offers "Verify this result" for it. */
+  readonly verify?: VerifyTarget;
+}
+
+/** The Verify target of an executed experiment, or undefined when nothing was executed. */
+function verifyOf(projectId: string, run: ResearchRunView, x: ResearchRunExperiment | undefined): VerifyTarget | undefined {
+  return x?.execution ? { projectId, researchRunId: run.researchRunId, experimentId: x.experimentId } : undefined;
 }
 
 export const VERDICT_LABEL: Record<ResearchRunVerdict, string> = {
@@ -134,7 +142,7 @@ async function executeNext(token: string, projectId: string, run: ResearchRunVie
   if (!executed.ok) return refusal(prefix, executed, run.researchRunId);
   const x = executed.data.experiment ?? executed.data.researchRun.experiments.at(-1);
   if (!x) return { text: `${prefix}: brak eksperymentu w odpowiedzi serwera.`, tag: 'SYSTEM', researchRunId: run.researchRunId };
-  return { text: formatExperiment(executed.data.researchRun, x), tag: tagOf(x), researchRunId: run.researchRunId };
+  return { text: formatExperiment(executed.data.researchRun, x), tag: tagOf(x), researchRunId: run.researchRunId, verify: verifyOf(projectId, executed.data.researchRun, x) };
 }
 
 /**
@@ -163,7 +171,7 @@ export async function runResearchRunAction(
     // The same question returns the same run; one that already waits for a person is shown, not re-run.
     if (run.nextStep === 'AWAITING_HUMAN_REVIEW') {
       const last = run.experiments.at(-1);
-      return { text: `${header}\n\nTo pytanie ma już przebieg.\n${last ? formatExperiment(run, last) : ''}`.trim(), tag: tagOf(last), researchRunId: run.researchRunId };
+      return { text: `${header}\n\nTo pytanie ma już przebieg.\n${last ? formatExperiment(run, last) : ''}`.trim(), tag: tagOf(last), researchRunId: run.researchRunId, verify: verifyOf(projectId, run, last) };
     }
     const turn = await executeNext(token, projectId, run, client, 'Eksperyment nie został wykonany');
     return { ...turn, text: `${header}\n\n${turn.text}` };
@@ -216,5 +224,6 @@ export async function runResearchRunAction(
     text: `${replayLine(replayed.data.verification)}\nWszystkie powtórzenia tego eksperymentu: ${all.join(', ')}. Każde jest zapisane; żadne nie zmienia werdyktu.`,
     tag: replayed.data.verification.verdict === 'MATCH' ? 'WYNIK' : 'SYSTEM',
     researchRunId,
+    verify: verifyOf(projectId, run, last),
   };
 }

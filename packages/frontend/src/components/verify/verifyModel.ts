@@ -1,5 +1,6 @@
 import type { ApiResult, GenesisVerifyReport, ResearchRunExperiment } from '../../core/backend/client';
 import type { Locale } from '../../core/i18n';
+import type { VerifyTarget } from '../../core/verifyTarget';
 import {
   CAPABILITY_TEXT, CHECK_REASONS, CHECK_TITLE, NOT_CHECKED_TEXT, VERDICT_TEXT,
   checkExplain, pairText, statusWord, vText, verdictWord,
@@ -158,4 +159,27 @@ export function readRecordFile(file: Blob): Promise<string> {
 /** A Blob for a download link; the caller owns the object URL made from it. */
 export function downloadBlob(text: string, mimeType: string): Blob {
   return new Blob([text], { type: `${mimeType};charset=utf-8` });
+}
+
+/*
+ * "Verify this result" preselection. A result screen hands over ids; Verify picks each one only when
+ * the server lists it for this account, never by guessing. The functions are pure so a test can check
+ * them without a browser.
+ */
+
+/** The project to open: the asked one if listed, else the active knowledge project, else the first. */
+export function preselectProject(projectIds: readonly string[], target: VerifyTarget | null, preferredId: string | null | undefined): string | null {
+  if (target?.projectId && projectIds.includes(target.projectId)) return target.projectId;
+  if (preferredId && projectIds.includes(preferredId)) return preferredId;
+  return projectIds[0] ?? null;
+}
+
+/** The asked research run, when the project's list holds it. */
+export function preselectRun(target: VerifyTarget | null, runs: readonly { researchRunId: string }[]): string | null {
+  return target && runs.some((r) => r.researchRunId === target.researchRunId) ? target.researchRunId : null;
+}
+
+/** The asked experiment, when it is one of the run's executed (exportable) experiments. */
+export function preselectExperiment(target: VerifyTarget | null, experiments: readonly { experimentId: string }[]): string | null {
+  return target?.experimentId && experiments.some((x) => x.experimentId === target.experimentId) ? target.experimentId : null;
 }

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "genesis.literature-raw-fixtures@1",
+  "label": "SYNTHETIC RAW RESPONSES IN PROVIDER FORMAT - NOT A LIVE CAPTURE",
+  "captureStatus": "SYNTHETIC_PROVIDER_FORMAT",
+  "why": "The build environment that wrote these files could not reach www.ebi.ac.uk or eutils.ncbi.nlm.nih.gov (egress proxy refused CONNECT, HTTP 403, 2026-10-03). The bodies were written by hand in the documented Europe PMC REST (resultType=core) and NCBI E-utilities (esearch/esummary, retmode=json) response shapes so the real connector code parses them. They are test inputs, not literature: every identifier is synthetic (PMIDs 99000001-99000004, DOI prefix 10.5555 is the Crossref test prefix) and every title starts with [SYNTHETIC FIXTURE].",
+  "replaceWith": "node scripts/research-run-literature-live-proof.mjs on a host with network access writes real recorded bodies and a manifest of the same shape under artifacts/research-run-literature-live-proof/raw/.",
+  "epistemicStatus": "NOT_EVIDENCE",
+  "files": [
+    { "file": "europepmc-primary.json", "provider": "EUROPE_PMC", "route": "/europepmc/webservices/rest/search (primary query)", "sha256": "c6c473eff34a045705f3cdcddfd4559b8b6ee07a212b475c0dfb9b3f59509b90", "bytes": 769 },
+    { "file": "europepmc-contradiction.json", "provider": "EUROPE_PMC", "route": "/europepmc/webservices/rest/search (contradiction-candidate query)", "sha256": "3ff0b91ca7f996f22a7a02b0076ece4366329c483a94ef391d723294132477f8", "bytes": 514 },
+    { "file": "pubmed-esearch-primary.json", "provider": "PUBMED", "route": "/entrez/eutils/esearch.fcgi (primary query)", "sha256": "203c389b1653e533fb4d6dd7f390a7d959c70f1c5ab6f7f5c2200866bacbfb63", "bytes": 209 },
+    { "file": "pubmed-esummary-primary.json", "provider": "PUBMED", "route": "/entrez/eutils/esummary.fcgi (ids from the primary esearch)", "sha256": "d036d9cd78e2bfd7f1a8bd6fc02bf286a3e4be365eac412a91b16afa49a823e6", "bytes": 893 },
+    { "file": "pubmed-esearch-contradiction.json", "provider": "PUBMED", "route": "/entrez/eutils/esearch.fcgi (contradiction-candidate query, no ids)", "sha256": "3cdc18ac967eb9d978874dc35ffd0fa6873c8d84e65f35a517ea2ccd6cb4744b", "bytes": 187 }
+  ]
+}

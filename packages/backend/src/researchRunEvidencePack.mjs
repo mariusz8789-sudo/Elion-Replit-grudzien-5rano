@@ -33,6 +33,7 @@ import { canonicalHash } from './provenance.mjs';
 import { getResearchRun, RESEARCH_RUN_CONTRACT_VERSION, RESEARCH_RUN_DOMAIN } from './researchRun.mjs';
 import { buildExecutionBundle, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { EXECUTION_RECORD_VERSION, PROTOCOL_VERDICT, REPLAY_NOT_APPLICABLE } from './researchRunExecution.mjs';
+import { readSourceRecord, SOURCE_RECORD_STATUS } from './sourceRecordStore.mjs';
 import { getExperimentRecord, getScienceRun, getScienceRunVerification, listScienceRunVerifications, verifyExperimentRecordChain } from './store.mjs';
 
 export const EVIDENCE_PACK_CONTRACT = 'research-run-envelope@1';
@@ -52,7 +53,22 @@ export const PACK_FAILURE = Object.freeze({
   PACK_HASH_MISMATCH: 'PACK_HASH_MISMATCH',
   REFERENCE_UNRESOLVED: 'REFERENCE_UNRESOLVED',
   STATE_ANCHOR_MISMATCH: 'STATE_ANCHOR_MISMATCH',
+  SOURCE_RECORD_MUTATED: 'SOURCE_RECORD_MUTATED',
 });
+
+/** Run-level source events the pack embeds verbatim: literature retrievals, their replays, registered datasets. */
+export const SOURCE_EVENT_TYPES = Object.freeze(['KNOWLEDGE_SNAPSHOT', 'LITERATURE_REPLAYED', 'DATASET_ATTACHED']);
+
+/** The raw-byte records a list of source events names: literature response bodies and dataset files. */
+export function sourceRecordRefsOf(sourceEvents) {
+  const refs = [];
+  for (const event of sourceEvents ?? []) {
+    if (event.type === 'KNOWLEDGE_SNAPSHOT') for (const r of event.payload?.rawResponses ?? []) refs.push({ artifactId: `artifact:${r.sha256}`, sha256: r.sha256, bytes: r.bytes, seq: event.seq });
+    if (event.type === 'DATASET_ATTACHED') refs.push({ artifactId: `artifact:${event.payload?.sha256}`, sha256: event.payload?.sha256, bytes: event.payload?.bytes, seq: event.seq });
+  }
+  return refs;
+}
+const sourceArtifactIdsOf = (sourceEvents) => [...new Set(sourceRecordRefsOf(sourceEvents).map((r) => r.artifactId))].sort();
 
 /** The experiment events a pack embeds, in lifecycle order. ARTIFACT_PERSISTED is absent when custody never ran. */
 const EXPERIMENT_EVENT_TYPES = ['PREDICTIONS_FROZEN', 'EXPERIMENT_HANDOFF', 'SELF_FALSIFICATION', 'EVIDENCE_UPDATE', 'NEXT_EXPERIMENT', 'ARTIFACT_PERSISTED'];
@@ -157,6 +173,14 @@ async function anchoredFailures(pack, { db, projectId, artifactStorage }) {
       fail(PACK_FAILURE.STATE_ANCHOR_MISMATCH, `event ${ref.seq} (${ref.type}) differs from the stored research state`);
     }
   }
+  for (const embedded of pack.sources?.events ?? []) {
+    const event = stored[embedded.seq];
+    if (!event || event.type !== embedded.type || !sameJson(event.payload, embedded.payload)) fail(PACK_FAILURE.STATE_ANCHOR_MISMATCH, `${embedded.type} payload differs from the stored event ${embedded.seq}`);
+  }
+  for (const ref of sourceRecordRefsOf(pack.sources?.events)) {
+    const read = readSourceRecord(db, ref.sha256);
+    if (read.status !== SOURCE_RECORD_STATUS.INTACT || read.bytes !== ref.bytes) fail(PACK_FAILURE.SOURCE_RECORD_MUTATED, `source record ${ref.sha256} (event ${ref.seq}) is ${read.status === SOURCE_RECORD_STATUS.INTACT ? SOURCE_RECORD_STATUS.TAMPERED : read.status}`);
+  }
   for (const x of pack.experiments ?? []) {
     for (const type of EXPERIMENT_EVENT_TYPES) {
       const embedded = x.events?.[type];
@@ -241,8 +265,15 @@ export async function buildResearchRunEvidencePack(db, projectId, runId, { artif
     return { ...experiment, summary: summaryOf(experiment) };
   });
 
+  const sourceEvents = events.filter((e) => SOURCE_EVENT_TYPES.includes(e.type)).map((e) => ({ seq: e.seq, type: e.type, payload: e.payload }));
   const missing = [];
   if (!/^[a-f0-9]{40}$/.test(String(producerCommit))) missing.push('Producer commit unknown in this runtime.');
+  const replayed = new Set(sourceEvents.filter((e) => e.type === 'LITERATURE_REPLAYED' && e.payload?.verdict === 'MATCH').map((e) => e.payload.snapshotId));
+  for (const e of sourceEvents.filter((x) => x.type === 'KNOWLEDGE_SNAPSHOT' && x.payload?.status !== 'BLOCKED')) {
+    const snapshotId = e.payload.snapshotId ?? `lit-${e.payload.requestFingerprint}`;
+    if (!(e.payload.rawResponses ?? []).length) missing.push(`Literature snapshot ${snapshotId} has no stored raw responses: it cannot be replayed.`);
+    else if (!replayed.has(snapshotId)) missing.push(`Literature snapshot ${snapshotId} has no MATCH replay from its stored raw responses.`);
+  }
   for (const x of open) missing.push(`Experiment ${x.experimentId} is not closed (${x.execution ? 'awaiting evidence/next step' : 'never executed'}); it is not in this pack.`);
   for (const x of experiments) if (!x.events.ARTIFACT_PERSISTED && x.summary.executionStatus === 'EXECUTED') missing.push(`Experiment ${x.experimentId} has no recorded artifact.`);
   if (!artifactStorage) missing.push('Artifact bytes were not re-read: no artifact storage configured.');
@@ -266,9 +297,10 @@ export async function buildResearchRunEvidencePack(db, projectId, runId, { artif
     scienceRunRefs: experiments.filter((x) => x.scienceRunId).map((x) => ({ id: x.scienceRunId })),
     evidenceRefs: experiments.map((x) => ({ proposalId: payloadOf(x, 'EVIDENCE_UPDATE').evidenceProposalId })),
     replayRefs: experiments.flatMap((x) => x.replays.map((r) => ({ verificationId: r.verificationId, scienceRunId: r.scienceRunId }))),
-    sourceArtifactRefs: [],
+    sourceArtifactRefs: sourceArtifactIdsOf(sourceEvents),
     reportArtifactRefs: [],
     licenceDecisionArtifactRefs: [],
+    sources: { events: sourceEvents },
     experiments,
   };
   const anchored = await anchoredFailures(pack, { db, projectId, artifactStorage });
@@ -346,6 +378,17 @@ function offlineFailures(pack, { skipPackHash = false } = {}) {
     head = next;
   }
   if (pack.integrity?.stateChainHead !== head || pack.integrity?.stateChainLength !== pack.eventRefs.length) fail(PACK_FAILURE.STATE_CHAIN_MISMATCH, 'chain head differs from the recomputed head');
+
+  // Source events (literature, replays, datasets): each embedded payload is the one the chain fingerprinted.
+  for (const embedded of pack.sources?.events ?? []) {
+    const ref = pack.eventRefs[embedded.seq];
+    if (!SOURCE_EVENT_TYPES.includes(embedded.type) || !ref || ref.type !== embedded.type || fnv1a(canonicalJson(embedded.payload)) !== ref.payloadFingerprint) {
+      fail(PACK_FAILURE.EVENT_FINGERPRINT_MISMATCH, `${embedded.type} payload does not match the chain at seq ${embedded.seq}`);
+    }
+  }
+  const embeddedSeqs = new Set((pack.sources?.events ?? []).map((e) => e.seq));
+  if (pack.eventRefs.some((ref) => SOURCE_EVENT_TYPES.includes(ref.type) && !embeddedSeqs.has(ref.seq))) fail(PACK_FAILURE.PROVENANCE_MISSING, 'a literature or dataset event of the chain is not embedded');
+  if (pack.sources && !sameJson(pack.sourceArtifactRefs ?? [], sourceArtifactIdsOf(pack.sources.events))) fail(PACK_FAILURE.PROVENANCE_MUTATED, 'sourceArtifactRefs differ from the embedded source events');
 
   const declared = new Map((pack.integrity?.experiments ?? []).map((x) => [x.experimentId, x.sections]));
   for (const x of pack.experiments) {

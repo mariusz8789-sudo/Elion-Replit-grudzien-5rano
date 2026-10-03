@@ -1,0 +1,176 @@
+/* #/flight-control — Kontrola lotów nauki. Reads the app's tokens (styles.css :root); falls back to the same values. */
+.fc-room {
+  --fc-bg: var(--bg, #070b17);
+  --fc-raised: var(--bg-raised, #0e1426);
+  --fc-panel: var(--bg-panel, #131b31);
+  --fc-line: var(--border, rgba(164, 184, 232, 0.10));
+  --fc-line-strong: var(--border-strong, rgba(164, 184, 232, 0.22));
+  --fc-text: var(--text, #eef2fb);
+  --fc-dim: var(--text-dim, #a9b3cf);
+  --fc-faint: var(--text-faint, #6f7a9b);
+  --fc-good: var(--green, #6ee7a0);
+  --fc-warn: var(--gold, #f0b35c);
+  --fc-bad: var(--red, #f47c7c);
+  --fc-accent: var(--cyan, #5cd6e8);
+  background: var(--fc-bg);
+  color: var(--fc-text);
+  min-height: 100vh;
+  padding: var(--sp-3, 1.1rem) 16px calc(4rem + var(--safe-bottom, 0px));
+  box-sizing: border-box;
+  font-family: var(--font-body, system-ui, sans-serif);
+  overflow-x: clip;
+}
+.fc-room *, .fc-room *::before, .fc-room *::after { box-sizing: border-box; }
+.fc-room > * { max-width: 1180px; margin-left: auto; margin-right: auto; }
+.fc-room code, .fc-mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.86em; overflow-wrap: anywhere; word-break: break-word; }
+.fc-room h1, .fc-room h2, .fc-room h3, .fc-room h4 { margin: 0; line-height: 1.25; }
+
+/* hero */
+.fc-hero { padding: var(--sp-3, 1.1rem) 0 var(--sp-2, 0.7rem); }
+.fc-kicker { margin: 0; font-size: var(--fs-micro, 0.72rem); letter-spacing: 0.12em; text-transform: uppercase; color: var(--fc-accent); font-weight: 700; }
+.fc-hero h1 { font-size: clamp(1.55rem, 4.6vw, 2.4rem); margin: 0.25em 0 0.35em; font-weight: 750; letter-spacing: -0.01em; }
+.fc-hero p:last-child { margin: 0; color: var(--fc-dim); max-width: 64ch; line-height: 1.55; font-size: var(--fs-body, 0.95rem); }
+
+/* gate: signed out, no project */
+.fc-gate { margin-top: var(--sp-3, 1.1rem); padding: var(--sp-3, 1.1rem) 0; border-top: 1px solid var(--fc-line); display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; align-items: center; }
+.fc-gate p { margin: 0; flex: 1 1 260px; color: var(--fc-dim); line-height: 1.55; max-width: 60ch; }
+
+/* toolbar */
+.fc-body { display: flex; flex-direction: column; gap: var(--sp-4, 1.6rem); margin-top: var(--sp-2, 0.7rem); }
+.fc-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.5rem 0; border-top: 1px solid var(--fc-line); border-bottom: 1px solid var(--fc-line); }
+.fc-project { display: flex; align-items: center; gap: 0.6rem; margin: 0; min-width: 0; flex: 1 1 220px; font-size: var(--fs-meta, 0.82rem); color: var(--fc-dim); }
+.fc-project strong { color: var(--fc-text); overflow-wrap: anywhere; }
+.fc-project select { min-height: 44px; flex: 1 1 auto; min-width: 0; max-width: 100%; padding: 0 0.8rem; border-radius: var(--r-sm, 12px); border: 1px solid var(--fc-line-strong); background: var(--fc-raised); color: var(--fc-text); font: inherit; font-size: 0.95rem; }
+.fc-refresh { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+
+/* buttons: 44px touch targets */
+.fc-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px;
+  padding: 0 1.05rem; border-radius: 999px; border: 1px solid transparent;
+  background: var(--fc-accent); color: #04121a; font: inherit; font-weight: 650; font-size: 0.92rem;
+  text-decoration: none; cursor: pointer; transition: transform var(--dur-fast, 0.15s) var(--ease-out, ease), opacity var(--dur-fast, 0.15s);
+}
+.fc-btn:active { transform: scale(0.97); }
+.fc-btn:disabled { opacity: 0.55; cursor: progress; }
+.fc-btn:focus-visible, .fc-disclose:focus-visible, .fc-tech summary:focus-visible, .fc-project select:focus-visible { outline: 2px solid var(--fc-accent); outline-offset: 2px; }
+.fc-btn-quiet { background: transparent; color: var(--fc-text); border-color: var(--fc-line-strong); }
+.fc-btn-danger { background: var(--fc-bad); color: #1b0606; }
+.fc-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
+
+/* summary: one strip of readings, not boxes */
+/* 1px gaps over a line-coloured background draw the rules between readings at any column count */
+.fc-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; border-radius: var(--r-md, 18px); background: var(--fc-line); border: 1px solid var(--fc-line); overflow: hidden; }
+@media (min-width: 520px) { .fc-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .fc-summary { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.fc-gauge { padding: 0.75rem 0.9rem; min-width: 0; background: linear-gradient(160deg, rgba(92, 214, 232, 0.06), rgba(167, 139, 250, 0.03)), var(--fc-bg); }
+.fc-gauge dt { font-size: var(--fs-micro, 0.72rem); color: var(--fc-dim); text-transform: uppercase; letter-spacing: 0.05em; overflow-wrap: anywhere; }
+.fc-gauge dd { margin: 0.15rem 0 0; font-size: 1.65rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.fc-gauge.fc-tone-good dd { color: var(--fc-good); }
+.fc-gauge.fc-tone-warn dd { color: var(--fc-warn); }
+.fc-gauge.fc-tone-bad dd { color: var(--fc-bad); }
+
+/* sections */
+.fc-grid { display: grid; gap: var(--sp-4, 1.6rem); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1080px) { .fc-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; } }
+.fc-section { min-width: 0; }
+.fc-section-head { margin-bottom: 0.8rem; }
+.fc-section-head h2 { font-size: var(--fs-title, 1.35rem); font-weight: 700; }
+.fc-section-head p { margin: 0.3rem 0 0; color: var(--fc-dim); font-size: 0.9rem; line-height: 1.5; max-width: 70ch; }
+.fc-empty { margin: 0; padding: 0.9rem 1rem; border-radius: var(--r-sm, 12px); border: 1px dashed var(--fc-line-strong); color: var(--fc-dim); font-size: 0.92rem; line-height: 1.5; }
+.fc-muted { color: var(--fc-dim); }
+.fc-small { font-size: var(--fs-meta, 0.82rem); color: var(--fc-dim); line-height: 1.5; margin: 0.4rem 0 0; overflow-wrap: anywhere; }
+.fc-ok { color: var(--fc-good); }
+.fc-broken { color: var(--fc-bad); }
+
+/* status pill */
+.fc-pill { display: inline-block; flex: none; padding: 0.18rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 650; line-height: 1.35; border: 1px solid currentColor; max-width: 100%; overflow-wrap: anywhere; vertical-align: middle; }
+.fc-pill.fc-tone-good { color: var(--fc-good); }
+.fc-pill.fc-tone-warn { color: var(--fc-warn); }
+.fc-pill.fc-tone-bad { color: var(--fc-bad); }
+.fc-pill.fc-tone-idle { color: var(--fc-dim); }
+
+/* runs: a ruled list with a status rail, not a stack of cards */
+.fc-run-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--fc-line); }
+.fc-run { position: relative; padding: 1rem 0 1rem 1rem; border-bottom: 1px solid var(--fc-line); min-width: 0; }
+.fc-run::before { content: ''; position: absolute; left: 0; top: 1rem; bottom: 1rem; width: 3px; border-radius: 3px; background: var(--fc-faint); }
+.fc-rail-good::before { background: var(--fc-good); }
+.fc-rail-warn::before { background: var(--fc-warn); }
+.fc-rail-bad::before { background: var(--fc-bad); }
+.fc-run-head { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: flex-start; justify-content: space-between; }
+.fc-run-head h3 { flex: 1 1 12rem; font-size: 1.04rem; font-weight: 650; overflow-wrap: anywhere; min-width: 0; }
+.fc-run-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0.45rem 0 0; font-size: var(--fs-meta, 0.82rem); color: var(--fc-dim); }
+.fc-run-meta strong { color: var(--fc-text); font-weight: 600; }
+.fc-confirm { margin-top: 0.7rem; padding: 0.7rem 0.9rem; border-radius: var(--r-sm, 12px); background: rgba(244, 124, 124, 0.08); border: 1px solid rgba(244, 124, 124, 0.4); }
+.fc-confirm p { margin: 0; font-size: 0.9rem; }
+.fc-disclose { display: inline-flex; align-items: center; min-height: 44px; margin-top: 0.4rem; padding: 0; border: 0; background: none; color: var(--fc-accent); font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: left; }
+.fc-run-detail { margin-top: 0.4rem; padding: 0.2rem 0 0.2rem 0.9rem; border-left: 1px solid var(--fc-line-strong); }
+.fc-run-detail h4 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fc-dim); margin: 0.8rem 0 0.4rem; }
+.fc-hyps, .fc-exps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.fc-hyps li { line-height: 1.5; overflow-wrap: anywhere; }
+.fc-exp-claim { margin: 0 0 0.3rem; font-weight: 600; overflow-wrap: anywhere; }
+
+/* facts: label/value pairs that wrap */
+.fc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: 0.35rem 0.9rem; margin: 0.4rem 0 0; }
+.fc-facts > div { min-width: 0; }
+.fc-facts dt { font-size: var(--fs-micro, 0.72rem); color: var(--fc-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.fc-facts dd { margin: 0.1rem 0 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+
+/* notices */
+.fc-notice { margin-top: 0.7rem; padding: 0.7rem 0.9rem; border-radius: var(--r-sm, 12px); border: 1px solid var(--fc-line-strong); background: var(--fc-raised); font-size: 0.9rem; line-height: 1.5; }
+.fc-notice p { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
+.fc-notice p:last-of-type { margin-bottom: 0; }
+.fc-notice.fc-tone-good { border-color: rgba(110, 231, 160, 0.45); }
+.fc-notice.fc-tone-warn { border-color: rgba(240, 179, 92, 0.5); }
+.fc-notice.fc-tone-bad { border-color: rgba(244, 124, 124, 0.55); background: rgba(244, 124, 124, 0.07); }
+
+/* technical details */
+.fc-tech { margin-top: 0.3rem; font-size: var(--fs-meta, 0.82rem); color: var(--fc-dim); }
+.fc-tech summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; width: fit-content; max-width: 100%; color: var(--fc-faint); }
+.fc-tech ul { margin: 0 0 0.4rem; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
+
+/* job queue: three lanes side by side on wide screens, stacked with headers on phones */
+.fc-lanes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@media (min-width: 900px) { .fc-lanes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fc-lane { min-width: 0; padding: 0.8rem; border-radius: var(--r-md, 18px); background: var(--fc-raised); border: 1px solid var(--fc-line); }
+.fc-lane h3 { display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem; font-weight: 650; margin-bottom: 0.6rem; }
+.fc-lane-queued h3 { color: var(--fc-warn); }
+.fc-lane-claimed h3 { color: var(--fc-accent); }
+.fc-lane-finished h3 { color: var(--fc-dim); }
+.fc-count { font-variant-numeric: tabular-nums; font-size: 0.85rem; padding: 0.1rem 0.55rem; border-radius: 999px; background: rgba(255, 255, 255, 0.06); color: var(--fc-text); }
+.fc-lane ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.fc-lane .fc-empty { border: 0; padding: 0.2rem 0; font-size: 0.86rem; }
+.fc-ticket { position: relative; padding: 0.7rem 0.8rem 0.5rem 1rem; border-radius: var(--r-sm, 12px); background: var(--fc-panel); min-width: 0; }
+.fc-ticket::before { content: ''; position: absolute; left: 0.35rem; top: 0.7rem; bottom: 0.7rem; width: 3px; border-radius: 3px; background: var(--fc-faint); }
+.fc-ticket-run { margin: 0; font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
+
+/* flights: a four-stage path per flight */
+.fc-flight-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.2rem; }
+.fc-flight { padding: 1rem 0 0.4rem; border-top: 1px solid var(--fc-line-strong); min-width: 0; }
+.fc-flight-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; }
+.fc-flight-head h3 { font-size: 1rem; font-weight: 650; min-width: 0; overflow-wrap: anywhere; }
+.fc-path { list-style: none; margin: 0.8rem 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; counter-reset: fc-stage; }
+.fc-stage { position: relative; padding: 0 0 0.9rem 1.9rem; min-width: 0; counter-increment: fc-stage; }
+.fc-stage::before { content: counter(fc-stage); position: absolute; left: 0; top: 0; width: 1.3rem; height: 1.3rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.72rem; font-weight: 700; background: var(--fc-raised); border: 2px solid var(--fc-faint); color: var(--fc-text); }
+.fc-stage::after { content: ''; position: absolute; left: calc(0.65rem - 1px); top: 1.4rem; bottom: 0.1rem; width: 2px; background: var(--fc-line-strong); }
+.fc-stage:last-child::after { display: none; }
+.fc-stage.fc-tone-good::before { border-color: var(--fc-good); }
+.fc-stage.fc-tone-warn::before { border-color: var(--fc-warn); }
+.fc-stage.fc-tone-bad::before { border-color: var(--fc-bad); }
+.fc-stage h4 { font-size: 0.84rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fc-dim); margin-bottom: 0.3rem; line-height: 1.3rem; }
+.fc-stage p { margin: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.fc-checks { list-style: none; margin: 0.35rem 0 0; padding: 0; font-size: 0.84rem; display: grid; gap: 0.15rem; }
+@media (min-width: 760px) {
+  .fc-path { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; }
+  .fc-stage { padding: 1.9rem 0 0; }
+  .fc-stage::after { left: 1.5rem; right: -0.6rem; top: calc(0.65rem - 1px); bottom: auto; width: auto; height: 2px; }
+}
+.fc-stop { margin: 0.2rem 0 0; padding: 0.55rem 0.8rem; border-radius: var(--r-sm, 12px); background: rgba(244, 124, 124, 0.08); border-left: 3px solid var(--fc-bad); font-size: 0.9rem; overflow-wrap: anywhere; }
+
+/* blocked dependencies: chips that wrap */
+.fc-blocked .fc-section-head p { max-width: none; }
+.fc-deps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.fc-dep { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.55rem 0.8rem; border-radius: var(--r-sm, 12px); border: 1px solid rgba(244, 124, 124, 0.35); background: rgba(244, 124, 124, 0.05); min-width: 0; max-width: 100%; flex: 1 1 14rem; }
+.fc-dep-kind { font-size: var(--fs-micro, 0.72rem); color: var(--fc-bad); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.fc-dep .fc-small { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .fc-btn { transition: none; } }

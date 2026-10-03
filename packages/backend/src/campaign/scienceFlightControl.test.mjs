@@ -73,6 +73,21 @@ describe('Science Flight Control / Experiment Firewall projection', () => {
     assert.equal(replayFlight.bytUpdate.status, 'INCOMPLETE');
   });
 
+  test('a plan without a recorded research gate is not cleared by default', () => {
+    const withoutGate = { ...plan.payload };
+    delete withoutGate.researchGate;
+    const ungated = event('plan-ungated', 'VIRTUAL_EXPERIMENT_PLANNED', 1, withoutGate);
+    const flight = projectScienceFlightControl({ plans: [ungated] }).flights[0];
+    assert.equal(flight.preflight.decision, 'BLOCKED');
+    assert.equal(flight.preflight.checks.find((check) => check.check === 'RESEARCH_GATE').status, 'FAIL');
+    assert.equal(flight.status, FLIGHT_STATUS.BLOCKED);
+    assert.equal(flight.failureAttribution.layer, FAILURE_LAYER.RESEARCH_GATE);
+    assert.equal(flight.failureAttribution.code, 'RESEARCH_GATE_NOT_RECORDED');
+
+    const vetoed = event('plan-veto', 'VIRTUAL_EXPERIMENT_PLANNED', 1, { ...plan.payload, researchGate: { verdict: 'RESEARCH_PRIORITY_DENIED', reason: 'SAFETY_VETO' } });
+    assert.equal(projectScienceFlightControl({ plans: [vetoed] }).flights[0].failureAttribution.code, 'SAFETY_VETO');
+  });
+
   test('is deterministic and leaves canonical event inputs untouched', () => {
     const input = { plans: [plan], results: [result], evidenceLinks: [evidence], replays: [replay] };
     const before = JSON.stringify(input);

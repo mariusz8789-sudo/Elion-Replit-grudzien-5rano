@@ -39,6 +39,7 @@ const ITEMS: Readonly<Record<string, { label: Pair; short?: Pair; description?: 
   'myths-theories': { label: ['Myths and theories'] },
   'virtual-bio': { label: ['Virtual Lab: biology'] },
   memory: { label: ['Evidence and memory'] },
+  'flight-control': { label: ['Science Flight Control'], description: ['Research runs, the job queue and experiment flights; pause, resume, cancel'] },
   'discovery-log': { label: ['Discovery log'] },
   'knowledge-sources': { label: ['Knowledge and public sources'] },
   worlds: { label: ['Visualisations and worlds'] },

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setInterval, clearInterval } from 'node:timers';
@@ -23,7 +22,23 @@ const alive = (pid) => {
   try { process.kill(pid, 0); } catch { return false; }
   try { return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8')); } catch { return true; }
 };
-const strays = (pattern) => { try { return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).length; } catch { return 0; } };
+// Processes started by THIS test process (they inherit its environment tag), wherever they now sit in the process tree.
+// Counting by command line alone would also count the engines of other test files running in parallel.
+const TAG = `GENESIS_ISOLATION_TEST=${process.pid}-${Date.now()}`;
+process.env.GENESIS_ISOLATION_TEST = TAG.split('=')[1];
+const strays = (pattern) => {
+  const matcher = new RegExp(pattern);
+  let count = 0;
+  for (const entry of readdirSync('/proc')) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      if (!readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').includes(TAG)) continue;
+      if (/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${entry}/stat`, 'utf8'))) continue;
+      if (matcher.test(readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0').join(' '))) count += 1;
+    } catch { /* the process ended while it was inspected */ }
+  }
+  return count;
+};
 // Anchored at the start of the command line so a shell whose text merely mentions the script is not counted.
 const ENGINE_PROCESS = '^\\S*python\\S* \\S*qm_worker\\.py';
 const CHILD_PROCESS = '^\\S*node\\S* --no-warnings \\S*researchRunChild\\.mjs';

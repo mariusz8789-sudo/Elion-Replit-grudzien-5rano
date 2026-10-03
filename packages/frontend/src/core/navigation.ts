@@ -116,6 +116,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log', variantOf: 'memory' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', variantOf: 'memory', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
+  { id: 'flight-control', label: 'Kontrola lotów nauki', icon: '◎', hash: '#/flight-control', description: 'Przebiegi badań, kolejka zadań i loty eksperymentów; wstrzymaj, wznów, anuluj' },
   // — Światy i symulacje —
   { id: 'worlds', label: 'Wizualizacje i światy', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },
   { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world', variantOf: 'worlds' },
@@ -171,7 +172,7 @@ export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'Wszyst
  */
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   { id: 'more-ls', label: 'Nauki o życiu', ids: ['campaign', 'chemistry', 'virtual-bio'] },
-  { id: 'more-evidence', label: 'Dowody i weryfikacja', ids: ['memory', 'meta-cognition'] },
+  { id: 'more-evidence', label: 'Dowody i weryfikacja', ids: ['memory', 'flight-control', 'meta-cognition'] },
   { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
   { id: 'more-physics', label: 'Fizyka, kwanty i CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
   { id: 'more-worlds', label: 'Świat i cyfrowy bliźniak', ids: ['worlds', 'whatif'] },

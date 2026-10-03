@@ -163,6 +163,9 @@ export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now
       return changed === 1 ? { ok: true, job: read(jobId) } : { ok: false, error: 'JOB_NOT_CANCELLABLE' };
     },
     get: read,
+    /** Every queue job of one ResearchRun, oldest first (read-only; used by run-level control and state views). */
+    listForResearchRun: (researchRunId) => db.prepare(`SELECT * FROM jobs WHERE idempotency_key IS NOT NULL AND research_run_id = ?
+      ORDER BY created_at ASC, rowid ASC`).all(String(researchRunId)).map(scientificJob),
   });
 }
 

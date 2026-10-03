@@ -77,14 +77,16 @@ import { synthesizeKnowledge } from './knowledgeSynthesis.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
-import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
+import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
+import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
-import { enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { controlResearchRunExecution, enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
+import { renderVerifyReportHtml, verifySubmittedRecord } from './genesisVerify.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
@@ -798,6 +800,24 @@ export function handleApi(db, ctx) {
       if (seg[3] === 'contradictions' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveContradiction(db, projectId, seg[4], body, user.id));
       return err(404, 'not_found');
     }
+    // ---- Genesis Verify: a submitted ResearchRun record → integrity + ledger anchor + replay → one-page report ----
+    // Read-only towards the ledger; the replay re-runs a real engine, so it needs editor rights.
+    if (seg[2] === 'genesis-verify' && seg.length === 3) {
+      if (method !== 'POST') return err(405, 'method_not_allowed');
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+      if (body?.record === undefined || body?.record === null) return err(400, 'record_required');
+      // Same admission as every other real-engine replay: one heavy run at a time, per-user rate limit,
+      // and the commercial ADMET licence gate for ADMET capabilities.
+      const admitCapability = (capability) => {
+        if (!['admet-estimation', 'toxicity-risk-estimation'].includes(capability)) return null;
+        const blocked = admitCommercialAdmet();
+        return blocked ? { reason: 'BLOCKED_BY_LICENSE', detail: `The ADMET engine is not licensed for this use (${blocked.body?.error ?? 'licence gate'}).` } : null;
+      };
+      return runHeavyCompute(db, ctx, `genesis-verify:${projectId}`, () => {
+        const report = verifySubmittedRecord(body.record, { declaredSha256: body?.declaredSha256 ?? null, db, projectId, admitCapability });
+        return ok({ report, ...(body?.format === 'html' ? { html: renderVerifyReportHtml(report) } : {}) });
+      });
+    }
     // ---- R1-a Research Run: one question → one run id → the model PROPOSES a plan (researchRun.mjs) ----
     // A research run is an agent run of RESEARCH_RUN_DOMAIN; only the server writes its research state.
     if (seg[2] === 'research-runs') {
@@ -818,7 +838,8 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        // Cancelling a parent reaches its children too; a run without children keeps the plain synchronous path.
+        // Cancelling a parent reaches its children too; every other control goes through the lease queue,
+        // where pause/cancel withdraw queued jobs and resume re-enqueues them.
         if (seg[4] === 'cancel' && hasFanOutChildren(db, projectId, current.researchRunId)) {
           return (async () => {
             const cancelled = await cancelFanOut(db, projectId, current.researchRunId, { userId: user.id, reason: body?.reason ?? 'USER_REQUEST' });
@@ -826,10 +847,12 @@ export function handleApi(db, ctx) {
             return { status: cancelled.status === 'NOT_FOUND' ? 404 : 409, body: { error: cancelled.status, from: cancelled.from ?? null, action: cancelled.action ?? null } };
           })();
         }
-        const result = controlResearchRun(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
-        if (result.ok) return ok(result);
-        const status = result.status === 'NOT_FOUND' ? 404 : 409;
-        return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+        return (async () => {
+          const result = await controlResearchRunExecution(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
+          if (result.ok) return ok(result);
+          const status = result.status === 'NOT_FOUND' ? 404 : 409;
+          return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+        })();
       }
       // The next justified experiment: executes the choice the run's fixed rule recorded, never one the caller names.
       if (seg.length === 5 && seg[4] === 'advance') {
@@ -1011,7 +1034,7 @@ export function handleApi(db, ctx) {
           // Same execution path as below, started by a queue worker instead of this request.
           return (async () => {
             const queued = await enqueueResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
-            if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
+            if (!queued.ok) return { status: { NOT_FOUND: 404, RUN_NOT_EXECUTABLE: 409 }[queued.status] ?? 422, body: { error: queued.status, reason: queued.reason ?? null } };
             return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
           })();
         }
@@ -1057,6 +1080,21 @@ export function handleApi(db, ctx) {
           const status = { NO_ARTIFACT_RECORDED: 404, NOT_EXECUTED: 409, BLOCKED_BY_CONFIGURATION: 503 }[v.status] ?? 409;
           return { status, body: { error: v.status, reason: v.reason ?? null, verified: false } };
         })();
+      }
+      // Canonical Evidence Pack (docs/astra): a read-only projection of this run's records, every hash recomputable.
+      // No executed experiment (e.g. engine unavailable) gives 409 BLOCKED; nothing is assembled from anything else.
+      if (seg[4] === 'evidence-pack' && (seg.length === 5 || (seg.length === 6 && seg[5] === 'verify'))) {
+        if (seg.length === 5) {
+          if (method !== 'GET') return err(405, 'method_not_allowed');
+          return (async () => {
+            const built = await buildResearchRunEvidencePack(db, projectId, current.researchRunId, { artifactStorage: ctx.artifactStorage ?? null });
+            if (!built.ok) return { status: built.status === 'NOT_FOUND' ? 404 : 409, body: { error: built.status, blockers: built.blockers ?? null } };
+            return ok({ pack: built.pack });
+          })();
+        }
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (body?.pack?.researchRunId !== current.researchRunId) return err(400, 'pack_run_mismatch', 'pack.researchRunId musi wskazywać ten przebieg.');
+        return (async () => ok({ verification: await verifyResearchRunEvidencePack(body.pack, { db, projectId, artifactStorage: ctx.artifactStorage ?? null }) }))();
       }
       // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
       if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {

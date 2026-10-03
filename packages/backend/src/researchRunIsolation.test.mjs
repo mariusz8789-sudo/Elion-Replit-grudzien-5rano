@@ -24,6 +24,8 @@ const alive = (pid) => {
   try { return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8')); } catch { return true; }
 };
 const strays = (pattern) => { try { return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).length; } catch { return 0; } };
+// Anchored at the start of the command line so a shell whose text merely mentions the script is not counted.
+const ENGINE_PROCESS = '^\\S*python\\S* \\S*qm_worker\\.py';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test('isolated process: a timeout or abort kills the child AND what it started, and the loop stays free', { skip: skipProcess }, async () => {
@@ -94,7 +96,7 @@ test('a real PySCF job that outlives its timeout is killed (not ignored); the re
     assert.ok(elapsed < 1_900, `stopped at the deadline, not after the ~2 s engine run (${elapsed} ms)`);
     assert.ok(ticks >= 20, `the server's event loop stayed free while the engine ran (${ticks} ticks)`);
     await sleep(300);
-    assert.equal(strays('qm_worker'), 0, 'no engine process outlived the killed job');
+    assert.equal(strays(ENGINE_PROCESS), 0, 'no engine process outlived the killed job');
     let run = getResearchRun(ctx.db, ctx.projectId, ctx.runId);
     assert.equal(run.experiments.filter((e) => e.execution).length, 0, 'nothing was executed or sealed by the killed attempt');
     assert.equal(run.researchState.chain.ok, true);
@@ -117,15 +119,17 @@ test('a job cancelled while its real engine runs loses its lease, the engine is 
     const worker = createResearchRunWorker(ctx.db, { workerId: 'worker-iso-cancel', leaseMs: 3_000 });
     const queued = await enqueueResearchExperiment(ctx.db, ctx.projectId, ctx.runId, { timeoutMs: 120_000 });
     const running = worker.runOnce();
-    await sleep(450);
-    assert.ok(strays('qm_worker') >= 1 || getResearchRun(ctx.db, ctx.projectId, ctx.runId).experiments.length === 1, 'the engine is running in a child');
+    // Cancel only once the real engine process exists (the child needs a moment to boot, longer on a loaded runner).
+    const deadline = Date.now() + 15_000;
+    while (strays(ENGINE_PROCESS) === 0 && Date.now() < deadline) await sleep(50);
+    assert.ok(strays(ENGINE_PROCESS) >= 1, 'the engine is running in a child');
     assert.equal((await queueFor(ctx.db).cancel(queued.job.jobId, 'OPERATOR')).ok, true);
     const t0 = Date.now();
     const out = await running;
     assert.equal(out.state, 'LEASE_LOST');
     assert.ok(Date.now() - t0 < 2_500, 'the worker noticed the cancel at its next heartbeat');
     await sleep(500);
-    assert.equal(strays('qm_worker'), 0, 'the engine process was killed');
+    assert.equal(strays(ENGINE_PROCESS), 0, 'the engine process was killed');
     const run = getResearchRun(ctx.db, ctx.projectId, ctx.runId);
     assert.equal(run.experiments.filter((e) => e.execution).length, 0, 'a cancelled job produced no result');
     assert.equal(run.researchState.chain.ok, true);

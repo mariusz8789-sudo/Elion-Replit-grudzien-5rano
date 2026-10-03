@@ -52,6 +52,7 @@ import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
+import { MAX_VERIFY_INPUT_BYTES } from './genesisVerify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -347,6 +348,9 @@ function handlePersistApi(req, res, url) {
   // bigger than a typical trial/run's small parameter vectors) — same size class as the other two
   // upload routes above, not the default 64 kB meant for small JSON payloads.
   const isWorldUpload = (req.method === 'POST' || req.method === 'PUT') && /^\/api\/worlds(\/[^/]+)?\/?$/.test(url.pathname);
+  // Genesis Verify: the submitted record is a JSON string inside the JSON body (escaping grows it), and the
+  // verifier itself accepts records up to MAX_VERIFY_INPUT_BYTES; the default 64 kB would refuse a docking record.
+  const isVerifyUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/genesis-verify\/?$/.test(url.pathname);
   if (isKnowledgeUpload && !knowledgeUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'knowledge_upload_rate_limited', message: 'Limit uploadu materiałów: 6 na minutę.' });
   }
@@ -361,7 +365,8 @@ function handlePersistApi(req, res, url) {
   if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments(\/[^/]+\/replays)?))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
   }
-  const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
+  const maxBodyBytes = isVerifyUpload ? 2 * MAX_VERIFY_INPUT_BYTES + 65_536
+    : (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
     return json(res, 413, { error: 'payload_too_large', message: 'Przesłany materiał przekracza limit transportu.' });

@@ -176,6 +176,23 @@ describe('server HTTP persistence', () => {
     assert.equal(r.status, 413);
     assert.equal(r.json.error, 'payload_too_large');
   });
+
+  test('Genesis Verify accepts a record body larger than the 64 kB default, and still caps it', async () => {
+    const reg = await api('POST', '/api/auth/register', { body: { email: 'verify-http@lab.org', password: 'password123' } });
+    const project = await api('POST', '/api/projects', { token: reg.json.token, body: { name: 'Verify HTTP' } });
+    const url = `/api/projects/${project.json.project.id}/genesis-verify`;
+    // ~200 kB of not-a-record: transport lets it through, the verifier answers BLOCKED with its reason.
+    const big = JSON.stringify({ padding: 'x'.repeat(200_000) });
+    const r = await api('POST', url, { token: reg.json.token, body: { record: big } });
+    assert.equal(r.status, 200, JSON.stringify(r.json).slice(0, 300));
+    assert.equal(r.json.report.verdict, 'BLOCKED');
+    assert.ok(r.json.report.reasons.includes('MISSING_PROVENANCE'));
+    const capped = await requestWithDeclaredLength(url, 64 * 1024 * 1024);
+    assert.equal(capped.status, 413);
+    // Other project routes keep the 64 kB default.
+    const other = await requestWithDeclaredLength(`/api/projects/${project.json.project.id}/trials`, 65_537);
+    assert.equal(other.status, 413);
+  });
 });
 
 describe('Genesis C3 World Proposal endpoint (real LLM adapter, no key in this test process)', () => {

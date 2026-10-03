@@ -116,6 +116,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log', variantOf: 'memory' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', variantOf: 'memory', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
+  { id: 'verify', label: 'Genesis Verify — sprawdź zapis wyniku', icon: '✓', hash: '#/verify', variantOf: 'memory', description: 'Wgraj zapis z Genesis: odciski sha256, rejestr i powtórzenie obliczenia, raport HTML' },
   { id: 'flight-control', label: 'Kontrola lotów nauki', icon: '◎', hash: '#/flight-control', description: 'Przebiegi badań, kolejka zadań i loty eksperymentów; wstrzymaj, wznów, anuluj' },
   // — Światy i symulacje —
   { id: 'worlds', label: 'Wizualizacje i światy', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },

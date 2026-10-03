@@ -1,5 +1,7 @@
 # Human Explorer: isolated visual ceiling prototype
 
+> Integration note (2026-10-03): the screenshots under `artifacts/human-visual-ceiling/` were not merged; they document the pre-rebuild prototype (see [docs/astra/INTEGRATION-STATUS.md](./astra/INTEGRATION-STATUS.md)). The review script is on main and regenerates them.
+
 Base: `e01e6950d941af95195d9e349ee053ad1538cc35`.
 Branch: `astra/human-explorer-visual-ceiling`.
 Scope: four frontend presentation files, one browser review script, this report and real browser artifacts. Not deployed or merged.

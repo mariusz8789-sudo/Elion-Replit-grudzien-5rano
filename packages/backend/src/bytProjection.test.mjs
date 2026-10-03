@@ -90,4 +90,12 @@ describe('BYT canonical projection', () => {
     assert.equal(byt.scienceFlightControl.rejectedUntraceableRecords, 1);
     assert.match(byt.scienceFlightControl.limitation, /not a second BYT store/i);
   });
+
+  test('says NOT_COMPUTED, never AVAILABLE with zero flights, when Flight Control was not rebuilt', () => {
+    const byt = buildBytProjection({});
+    assert.equal(byt.scienceFlightControl.status, 'NOT_COMPUTED');
+    assert.deepEqual(byt.scienceFlightControl.flights, []);
+    assert.equal(byt.scienceFlightControl.verified, null);
+    assert.equal(buildBytProjection({ flightControl: [] }).scienceFlightControl.status, 'AVAILABLE');
+  });
 });

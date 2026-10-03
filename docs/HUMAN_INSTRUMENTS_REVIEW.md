@@ -1,5 +1,7 @@
 # Human Explorer — second bounded visual pass
 
+> Integration note (2026-10-03): the screenshots under `artifacts/human-visual-ceiling/` were not merged; they document the pre-rebuild prototype (see [docs/astra/INTEGRATION-STATUS.md](./astra/INTEGRATION-STATUS.md)). The review script is on main and regenerates them.
+
 Branch: `astra/human-explorer-visual-ceiling`. Original base: `e01e6950d941af95195d9e349ee053ad1538cc35`. Previous prototype commit: `7740f886a61f64a8cac2e11fe0f22d421af3f45a`.
 
 ## What was already there

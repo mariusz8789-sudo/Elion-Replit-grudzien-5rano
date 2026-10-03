@@ -125,6 +125,11 @@ function scienceFlightControlOf(db, projectId) {
 export function buildCognitiveState(db, projectId, { selfModel = null, now = () => new Date() } = {}) {
   const campaigns = db.prepare('SELECT id, objective, domain, status, current_generation FROM campaigns WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
   const jobs = db.prepare("SELECT id, type, status, progress FROM jobs WHERE project_id = ? AND status IN ('queued', 'running') ORDER BY created_at ASC").all(projectId);
+  // ResearchRun experiments live in the lease queue (uppercase states, no project_id on the row): join via the run.
+  const researchJobs = db.prepare(`SELECT j.id, j.research_run_id, j.status, j.params_json, j.worker_id, j.lease_expires_at, j.attempts
+    FROM jobs j JOIN agent_runs r ON r.id = j.research_run_id
+    WHERE r.project_id = ? AND j.idempotency_key IS NOT NULL AND j.status IN ('QUEUED', 'CLAIMED') ORDER BY j.created_at ASC, j.rowid ASC`).all(projectId)
+    .map((j) => ({ ...j, hypothesisId: P(j.params_json, {})?.hypothesisId ?? null }));
   const runs = researchRuns(db, projectId);
   const registry = readKnowledgeRegistry(db, projectId);
   const openRuns = runs.filter((r) => r.integrity.ok && !r.terminal && r.run.status === 'RUNNING');
@@ -201,10 +206,15 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     pendingExperiments: [
       ...campaigns.filter((c) => c.status === 'created').map((c) => ({ kind: 'CAMPAIGN', id: c.id })),
       ...jobs.filter((j) => j.status === 'queued').map((j) => ({ kind: 'JOB', id: j.id, type: j.type })),
+      ...researchJobs.filter((j) => j.status === 'QUEUED').map((j) => ({ kind: 'RESEARCH_RUN_JOB', id: j.id, researchRunId: j.research_run_id, hypothesisId: j.hypothesisId })),
     ],
     runningExperiments: [
       ...campaigns.filter((c) => c.status === 'running').map((c) => ({ kind: 'CAMPAIGN', id: c.id, generation: c.current_generation })),
       ...jobs.filter((j) => j.status === 'running').map((j) => ({ kind: 'JOB', id: j.id, type: j.type, progress: j.progress })),
+      ...researchJobs.filter((j) => j.status === 'CLAIMED').map((j) => ({
+        kind: 'RESEARCH_RUN_JOB', id: j.id, researchRunId: j.research_run_id, hypothesisId: j.hypothesisId,
+        workerId: j.worker_id, leaseExpiresAt: j.lease_expires_at, attempts: j.attempts,
+      })),
     ],
     awaitingExternalMeasurements: awaitingList,
     recentEvidenceRefs,
@@ -218,5 +228,5 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
 
 /** BYT projection only (no campaigns, jobs or flight control): enough for cross-run memory such as the Necropolis. */
 export function buildProjectBytProjection(db, projectId) {
-  return buildBytProjection({ runs: researchRuns(db, projectId), registry: readKnowledgeRegistry(db, projectId), selfModel: null, flightControl: [] });
+  return buildBytProjection({ runs: researchRuns(db, projectId), registry: readKnowledgeRegistry(db, projectId), selfModel: null, flightControl: null });
 }

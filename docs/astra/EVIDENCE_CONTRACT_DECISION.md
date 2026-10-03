@@ -24,7 +24,7 @@ Backend paths above are under `packages/backend/src/`. Fabric/campaign records o
 ## Compatibility and scope
 
 - Existing ScientificEvidencePack v1 remains readable; this schema neither replaces it nor requires rewriting old packs.
-- [schema.json](./schema.json) validates a reference index over existing records; [example.json](./example.json) is explicitly synthetic documentation. Neither is a runtime serializer or proof that any run occurred.
+- [schema.json](./schema.json) validates a reference index over existing records; [example.json](./example.json) is explicitly synthetic documentation. The example is no proof that any run occurred; real packs come from `researchRunEvidencePack.mjs` and are verified there, not by JSON Schema alone.
 - Failed intake/execution may have no Scientific Run or Evidence Pack. Empty arrays are honest; a partial export cannot claim successful delivery.
 - The schema has no editable customer state, verdict, approval or ledger payload. Referential integrity and content hashes require the existing resolvers/verifiers, not JSON Schema alone.
 - `VALID_TRUSTED` and organizational signatures remain PLANNED. Current schema permits no trusted-signature claim.

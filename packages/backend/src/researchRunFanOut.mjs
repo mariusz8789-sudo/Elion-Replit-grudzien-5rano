@@ -1,7 +1,7 @@
 import { canonicalJson, fnv1a, sha256Hex } from './determinism.mjs';
 import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, listAgentRuns, updateAgentRunStatus } from './agentRun.mjs';
-import { controlResearchRun, getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION, RESEARCH_RUN_DOMAIN } from './researchRun.mjs';
-import { createResearchRunWorker, enqueueResearchExperiment, jobBackendFor, queueFor } from './researchRunJobs.mjs';
+import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION, RESEARCH_RUN_DOMAIN } from './researchRun.mjs';
+import { controlResearchRunExecution, createResearchRunWorker, enqueueResearchExperiment, jobBackendFor, queueFor } from './researchRunJobs.mjs';
 
 /**
  * Bounded fan-out: one parent ResearchRun spawns child ResearchRuns, one per plan hypothesis. A child is a
@@ -206,7 +206,7 @@ export async function cancelFanOut(db, projectId, parentId, { userId = null, rea
   const parent = getResearchRun(db, projectId, parentId);
   if (!parent) return { ok: false, status: 'NOT_FOUND' };
   if ([AGENT_RUN_STATUS.RUNNING, AGENT_RUN_STATUS.PAUSED].includes(parent.run.status)) {
-    const cancelled = controlResearchRun(db, projectId, parentId, 'CANCEL', { userId, reason });
+    const cancelled = await controlResearchRunExecution(db, projectId, parentId, 'CANCEL', { userId, reason });
     if (!cancelled.ok) return cancelled;
   }
   const propagated = [];
@@ -215,7 +215,7 @@ export async function cancelFanOut(db, projectId, parentId, { userId = null, rea
     if (before.state === CHILD_STATE.COMPLETED) { propagated.push({ childRunId: child.id, action: 'KEPT_COMPLETED' }); continue; }
     const job = latestJobOf(db, child.id);
     if (job && ['QUEUED', 'CLAIMED'].includes(job.state)) await queueFor(db).cancel(job.jobId, `PARENT_CANCELLED:${reason}`);
-    if ([AGENT_RUN_STATUS.RUNNING, AGENT_RUN_STATUS.PAUSED].includes(child.status)) controlResearchRun(db, projectId, child.id, 'CANCEL', { userId, reason: `PARENT_CANCELLED:${reason}` });
+    if ([AGENT_RUN_STATUS.RUNNING, AGENT_RUN_STATUS.PAUSED].includes(child.status)) await controlResearchRunExecution(db, projectId, child.id, 'CANCEL', { userId, reason: `PARENT_CANCELLED:${reason}` });
     propagated.push({ childRunId: child.id, action: 'CANCELLED' });
   }
   return { ok: true, status: 'CANCELLED', propagated, fanOut: reconcileFanOut(db, projectId, parentId).fanOut, researchRun: getResearchRun(db, projectId, parentId) };

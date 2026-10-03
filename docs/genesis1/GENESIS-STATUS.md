@@ -53,7 +53,7 @@ measurement of customers or revenue: there are
   20:30 UTC.
 - PR #77: ResearchRun jobs in killable child
   processes, queued advance. Open.
-- Deploy only on the owner's "wdrażaj".
+- Standing deploy authorization since 3 Oct 19:06Z: GENESIS 1 deploys coherent batches after the release gate, with production smoke and rollback.
 - `production-smoke.yml` exists (7456c4c1)
   but has **0 runs**: no deploy since.
 - CSRN key not generated: every certificate
@@ -353,7 +353,7 @@ measured unit economics.
 
 ## Owner actions that move the numbers
 
-1. "wdrażaj" (production is 361 behind).
+1. Deploy batches 1+2 (production is 361 behind) under the standing authorization.
 2. Generate the CSRN key
    (`docs/keys/OWNER-CSRN-KEY-COMMANDS.md`).
 3. Invoicing entity + one design partner for

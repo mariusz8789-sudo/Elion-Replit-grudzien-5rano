@@ -26,7 +26,7 @@ Ground rules for everything below:
 
 1. **Scope the offer to what replays today:** RDKit descriptors, PySCF RHF single points (≤12 atoms, sto-3g/3-21g/6-31g), AutoDock Vina against Genesis's vetted docking targets. ADMET-AI replays, but commercial use is `BLOCKED_BY_LICENSE`; leave it out. OpenMM has no replay path.
 2. **Delivery recipe (works on main today):** the customer sends their claimed computations (SMILES, parameters, their reported numbers). An operator creates one ResearchRun per claim, and the plan carries the customer's reported value as the frozen prediction, so the protocol verdict says whether Genesis reproduces the number. Caveat: today the plan can only come from the configured reasoning provider (`POST .../research-runs/:id/proposals`). An operator-authored plan entry (paste SMILES, parameters and the claimed value) is the one small piece of software still missing for this recipe. The run executes, the artifact bundle is stored, and `POST /api/projects/:id/genesis-verify` with `format: "html"` produces the one-page report per record. A human reviewer writes a one-paragraph cover note and hands over the reports plus the bundles, so the customer or their auditor can re-verify later.
-3. **Owner actions before invoicing:** deploy main ("wdrażaj"); decide whether to ship UNSIGNED reports (honest and acceptable for a pilot) or generate the CSRN key first; confirm RDKit (BSD), Vina and PySCF (Apache-2.0) licence status in `COMMERCIAL_LICENSE_GATE.md` for this use; put an invoicing entity in place (the audit notes the legal entity comes after Hub71); write a one-page SOW that lists what is NOT checked, using the report's own list.
+3. **Owner actions before invoicing:** deploy main (standing authorization, batch release); decide whether to ship UNSIGNED reports (honest and acceptable for a pilot) or generate the CSRN key first; confirm RDKit (BSD), Vina and PySCF (Apache-2.0) licence status in `COMMERCIAL_LICENSE_GATE.md` for this use; put an invoicing entity in place (the audit notes the legal entity comes after Hub71); write a one-page SOW that lists what is NOT checked, using the report's own list.
 4. **Find one design partner** (a computational chemistry CRO, a biotech preparing a grant or due-diligence package, or a journal or reviewer who needs computations re-run) with an LOI, then a paid pilot at the low end of the hypothesis range.
 5. **Do not sell:** "validation", "certification", "signed evidence", benchmark claims for GNINA rankers, or anything about wet-lab or clinical relevance.
 
@@ -271,7 +271,7 @@ Rules for this part (same as above):
 - **TECHNICAL READINESS:** 70% (`genesisVerify.test.mjs` real RDKit: export → MATCH, edited → TAMPERED; `verifyScreen.test.tsx`). Missing: only Genesis-produced records; 4 replayable engines; operator-authored plan entry.
 - **PRODUCT READINESS:** 45% (screen exists on #78; not merged, not deployed; no SOW, no entity).
 - **PRICING HYPOTHESIS:** €3k–€8k / audit.
-- **PATH TO FIRST REVENUE:** merge #78 → "wdrażaj" → add operator plan entry → SOW listing what is NOT checked → entity → one design partner (CRO, grant applicant) → paid pilot at the low end.
+- **PATH TO FIRST REVENUE:** merge #78 → batch deploy → add operator plan entry → SOW listing what is NOT checked → entity → one design partner (CRO, grant applicant) → paid pilot at the low end.
 
 ### 7.2 GENESIS BENCHMARK
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { DEFAULT_DOCKING_TARGET } from '../compute/dockingTargets.mjs';
+import { DEFAULT_DOCKING_TARGET, getDockingTarget, listDockingTargets } from '../compute/dockingTargets.mjs';
 
 /**
  * D-156 — guard on the wider-set structure selection. It must have run D-154's rule file, byte
@@ -66,5 +66,19 @@ describe('D-156 sealed wider-set structure selection', () => {
 
   test('the default docking target was not touched', () => {
     assert.equal(DEFAULT_DOCKING_TARGET, 'ABL1_1IEP');
+  });
+
+  // The owner ruled on 2026-10-03 (D-159) that 6X18 stays a reference structure and is NOT
+  // registered as a docking target, because its pocket is defined by a bound peptide. This test
+  // is the guard: it fails the moment any id in the registry carries this structure, whatever
+  // name it is given, so the ruling cannot be undone quietly by a later commit.
+  test('6X18 is not in the docking-target registry, under any id', () => {
+    const ids = listDockingTargets();
+    for (const id of ids) {
+      assert.ok(!/6X18|GLP1R|GLP_1R/i.test(id), `6X18 must not be a docking target: found id ${id}`);
+      const target = getDockingTarget(id);
+      assert.ok(target.ok, `registry entry ${id} must still resolve`);
+      assert.notEqual(String(target.pdbId).toUpperCase(), '6X18');
+    }
   });
 });

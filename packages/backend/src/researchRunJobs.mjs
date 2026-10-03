@@ -25,7 +25,7 @@ export function researchJobIdentity(runId, ordinal, hypothesisId, generation = 0
   return { jobId: `job-rr-${digest}`, idempotencyKey: `idem-rr-${digest}`, experimentId: `queued-${digest}` };
 }
 
-export async function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000 } = {}) {
+export async function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000, lineage = null } = {}) {
   const view = getResearchRun(db, projectId, runId);
   if (!view) return { ok: false, status: 'NOT_FOUND' };
   // A cancelled or dead-lettered job is history, never revived: the next request opens a new generation.
@@ -45,7 +45,7 @@ export async function enqueueResearchExperiment(db, projectId, runId, { hypothes
     priority: 5,
     maxAttempts: 1,
     timeoutMs,
-    payload: { projectId, hypothesisId, userId },
+    payload: { projectId, hypothesisId, userId, ...(lineage ? { lineage } : {}) },
   });
   if (!queued?.ok) return { ok: false, status: 'ENQUEUE_FAILED', reason: queued?.error ?? null };
   return { ok: true, deduped: Boolean(queued.deduped), job: queued.job };

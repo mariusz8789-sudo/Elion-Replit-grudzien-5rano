@@ -303,6 +303,8 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
   return inWriteTransaction(db, () => {
     const current = getResearchRun(db, projectId, runId);
     if (!current || !current.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
+    // A run cancelled while its engine was running must not turn into a result afterwards.
+    if (current.run.status !== 'RUNNING') return { ok: false, status: 'RUN_NOT_EXECUTABLE', reason: current.run.status };
     if (current.experiments.find((e) => e.experimentId === frozen.experimentId)?.execution) return { ok: true, deduped: true };
     const sealed = sealExperimentSession(db, {
       projectId,

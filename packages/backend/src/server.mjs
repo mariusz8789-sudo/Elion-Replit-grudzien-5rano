@@ -41,6 +41,7 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { createResearchRunWorker } from './researchRunJobs.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
 import { createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
@@ -507,6 +508,21 @@ server.listen(PORT, () => {
   if (LEDGER_PERSISTENCE.status === 'REJECTED_IN_MEMORY') log('error', 'knowledge_ledger_snapshot_rejected', { path: LEDGER_PERSISTENCE.path, reason: LEDGER_PERSISTENCE.reason });
   if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
+
+// Jeden lokalny worker opróżnia trwałą kolejkę zadań ResearchRun (research-run:experiment-jobs). To ta sama
+// ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
+// (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
+if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
+  const worker = createResearchRunWorker(db);
+  let busy = false;
+  setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      for (let i = 0; i < 8; i += 1) if ((await worker.runOnce()).state === 'IDLE') break;
+    } catch (error) { log('error', 'research_worker_failed', { error: String(error?.message ?? error) }); } finally { busy = false; }
+  }, 500).unref();
+}
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.
 for (const sig of ['SIGTERM', 'SIGINT']) {

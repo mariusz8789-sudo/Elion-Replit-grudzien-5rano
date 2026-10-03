@@ -28,6 +28,16 @@ describe(`RDKit descriptors (runtime available=${det.available})`, () => {
       assert.equal(r.units.tpsa, 'Å²');
     });
 
+    test('the descriptor projection carries the structural identity RDKit already computed', () => {
+      // The worker computes InChI in the SAME invocation as the descriptors; the projection used
+      // to drop it, which left a persisted candidate with no identifier anyone outside its own
+      // campaign could match on. Aspirin's InChIKey is a published constant.
+      const r = runModel('chem-rdkit-descriptors', { smiles: 'CC(=O)Oc1ccccc1C(=O)O' });
+      assert.equal(r.status, 'ok');
+      assert.equal(r.outputs.inchiKey, 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N');
+      assert.match(r.outputs.inchi, /^InChI=1S\/C9H8O4/);
+    });
+
     test('caffeine descriptors are sane', () => {
       const r = runModel('chem-rdkit-descriptors', { smiles: 'Cn1cnc2c1c(=O)n(C)c(=O)n2C' });
       assert.equal(r.status, 'ok');

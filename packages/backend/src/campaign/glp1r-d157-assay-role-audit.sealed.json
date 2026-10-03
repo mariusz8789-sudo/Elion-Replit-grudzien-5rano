@@ -1,0 +1,514 @@
+{
+  "decisionId": "D-157",
+  "preregFingerprint": "616079336b7d046f",
+  "preregFrozenAtCommit": "a229ad65",
+  "computedAt": "2026-10-03T02:55:34.535Z",
+  "rule": "glp1rEndpointScope.mjs::classifyAssayRoleScoped, the D-152 rule, imported unchanged",
+  "d152ReferencedNotEdited": {
+    "sealed": "glp1r-d152-endpoint-scope.sealed.json",
+    "roles": "glp1r-assay-roles-d152.json"
+  },
+  "sourceData": {
+    "dir": "../../../tmp/claude-0/-home-claude-Elion-Replit-grudzien-5rano/7cb931f9-a2cf-5e07-b71b-5f2c7d0ddd12/scratchpad/glp1r-src",
+    "gitRef": "887c54cc",
+    "chemblRelease": "ChEMBL_37 (2026-05-01)",
+    "filesVerified": 17,
+    "allHashesMatched": true,
+    "files": [
+      {
+        "path": "chembl/status.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/status.json",
+        "retrievedAt": "2026-10-03T02:17:58Z",
+        "sha256": "29dc1fb09487a8d2962253a4d0d92c4ded0aa0d831effab42445d0c3483d4740"
+      },
+      {
+        "path": "chembl/assay/CHEMBL1246709.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1246709.json",
+        "retrievedAt": "2026-10-03T02:18:00Z",
+        "sha256": "da2105342fa306836822af7ee9e58b7cdc1f2203ba0060207e0095acfac5f4b3"
+      },
+      {
+        "path": "chembl/assay/CHEMBL1648248.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1648248.json",
+        "retrievedAt": "2026-10-03T02:18:01Z",
+        "sha256": "add17506da84e8c186eeeb46b8d0025893f53947fd3a70421e09ef0c5cde5f4c"
+      },
+      {
+        "path": "chembl/assay/CHEMBL1924543.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1924543.json",
+        "retrievedAt": "2026-10-03T02:18:01Z",
+        "sha256": "c7736353fcc04334ea87738e0c93b57d015a6f3f6d23c11297520e99ea5fc73d"
+      },
+      {
+        "path": "chembl/assay/CHEMBL1925821.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1925821.json",
+        "retrievedAt": "2026-10-03T02:18:02Z",
+        "sha256": "10646fb139f7ddeaab21434ea49532339985fc9da7009aa07c190efb05fc661b"
+      },
+      {
+        "path": "chembl/assay/CHEMBL1937452.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL1937452.json",
+        "retrievedAt": "2026-10-03T02:18:02Z",
+        "sha256": "27b896f22bbcec3373fe1ab99928c2c37e3ff4d185300e8ca0b114c83e58870f"
+      },
+      {
+        "path": "chembl/assay/CHEMBL829559.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL829559.json",
+        "retrievedAt": "2026-10-03T02:18:03Z",
+        "sha256": "eb58afbdbb296afd08444dc2104c1f36de1d10ae59c65584c0940ca04913b71f"
+      },
+      {
+        "path": "chembl/assay/CHEMBL874550.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL874550.json",
+        "retrievedAt": "2026-10-03T02:18:03Z",
+        "sha256": "f7b30048c11b6af54e57d6f8353de88a2e20e24a3117033e323019c2fcffbe6c"
+      },
+      {
+        "path": "chembl/assay/CHEMBL884187.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL884187.json",
+        "retrievedAt": "2026-10-03T02:18:04Z",
+        "sha256": "80e8f29cb80ccd6d94c7b5dd7c3155f32570bcb138c18d3c781150725e697a64"
+      },
+      {
+        "path": "chembl/assay/CHEMBL911100.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL911100.json",
+        "retrievedAt": "2026-10-03T02:18:04Z",
+        "sha256": "1fb19501372fef522b571326685aaef59f831b0d5abc72273bb81af137919c3d"
+      },
+      {
+        "path": "chembl/assay/CHEMBL923946.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL923946.json",
+        "retrievedAt": "2026-10-03T02:18:05Z",
+        "sha256": "69c0fdae5e02c701316f2717bb5744f467249b2fc43589afd6fcc9e1b4ba5549"
+      },
+      {
+        "path": "chembl/assay/CHEMBL937687.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL937687.json",
+        "retrievedAt": "2026-10-03T02:18:05Z",
+        "sha256": "d9487785d4877e0cc3dffdba6043bb5c870b69531a4cfde83248858b29aef72a"
+      },
+      {
+        "path": "chembl/assay/CHEMBL972348.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972348.json",
+        "retrievedAt": "2026-10-03T02:18:06Z",
+        "sha256": "889806b1b32b3c909f4f2a185ce9188e272723b40ad0cff2f491390f995fa514"
+      },
+      {
+        "path": "chembl/assay/CHEMBL972349.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL972349.json",
+        "retrievedAt": "2026-10-03T02:18:06Z",
+        "sha256": "3fd834ff9d2f800644c48a15044f0e51832dafbecf90f55a276114c908217b00"
+      },
+      {
+        "path": "chembl/assay/CHEMBL977343.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL977343.json",
+        "retrievedAt": "2026-10-03T02:18:07Z",
+        "sha256": "40d9ef39d0ddda3fd254ce439f9f2ac222a4f7292e28095272a1d69bc3000ebc"
+      },
+      {
+        "path": "chembl/assay/CHEMBL991608.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991608.json",
+        "retrievedAt": "2026-10-03T02:18:08Z",
+        "sha256": "b2ffe1f9237bac17cd05b80fdee7bdc926cb91caf6f2a1aa3aa400624fdd9461"
+      },
+      {
+        "path": "chembl/assay/CHEMBL991609.json",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL991609.json",
+        "retrievedAt": "2026-10-03T02:18:08Z",
+        "sha256": "ac5cd43f3fb3c51fbea3e02494632b8b373b2e2fe0e55dcd01551451180255bf"
+      }
+    ]
+  },
+  "assays": [
+    {
+      "assayId": "CHEMBL1246709",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED",
+      "endpointTextRead": "Activation of human GLP1 receptor expressed in HEK293 cells assessed as increase in cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "HEK293",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1240496",
+        "descriptionVerbatim": "Activation of human GLP1 receptor expressed in HEK293 cells assessed as increase in cAMP accumulation"
+      },
+      "rowsInCombinedSet": 12,
+      "standardTypes": [
+        "EC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL1648248",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "OTHER_FUNCTIONAL",
+      "newReason": "ANTAGONISM_NOT_AGONISM",
+      "endpointTextRead": "Antagonist activity at human GLP1R expressed in CHO cells assessed as inhibition of glucagon-induced cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1641377",
+        "descriptionVerbatim": "Antagonist activity at human GLP1R expressed in CHO cells assessed as inhibition of glucagon-induced cAMP accumulation"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL1924543",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED",
+      "endpointTextRead": "Inhibition of human GLP1 receptor by cAMP assay",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1921761",
+        "descriptionVerbatim": "Inhibition of human GLP1 receptor by cAMP assay"
+      },
+      "rowsInCombinedSet": 6,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL1925821",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "OTHER_FUNCTIONAL",
+      "newReason": "ANTAGONISM_NOT_AGONISM",
+      "endpointTextRead": "Antagonist activity at human GLP1 receptor assessed as inhibition of cAMP production",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1921704",
+        "descriptionVerbatim": "Antagonist activity at human GLP1 receptor assessed as inhibition of cAMP production"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL1937452",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "BINDING_AFFINITY",
+      "newReason": "BINDING_READOUT_NAMED",
+      "endpointTextRead": "Displacement of [125I]GLP-1 from human GLP1R",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1933020",
+        "descriptionVerbatim": "Displacement of [125I]GLP-1 from human GLP1R"
+      },
+      "rowsInCombinedSet": 4,
+      "standardTypes": [
+        "KI"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL829559",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "UNCLASSIFIABLE_UNDER_FROZEN_RULES",
+      "endpointTextRead": "Inhibitory concentration against human GLP1 receptor expressed in CHO cell membrane homogenates with 1%DMSO",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1137923",
+        "descriptionVerbatim": "Inhibitory concentration against human GLP1 receptor expressed in CHO cell membrane homogenates with 1%DMSO"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL874550",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "UNCLASSIFIABLE_UNDER_FROZEN_RULES",
+      "endpointTextRead": "Inhibitory concentration required against human GLP1 receptor expressed in CHO cell membrane homogenates",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1137923",
+        "descriptionVerbatim": "Inhibitory concentration required against human GLP1 receptor expressed in CHO cell membrane homogenates"
+      },
+      "rowsInCombinedSet": 9,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL884187",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED",
+      "endpointTextRead": "Inhibitory concentration against human glucagon-like peptide 1 receptor (hGLP1) mediated cAMP accumulation",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1142854",
+        "descriptionVerbatim": "Inhibitory concentration against human glucagon-like peptide 1 receptor (hGLP1) mediated cAMP accumulation"
+      },
+      "rowsInCombinedSet": 1,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL911100",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "UNCLASSIFIABLE_UNDER_FROZEN_RULES",
+      "endpointTextRead": "Inhibition of GLP1 receptor",
+      "speciesStated": false,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1139230",
+        "descriptionVerbatim": "Inhibition of GLP1 receptor"
+      },
+      "rowsInCombinedSet": 3,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL923946",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "UNCLASSIFIABLE_UNDER_FROZEN_RULES",
+      "endpointTextRead": "Effect on augmentation of [125]GLP1 binding to human GLP1",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": null,
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1140467",
+        "descriptionVerbatim": "Effect on augmentation of [125]GLP1 binding to human GLP1"
+      },
+      "rowsInCombinedSet": 14,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": false
+    },
+    {
+      "assayId": "CHEMBL937687",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "BINDING_AFFINITY",
+      "newReason": "BINDING_READOUT_NAMED",
+      "endpointTextRead": "Displacement of [125I]exendin(9-39) from human GLP1R expressed in CHO cells",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1152280",
+        "descriptionVerbatim": "Displacement of [125I]exendin(9-39) from human GLP1R expressed in CHO cells"
+      },
+      "rowsInCombinedSet": 8,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL972348",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "BINDING_AFFINITY",
+      "newReason": "BINDING_READOUT_NAMED",
+      "endpointTextRead": "Displacement of [125I]GLP1 from human GLP1R expressed in CHOK1 cells",
+      "speciesStated": true,
+      "heterologousSystem": false,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO-K1",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1150266",
+        "descriptionVerbatim": "Displacement of [125I]GLP1 from human GLP1R expressed in CHOK1 cells"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL972349",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "FUNCTIONAL_AGONISM",
+      "newReason": "AGONISM_STATED_AND_CAMP_READOUT_NAMED",
+      "endpointTextRead": "Agonist activity at human GLP1R expressed in CHO cells assessed as increase in cAMP level by cAMP-response element/luciferase activation assay",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "CHO",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1150266",
+        "descriptionVerbatim": "Agonist activity at human GLP1R expressed in CHO cells assessed as increase in cAMP level by cAMP-response element/luciferase activation assay"
+      },
+      "rowsInCombinedSet": 21,
+      "standardTypes": [
+        "EC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL977343",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "BINDING_AFFINITY",
+      "newReason": "BINDING_READOUT_NAMED",
+      "endpointTextRead": "Binding affinity to human cloned GLP1R expressed in BHK cells",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "BHK",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1140036",
+        "descriptionVerbatim": "Binding affinity to human cloned GLP1R expressed in BHK cells"
+      },
+      "rowsInCombinedSet": 8,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL991608",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "BINDING_AFFINITY",
+      "newReason": "BINDING_READOUT_NAMED",
+      "endpointTextRead": "Displacement of [125I]exendin(9-39) from human GLP1R expressed in HEK293 cells",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "B",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "HEK293",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1151687",
+        "descriptionVerbatim": "Displacement of [125I]exendin(9-39) from human GLP1R expressed in HEK293 cells"
+      },
+      "rowsInCombinedSet": 16,
+      "standardTypes": [
+        "IC50"
+      ],
+      "interpretationChanged": true
+    },
+    {
+      "assayId": "CHEMBL991609",
+      "d152Role": "UNKNOWN",
+      "d152Reason": "BLOCKED_BY_DATA_ACCESS",
+      "newRole": "UNKNOWN",
+      "newReason": "CAMP_READOUT_BUT_AGONISM_NOT_STATED",
+      "endpointTextRead": "Activation of human GLP1R expressed in HEK293 cells assessed as effect on cAMP responsive element promoter driven luciferase expression",
+      "speciesStated": true,
+      "heterologousSystem": true,
+      "chembl": {
+        "assayType": "F",
+        "assayOrganism": "Homo sapiens",
+        "cellType": "HEK293",
+        "confidenceScore": 9,
+        "documentChemblId": "CHEMBL1151687",
+        "descriptionVerbatim": "Activation of human GLP1R expressed in HEK293 cells assessed as effect on cAMP responsive element promoter driven luciferase expression"
+      },
+      "rowsInCombinedSet": 20,
+      "standardTypes": [
+        "EC50"
+      ],
+      "interpretationChanged": false
+    }
+  ],
+  "tally": {
+    "UNKNOWN": 8,
+    "OTHER_FUNCTIONAL": 2,
+    "BINDING_AFFINITY": 5,
+    "FUNCTIONAL_AGONISM": 1
+  },
+  "outcome": "INTERPRETATION_CHANGED",
+  "counterfactualFunctionalArm": {
+    "status": "REPORTED_NOT_ADOPTED",
+    "d152Arm": {
+      "rows": 320,
+      "compounds": 206
+    },
+    "newlyFunctionalAssays": [
+      "CHEMBL972349"
+    ],
+    "rowsThatWouldBeAdded": 21,
+    "compoundsThatWouldBeAddedThatAreNotAlreadyInTheArm": 20,
+    "d153Status": "D-153 stands exactly as sealed on the 320-row arm. Re-validating on an enlarged arm needs its own preregistered decision written before that run."
+  },
+  "boundary": "A classification of 16 assays with a rule frozen on 2026-09-30. No model is trained, no gate is read for thresholds, no candidate is touched, nothing sealed is edited.",
+  "artifactHash": "96c6934e8671ea76"
+}

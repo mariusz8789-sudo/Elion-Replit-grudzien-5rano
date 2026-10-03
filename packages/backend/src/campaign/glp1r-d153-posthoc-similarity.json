@@ -1,0 +1,40 @@
+{
+  "decisionId": "D-153",
+  "kind": "POST_HOC_DIAGNOSTIC",
+  "notPartOfPreregistration": "Written after the sealed verdict. Reports no verdict, moves no threshold, and does not alter glp1r-d153-functional-model.sealed.json.",
+  "computedAt": "2026-10-03T02:07:17.609Z",
+  "engine": {
+    "rdkitVersion": "2026.03.6"
+  },
+  "rows": {
+    "featurized": 320,
+    "train": 193,
+    "test": 53
+  },
+  "activityDistribution": {
+    "n": 320,
+    "mean": 8.2767,
+    "sd": 1.7059,
+    "min": 4.52,
+    "max": 11.1
+  },
+  "trainMeanBaseline": {
+    "predictor": "constant = mean pActivity of the training split",
+    "mae": 1.543,
+    "r2": -0.0154,
+    "reading": "The sealed model has to beat this to mean anything. It does, by a wide margin, so the pass is not an artefact of a narrow activity range."
+  },
+  "nearestNeighbourTanimoto": {
+    "direction": "each test row to its closest training row",
+    "fingerprint": "the same Morgan r=2 512-bit folded fingerprint the model is fitted on",
+    "min": 0.622,
+    "q25": 0.7614,
+    "median": 0.8415,
+    "q75": 0.9113,
+    "max": 1,
+    "testRowsAtOrAbove090": 22,
+    "testRowsAtOrAbove095": 1,
+    "reading": "This is the load-bearing caveat. The split is scaffold-disjoint and compound-disjoint, which is what the frozen gate asks for and what it got. It is NOT chemically distant: the median test row has a close training analogue, and a minority sit at or above 0.90. So the sealed result says the model interpolates within this chemical series. It does not say the model extrapolates to a new series, and nothing here licenses that claim."
+  },
+  "artifactHash": "17e9e7468738160f"
+}

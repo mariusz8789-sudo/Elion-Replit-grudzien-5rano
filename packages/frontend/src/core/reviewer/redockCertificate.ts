@@ -67,28 +67,62 @@ export async function redockCertificateInput(recordText: string): Promise<Unsign
  * served as `/.well-known/genesis-csrn-key.json`). Before the owner generates the
  * production key, `status` is NOT_YET_GENERATED and nothing is trusted.
  */
+export interface GenesisPublicKeyJwk { readonly kty: string; readonly crv: string; readonly x: string; readonly y: string }
+
+/** A key that was replaced by a rotation. RETIRED keeps verifying what it signed inside its window; REVOKED never does. */
+export interface GenesisPreviousKey {
+  readonly status: 'RETIRED' | 'REVOKED';
+  readonly keyId: string;
+  readonly publicKeyJwk: GenesisPublicKeyJwk;
+  readonly validFrom: string;
+  readonly validUntil: string;
+}
+
 export interface GenesisPublicKeyFile {
   readonly kind: 'GENESIS_CSRN_PUBLIC_KEY';
   readonly version: 1;
   readonly status: 'NOT_YET_GENERATED' | 'ACTIVE' | 'REVOKED';
   readonly algorithm: 'ECDSA-P256-SHA256';
   readonly keyId: string | null;
-  readonly publicKeyJwk: { readonly kty: string; readonly crv: string; readonly x: string; readonly y: string } | null;
+  readonly publicKeyJwk: GenesisPublicKeyJwk | null;
   readonly validFrom: string | null;
   readonly validUntil: string | null;
+  /** Rotation history, newest last. Absent until the first rotation. */
+  readonly previousKeys?: readonly GenesisPreviousKey[];
   readonly keyIdMethod: string;
   readonly notice: string;
 }
 
+/** Fail-closed validity window: a bound that is set must hold; with a bound set and no usable time, the key is not trusted. */
+function withinWindow(validFrom: string | null, validUntil: string | null, signedAt: string | undefined): boolean {
+  if (validFrom === null && validUntil === null) return true;
+  const at = signedAt === undefined ? Number.NaN : Date.parse(signedAt);
+  if (!Number.isFinite(at)) return false;
+  if (validFrom !== null) { const from = Date.parse(validFrom); if (!Number.isFinite(from) || at < from) return false; }
+  if (validUntil !== null) { const until = Date.parse(validUntil); if (!Number.isFinite(until) || at > until) return false; }
+  return true;
+}
+
 /**
- * The trust store: the published key id, but only if the file is ACTIVE and its
- * keyId really is the SHA-256 identity of the JWK it publishes (recomputed here,
- * never taken on the file's word).
+ * The trust store: key ids the file publishes, each only if its keyId really is the SHA-256 identity of its
+ * own JWK (recomputed here, never taken on the file's word) and the certificate's claimed signing time
+ * (signature.signedAt; issuedAt is the run's own finish time and predates the key) falls inside the key's validity window.
+ * signedAt is not part of the signed payload: the window is a claimed time, so revocation and rotation, not the window,
+ * are the control against a stolen key. The current key must be ACTIVE; a rotated-out key counts only while RETIRED, inside its
+ * window. REVOKED keys (current or previous) are never trusted.
  */
-export async function genesisTrustStore(keyFile: GenesisPublicKeyFile): Promise<ReadonlySet<string>> {
-  if (keyFile.status !== 'ACTIVE' || keyFile.publicKeyJwk === null || keyFile.keyId === null) return new Set();
-  const recomputed = await computePublicKeyId(keyFile.publicKeyJwk as JsonWebKey);
-  return recomputed === keyFile.keyId ? new Set([keyFile.keyId]) : new Set();
+export async function genesisTrustStore(keyFile: GenesisPublicKeyFile, signedAt?: string): Promise<ReadonlySet<string>> {
+  const trusted = new Set<string>();
+  const consider = async (status: string, keyId: string | null, jwk: GenesisPublicKeyJwk | null, validFrom: string | null, validUntil: string | null, okStatus: string) => {
+    if (status !== okStatus || jwk === null || keyId === null) return;
+    if ((await computePublicKeyId(jwk as JsonWebKey)) !== keyId) return;
+    if (withinWindow(validFrom, validUntil, signedAt)) trusted.add(keyId);
+  };
+  await consider(keyFile.status, keyFile.keyId, keyFile.publicKeyJwk, keyFile.validFrom, keyFile.validUntil, 'ACTIVE');
+  for (const previous of keyFile.previousKeys ?? []) {
+    await consider(previous.status, previous.keyId, previous.publicKeyJwk, previous.validFrom, previous.validUntil, 'RETIRED');
+  }
+  return trusted;
 }
 
 export type SignerStatus = 'SIGNED_BY_GENESIS_KEY' | 'SIGNED_UNTRUSTED' | 'UNSIGNED' | 'NOT_CHECKED';
@@ -110,7 +144,7 @@ export interface EvidenceVerification {
 }
 
 export async function verifyRedockEvidence(certificate: Certificate, presentedText: string, keyFile: GenesisPublicKeyFile): Promise<EvidenceVerification> {
-  const trust = await genesisTrustStore(keyFile);
+  const trust = await genesisTrustStore(keyFile, certificate.signature?.signedAt);
   const audit = await auditCertificate(certificate, trust);
   const trail = certificate.provenance?.provenanceTrail ?? [];
   const certifiedFileSha256 = trail[trail.length - 1]?.outputFingerprint ?? '';
@@ -135,7 +169,7 @@ export async function verifyRedockEvidence(certificate: Certificate, presentedTe
     presentedFileSha256,
     signer,
     signerKeyId: audit.signerKeyId ?? null,
-    genesisKeyId: trust.size > 0 ? keyFile.keyId : null,
+    genesisKeyId: keyFile.keyId !== null && trust.has(keyFile.keyId) ? keyFile.keyId : null,
     errors,
   };
 }

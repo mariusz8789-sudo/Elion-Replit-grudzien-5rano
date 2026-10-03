@@ -111,6 +111,37 @@ describe('foreign key — a valid signature from someone else is SIGNED_UNTRUSTE
   });
 });
 
+describe('validity window and rotation — a disposable key, never the production one', () => {
+  it('a signature claimed outside the key window is not trusted; a missing signing time fails closed', async () => {
+    const { keyFile, certificate } = await stagedGenesisKey();
+    const expired = { ...keyFile, validUntil: '2026-09-28T00:00:00Z' };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, certificate, expired)).signer).toBe('SIGNED_BY_GENESIS_KEY');
+    const early = { ...keyFile, validFrom: '2026-09-29T00:00:00Z' };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, certificate, early)).signer).toBe('SIGNED_UNTRUSTED');
+    const ended = { ...keyFile, validUntil: '2026-09-27T23:59:59Z' };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, certificate, ended)).signer).toBe('SIGNED_UNTRUSTED');
+    const noTime = { ...certificate, signature: { ...certificate.signature!, signedAt: 'not a time' } };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, noTime, keyFile)).signer).toBe('SIGNED_UNTRUSTED');
+  });
+
+  it('rotation: a RETIRED key still verifies what it signed inside its window; a REVOKED previous key never does; the new key verifies new signatures', async () => {
+    const old = await stagedGenesisKey();
+    const next = await stagedGenesisKey();
+    const rotatedOut = { keyId: old.keyFile.keyId!, publicKeyJwk: old.keyFile.publicKeyJwk!, validFrom: '2026-09-28T00:00:00Z', validUntil: '2026-12-31T00:00:00Z' };
+    const rotated = (status: 'RETIRED' | 'REVOKED'): GenesisPublicKeyFile => ({ ...next.keyFile, validFrom: '2027-01-01T00:00:00Z', previousKeys: [{ ...rotatedOut, status }] });
+    const viaRetired = await verifyEvidence(REDOCK_RECORD_TEXT, old.certificate, rotated('RETIRED'));
+    expect(viaRetired.signer).toBe('SIGNED_BY_GENESIS_KEY');
+    expect(viaRetired.signerKeyId).toBe(old.keyFile.keyId);
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, old.certificate, rotated('REVOKED'))).signer).toBe('SIGNED_UNTRUSTED');
+    const outsideWindow = { ...rotated('RETIRED'), previousKeys: [{ ...rotatedOut, status: 'RETIRED' as const, validUntil: '2026-09-27T00:00:00Z' }] };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, old.certificate, outsideWindow)).signer).toBe('SIGNED_UNTRUSTED');
+    const lying = { ...rotated('RETIRED'), previousKeys: [{ ...rotatedOut, status: 'RETIRED' as const, keyId: 'c'.repeat(64) }] };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, old.certificate, lying)).signer).toBe('SIGNED_UNTRUSTED');
+    const newKeyOldWindow = { ...next.keyFile, validFrom: '2026-09-28T00:00:00Z' };
+    expect((await verifyEvidence(REDOCK_RECORD_TEXT, next.certificate, newKeyOldWindow)).signer).toBe('SIGNED_BY_GENESIS_KEY');
+  });
+});
+
 describe('assertPromotionEarned — no promotion to a measured/validated/confirmed status without a real record', () => {
   it('MODEL_ESTIMATE -> REAL_MEASUREMENT with nothing attached is refused', () => {
     expect(() => assertPromotionEarned('MODEL_ESTIMATE', 'REAL_MEASUREMENT', null)).toThrow(/EPISTEMIC_PROMOTION_UNEARNED/);

@@ -12,7 +12,9 @@
  *
  * keyId = SHA-256 of the canonical JSON of {crv, kty, x, y} (CSRN
  * `computePublicKeyId`). Refuses to run in CI, and refuses to replace an ACTIVE key
- * (rotation is a deliberate, separate step: mark the old key REVOKED first).
+ * (rotation is a deliberate, separate step: --rotate moves the ACTIVE key into
+ * previousKeys as RETIRED, valid only until now, so what it already signed still verifies;
+ * a key that is compromised is marked REVOKED by hand instead and verifies nothing).
  *
  * This is an ECDSA P-256 integrity and origin signature. It is not a qualified or
  * legal electronic signature.
@@ -34,10 +36,22 @@ if (existsSync(privateOut)) {
   console.error(`${SCRIPT}: ${privateOut} already exists; not overwriting a private key.`);
   process.exit(2);
 }
+const rotate = argv.includes('--rotate');
+let previousKeys = [];
 if (existsSync(publicOut)) {
   const current = JSON.parse(readFileSync(publicOut, 'utf8'));
+  previousKeys = Array.isArray(current.previousKeys) ? current.previousKeys : [];
   if (current.status === 'ACTIVE') {
-    console.error(`${SCRIPT}: ${publicOut} already holds an ACTIVE key (${current.keyId}). Mark it REVOKED before generating a new one.`);
+    if (!rotate) {
+      console.error(`${SCRIPT}: ${publicOut} already holds an ACTIVE key (${current.keyId}). Pass --rotate to retire it, or mark it REVOKED if it is compromised.`);
+      process.exit(2);
+    }
+    previousKeys = [...previousKeys, { status: 'RETIRED', keyId: current.keyId, publicKeyJwk: current.publicKeyJwk, validFrom: current.validFrom, validUntil: new Date().toISOString() }];
+  } else if (current.status === 'REVOKED' && current.keyId) {
+    // A revoked key stays on record so nothing it signed is ever trusted again.
+    previousKeys = [...previousKeys, { status: 'REVOKED', keyId: current.keyId, publicKeyJwk: current.publicKeyJwk, validFrom: current.validFrom, validUntil: current.validUntil ?? new Date().toISOString() }];
+  } else if (rotate) {
+    console.error(`${SCRIPT}: --rotate needs an ACTIVE key to retire; ${publicOut} is ${current.status}.`);
     process.exit(2);
   }
 }
@@ -56,6 +70,7 @@ const keyFile = {
   publicKeyJwk: { kty, crv, x, y },
   validFrom: new Date().toISOString(),
   validUntil: null,
+  ...(previousKeys.length ? { previousKeys } : {}),
   keyIdMethod: 'SHA-256 (hex) of the canonical JSON (sorted keys) of {crv, kty, x, y}; packages/csrn computePublicKeyId',
   notice: 'Public half of the Genesis CSRN evidence-signing key. A valid signature means the signed evidence was not altered and was signed by the holder of this key. It is not a qualified or legal electronic signature, and it is not laboratory validation.',
 };

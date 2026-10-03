@@ -32,6 +32,9 @@ import { buildDecisionTrace } from './decisionTrace.mjs';
 import { appendServerResearchStateEvent } from './agentRun.mjs';
 import { deriveVerdict, preregisterExperiment, sealExperimentSession } from './experimentMemory.mjs';
 import { proposeStructuredEvidence } from './knowledgeApi.mjs';
+import { buildProjectBytProjection } from './cognitiveState.mjs';
+import { normalizeText } from './knowledgeRecall.mjs';
+import { priorFalsifiedClaims } from './knowledgeSynthesis.mjs';
 import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION, researchSteeringOf } from './researchRun.mjs';
 import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 import { getScienceRun, listScienceRunVerifications, saveScienceRun } from './store.mjs';
@@ -163,6 +166,8 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
     return { action: 'HUMAN_REVIEW', reason: `REPLAY_${replayVerdict}`, planNextActions: (plan?.nextActions ?? []).map((a) => a.action) };
   }
   const abandoned = new Set(steering.abandonedHypothesisIds ?? []);
+  const priorFalsified = steering.priorFalsifiedClaims instanceof Map ? steering.priorFalsifiedClaims : new Map();
+  const skippedByMemory = [];
   const challengeIsAdmissible = lastVerdict === PROTOCOL_VERDICT.SUPPORTED && replayVerdict === REPLAY_VERDICT.MATCH;
   const priority = (hypothesis) => {
     if (hypothesis.hypothesisId === steering.focusedHypothesisId) return 0;
@@ -173,6 +178,11 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
   for (const h of hypotheses) {
     if (doneHypothesisIds.has(h.hypothesisId)) continue;
     if (abandoned.has(h.hypothesisId)) continue;
+    const priorRefutation = priorFalsified.get(normalizeText(h.claim));
+    if (priorRefutation && h.hypothesisId !== steering.focusedHypothesisId) {
+      skippedByMemory.push({ hypothesisId: h.hypothesisId, reason: 'FALSIFIED_IN_PRIOR_RUN', necropolisId: priorRefutation });
+      continue;
+    }
     const x = executabilityOf(h, executors);
     if (x.executable) {
       const isFocused = h.hypothesisId === steering.focusedHypothesisId;
@@ -183,13 +193,16 @@ export function nextExperimentProposal(plan, doneHypothesisIds, lastVerdict, exe
         engineId: x.engineId,
         reason: isFocused ? 'USER_FOCUSED_HYPOTHESIS' : isChallenge ? 'SELF_FALSIFICATION_CHALLENGE_IN_PLAN' : 'NEXT_EXECUTABLE_HYPOTHESIS_IN_PLAN',
         ...(isChallenge ? { challengesHypothesisId: lastHypothesisId } : {}),
+        ...(skippedByMemory.length ? { skippedByMemory } : {}),
       };
     }
   }
   return {
     action: 'HUMAN_REVIEW',
-    reason: lastVerdict === PROTOCOL_VERDICT.UNRESOLVED ? 'INCONCLUSIVE_UNDER_PROTOCOL_AND_NO_FURTHER_EXECUTABLE_EXPERIMENT' : 'NO_FURTHER_EXECUTABLE_EXPERIMENT_IN_PLAN',
+    reason: skippedByMemory.length ? 'REMAINING_HYPOTHESES_FALSIFIED_IN_PRIOR_RUNS'
+      : lastVerdict === PROTOCOL_VERDICT.UNRESOLVED ? 'INCONCLUSIVE_UNDER_PROTOCOL_AND_NO_FURTHER_EXECUTABLE_EXPERIMENT' : 'NO_FURTHER_EXECUTABLE_EXPERIMENT_IN_PLAN',
     planNextActions: (plan?.nextActions ?? []).map((a) => a.action),
+    ...(skippedByMemory.length ? { skippedByMemory } : {}),
   };
 }
 
@@ -490,7 +503,7 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
     }
     if (!now.next) {
       const done = new Set(current.experiments.map((e) => e.frozen.hypothesisId));
-      const steering = researchSteeringOf(current.researchState);
+      const steering = { ...researchSteeringOf(current.researchState), priorFalsifiedClaims: priorFalsifiedClaims(buildProjectBytProjection(db, projectId), { excludeRunId: runId }) };
       const proposal = nextExperimentProposal(current.plan, done, now.falsification.verdict, tools.executors, replay?.verdict, steering, now.frozen.hypothesisId);
       const evidence = now.evidence ?? {
         evidenceProposalId: proposed.proposalId,

@@ -72,6 +72,8 @@ import { listToolchain, listToolchainMetadata, getToolMetadata } from './campaig
 import { createAgentRun, getAgentRun, listAgentRuns, readResearchState, appendResearchStateEvent } from './agentRun.mjs';
 import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolveContradiction } from './knowledgeRegistry.mjs';
 import { buildCognitiveState } from './cognitiveState.mjs';
+import { loadKnowledgeSources } from './knowledgeSources.mjs';
+import { synthesizeKnowledge } from './knowledgeSynthesis.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
@@ -672,6 +674,18 @@ export function handleApi(db, ctx) {
         let selfModel;
         try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: reasoningProviderOf(ctx).describe() }); } catch { selfModel = null; }
         return ok({ cognitiveState: buildCognitiveState(db, projectId, { selfModel }) });
+      })();
+    }
+    // Knowledge loop: recall + synthesis over canonical state. A read-only view; stores nothing, calls no model.
+    if (seg[2] === 'knowledge' && seg[3] === 'synthesis' && seg.length === 4) {
+      if (method !== 'GET') return err(405, 'method_not_allowed');
+      const question = String(ctx.query?.q ?? '').trim().slice(0, 500);
+      if (!question) return err(400, 'question_required');
+      return (async () => {
+        let selfModel;
+        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: reasoningProviderOf(ctx).describe() }); } catch { selfModel = null; }
+        const cognitiveState = buildCognitiveState(db, projectId, { selfModel });
+        return ok({ synthesis: synthesizeKnowledge({ question, cognitiveState, sources: loadKnowledgeSources(), limit: 15 }) });
       })();
     }
     // ENTITY-3: an external model proposes; the answer is validated and stored as PROPOSED, never as knowledge.

@@ -1,4 +1,4 @@
-# Completion Matrix — main 122ef7da (rollback before #58: 97940b8c)
+# Completion Matrix — main d97759e6 (rollback before #58: 97940b8c; #58 = 122ef7da)
 
 Lightweight table, not a product module. Status: DONE_GREEN / PARTIAL_IN_REPO / BLOCKED_EXTERNAL / NOT_APPLICABLE.
 "Local" = this sandbox (Node, RDKit 2026.03.6 installed with pip). "CI" = .github/workflows/ci.yml, which sets GENESIS_REQUIRE_ENGINES=rdkit, so a skipped RDKit test fails CI instead of passing silently.

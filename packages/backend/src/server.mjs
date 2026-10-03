@@ -20,7 +20,8 @@
  */
 
 import http from 'node:http';
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -42,6 +43,7 @@ import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { createResearchRunWorker } from './researchRunJobs.mjs';
+import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
 import { createScientificSandboxPort } from './compute/scientificSandboxContract.mjs';
@@ -93,6 +95,8 @@ const DB_PATH = process.env.GENESIS_DB_PATH ?? path.join(__dirname, '../data/gen
 // startowym, i w /api/health — operator nie musi zgadywać, a komisja nie musi
 // wierzyć na słowo. Sama diagnoza NIE blokuje startu: wdrożenie świadomie
 // efemeryczne (demo, :memory:) jest legalne, o ile jest NAZWANE.
+// Single-node content-addressed artifact custody next to the database (GENESIS_ARTIFACT_DIR overrides).
+const artifactStorage = createLocalContentAddressedArtifactStorage({ rootDir: path.resolve(process.env.GENESIS_ARTIFACT_DIR ?? (DB_PATH === ':memory:' ? mkdtempSync(path.join(tmpdir(), 'genesis-artifacts-')) : path.join(path.dirname(DB_PATH), 'artifacts'))) });
 const DB_DURABILITY = classifyDbPath({ dbPath: DB_PATH, appDir: path.resolve(__dirname, '..') });
 let db = null;
 try {
@@ -388,6 +392,7 @@ function handlePersistApi(req, res, url) {
         body,
         query,
         reasoningProvider,
+        artifactStorage,
         scientificSandboxPort,
         scientificSandboxImage,
       });
@@ -513,7 +518,7 @@ server.listen(PORT, () => {
 // ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
 // (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
 if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
-  const worker = createResearchRunWorker(db);
+  const worker = createResearchRunWorker(db, { artifactStorage });
   let busy = false;
   setInterval(async () => {
     if (busy) return;

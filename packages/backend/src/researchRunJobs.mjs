@@ -3,6 +3,7 @@ import { ENGINE_EXECUTION_STATUS } from './compute/engineExecutionContract.mjs';
 import { createScientificWorkerRuntime } from './compute/scientificWorkerRuntime.mjs';
 import { createScientificJobQueuePort, createSqliteScientificJobQueueBackend } from './compute/workerInfrastructureContract.mjs';
 import { executeResearchExperiment } from './researchRunExecution.mjs';
+import { recoverMissingArtifacts } from './researchRunArtifacts.mjs';
 import { getResearchRun } from './researchRun.mjs';
 
 /**
@@ -54,7 +55,7 @@ export function readResearchJob(db, runId, jobId) {
 }
 
 /** Adapts executeResearchExperiment() to the EngineExecutionPort shape the worker runtime already consumes. */
-export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now } = {}) {
+export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now, artifactStorage = null } = {}) {
   return Object.freeze({
     async execute(request) {
       const { projectId, hypothesisId, userId } = request.input ?? {};
@@ -63,6 +64,15 @@ export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now
       if (proposeEvidence) options.proposeEvidence = proposeEvidence;
       if (now) options.now = now;
       const result = executeResearchExperiment(db, projectId, request.researchRunId, options);
+      if (artifactStorage) {
+        // Custody is part of the job: a run whose artifact cannot be stored is not reported as a success.
+        // A retry after a storage failure has nothing left to execute, so it only recovers the custody gap.
+        const custody = await recoverMissingArtifacts(db, artifactStorage, projectId, request.researchRunId);
+        if (custody.failed.length) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: custody.failed[0].status } };
+        if (!result.ok && custody.recovered.length && ['NO_EXECUTABLE_EXPERIMENT', 'ALREADY_EXECUTED'].includes(result.status)) {
+          return { record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: request.researchRunId, experimentId: custody.recovered[0] }, result: { status: 'ARTIFACT_RECOVERED', deduped: true, experimentId: custody.recovered[0] } };
+        }
+      }
       if (result.ok) {
         return { record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: request.researchRunId, experimentId: result.experimentId }, result: { status: result.status, deduped: Boolean(result.deduped), experimentId: result.experimentId } };
       }

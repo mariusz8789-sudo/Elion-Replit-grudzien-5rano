@@ -134,7 +134,7 @@ const recordingStartedAt = Date.now();
 await page.goto(`${BASE}/#/research-console`, { waitUntil: 'load' });
 await sleep(1500);
 await dismissOnboarding();
-await page.getByText('Run full scientific process').first().waitFor({ timeout: 120000 });
+await page.getByText('Uruchom cały proces badawczy').first().waitFor({ timeout: 120000 });
 await page.evaluate(() => window.scrollTo(0, 0));
 await sleep(400);
 say(`console ready ${((Date.now() - recordingStartedAt) / 1000).toFixed(1)}s after recording start`);
@@ -148,7 +148,7 @@ await installOverlay();
 // 2. QUESTION — the user types a plain-language research question
 await caption('1 · PYTANIE', 'Genesis to system operacyjny nauki. Zadajesz pytanie zwykłym językiem — nie musisz znać kodu ani struktury systemu.');
 await sleep(2600);
-await page.getByText('REAL — LOWER-HARM (production data)').first().click();
+await page.getByText('Prawdziwe dane: ChEMBL i ClinicalTrials.gov').first().click();
 await sleep(500);
 await caption('1 · PYTANIE', 'Wybieramy tryb REAL: prawdziwe, przypięte dane ChEMBL i ClinicalTrials.gov — bez syntetycznych przykładów.', REAL);
 await sleep(1800);
@@ -161,7 +161,7 @@ await sleep(900);
 
 // 3. GENESIS STARTS WORKING — the real 20-stage pipeline runs in the browser
 await caption('2 · GENESIS PRACUJE', 'Genesis uruchamia pełny, 20-etapowy proces naukowy: formalizacja → kandydaci → filtry → ranking → dowody → eksperyment → falsyfikacja → bramka zwycięzcy.', REAL);
-await page.getByText('Run full scientific process').first().click();
+await page.getByText('Uruchom cały proces badawczy').first().click();
 await page.waitForSelector('[data-testid="winner-record"], [data-testid="no-winner-blocker"], .gu-locked-panel', { timeout: 120000 });
 say('pipeline finished');
 await sleep(600);

@@ -230,11 +230,12 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         />
         <div className="gu-locale-switch" style={{ margin: '8px 0', flexWrap: 'wrap' }}>
           {([
-            ['SANDBOX', 'SANDBOX (toy adapters)'],
-            ['REAL_PRODUCTION', 'REAL — LOWER-HARM (production data)'],
-            ['REAL_SYNTHETIC_WINNER_DEMO', 'REAL — LOWER-HARM (synthetic winner demo)'],
+            // Plain words for a layperson; the mode id stays in the button's title.
+            ['SANDBOX', 'Ćwiczenie: modele zabawkowe, bez prawdziwych danych'],
+            ['REAL_PRODUCTION', 'Prawdziwe dane: ChEMBL i ClinicalTrials.gov'],
+            ['REAL_SYNTHETIC_WINNER_DEMO', 'Pokaz: prawdziwy proces, syntetyczny zwycięzca'],
           ] as const).map(([value, label]) => (
-            <button key={value} type="button" className={source === value ? 'chip-btn primary' : 'chip-btn'} onClick={() => setSource(value)}>
+            <button key={value} type="button" className={source === value ? 'chip-btn primary' : 'chip-btn'} onClick={() => setSource(value)} title={value}>
               {label}
             </button>
           ))}
@@ -256,13 +257,13 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
             </div>
             <label className="gu-hint" style={{ display: 'block', margin: '4px 0' }}>
               <input type="checkbox" checked={vagueProblem} onChange={(e) => setVagueProblem(e.target.checked)} />
-              {' '}Submit as a vague problem (text only, no objectives/evidenceMinimum) — tests the real fail-closed NEEDS_INPUT path
+              {' '}Wyślij samo pytanie, bez celów i progów dowodu: Genesis powinien poprosić o brakujące dane, a nie zgadywać
             </label>
           </>
         )}
         <div className="research-console-actions">
           <button type="button" className="chip-btn primary" onClick={() => void start()} disabled={busy}>
-            {busy ? 'Running…' : 'Run full scientific process'}
+            {busy ? 'Trwa…' : 'Uruchom cały proces badawczy'}
           </button>
           {guideMode === null && (
             <>

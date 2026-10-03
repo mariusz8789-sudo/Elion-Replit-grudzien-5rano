@@ -6094,3 +6094,12 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .lab-mode-select { display: inline-flex; align-items: center; gap: 0.4rem; }
 .lab-mode-select-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lab-mode-select select { padding: 0.45rem 0.7rem; border-radius: 999px; min-height: 44px; font: 500 0.78rem/1.4 inherit; color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.72); }
+
+/* Pilot A/B over the protocol's own arms — wraps at 375/390/430 px, long fingerprints break. */
+.pilot-ab-panel { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid rgba(148, 163, 184, 0.25); min-width: 0; }
+.pilot-ab-panel h3 { margin: 0 0 0.5rem; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.pilot-ab-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.pilot-ab-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; flex: 1 1 10rem; min-width: 0; }
+.pilot-ab-controls select { max-width: 100%; min-width: 0; }
+.pilot-ab-result { margin-top: 0.7rem; min-width: 0; }
+.pilot-ab-result dd, .pilot-ab-result dt, .pilot-ab-result .mono { overflow-wrap: anywhere; word-break: break-word; }

@@ -133,7 +133,8 @@ export const RESEARCH_STATE_EVENT_TYPES = Object.freeze([
 ]);
 export const RESEARCH_STATE_GENESIS_HEAD = fnv1a(canonicalJson({ genesis: 'research-state-v1' }));
 
-function researchTransition(previousHead, type, payloadFingerprint, seq) {
+/** The chain step rule: one transition fingerprint from the previous head and one event. Exported so an Evidence Pack verifier recomputes the same chain, not a second one. */
+export function researchTransition(previousHead, type, payloadFingerprint, seq) {
   return fnv1a(canonicalJson({ prev: previousHead, type, payloadFingerprint, seq }));
 }
 

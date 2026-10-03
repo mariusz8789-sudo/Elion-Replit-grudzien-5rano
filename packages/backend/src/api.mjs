@@ -79,6 +79,7 @@ import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
+import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { controlResearchRunExecution, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
@@ -1031,6 +1032,21 @@ export function handleApi(db, ctx) {
           const status = { NO_ARTIFACT_RECORDED: 404, NOT_EXECUTED: 409, BLOCKED_BY_CONFIGURATION: 503 }[v.status] ?? 409;
           return { status, body: { error: v.status, reason: v.reason ?? null, verified: false } };
         })();
+      }
+      // Canonical Evidence Pack (docs/astra): a read-only projection of this run's records, every hash recomputable.
+      // No executed experiment (e.g. engine unavailable) gives 409 BLOCKED; nothing is assembled from anything else.
+      if (seg[4] === 'evidence-pack' && (seg.length === 5 || (seg.length === 6 && seg[5] === 'verify'))) {
+        if (seg.length === 5) {
+          if (method !== 'GET') return err(405, 'method_not_allowed');
+          return (async () => {
+            const built = await buildResearchRunEvidencePack(db, projectId, current.researchRunId, { artifactStorage: ctx.artifactStorage ?? null });
+            if (!built.ok) return { status: built.status === 'NOT_FOUND' ? 404 : 409, body: { error: built.status, blockers: built.blockers ?? null } };
+            return ok({ pack: built.pack });
+          })();
+        }
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (body?.pack?.researchRunId !== current.researchRunId) return err(400, 'pack_run_mismatch', 'pack.researchRunId musi wskazywać ten przebieg.');
+        return (async () => ok({ verification: await verifyResearchRunEvidencePack(body.pack, { db, projectId, artifactStorage: ctx.artifactStorage ?? null }) }))();
       }
       // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
       if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {

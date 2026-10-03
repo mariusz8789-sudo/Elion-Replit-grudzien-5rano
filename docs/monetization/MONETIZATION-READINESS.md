@@ -4,7 +4,7 @@ Base: `origin/main` 5f52356a plus branch `g1/monetization-verify` (this document
 
 Ground rules for everything below:
 
-- **Every price is a HYPOTHESIS.** No price has been tested with a customer. The repository has no price source of truth: `granty/monetyzacja-source-of-truth-*.md` does not exist on any branch (checked with `git log --all -- 'granty/*' '*monetyz*'`). The only figures in the repo (`€15k–€40k pilot`, `€40k–€150k annual`) are already labelled `ESTIMATE / UNSUPPORTED` in `docs/GENESIS_PERPLEXITY_STRATEGIC_REVIEW.md:31` and are not used here.
+- **Every price is a HYPOTHESIS.** The owner's price sheet (`/mnt/project-files/granty/monetyzacja-source-of-truth-2026-09-29.md`, 29 September, outside the repo) is the only source, quoted verbatim below. Its own rule: "Initial pricing hypotheses — to be validated with first customers." No price has been tested with a customer; ranges change only by a separate owner decision.
 - **Nothing is "validated" science.** Genesis verdicts are `SUPPORTED_WITHIN_PROTOCOL / FALSIFIED_WITHIN_PROTOCOL / INCONCLUSIVE` for one frozen protocol; replay verdicts say whether a computation reproduces, not whether it is true.
 - **Nothing is signed.** The CSRN production key has not been generated (`docs/keys/OWNER-CSRN-KEY-COMMANDS.md`, audit item 13). Every certificate and every Genesis Verify report is **UNSIGNED**.
 - **Production is behind main.** Production runs b3be8635 (deploy of 29 September); main is about 315 commits ahead. Nothing below is live for a customer until the owner deploys.
@@ -16,9 +16,9 @@ Ground rules for everything below:
 |---|---|---|---|
 | Genesis Verify | **45%** | €3k–€8k per audit, HYPOTHESIS | Record → integrity + ledger anchor + real replay → one-page report works and is tested. Only Genesis-produced records on 4 replayable engines; no upload UI; unsigned. |
 | Genesis Benchmark | **25%** | €5k–€15k per project, HYPOTHESIS | Real Astex and PoseBusters runs exist as offline scripts and reports. No customer dataset intake; the scorer that won is licence-blocked from product use. |
-| Discovery Sprint | **30%** | not set; owner to set, HYPOTHESIS | ResearchRun question → plan → frozen prediction → engine → verdict → replay → next experiment is E2E tested. No real customer-scale run, ADMET/retrosynthesis blocked for commercial use. |
-| Evidence Platform | **20%** | not set; owner to set, HYPOTHESIS | Hash-chained research state, evidence proposals, replay, artifact custody exist. Single-node SQLite, no tenant model, no backend Evidence Pack, prod behind main. |
-| Enterprise | **15%** | not set; owner to set, HYPOTHESIS | Sessions, RBAC, projects. No SSO/MFA, API keys, billing, backup drill, HA or compliance evidence. |
+| Discovery Sprint | **30%** | €10k–€25k per pilot (subject to runtime availability), HYPOTHESIS | ResearchRun question → plan → frozen prediction → engine → verdict → replay → next experiment is E2E tested. No real customer-scale run, ADMET/retrosynthesis blocked for commercial use. |
+| Evidence Platform | **20%** | €30k–€80k per year, HYPOTHESIS | Hash-chained research state, evidence proposals, replay, artifact custody exist. Single-node SQLite, no tenant model, no backend Evidence Pack, prod behind main. |
+| Enterprise | **15%** | €80k–€200k+ per year, HYPOTHESIS | Sessions, RBAC, projects. No SSO/MFA, API keys, billing, backup drill, HA or compliance evidence. |
 
 ## Fastest honest path to the first paid customer
 
@@ -159,7 +159,7 @@ Smallest real next step (not done here): wrap `posebusters-unseen-benchmark.py`'
 
 **Infrastructure.** Same node; LLM provider for plans; literature API access.
 
-**Price.** Not set — **HYPOTHESIS to be set by the owner**. No figure in the repo is usable.
+**Price.** €10k–€25k per pilot (subject to runtime availability) — **HYPOTHESIS**, untested.
 
 **Cost drivers.** Scientist hours, LLM tokens, engine CPU.
 
@@ -189,7 +189,7 @@ Smallest real next step (not done here): wrap `posebusters-unseen-benchmark.py`'
 
 **Infrastructure.** Managed DB with backup/restore, shared object storage, multi-replica queue, secret manager (`GENESIS_SAAS_ENTERPRISE_READINESS.md` P0 list).
 
-**Price.** Not set — **HYPOTHESIS to be set by the owner**.
+**Price.** €30k–€80k per year — **HYPOTHESIS**, untested; offered only after first successful pilots.
 
 **Cost drivers.** Hosting, storage growth for artifacts, compute per run, support.
 
@@ -219,7 +219,7 @@ Smallest real next step (not done here): wrap `posebusters-unseen-benchmark.py`'
 
 **Infrastructure.** Multi-replica, managed DB, KMS, monitoring, incident runbook.
 
-**Price.** Not set — **HYPOTHESIS to be set by the owner**.
+**Price.** €80k–€200k+ per year — **HYPOTHESIS**, untested; offered only after first successful pilots.
 
 **Cost drivers.** Security and compliance programme, dedicated infrastructure, support.
 

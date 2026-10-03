@@ -41,6 +41,9 @@ describe('StartHero dashboard', () => {
     const drug = html.slice(html.indexOf('data-testid="home-area-drug"'), html.indexOf('data-testid="home-area-biology"'));
     expect(drug).toContain('href="#/molecule"');
     expect(html.split('href="#/molecule"').length - 1).toBe(1);
+    // The benchmark card carries no molecule picture: caffeine is not one of its complexes.
+    const run = html.slice(html.indexOf('data-testid="home-running"'), html.indexOf('</section>', html.indexOf('data-testid="home-running"')));
+    expect(run).not.toContain('<img');
   });
 
   it('is the approved command centre: hero with Running now and Latest verified, bento, and the More strip', async () => {

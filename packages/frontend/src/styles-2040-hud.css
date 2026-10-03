@@ -130,6 +130,8 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
 /* HUD telemetry readout: measured machine state + computed 5D geometry of the
    backdrop flight path. Mono, hairline-separated, wraps under the route. */
 .shell-hud { flex-wrap: wrap; row-gap: 0.15rem; }
+/* On short screens (1366×768) the sidebar scrolls; its header rows must not be squeezed into each other. */
+.shell-hud, .shell-account { flex-shrink: 0; }
 .shell-hud-telemetry { flex-basis: 100%; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.06em; color: var(--text-dim); white-space: normal; line-height: 1.4; }
 
 /* Matrix hub (#/matrix) in HUD mode: the world stays visible through every

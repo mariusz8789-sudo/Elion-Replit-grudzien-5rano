@@ -262,7 +262,6 @@ export function StartHero(): React.ReactElement {
           </form>
 
           <section className="cc-run" data-testid="home-running" aria-label="Running now">
-            <a className="cc-thumb" href="#/drug" aria-hidden="true" tabIndex={-1}><img src={MOLECULE_IMG} alt="" /></a>
             <p className="cc-k"><i className="cc-dot" />{running ? 'RUNNING NOW' : 'LATEST BENCHMARK'}<span>started {utcStamp(RUN8.startedAt)}</span></p>
             <h2>{RUN8.title}</h2>
             <p className="cc-m">

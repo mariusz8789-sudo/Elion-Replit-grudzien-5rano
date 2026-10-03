@@ -9,8 +9,12 @@ import { openDatabase } from './store.mjs';
 import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { createSqliteScientificJobQueueBackend } from './compute/workerInfrastructureContract.mjs';
 import { createResearchRunWorker, enqueueResearchExperiment, queueFor, RESEARCH_REMOTE_CAPABILITY } from './researchRunJobs.mjs';
+import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { handleRemoteWorkerApi, REMOTE_OUTCOME_KIND, workerTokenMatches } from './remoteWorkerApi.mjs';
 
+// Planning accepts an RDKit experiment only where the server itself has RDKit (the server also replays), so these need it.
+const RDKIT = rdkitDetect();
+const skip = RDKIT.available ? false : `RDKit runtime unavailable: ${RDKIT.reason}`;
 const TOKEN = 'unit-test-worker-token-0123456789';
 const plan = {
   subProblems: [{ question: 'Aspirin molecular weight?', whyItMatters: 'Remote worker API proof.' }],
@@ -70,7 +74,7 @@ test('the worker API is off without a token and refuses anything but the worker 
   } finally { ctx.done(); }
 });
 
-test('a remote job is invisible to the in-process worker; a worker without the engine releases it until the attempts are spent', async () => {
+test('a remote job is invisible to the in-process worker; a worker without the engine releases it until the attempts are spent', { skip }, async () => {
   const ctx = await setup();
   try {
     const queued = await enqueueResearchExperiment(ctx.db, ctx.project.id, ctx.runId, { remote: true });
@@ -89,7 +93,7 @@ test('a remote job is invisible to the in-process worker; a worker without the e
   } finally { ctx.done(); }
 });
 
-test('a completion is only as good as its artifact: wrong digest, wrong worker, wrong input and a missing artifact are refused and write nothing', async () => {
+test('a completion is only as good as its artifact: wrong digest, wrong worker, wrong input and a missing artifact are refused and write nothing', { skip }, async () => {
   const ctx = await setup();
   try {
     const queued = await enqueueResearchExperiment(ctx.db, ctx.project.id, ctx.runId, { remote: true });

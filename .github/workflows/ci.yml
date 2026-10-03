@@ -575,7 +575,14 @@ jobs:
           cache-dependency-path: packages/backend/requirements-pyscf.txt
       - name: Install pinned PySCF runtime
         run: python -m pip install --disable-pip-version-check -r packages/backend/requirements-pyscf.txt
+      - name: Install RDKit (3D embedding for the ResearchRun PySCF executor)
+        run: python -m pip install --disable-pip-version-check -r packages/backend/requirements-rdkit.txt
       - name: Run real Fabric PySCF contract tests
         env:
           GENESIS_PYSCF_PYTHON: python
         run: node --test packages/backend/src/pyscfFabricApi.test.mjs
+      - name: Real PySCF through ResearchRun and the durable queue (frozen prediction, falsification, Replay MATCH, restart)
+        env:
+          GENESIS_PYSCF_PYTHON: python
+          GENESIS_REQUIRE_ENGINES: pyscf,rdkit
+        run: node --test packages/backend/src/researchRunEngines.real.test.mjs

@@ -8,12 +8,16 @@
  * fields a frozen prediction may name. An engine without an entry here is not executable from a
  * ResearchRun (NO_RESEARCH_RUN_ADAPTER); nothing is ever substituted for it.
  */
-import { descriptors } from './compute/rdkitAdapter.mjs';
+import { descriptors, embed3d } from './compute/rdkitAdapter.mjs';
+import { singlePoint as pyscfSinglePoint } from './compute/qmAdapter.mjs';
 import { getTool, TOOL_STATUS } from './campaign/toolchain.mjs';
 
 export const PREDICTION_OPERATORS = Object.freeze(['<', '<=', '>', '>=', '==', '!=']);
 export const MAX_PREDICTIONS = 8;
 const MAX_SMILES = 500;
+// PySCF is bounded on purpose: small molecules, minimal/split-valence bases, Hartree-Fock only.
+const PYSCF_BASES = Object.freeze(['sto-3g', '3-21g', '6-31g']);
+const PYSCF_MAX_ATOMS = 12;
 
 export const RESEARCH_RUN_EXECUTORS = Object.freeze({
   rdkit: Object.freeze({
@@ -44,6 +48,42 @@ export const RESEARCH_RUN_EXECUTORS = Object.freeze({
       if (r.error === 'invalid_smiles') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
       // A timeout, a killed worker or any other fault says nothing about the hypothesis: it is BLOCKED,
       // nothing is sealed, and the same frozen experiment runs again once the engine works.
+      return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
+    },
+  }),
+  pyscf: Object.freeze({
+    engineId: 'pyscf',
+    /** Same capability the existing replayer ('quantum-chemistry' in campaign/verify.mjs) re-runs, bit-exact. */
+    scienceCapability: 'quantum-chemistry',
+    inputShape: '{ "smiles": string, "basis"?: "sto-3g"|"3-21g"|"6-31g", "charge"?: integer }',
+    observables: Object.freeze({
+      energyHartree: 'number', homoHartree: 'number', lumoHartree: 'number', homoLumoGapHartree: 'number',
+      homoLumoGapEv: 'number', dipoleDebye: 'number', converged: 'boolean', nElectrons: 'number', nBasisFunctions: 'number',
+    }),
+    parseInput(parameters) {
+      const smiles = typeof parameters?.smiles === 'string' ? parameters.smiles.trim() : '';
+      if (!smiles) return { ok: false, reason: 'smiles_required' };
+      if (smiles.length > MAX_SMILES || /\s/.test(smiles)) return { ok: false, reason: 'smiles_invalid_shape' };
+      const basis = parameters?.basis ?? 'sto-3g';
+      if (!PYSCF_BASES.includes(basis)) return { ok: false, reason: 'basis_not_supported' };
+      const input = { smiles, method: 'RHF', basis };
+      if (parameters?.charge !== undefined) {
+        if (!Number.isInteger(parameters.charge) || Math.abs(parameters.charge) > 2) return { ok: false, reason: 'charge_invalid' };
+        input.charge = parameters.charge;
+      }
+      return { ok: true, input };
+    },
+    run(input) {
+      const emb = embed3d(input.smiles);
+      if (!emb.ok) {
+        if (emb.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: emb.reason ?? emb.error };
+        return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: emb.error };
+      }
+      if (emb.atoms.length > PYSCF_MAX_ATOMS) return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: `too_many_atoms_${emb.atoms.length}_max_${PYSCF_MAX_ATOMS}` };
+      const r = pyscfSinglePoint({ atoms: emb.atoms, charge: input.charge ?? emb.charge ?? 0, method: input.method, basis: input.basis });
+      if (r.ok) return { ok: true, output: r.data, engineLabel: String(r.meta?.engine ?? '').replace('PySCF ', '') };
+      if (r.error === 'BLOCKED_BY_RUNTIME') return { ok: false, status: 'BLOCKED', reason: r.reason ?? r.error };
+      if (r.error === 'invalid_input') return { ok: false, status: 'ENGINE_REJECTED_INPUT', error: r.error };
       return { ok: false, status: 'BLOCKED', reason: `ENGINE_FAILED: ${r.error}${r.reason ? `: ${r.reason}` : ''}` };
     },
   }),

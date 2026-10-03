@@ -680,9 +680,10 @@ export function openDatabase(filename = ':memory:', { backupDir = null } = {}) {
   try {
     db.exec('PRAGMA foreign_keys = ON;');
     if (filename !== ':memory:') {
-      db.exec('PRAGMA journal_mode = WAL;');
-      // A heavy job writes from a worker thread on its own connection; wait for the lock instead of failing.
+      // A heavy job writes from a worker thread on its own connection, and several processes may open the same file
+      // at once: wait for the lock instead of failing. Set before WAL, which itself needs the lock.
       db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
     }
     const { user_version: before } = db.prepare('PRAGMA user_version').get();
     // An older release refuses a database whose schema is newer than it knows, so a code-only rollback cannot
@@ -693,9 +694,18 @@ export function openDatabase(filename = ':memory:', { backupDir = null } = {}) {
     if (preMigrationSnapshot) {
       console.log(JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'db_pre_migration_snapshot', fromSchema: before, toSchema: CURRENT_SCHEMA_VERSION, file: preMigrationSnapshot.file, bytes: preMigrationSnapshot.bytes }));
     }
-    db.exec(SCHEMA);
-    migrate(db);
-    ensureAccessSchema(db);
+    // Schema creation and migration run under one write lock, so a second process opening the same file at the
+    // same time waits and then sees the finished schema instead of migrating it a second time.
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(SCHEMA);
+      migrate(db);
+      ensureAccessSchema(db);
+      db.exec('COMMIT');
+    } catch (error) {
+      if (db.isTransaction) db.exec('ROLLBACK');
+      throw error;
+    }
     return db;
   } catch (error) {
     // A rejected migration must not leak the handle (or lock its files on Windows).

@@ -1,0 +1,92 @@
+{
+  "kind": "GENESIS_PREREGISTRATION",
+  "frozenAt": "2026-10-03T00:17:48+00:00",
+  "protocolFingerprintSha256": "7f9981173699aa917fa3299c904c23a8749a656b0720200a48caee0d2c017762",
+  "fingerprintRecipe": "sha256(json.dumps(protocol, sort_keys=True))",
+  "protocol": {
+    "id": "run9-ranking-prereg",
+    "label": "Run 9 - a better choice among already-found poses, tested once on a fresh unseen set",
+    "status": "SEAL A: PREREGISTERED BEFORE ANY DEVELOPMENT RESULT OF THE CANDIDATE RANKERS BELOW AND BEFORE THE FRESH SET IS DOWNLOADED. Frozen; amendments only by append. Seal B (case list, file hashes, final code hashes, selected ranker) is appended before any fresh-set docking.",
+    "ownerAuthorisation": "Mariusz, 2026-10-03 00:14Z: 'Zielone światło masz na prerejestrację'. This covers writing and freezing this document only. Development (phase D) and the final run (phase F) each wait for his explicit word.",
+    "relationToRun8": "Run 8 is closed and is not amended, reinterpreted or re-run here. Its verdict DOES_NOT_GENERALISE (GNINA cnnScore top-1 204/308 vs Vina 202/308) stands. From 2026-09-30 21:38Z, by the owner's instruction, the PoseBusters Benchmark set is a DEVELOPMENT / DIAGNOSTIC set: its results have been seen, so nothing measured on it can be a validation.",
+    "question": "Among the poses the frozen Run 8 search already produces, can a ranking rule chosen on PoseBusters by a rule fixed here pick a sub-2.0 A pose first more often than the Run 8 rule, on complexes that neither Genesis nor GNINA has ever seen?",
+    "whatIsAlreadyKnownBeforeThisFreeze": {
+      "statement": "Diagnostics already computed on the Run 8 pools and pushed in docs/evidence/run9-plan/ (commit f5d12d06), recorded here so that nobody can later claim the development phase started blind.",
+      "rankSumConsensusOnPoseBusters": "215 to 217 of 308 for GNINA weights 0.3 / 0.5 / 0.7, against 204 for the Run 8 rule",
+      "agreement": "the two scorers pick the same pose in 138 of 290 scored cases, correct in 128",
+      "disagreement": "152 cases, GNINA right 76, Vina right 74, either right 108",
+      "notYetComputed": "the plausibility filter, the cluster-support tie-break and every combination of them; these are the phase-D measurements and are selected by the rule below, not by judgement"
+    },
+    "phaseD_development": {
+      "set": "PoseBusters Benchmark set, 308 cases, the Run 8 per-case pools and pose files exactly as produced by Run 8. No re-docking.",
+      "allowedChangesToThePipeline": [
+        "the ranking rule, chosen only from the candidate family below by the selection rule below",
+        "an input adapter that reads the fresh set's distribution format (receptor.cif + ligand SDF per system) into the unchanged Run 8 preparation; it may be developed only on PoseBusters and on the single example system shipped in the benchmark's own GitHub repository (8c3u__1__1.A__1.C), never on fresh-set data",
+        "a fix for receptor atom types GNINA cannot parse (the cause of Run 8's three UNAVAILABLE cases 7SUC, 7UMW, 7XRL), developed on those three cases; it must leave every other Run 8 case's receptor file byte-identical, which is checked and reported",
+        "the Run 8 glue fix for cases where only some seeds dock (commit 8f7ed018), already in place"
+      ],
+      "everythingElseStaysTheRun8Pipeline": "Vina 1.2.7, Meeko 0.8.0, RDKit and biotite as pinned for Run 8, seeds 42/1042/2042/3042/4042, exhaustiveness 32, num_modes 20, energy_range 20.0, box from the crystal ligand as in Run 8, pooling across seeds, dedup at 1.0 A, GNINA 1.3 --score_only --cnn crossdock_default2018_ensemble on the CPU.",
+      "candidateRankerFamily": {
+        "C0": "Run 8 rule: GNINA cnnScore descending. The comparator, never selectable.",
+        "C1(w)": "rank-sum consensus: minimise w * rank_by_cnnScore + (1 - w) * rank_by_Vina_affinity, w in {0.3, 0.5, 0.7}; ties by the pooled order",
+        "C2(w)": "C1(w) applied after a physical-plausibility filter: a pose is removed if it fails any of the PoseBusters package checks for internal geometry (bond lengths, bond angles, internal steric clash, aromatic ring flatness, double-bond flatness, internal energy) or for intermolecular clash with the protein; if every pose of a case fails, no pose is removed. The package version is pinned in seal B.",
+        "C3(w)": "C2(w), then among the two best-ranked surviving poses the one with more pooled poses within 2.0 A of it (cluster support across seeds) is taken first; ties keep the C2(w) order",
+        "C4": "PRODUCT-ELIGIBLE ARM, no GNINA: Vina affinity after the C2 filter, then the C3 cluster-support tie-break. Evaluated and reported separately; it is not part of the selection and has its own verdict."
+      },
+      "selectionRule": "Compute top-1 on all 308 PoseBusters cases (denominator 308, every failure kept) for the nine variants C1(0.3), C1(0.5), C1(0.7), C2(...), C3(...). Select the variant with the highest top-1. Ties are broken toward fewer components (C1 before C2 before C3), then toward w = 0.5. The selected variant is the Run 9 ranker R. If R does not beat C0 by at least +2.0 percentage points on PoseBusters, the outcome is NO_RANKER_SELECTED: it is reported, and phase F is not run for the primary comparison.",
+      "noOtherCandidates": "No variant outside this family is evaluated in phase D and kept. Adding a candidate after seeing any phase-D number requires a new preregistration and a new fresh set."
+    },
+    "freshSet": {
+      "name": "Runs N' Poses",
+      "why": "a published benchmark built specifically to test generalisation beyond training data, with structural similarity of every system to the whole PDB up to 2021-09-30 precomputed by its authors; Genesis has never docked, scored or opened any of it.",
+      "upstream": "Skrinjar et al., 'Have protein-ligand co-folding methods moved beyond memorisation?', bioRxiv doi 10.1101/2025.02.03.636309; repository github.com/plinder-org/runs-n-poses at commit 197fafc60a5cef3a9e7f8a4b0dac7c965eed3839 (Apache-2.0); data Zenodo doi 10.5281/zenodo.14794785, files annotations.csv and ground_truth.tar.gz",
+      "accessState": "BLOCKED at the time of this freeze: zenodo.org is denied by this environment's network policy (probed 2026-10-03 00:15Z, together with files.rcsb.org, data.rcsb.org, files.wwpdb.org, www.ebi.ac.uk, pdbj.org and polarishub.io, all denied). Only the code repository could be cloned. Nothing from the data release has been seen.",
+      "noSubstituteSource": "If zenodo.org stays blocked, Run 9 is not run. No mirror, no other benchmark and no self-assembled set is substituted under this preregistration.",
+      "eligibility": [
+        "ligand_is_proper is true and num_proper_ligand_chains equals 1",
+        "ligand_num_heavy_atoms between 10 and 60 inclusive",
+        "ligand_num_rot_bonds at most 15",
+        "entry PDB id absent from the PoseBusters 308, the Astex 85, CrossDocked2020 ids and PDBbind2016 ids (the same GNINA lists, same commit, as the Run 8 contamination audit)",
+        "one system per PDB id: the first one in the draw order below"
+      ],
+      "draw": "Order eligible systems by sha256('run9|' + group_key) ascending and take the first 300. If fewer than 300 are eligible, take all of them. The case list file and its sha256 are written into seal B before any docking.",
+      "denominator": "every drawn case. PREPARATION_FAILED, DOCKING_FAILED and UNAVAILABLE stay in the denominator as failures for every arm, reported by name, never re-docked because of a poor result, never replaced."
+    },
+    "phaseF_final": {
+      "runOnce": "The frozen pipeline from seal B runs once on the fresh set. Infrastructure aborts are resumed with the identical command and logged, as in Run 8; no case is recomputed because of its result.",
+      "metric": "PRIMARY: top-1 success, symmetry-aware heavy-atom RMSD < 2.0 A without superposition (rdMolAlign.CalcRMS, as in Run 8), denominator = all drawn cases. Secondary: top-3/5, sampling ceiling, per-seed top-1 with each rule applied to each seed's own poses, and the result split into thirds of the authors' sucos_shape_pocket_qcov similarity.",
+      "primaryComparison": "R versus C0 on the same pooled poses, paired by case",
+      "verdict": {
+        "GENERALISES": "R minus C0 >= +3.0 percentage points AND one-sided exact McNemar test on the discordant cases p < 0.05 AND R minus C0 >= 0 on at least 4 of the 5 per-seed analyses",
+        "DOES_NOT_GENERALISE": "R minus C0 <= +1.0 percentage point OR R minus C0 < 0 on 2 or more of the 5 per-seed analyses",
+        "PARTIAL": "anything else"
+      },
+      "secondaryVerdictC4": "The same three-way criterion applied to C4 versus Vina-affinity top-1 on the same pooled poses.",
+      "reportedRegardlessOfOutcome": "both verdicts, every failure by name, the phase-D table of all nine variants, and this prediction scored against reality"
+    },
+    "falsifiablePrediction": {
+      "phaseD": "the selected R reaches 214 to 222 of 308 on PoseBusters",
+      "phaseF_gainOverC0": "+1.5 to +4.0 percentage points; development gains shrink on unseen data and the selection itself is optimistic",
+      "phaseF_verdictPredicted": "PARTIAL, with GENERALISES possible; recorded as a weak prior only",
+      "caveat": "my Run 8 gap prediction (+8 to +16 pp) was wrong; the result was +0.65"
+    },
+    "productBoundary": "No ranker from this work enters the product before a GENERALISES verdict on the fresh set. Any ranker that uses GNINA (C1-C3, hence R) stays out of the product even then, until GNINA's GPL and model-weight licensing are resolved; C4 is the only arm that could become product-eligible.",
+    "forbidden": [
+      "opening, listing or summarising fresh-set data before seal B is committed, beyond annotations.csv columns needed for the eligibility rule",
+      "changing any rule, threshold, candidate, weight, filter or denominator after a phase-D or phase-F number is seen",
+      "evaluating a ranker outside the frozen family and keeping it",
+      "running phase F more than once or reporting the better of two runs",
+      "per-case, per-target or per-PDB exceptions, repairs or boxes",
+      "removing, replacing or substituting any case",
+      "comparing the fresh-set absolute rate one-to-one with Astex or PoseBusters",
+      "any modification of Runs 1-8, their preregistrations or their evidence"
+    ],
+    "computeCost": "phase D: no docking, scoring of existing pools only, plus the PoseBusters checks on about 17,000 poses. Phase F: about 300 cases x 5 seeds = 1,500 Vina runs at exhaustiveness 32 plus GNINA scoring, comparable to Run 8, which took about two days of wall clock on 4 cores including three container restarts.",
+    "codeIdentityAtSealA": {
+      "gitHead": "f5d12d0660ff64de71101c02a44f0eb582aafbf1",
+      "note": "final pipeline code hashes are pinned in seal B, after phase D and before phase F"
+    },
+    "sealB": null,
+    "amendments": []
+  }
+}

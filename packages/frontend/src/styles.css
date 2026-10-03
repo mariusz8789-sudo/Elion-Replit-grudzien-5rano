@@ -6111,3 +6111,15 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .temporal-branch-evidence { margin: .3rem .68rem .6rem; min-width: 0; display: flex; flex-direction: column; gap: .35rem; align-items: flex-start; }
 .temporal-branch-evidence p, .temporal-branch-evidence details { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
 .temporal-branch-evidence .scenario-provenance { width: 100%; box-sizing: border-box; }
+
+/* Reality Navigator scene capture — colour carries the epistemic status. Wraps at 375/390/430 px. */
+.reality-capture { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border); min-width: 0; }
+.reality-capture-toggle { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); cursor: pointer; }
+.reality-capture .reality-compare-row { flex-wrap: wrap; min-width: 0; }
+.reality-capture .reality-compare-hint, .reality-capture .mono { overflow-wrap: anywhere; word-break: break-word; }
+.reality-capture-details summary { cursor: pointer; font-size: 0.66rem; color: var(--text-faint); }
+.reality-deriv.status-model, .reality-deriv.replay-match { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.reality-deriv.status-scenario, .reality-deriv.replay-drift { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.reality-deriv.status-cinematic { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.reality-deriv.status-blocked, .reality-deriv.status-not_modeled,
+.reality-deriv.replay-blocked, .reality-deriv.replay-not_reproducible { color: var(--red, #ef6f7b); border-color: rgba(239, 111, 123, 0.45); }

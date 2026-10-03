@@ -64,6 +64,14 @@ describe('navigation entries point at routes the router actually has', () => {
    * dome-world falsification had a route and a screen before it had any way
    * in.
    */
+  it('the Reality Navigator (#/reality) is reachable from Worlds, not only from itself and one lab', () => {
+    const entry = MORE_ITEMS.find((i) => i.hash === '#/reality');
+    expect(entry, 'no menu entry navigates to #/reality').toBeDefined();
+    expect(entry!.variantOf).toBe('worlds');
+    expect(navVariants('worlds').map((item) => item.id)).toContain(entry!.id);
+    expect(activeNavId('#/reality')).toBe(entry!.id);
+  });
+
   it('the dome-world falsification is reachable from the menu, not only by URL', () => {
     const entry = MORE_ITEMS.find((i) => i.hash === '#/dome-world');
     expect(entry, 'no menu entry navigates to #/dome-world').toBeDefined();

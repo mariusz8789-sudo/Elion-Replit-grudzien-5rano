@@ -46,6 +46,7 @@ const ITEMS: Readonly<Record<string, { label: Pair; short?: Pair; description?: 
   simulation: { label: ['Simulation generator'] },
   'world-proposal': { label: ['Propose a world'] },
   city3d: { label: ['3D city (WebGL)'] },
+  reality: { label: ['Reality Navigator: an orbit and its variants', 'مستكشف الواقع: مدار ومتغيراته'], description: ['Change the star’s mass or the orbit, compare variants, save the scene and compute it again', 'غيّر كتلة النجم أو المدار، وقارن المتغيرات، واحفظ المشهد وأعد حسابه'] },
   'first-person-lab': { label: ['First-person laboratory'] },
   mirror: { label: ['Genesis Mirror: experimental'] },
   'matrix-map': { label: ['Matrix: system map'] },

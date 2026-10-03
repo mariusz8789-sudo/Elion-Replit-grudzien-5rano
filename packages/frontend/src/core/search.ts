@@ -92,13 +92,17 @@ export function buildDestinationIndex(locale: Locale = getLocale()): SearchEntry
     ...NAV_SECTIONS.flatMap((section) => section.items).filter((item) => item.hash !== undefined && item.hash !== '#/'),
     ...MORE_ITEMS.filter((item) => item.hash !== undefined && DESTINATION_WORDS[item.id] !== undefined),
   ];
+  const main = new Set(NAV_SECTIONS.flatMap((section) => section.items).map((item) => item.id));
   return places.map((item) => {
     const name = navLabel(item, locale);
     const tagline = navDescription(item, locale) ?? '';
-    const words = [item.label, item.description ?? '', navLabel(item, 'en'), navDescription(item, 'en') ?? '', DESTINATION_WORDS[item.id] ?? ''].join(' ');
+    // Main places match on their lines too; a More place only on its name and chosen words, so a
+    // stray verb in its description ("zmień masę") does not pull Ask's fallback to it.
+    const lines = main.has(item.id) ? `${tagline} ${item.description ?? ''} ${navDescription(item, 'en') ?? ''}` : '';
+    const words = [item.label, navLabel(item, 'en'), lines, DESTINATION_WORDS[item.id] ?? ''].join(' ');
     return {
       labId: item.hash!, expId: '__base', icon: item.icon, labName: name, expName: name, tagline, hash: item.hash,
-      keywords: normalize(`${name} ${tagline} ${words}`),
+      keywords: normalize(`${name} ${words}`),
     };
   });
 }

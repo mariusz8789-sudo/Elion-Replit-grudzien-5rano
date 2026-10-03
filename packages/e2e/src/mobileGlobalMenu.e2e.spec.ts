@@ -87,6 +87,11 @@ for (const viewport of PHONES) {
       await expect(explorer.getByRole('heading', { name: group })).toBeVisible();
     }
     await expectTargetsAtLeast44(page, '[data-testid="nav-explorer"] a, [data-testid="nav-explorer"] button');
+    // Alternative screens fold under their capability; demos carry a DEMO badge.
+    const views = explorer.locator('.gn-variants-toggle').first();
+    await views.tap();
+    await expect(views).toHaveAttribute('aria-expanded', 'true');
+    await expect(explorer.locator('.gn-badge-demo').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.keyboard.press('Escape');
     await expect(explorer).toHaveCount(0);
@@ -107,6 +112,10 @@ for (const viewport of PHONES) {
     await expect(page).toHaveURL(/#\/physics\/cms-z$/);
     await expect(page.getByTestId('nav-explorer')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
+
+    // Zapytaj opens the one Ask.
+    await bar.getByRole('button', { name: 'Zapytaj' }).tap();
+    await expect(page.locator('.science-chat-form')).toBeVisible();
 
     expect(realErrors(errors), errors.join('\n')).toEqual([]);
   });

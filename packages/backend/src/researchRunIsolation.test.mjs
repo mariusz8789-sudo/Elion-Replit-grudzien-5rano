@@ -25,7 +25,7 @@ const alive = (pid) => {
 // Processes started by THIS test process (they inherit its environment tag), wherever they now sit in the process tree.
 // Counting by command line alone would also count the engines of other test files running in parallel.
 const TAG = `GENESIS_ISOLATION_TEST=${process.pid}-${Date.now()}`;
-process.env.GENESIS_ISOLATION_TEST = TAG.split('=')[1];
+process.env[TAG.split('=')[0]] = TAG.split('=')[1]; // test-only tag inherited by children; not a runtime setting
 const strays = (pattern) => {
   const matcher = new RegExp(pattern);
   let count = 0;

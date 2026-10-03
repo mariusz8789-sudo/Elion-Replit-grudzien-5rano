@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { exportResearchRunRecord, runGenesisVerify, type GenesisVerifyReport, type ResearchRunExperiment } from '../core/backend/client';
 import { clearSession } from '../core/backend/session';
-import { activeNavId, NAV_ITEMS, navVariants } from '../core/navigation';
+import { activeNavId, NAV_ITEMS, NAV_SECTIONS, navVariants } from '../core/navigation';
 import { navDescription, navLabel } from '../core/navigationText';
 import { buildDestinationIndex, buildGoalIndex, filterSearchIndex } from '../core/search';
 import { VerifyScreen } from '../components/VerifyScreen';
@@ -301,11 +301,12 @@ describe('helpers', () => {
 });
 
 describe('navigation and search reach #/verify', () => {
-  it('one menu entry, folded under Evidence and memory, with an English label', () => {
+  it('one menu entry, a place of its own in the Proof group, with an English label', () => {
     expect(activeNavId('#/verify')).toBe('verify');
     const item = NAV_ITEMS.find((i) => i.id === 'verify')!;
-    expect(navVariants('memory')).toContain(item);
-    expect(navLabel(item, 'en')).toBe('Genesis Verify: check a result record');
+    expect(NAV_SECTIONS.find((s) => s.id === 'proof')!.items).toContain(item);
+    expect(navVariants('memory')).not.toContain(item);
+    expect(navLabel(item, 'en')).toBe('Genesis Verify');
     expect(navDescription(item, 'en')).toMatch(/replay/);
   });
 

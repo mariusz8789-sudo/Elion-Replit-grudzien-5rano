@@ -5,6 +5,10 @@ import { createScientificJobQueuePort, createSqliteScientificJobQueueBackend } f
 import { executeResearchExperiment } from './researchRunExecution.mjs';
 import { recoverMissingArtifacts } from './researchRunArtifacts.mjs';
 import { controlResearchRun, getResearchRun } from './researchRun.mjs';
+import { advanceResearchRun, MAX_ADVANCE_STEPS } from './researchRunAdvance.mjs';
+import { databaseFile } from './compute/heavyJobThread.mjs';
+import { CHILD_RESULT_MARKER, runIsolatedProcess } from './compute/isolatedProcess.mjs';
+import { knowledgeLedgerPersistenceStatus } from './knowledgeApi.mjs';
 
 /**
  * Asynchronous front door to the ONE ResearchRun execution path. A queued job owns no scientific state:
@@ -14,6 +18,7 @@ import { controlResearchRun, getResearchRun } from './researchRun.mjs';
  * maxAttempts is 1 on purpose: a silent retry must never change the scientific conditions of a run.
  */
 export const RESEARCH_EXPERIMENT_CAPABILITY = 'research-run-experiment';
+export const RESEARCH_ADVANCE_CAPABILITY = 'research-run-advance';
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
 export const queueFor = (db) => createScientificJobQueuePort({ backend: createSqliteScientificJobQueueBackend({ db }) });
@@ -25,7 +30,7 @@ export function researchJobIdentity(runId, ordinal, hypothesisId, generation = 0
   return { jobId: `job-rr-${digest}`, idempotencyKey: `idem-rr-${digest}`, experimentId: `queued-${digest}` };
 }
 
-export async function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000, lineage = null } = {}) {
+async function enqueueResearchJob(db, projectId, runId, { capabilityId, label, userId, timeoutMs, extra = {} }) {
   const view = getResearchRun(db, projectId, runId);
   if (!view) return { ok: false, status: 'NOT_FOUND' };
   // A paused or cancelled run accepts no new work; the worker would only dead-letter it.
@@ -35,22 +40,36 @@ export async function enqueueResearchExperiment(db, projectId, runId, { hypothes
   // The ordinal counts COMPLETED experiments (those with a next step), so a frozen-but-unfinished one resumes under its own slot.
   const ordinal = view.experiments.filter((e) => e.next).length;
   let generation = 0;
-  let identity = researchJobIdentity(runId, ordinal, hypothesisId, generation);
+  let identity = researchJobIdentity(runId, ordinal, label, generation);
   for (let prior = backend.get(identity.jobId); prior && ['CANCELLED', 'DEAD_LETTER', 'FAILED'].includes(prior.state); prior = backend.get(identity.jobId)) {
     generation += 1;
-    identity = researchJobIdentity(runId, ordinal, hypothesisId, generation);
+    identity = researchJobIdentity(runId, ordinal, label, generation);
   }
   const queued = await queueFor(db).enqueue({
     ...identity,
     researchRunId: runId,
-    capabilityId: RESEARCH_EXPERIMENT_CAPABILITY,
+    capabilityId,
     priority: 5,
     maxAttempts: 1,
     timeoutMs,
-    payload: { projectId, hypothesisId, userId, ...(lineage ? { lineage } : {}) },
+    payload: { projectId, userId, ...extra },
   });
   if (!queued?.ok) return { ok: false, status: 'ENQUEUE_FAILED', reason: queued?.error ?? null };
   return { ok: true, deduped: Boolean(queued.deduped), job: queued.job };
+}
+
+export function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000, lineage = null } = {}) {
+  return enqueueResearchJob(db, projectId, runId, {
+    capabilityId: RESEARCH_EXPERIMENT_CAPABILITY, label: hypothesisId, userId, timeoutMs, extra: { hypothesisId, ...(lineage ? { lineage } : {}) },
+  });
+}
+
+/** The queued form of advance(): the worker runs up to maxSteps justified experiments for this run. */
+export function enqueueResearchAdvance(db, projectId, runId, { maxSteps = 1, userId = null, timeoutMs = 600_000 } = {}) {
+  const steps = Math.min(MAX_ADVANCE_STEPS, Math.max(1, Number.isInteger(maxSteps) ? maxSteps : 1));
+  return enqueueResearchJob(db, projectId, runId, {
+    capabilityId: RESEARCH_ADVANCE_CAPABILITY, label: `advance-${steps}`, userId, timeoutMs, extra: { maxSteps: steps },
+  });
 }
 
 export function readResearchJob(db, runId, jobId) {
@@ -107,16 +126,54 @@ export async function controlResearchRunExecution(db, projectId, runId, action, 
   return { ...controlled, researchRun: getResearchRun(db, projectId, runId), queue };
 }
 
-/** Adapts executeResearchExperiment() to the EngineExecutionPort shape the worker runtime already consumes. */
-export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now, artifactStorage = null } = {}) {
+const CHILD_ENTRY = new URL('./researchRunChild.mjs', import.meta.url).pathname;
+
+/** Runs one job request in a killable child process against the same database file. Never throws. */
+async function runInChild(db, kind, request, { signal, processTimeoutMs }) {
+  const ran = await runIsolatedProcess({
+    command: process.execPath,
+    args: ['--no-warnings', CHILD_ENTRY],
+    input: JSON.stringify({ dbPath: databaseFile(db), kind, ...request }),
+    timeoutMs: processTimeoutMs,
+    signal,
+  });
+  const line = ran.stdout.split('\n').reverse().find((l) => l.startsWith(CHILD_RESULT_MARKER));
+  if (ran.killed) return { ok: false, status: 'CHILD_KILLED', reason: ran.killed === 'TIMEOUT' ? 'CHILD_TIMEOUT' : `CHILD_${ran.killed}` };
+  if (!line) return { ok: false, status: 'CHILD_FAILED', reason: `CHILD_EXITED_${ran.code}` };
+  try { return JSON.parse(line.slice(CHILD_RESULT_MARKER.length)); } catch { return { ok: false, status: 'CHILD_FAILED', reason: 'CHILD_BAD_RESULT' }; }
+}
+
+/**
+ * Adapts executeResearchExperiment() / advanceResearchRun() to the EngineExecutionPort shape the worker runtime
+ * already consumes. With a database file (and the default tools) the work runs in a child process the worker can
+ * really kill, so a job timeout or a lost lease stops the engine and the server's event loop never waits for it;
+ * otherwise (":memory:" tests, injected tools) the same function runs in-process, as before.
+ */
+export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now, artifactStorage = null, isolation = 'auto', processTimeoutMs } = {}) {
+  const isolatable = isolation !== 'in-process' && Boolean(databaseFile(db)) && !tools && !proposeEvidence && !now;
   return Object.freeze({
-    async execute(request) {
-      const { projectId, hypothesisId, userId } = request.input ?? {};
-      const options = { hypothesisId: hypothesisId ?? null, userId: userId ?? null };
-      if (tools) options.tools = tools;
-      if (proposeEvidence) options.proposeEvidence = proposeEvidence;
-      if (now) options.now = now;
-      const result = executeResearchExperiment(db, projectId, request.researchRunId, options);
+    async execute(request, { signal } = {}) {
+      // The child proposes Evidence on the ledger too. That ledger is shared between processes only when SQLite is its
+      // source of truth; with a process-local ledger a child's proposal would exist nowhere the parent can see it.
+      const ledger = isolatable ? knowledgeLedgerPersistenceStatus() : null;
+      const inChild = isolatable && ledger.store === 'SQLITE' && ledger.status !== 'REJECTED_IN_MEMORY';
+      const { projectId, hypothesisId, userId, maxSteps } = request.input ?? {};
+      const advancing = request.capabilityId === RESEARCH_ADVANCE_CAPABILITY;
+      let result;
+      if (inChild) {
+        result = await runInChild(db, advancing ? 'advance' : 'experiment', { projectId, runId: request.researchRunId, hypothesisId: hypothesisId ?? null, userId: userId ?? null, maxSteps, ledgerPath: ledger.path }, { signal, processTimeoutMs });
+        if (result.status === 'CHILD_KILLED' || result.status === 'CHILD_FAILED') {
+          return { record: { status: result.reason === 'CHILD_TIMEOUT' ? ENGINE_EXECUTION_STATUS.TIMEOUT : ENGINE_EXECUTION_STATUS.FAILED, failureCode: result.reason } };
+        }
+      } else if (advancing) {
+        result = await advanceResearchRun(db, projectId, request.researchRunId, { maxSteps, userId: userId ?? null });
+      } else {
+        const options = { hypothesisId: hypothesisId ?? null, userId: userId ?? null };
+        if (tools) options.tools = tools;
+        if (proposeEvidence) options.proposeEvidence = proposeEvidence;
+        if (now) options.now = now;
+        result = executeResearchExperiment(db, projectId, request.researchRunId, options);
+      }
       if (artifactStorage) {
         // Custody is part of the job: a run whose artifact cannot be stored is not reported as a success.
         // A retry after a storage failure has nothing left to execute, so it only recovers the custody gap.
@@ -125,6 +182,12 @@ export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now
         if (!result.ok && custody.recovered.length && ['NO_EXECUTABLE_EXPERIMENT', 'ALREADY_EXECUTED'].includes(result.status)) {
           return { record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: request.researchRunId, experimentId: custody.recovered[0] }, result: { status: 'ARTIFACT_RECOVERED', deduped: true, experimentId: custody.recovered[0] } };
         }
+      }
+      if (advancing) {
+        // An advance that stopped on its own rules (human review, budget) is a success; one whose step failed is not.
+        const failedStep = result.steps?.find((x) => !x.ok);
+        if (!result.ok || failedStep) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: failedStep?.reason ?? failedStep?.status ?? result.status } };
+        return { record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: request.researchRunId, experimentId: result.steps.at(-1)?.experimentId ?? request.experimentId }, result: { status: result.status, steps: result.steps.length, experimentIds: result.steps.map((x) => x.experimentId) } };
       }
       if (result.ok) {
         return { record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: request.researchRunId, experimentId: result.experimentId }, result: { status: result.status, deduped: Boolean(result.deduped), experimentId: result.experimentId } };

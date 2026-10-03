@@ -82,10 +82,14 @@ import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOM
 import { buildExecutionBundle, recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
-import { controlResearchRunExecution, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { controlResearchRunExecution, enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
-import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { literatureReplaysOf, replayResearchRunLiterature, retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { attachResearchRunDataset, listResearchRunDatasets } from './researchRunDatasets.mjs';
+import {
+  compareModelToMeasurement, exportLabPackage, ingestLabObservation, prepareLabRequest, proposeLabEvidence, readLabLoop, reviewLabObservation, verifyLabPackage,
+} from './researchRunLab.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { renderVerifyReportHtml, verifySubmittedRecord } from './genesisVerify.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -859,6 +863,14 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && seg[4] === 'advance') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (body?.async === true) {
+          // The queued form: a worker runs the steps in a killable child process, this request returns at once.
+          return (async () => {
+            const queued = await enqueueResearchAdvance(db, projectId, current.researchRunId, { maxSteps: body?.maxSteps, userId: user.id });
+            if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
+            return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
+          })();
+        }
         return runHeavyComputeAsync(db, ctx, `research-run:${current.researchRunId}`, async () => {
           const result = await advanceResearchRun(db, projectId, current.researchRunId, {
             maxSteps: body?.maxSteps, userId: user.id,
@@ -903,10 +915,38 @@ export function handleApi(db, ctx) {
             options: ctx.literatureOptions,
             userId: user.id,
           });
+          // An unreachable source is BLOCKED with its reason: the attempt is recorded, but it is never a success.
+          if (result.ok && result.status === 'BLOCKED') {
+            return { status: 503, body: { error: 'BLOCKED', reason: result.snapshot.blockedReason ?? null, accessBlockers: [...result.snapshot.primary.accessBlockers, ...result.snapshot.contradictionSearch.accessBlockers], snapshot: result.snapshot } };
+          }
           if (result.ok) return ok(result, result.deduped ? 200 : 201);
-          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
+          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, SOURCE_RECORD_TAMPERED: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null } };
         })();
+      }
+      if (seg.length === 5 && seg[4] === 'literature-replays') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        return ok({ literatureReplays: literatureReplaysOf(current.researchState) });
+      }
+      if (seg.length === 7 && seg[4] === 'literature' && seg[6] === 'replay') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const result = await replayResearchRunLiterature(db, projectId, current.researchRunId, seg[5], {});
+          if (result.ok && result.status === 'TAMPERED') return { status: 409, body: { error: 'SOURCE_RECORD_TAMPERED', ...result } };
+          if (result.ok) return ok(result, result.recorded ? 201 : 200);
+          const status = { NOT_FOUND: 404, SNAPSHOT_NOT_FOUND: 404, SNAPSHOT_NOT_REPLAYABLE: 409, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null } };
+        })();
+      }
+      if (seg.length === 5 && seg[4] === 'datasets') {
+        if (method === 'GET') return ok({ datasets: listResearchRunDatasets(db, current) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = attachResearchRunDataset(db, projectId, current.researchRunId, body ?? {}, { userId: user.id });
+        if (result.ok) return ok(result, result.deduped ? 200 : 201);
+        const status = { NOT_FOUND: 404, INVALID_DATASET: 400, DATASET_HASH_MISMATCH: 422, RUN_NOT_WRITABLE: 409, STATE_INTEGRITY_FAILURE: 409, SOURCE_RECORD_TAMPERED: 409 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null } };
       }
       if (seg.length === 5 && seg[4] === 'customer-delivery') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
@@ -1099,6 +1139,49 @@ export function handleApi(db, ctx) {
             custody: custody.ok ? { status: 'VERIFIED', artifactRef: custody.artifactRef } : { status: custody.status, artifactRef: null },
           });
         })();
+      }
+      // Candidate -> laboratory loop (researchRunLab.mjs): request, UNSIGNED package, REAL MEASUREMENT intake, human review,
+      // model-vs-measurement comparison, Evidence PROPOSAL. Every step is an event on this run's own verified chain.
+      if (seg[4] === 'lab') {
+        const labStatus = { NOT_FOUND: 404, EXPERIMENT_NOT_FOUND: 404, REQUEST_NOT_FOUND: 404, OBSERVATION_NOT_FOUND: 404, STATE_INTEGRITY_FAILURE: 409, BLOCKED: 409, RUN_NOT_ACTIVE: 409, OBSERVATION_NOT_ACCEPTED: 409, EXTERNAL_OBSERVATION_CONFLICT: 409, MODEL_VALUE_CHANGED: 409, REVIEWER_CANNOT_BE_INGESTER: 409 };
+        const labFail = (r) => ({ status: labStatus[r.status] ?? 422, body: { error: r.status, reason: r.reason ?? null, ...(r.blockers ? { blockers: r.blockers } : {}), ...(r.declaredSha256 ? { declaredSha256: r.declaredSha256, computedSha256: r.computedSha256 } : {}) } });
+        if (seg.length === 5 && method === 'GET') {
+          const r = readLabLoop(db, projectId, current.researchRunId);
+          return r.ok ? ok({ lab: r.lab }) : labFail(r);
+        }
+        if (seg.length === 6 && seg[5] === 'package' && method === 'POST') {
+          return (async () => ok({ verification: await verifyLabPackage(body?.package) }))();
+        }
+        if (method !== 'POST' && !(method === 'GET' && seg.length === 8 && seg[5] === 'requests' && seg[7] === 'package')) return err(405, 'method_not_allowed');
+        if (method === 'GET') {
+          return (async () => {
+            const r = await exportLabPackage(db, projectId, current.researchRunId, seg[6], { artifactStorage: ctx.artifactStorage ?? null });
+            return r.ok ? ok({ package: r.package }) : labFail(r);
+          })();
+        }
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (seg.length === 6 && seg[5] === 'requests') {
+          const r = prepareLabRequest(db, projectId, current.researchRunId, { ...body, requestedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, request: r.request }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 6 && seg[5] === 'observations') {
+          const r = ingestLabObservation(db, projectId, current.researchRunId, { requestId: body?.requestId, observation: body?.observation, ingestedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, observation: r.observation }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 7 && seg[5] === 'observations') {
+          // The reviewer is always the authenticated person, never a name taken from the body.
+          const r = reviewLabObservation(db, projectId, current.researchRunId, { observationId: seg[6], verdict: body?.verdict, reviewerId: user.id, note: body?.note });
+          return r.ok ? ok({ deduped: r.deduped, review: r.review }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 8 && seg[5] === 'observations' && seg[7] === 'compare') {
+          const r = compareModelToMeasurement(db, projectId, current.researchRunId, { observationId: seg[6], comparedBy: user.id });
+          return r.ok ? ok({ deduped: r.deduped, comparison: r.comparison }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        if (seg.length === 8 && seg[5] === 'observations' && seg[7] === 'evidence') {
+          const r = proposeLabEvidence(db, projectId, current.researchRunId, { observationId: seg[6] });
+          return r.ok ? ok({ deduped: r.deduped, link: r.link }, r.deduped ? 200 : 201) : labFail(r);
+        }
+        return err(404, 'not_found');
       }
       // Canonical Evidence Pack (docs/astra): a read-only projection of this run's records, every hash recomputable.
       // No executed experiment (e.g. engine unavailable) gives 409 BLOCKED; nothing is assembled from anything else.

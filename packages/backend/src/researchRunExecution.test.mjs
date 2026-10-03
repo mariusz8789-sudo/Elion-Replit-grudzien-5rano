@@ -130,7 +130,7 @@ describe('R1-b research run execution', () => {
     assert.equal(first.body.experiment.falsification.verdict, 'SUPPORTED_WITHIN_PROTOCOL');
     // Provenance on read: the plan is a model proposal, the RDKit run a Genesis computation, no lab measurement.
     assert.equal(first.body.researchRun.provenance.plan, 'MODEL_PROPOSAL');
-    assert.deepEqual(first.body.researchRun.provenance.experimentExecutions, [{ experimentId: first.body.experimentId, provenanceClass: 'GENESIS_COMPUTATION' }]);
+    assert.deepEqual(first.body.researchRun.provenance.experimentExecutions, [{ experimentId: first.body.experimentId, provenanceClass: 'GENESIS_COMPUTATION', datasetId: null }]);
     assert.deepEqual(first.body.researchRun.provenance.realMeasurements, []);
     assert.equal(plan.hypotheses[1].challengesHypothesisId, plan.hypotheses[0].hypothesisId);
     assert.deepEqual(first.body.experiment.next.proposal, {

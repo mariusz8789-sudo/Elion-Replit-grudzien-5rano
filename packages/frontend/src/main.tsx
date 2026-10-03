@@ -11,6 +11,8 @@ import './styles-investor-polish.css';
 import './components/genesis-ui/worldViewShell.css';
 import './styles-account.css';
 import './styles-profile-dashboard.css';
+// Navigation last: AppShell's own classes, none of the older shell rules reach it.
+import './styles-nav.css';
 
 // Deep links by path (`/matrix`, as the Playwright specs and external links use) are served
 // by the backend's SPA fallback; the router is hash-based, so map the path onto the hash

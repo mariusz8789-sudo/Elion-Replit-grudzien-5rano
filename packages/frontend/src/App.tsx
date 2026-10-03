@@ -20,6 +20,7 @@ import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { requestOpenScienceChat } from './core/scienceChatBridge';
+import { OPEN_SEARCH_EVENT } from './core/navigation';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
 import { getLocale, t } from './core/i18n';
@@ -331,6 +332,13 @@ export default function App() {
     const onHash = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // The shell's Search entries (desktop sidebar, mobile explorer) open the one global Search.
+  useEffect(() => {
+    const onOpenSearch = (): void => setSearchOpen(true);
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
   }, []);
 
   // Dźwięk "wejścia do laboratorium" — tylko przy faktycznej zmianie route

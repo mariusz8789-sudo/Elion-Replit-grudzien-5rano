@@ -1,6 +1,6 @@
 /* global AbortSignal */
 import { canonicalHash } from '../provenance.mjs';
-import { sha256Hex } from '../determinism.mjs';
+import { canonicalJson, sha256Hex } from '../determinism.mjs';
 import { PROVENANCE_CLASS } from '../provenanceClass.mjs';
 import {
   classifyLiteratureLicence,
@@ -57,8 +57,12 @@ async function fetchAllowlisted(initialUrl, fetchImpl, timeoutMs) {
   return { ok: false, kind: 'NETWORK', error: 'PUBMED_TOO_MANY_REDIRECTS' };
 }
 
-/** One E-utilities call, read and parsed; returns `{ ok, body, provenance }` or a fail-closed result. */
-async function getJson(url, fetchImpl, timeoutMs, provenance) {
+/**
+ * One E-utilities call, read and parsed; returns `{ ok, body, provenance }` or a fail-closed result.
+ * A body that was read is handed, byte for byte, to `rawResponseSink` so the caller can keep it for
+ * offline replay; nothing else is ever substituted for it.
+ */
+async function getJson(url, fetchImpl, timeoutMs, provenance, rawResponseSink = null) {
   const fetched = await fetchAllowlisted(url, fetchImpl, timeoutMs);
   if (!fetched.ok) {
     const status = fetched.kind === 'NETWORK' ? LITERATURE_RETRIEVAL_STATUS.BLOCKED_BY_NETWORK : LITERATURE_RETRIEVAL_STATUS.NO_ACCESS;
@@ -75,6 +79,10 @@ async function getJson(url, fetchImpl, timeoutMs, provenance) {
     return { ok: false, result: blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'PUBMED_RESPONSE_READ_ERROR', 'PubMed response could not be read.', responseProvenance) };
   }
   const bodyProvenance = { ...responseProvenance, responseHash: sha256Hex(rawBody), responseBytes: Buffer.byteLength(rawBody, 'utf8') };
+  rawResponseSink?.({
+    provider: PROVIDER, requestUrl: url.toString(), finalUrl: fetched.url.toString(), responseStatus: response.status,
+    sha256: bodyProvenance.responseHash, bytes: bodyProvenance.responseBytes, body: rawBody,
+  });
   let body;
   try { body = JSON.parse(rawBody); } catch {
     return { ok: false, result: blocked(LITERATURE_RETRIEVAL_STATUS.NO_ACCESS, 'PUBMED_INVALID_JSON', 'PubMed returned invalid JSON.', bodyProvenance) };
@@ -122,6 +130,8 @@ function mapRecord(pmid, record, context) {
       responseHash: context.responseHash,
       responseBytes: context.responseBytes,
       searchResponseHash: context.searchResponseHash,
+      // SHA-256 of this one record exactly as the provider returned it (canonical JSON of its esummary entry).
+      recordHash: sha256Hex(canonicalJson(record)),
       retrievedAt: context.retrievedAt,
     },
   };
@@ -143,7 +153,7 @@ export async function queryPubmed(query, options = {}) {
   search.searchParams.set('retmax', String(validated.value.limit));
   search.searchParams.set('retmode', 'json');
   search.searchParams.set('tool', TOOL);
-  const searched = await getJson(search, fetchImpl, timeoutMs, common);
+  const searched = await getJson(search, fetchImpl, timeoutMs, common, options.rawResponseSink);
   if (!searched.ok) return searched.result;
   const ids = (Array.isArray(searched.body?.esearchresult?.idlist) ? searched.body.esearchresult.idlist : [])
     .map(String).filter((id) => /^\d{1,12}$/.test(id)).slice(0, validated.value.limit);
@@ -154,7 +164,7 @@ export async function queryPubmed(query, options = {}) {
   summary.searchParams.set('id', ids.join(','));
   summary.searchParams.set('retmode', 'json');
   summary.searchParams.set('tool', TOOL);
-  const summarised = await getJson(summary, fetchImpl, timeoutMs, { ...common, searchResponseHash: searched.provenance.responseHash });
+  const summarised = await getJson(summary, fetchImpl, timeoutMs, { ...common, searchResponseHash: searched.provenance.responseHash }, options.rawResponseSink);
   if (!summarised.ok) return summarised.result;
   const result = summarised.body?.result ?? {};
   // Only records for PMIDs this search returned; anything else in the payload is ignored.

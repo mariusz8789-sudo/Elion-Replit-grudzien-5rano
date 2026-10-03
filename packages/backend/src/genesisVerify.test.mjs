@@ -145,6 +145,62 @@ test('Genesis Verify: valid, tampered and missing-provenance ResearchRun records
   }
 });
 
+/**
+ * TEST 2 — the customer workflow end to end through the API only, as the #/verify screen drives it:
+ * export the record of an executed experiment → submit those exact bytes with the given sha256 → MATCH
+ * (real RDKit replay) and the HTML report; then the same exported file with one value edited → TAMPERED.
+ */
+test('Genesis Verify: record export route feeds Verify (export → verify → report)', { skip }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-verify-export-'));
+  let ctx;
+  try {
+    ctx = await realRecord(dir);
+    const { call, owner, base, run, x, ref, bytes } = ctx;
+    const url = `${base}/research-runs/${run.researchRunId}/experiments/${x.experimentId}/record`;
+    const exported = await call('GET', url, { token: owner.token });
+    assert.equal(exported.status, 200, JSON.stringify(exported.body));
+    const e = exported.body;
+    assert.equal(e.record, bytes.toString('utf8'), 'the export is byte-identical to the custody artifact');
+    assert.equal(e.sha256, ref.sha256);
+    assert.equal(e.sha256, sha256Hex(Buffer.from(e.record, 'utf8')));
+    assert.equal(e.size, ref.size);
+    assert.equal(e.custody.status, 'VERIFIED');
+    assert.equal(e.custody.artifactRef.sha256, ref.sha256);
+    assert.equal(e.mimeType, 'application/json');
+    assert.match(e.fileName, /^genesis-record-[A-Za-z0-9._-]+\.json$/);
+
+    const verified = await call('POST', `${base}/genesis-verify`, { token: owner.token, body: { record: e.record, declaredSha256: e.sha256, format: 'html' } });
+    assert.equal(verified.status, 200, JSON.stringify(verified.body));
+    assert.equal(verified.body.report.verdict, 'MATCH');
+    assert.equal(verified.body.report.signature, 'UNSIGNED');
+    assert.ok(verified.body.html.includes(e.sha256));
+
+    const edited = JSON.parse(e.record);
+    edited.output = { ...edited.output, molWt: 1 };
+    const tampered = await call('POST', `${base}/genesis-verify`, { token: owner.token, body: { record: canonicalJson(edited), declaredSha256: e.sha256 } });
+    assert.equal(tampered.body.report.verdict, 'TAMPERED');
+    assert.equal(tampered.body.html, undefined, 'no html unless format=html');
+
+    // Without artifact storage the record is still exported from the chain, and the custody status says so.
+    const noStorage = await handleApi(ctx.db, { method: 'GET', pathname: url, token: owner.token, body: undefined, query: {} });
+    assert.equal(noStorage.status, 200, JSON.stringify(noStorage.body));
+    assert.equal(noStorage.body.sha256, ref.sha256);
+    assert.equal(noStorage.body.custody.status, 'BLOCKED_BY_CONFIGURATION');
+    assert.equal(noStorage.body.custody.artifactRef, null);
+
+    // Read rights are enough to export; the route is GET only; unknown experiment / run are 404; no session is 401.
+    assert.equal((await call('POST', url, { token: owner.token })).status, 405);
+    assert.equal((await call('GET', `${base}/research-runs/${run.researchRunId}/experiments/nope/record`, { token: owner.token })).status, 404);
+    assert.equal((await call('GET', `${base}/research-runs/nope/experiments/${x.experimentId}/record`, { token: owner.token })).status, 404);
+    assert.equal((await call('GET', url, {})).status, 401);
+    const stranger = call('POST', '/api/auth/register', { body: { email: 'stranger@genesis.test', password: 'password123' } }).body;
+    assert.notEqual((await call('GET', url, { token: stranger.token })).status, 200, 'another account cannot export this project\'s record');
+  } finally {
+    try { ctx?.db.close(); } catch { /* closed */ }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('Genesis Verify: unreadable input and a bad declared hash are BLOCKED, never MATCH', () => {
   const garbage = verifySubmittedRecord('not json at all');
   assert.equal(garbage.verdict, 'BLOCKED');

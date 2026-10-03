@@ -642,6 +642,64 @@ export function cancelResearchRunJob(token: string, projectId: string, researchR
   return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiment-jobs/${encodeURIComponent(jobId)}/cancel`, { token });
 }
 
+/* ---------------- Genesis Verify: one submitted record → integrity, ledger anchor, replay → one report ---------------- */
+
+export type GenesisVerifyVerdict = 'MATCH' | 'DRIFT' | 'TAMPERED' | 'BLOCKED';
+export type GenesisVerifyCheckStatus = 'PASS' | 'FAIL' | 'NOT_RUN';
+export type GenesisVerifyCheckId = 'readable' | 'file-hash' | 'provenance' | 'content-hash' | 'ledger-anchor' | 'replay';
+
+/** The report exactly as packages/backend/src/genesisVerify.mjs builds it; nothing here is derived on the client. */
+export interface GenesisVerifyReport {
+  kind: string;
+  version: string;
+  verdict: GenesisVerifyVerdict;
+  meaning: string;
+  reasons: string[];
+  input: {
+    shape: 'EXECUTION_BUNDLE' | 'EXECUTION_RECORD' | 'UNKNOWN' | null;
+    submittedSha256: string | null;
+    declaredSha256: string | null;
+    researchRunId: string | null;
+    experimentId: string | null;
+    engine: { engineId: string | null; engineLabel: string | null } | null;
+    engineStatus: string | null;
+  };
+  hashes: Record<string, string | null>;
+  replay: { capability: string; replayEngineVersion: string | null; hashMatch: boolean; maxRelativeDiff: number | null; tolerance: number } | null;
+  checks: Array<{ id: GenesisVerifyCheckId | string; label: string; status: GenesisVerifyCheckStatus | string; detail: string }>;
+  notChecked: string[];
+  signature: string;
+  boundary: string;
+  reportFingerprint: string;
+  generatedAt: string;
+}
+
+/** POST /genesis-verify. `record` is the file text as the customer has it (the bytes are hashed server-side). */
+export function runGenesisVerify(
+  token: string, projectId: string, input: { record: string; declaredSha256?: string | null; format?: 'html' },
+): Promise<ApiResult<{ report: GenesisVerifyReport; html?: string }>> {
+  const body: Record<string, unknown> = { record: input.record };
+  if (input.declaredSha256) body.declaredSha256 = input.declaredSha256;
+  if (input.format) body.format = input.format;
+  return request('POST', `/projects/${projectId}/genesis-verify`, { token, body });
+}
+
+/** The exported record of one executed experiment: the exact bytes Genesis issued, and their sha256. */
+export interface GenesisRecordExport {
+  researchRunId: string;
+  experimentId: string;
+  fileName: string;
+  mimeType: string;
+  record: string;
+  sha256: string;
+  size: number;
+  custody: { status: string; artifactRef: { sha256: string; size: number; key?: string } | null };
+}
+
+export function exportResearchRunRecord(token: string, projectId: string, researchRunId: string, experimentId: string): Promise<ApiResult<GenesisRecordExport>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/record`, { token });
+}
+
 /** The model PROPOSES hypotheses and experiments; nothing it says becomes evidence. */
 export function proposeResearchPlan(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ deduped: boolean; researchRun: ResearchRunView }>> {
   return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/proposals`, { token });

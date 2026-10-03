@@ -11,7 +11,7 @@ import {
 } from './scenarioEngine';
 import { runScenarioCounterfactual, type ScenarioCounterfactual } from './scenarioCounterfactual';
 import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
-import { runTemporalMultiverse, type TemporalMultiverse } from './temporalMultiverse';
+import { runTemporalMultiverse, type TemporalMultiverse, type TemporalPreparedness } from './temporalMultiverse';
 import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 
 /**
@@ -158,16 +158,19 @@ export function replayScenarioCommandCenter(run: ScenarioCommandCenterRun): read
 
 
 /** Runs the existing many-worlds core from the live City parameter state. */
+/** The shared reference world (WORLD A) of the command-center multiverse. */
+export const COMMAND_CENTER_BASELINE_SCENARIO_ID: ScenarioId = 'BASELINE';
+
 export function runTemporalMultiverseCommandCenter(
   branchScenarioIds: readonly ScenarioId[],
   params: SimParams,
-  options: { branchInterventionStartDay?: number } = {},
+  options: { branchInterventionStartDay?: number; preparedness?: TemporalPreparedness } = {},
 ): TemporalMultiverse {
   const interventionStartDay = options.branchInterventionStartDay === undefined
     ? 0
     : Math.max(0, Math.floor(options.branchInterventionStartDay));
   return runTemporalMultiverse({
-    baselineScenarioId: 'BASELINE',
+    baselineScenarioId: COMMAND_CENTER_BASELINE_SCENARIO_ID,
     days: DEFAULT_SCENARIO_RUN.days,
     stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
     baseParams: scenarioParamsFromCommandCenter(params),
@@ -176,6 +179,7 @@ export function runTemporalMultiverseCommandCenter(
       scenarioId,
       interventionStartDay,
     })),
+    ...(options.preparedness === undefined ? {} : { preparedness: options.preparedness }),
   });
 }
 

@@ -6094,3 +6094,32 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .lab-mode-select { display: inline-flex; align-items: center; gap: 0.4rem; }
 .lab-mode-select-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lab-mode-select select { padding: 0.45rem 0.7rem; border-radius: 999px; min-height: 44px; font: 500 0.78rem/1.4 inherit; color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.72); }
+
+/* Pilot A/B over the protocol's own arms — wraps at 375/390/430 px, long fingerprints break. */
+.pilot-ab-panel { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid rgba(148, 163, 184, 0.25); min-width: 0; }
+.pilot-ab-panel h3 { margin: 0 0 0.5rem; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.pilot-ab-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.pilot-ab-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; flex: 1 1 10rem; min-width: 0; }
+.pilot-ab-controls select { max-width: 100%; min-width: 0; }
+.pilot-ab-result { margin-top: 0.7rem; min-width: 0; }
+.pilot-ab-result dd, .pilot-ab-result dt, .pilot-ab-result .mono { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Multiverse branch → evidence (pre-registered question + per-world pack). Fits 375/390/430 px. */
+.temporal-question-select { display: flex; flex-direction: column; gap: .25rem; margin: .4rem .68rem; min-width: 0; font-size: .62rem; }
+.temporal-question-select select { max-width: 100%; min-width: 0; font-size: .62rem; }
+.temporal-question-select small { opacity: .8; overflow-wrap: anywhere; }
+.temporal-branch-evidence { margin: .3rem .68rem .6rem; min-width: 0; display: flex; flex-direction: column; gap: .35rem; align-items: flex-start; }
+.temporal-branch-evidence p, .temporal-branch-evidence details { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+.temporal-branch-evidence .scenario-provenance { width: 100%; box-sizing: border-box; }
+
+/* Reality Navigator scene capture — colour carries the epistemic status. Wraps at 375/390/430 px. */
+.reality-capture { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border); min-width: 0; }
+.reality-capture-toggle { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); cursor: pointer; }
+.reality-capture .reality-compare-row { flex-wrap: wrap; min-width: 0; }
+.reality-capture .reality-compare-hint, .reality-capture .mono { overflow-wrap: anywhere; word-break: break-word; }
+.reality-capture-details summary { cursor: pointer; font-size: 0.66rem; color: var(--text-faint); }
+.reality-deriv.status-model, .reality-deriv.replay-match { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.reality-deriv.status-scenario, .reality-deriv.replay-drift { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.reality-deriv.status-cinematic { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.reality-deriv.status-blocked, .reality-deriv.status-not_modeled,
+.reality-deriv.replay-blocked, .reality-deriv.replay-not_reproducible { color: var(--red, #ef6f7b); border-color: rgba(239, 111, 123, 0.45); }

@@ -101,9 +101,11 @@ describe('shared scientific job contract', () => {
     await queue.enqueue({ ...JOB, jobId: 'job-retry', idempotencyKey: 'idem-retry', maxAttempts: 2 });
     const first = await queue.claim('worker-001', 1_000);
     time += 1_001;
-    assert.equal((await queue.heartbeat('job-retry', first.job.leaseId, 1_000)).error, 'LEASE_NOT_ACTIVE');
     const reclaimed = await queue.claim('worker-002', 1_000);
     assert.equal(reclaimed.job.attempts, 2);
+    // Once another worker took the expired lease, the first worker can neither extend nor finish it.
+    assert.equal((await queue.heartbeat('job-retry', first.job.leaseId, 1_000)).error, 'LEASE_NOT_ACTIVE');
+    assert.equal((await queue.complete('job-retry', first.job.leaseId, {})).error, 'LEASE_NOT_ACTIVE');
     const failed = await queue.fail('job-retry', reclaimed.job.leaseId, { code: 'TIMEOUT' });
     assert.equal(failed.retry, false);
     assert.equal(failed.job.state, 'DEAD_LETTER');

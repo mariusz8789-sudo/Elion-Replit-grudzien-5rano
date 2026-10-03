@@ -5,6 +5,17 @@ import { OrbitalRealityScene } from '../core/reality/scenes/orbitalScene';
 import { RealityBranchStore, type RealityBranch } from '../core/reality/branches';
 import { HonestyBadge } from './HonestyBadge';
 import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
+import {
+  captureScene,
+  replaySceneCapture,
+  TIME_SCALE_ORDER,
+  worldYearsFromDisplay,
+  type SceneCapture,
+  type SceneReplay,
+  type TimeScaleId,
+} from '../core/reality/sceneCapture';
+import { useLocale } from '../core/i18n';
+import { realityLimit, realityReplay, realityStatus, realityText, realityTimeScale } from './reality/realitySceneText';
 
 /**
  * Reality Navigator — prototyp „żywej, obliczeniowej rzeczywistości" na
@@ -32,6 +43,9 @@ const RADIUS_MAX = 5;
 const orbitalGraph = buildOrbitalModelGraph();
 const orbitalScene = new OrbitalRealityScene(orbitalGraph);
 const branchStore = new RealityBranchStore('Znajomy świat', orbitalGraph.getParameterSnapshot());
+
+/** Display seconds used for the world-time caption under the scale buttons. */
+const DISPLAY_WINDOW_SECONDS = 10;
 
 const DERIVATION_LABEL: Record<NodeDerivation, string> = {
   direct: 'wyprowadzenie dokładne',
@@ -63,6 +77,11 @@ export function RealityNavigator() {
   const [branches, setBranches] = useState<RealityBranch[]>(branchStore.listBranches());
   const [activeBranchId, setActiveBranchId] = useState(branchStore.getActive().id);
   const [compareBranchId, setCompareBranchId] = useState<string | null>(null);
+  const [timeScale, setTimeScale] = useState<TimeScaleId>('year');
+  const [thresholdLayer, setThresholdLayer] = useState(false);
+  const [capture, setCapture] = useState<SceneCapture | null>(null);
+  const [replay, setReplay] = useState<SceneReplay | null>(null);
+  const locale = useLocale();
   useRealityPoll();
 
   // Ładowanie silnika 3D jest asynchroniczne (RealityCanvas.tsx). Bez ref-owego
@@ -137,6 +156,32 @@ export function RealityNavigator() {
       fromSceneId: orbitalScene.id,
       toSceneId: orbitalScene.id,
     });
+  }
+
+  /**
+   * Capture goes through the same graph that drives the picture: captureScene()
+   * recomputes it from the parameter snapshot, so the model's result is saved,
+   * not whatever is on screen.
+   */
+  function handleCapture() {
+    setCapture(captureScene(
+      {
+        sceneId: orbitalScene.id,
+        parameters: orbitalGraph.getParameterSnapshot(),
+        timeScale,
+        branchCount: compareBranchId ? 2 : 1,
+        visualLayers: thresholdLayer ? ['wormhole-threshold'] : [],
+        claims: [],
+      },
+      orbitalGraph,
+    ));
+    setReplay(null);
+  }
+
+  /** Replay recomputes the model and compares — it never reads back a stored answer. */
+  function handleReplay() {
+    if (!capture) return;
+    setReplay(replaySceneCapture(capture, orbitalGraph));
   }
 
   function handleToggleCompare(id: string) {
@@ -256,6 +301,55 @@ export function RealityNavigator() {
                 </div>
               ))}
               <div className="reality-compare-hint">Druga rzeczywistość jest widoczna w scenie jako półprzezroczysty „duch".</div>
+            </div>
+          )}
+        </div>
+
+        <div className="reality-capture" data-testid="reality-scene-capture">
+          <div className="section-label">{realityText('title', locale)}</div>
+          <div className="reality-compare-hint">{realityText('lead', locale)}</div>
+          <div className="section-label">{realityText('timeScale', locale)}</div>
+          <div className="reality-branch-list">
+            {TIME_SCALE_ORDER.map((id) => (
+              <button key={id} className="chip-btn" aria-pressed={id === timeScale} onClick={() => { setTimeScale(id); setReplay(null); }}>
+                {realityTimeScale(id, locale)}
+              </button>
+            ))}
+          </div>
+          <div className="reality-compare-hint">
+            {DISPLAY_WINDOW_SECONDS} {realityText('timeHintBefore', locale)} {worldYearsFromDisplay(DISPLAY_WINDOW_SECONDS, timeScale).toExponential(2)} {realityText('timeHintAfter', locale)}
+          </div>
+          <label className="reality-capture-toggle">
+            <input type="checkbox" checked={thresholdLayer} onChange={(e) => setThresholdLayer(e.target.checked)} />
+            <span>{realityText('thresholdLayer', locale)}</span>
+          </label>
+          <div className="reality-branch-list">
+            <button className="chip-btn" onClick={handleCapture}>⌾ {realityText('capture', locale)}</button>
+            <button className="chip-btn" disabled={!capture} onClick={handleReplay}>↺ {realityText('replay', locale)}</button>
+          </div>
+          {capture && (
+            <div className="reality-compare" aria-label={realityText('title', locale)}>
+              <div className="reality-compare-row">
+                <span className="reality-log-node">{realityText('status', locale)}</span>
+                <span className={`reality-deriv status-${capture.status.toLowerCase()}`}>{realityStatus(capture.status, locale)}</span>
+              </div>
+              <div className="section-label">{realityText('doesNotProve', locale)}</div>
+              {capture.limits.map((limit) => {
+                const line = realityLimit(limit, locale);
+                return <div key={line} className="reality-compare-hint">• {line}</div>;
+              })}
+              {replay && (
+                <div className="reality-compare-row">
+                  <span className="reality-log-node">{realityText('replayResult', locale)}</span>
+                  <span className={`reality-deriv replay-${replay.verdict.toLowerCase()}`}>{realityReplay(replay.verdict, locale)}</span>
+                </div>
+              )}
+              <details className="reality-capture-details">
+                <summary>{realityText('technical', locale)}</summary>
+                <div className="reality-compare-hint">{capture.status} · {capture.statusReason}</div>
+                <div className="reality-compare-hint">{realityText('fingerprint', locale)}: <span className="mono">{capture.sceneStateFingerprint}</span></div>
+                {replay && <div className="reality-compare-hint">{replay.verdict} · {replay.message}</div>}
+              </details>
             </div>
           )}
         </div>

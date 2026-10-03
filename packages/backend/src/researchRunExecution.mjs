@@ -476,6 +476,8 @@ export function nextExperimentDecisionTrace({
 function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, proposeEvidence) {
   const before = getResearchRun(db, projectId, runId);
   const x = before.experiments.find((e) => e.experimentId === experimentId);
+  // An execution without its falsification cannot be produced by a crash (both are one transaction): refuse it.
+  if (!x?.execution || !x.falsification) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: 'falsification_missing' };
   if (x.evidence && x.next) return { ok: true, deduped: true };
   // Outside the SQL transaction: the ledger is its own store, and proposing the same content again
   // returns the same proposal, so a crash between here and the append below cannot duplicate it.

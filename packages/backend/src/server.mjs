@@ -52,6 +52,7 @@ import { listToolchainMetadata } from './campaign/toolchain.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
+import { MAX_VERIFY_INPUT_BYTES } from './genesisVerify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -109,10 +110,12 @@ try {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
 }
-// Evidence ledger of the knowledge channel (proposals, published records): a JSON snapshot beside the DB,
+// Evidence ledger of the knowledge channel (proposals, published records): append-only rows in genesis.db (V16), shared
+// by every process on the file; the JSON file beside the DB is imported once if the table is empty, then kept as an export.
+// Without a database it is the legacy single-process JSON snapshot,
 // restored at boot and rewritten after every appended entry (D-130). ':memory:' keeps it ephemeral, and says so.
 const LEDGER_PATH = process.env.GENESIS_LEDGER_PATH ?? (DB_PATH === ':memory:' ? ':memory:' : path.join(path.dirname(DB_PATH), 'evidence-ledger.json'));
-const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH);
+const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH, { db });
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
@@ -347,6 +350,9 @@ function handlePersistApi(req, res, url) {
   // bigger than a typical trial/run's small parameter vectors) — same size class as the other two
   // upload routes above, not the default 64 kB meant for small JSON payloads.
   const isWorldUpload = (req.method === 'POST' || req.method === 'PUT') && /^\/api\/worlds(\/[^/]+)?\/?$/.test(url.pathname);
+  // Genesis Verify: the submitted record is a JSON string inside the JSON body (escaping grows it), and the
+  // verifier itself accepts records up to MAX_VERIFY_INPUT_BYTES; the default 64 kB would refuse a docking record.
+  const isVerifyUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/genesis-verify\/?$/.test(url.pathname);
   if (isKnowledgeUpload && !knowledgeUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'knowledge_upload_rate_limited', message: 'Limit uploadu materiałów: 6 na minutę.' });
   }
@@ -361,7 +367,8 @@ function handlePersistApi(req, res, url) {
   if (req.method === 'POST' && /^\/api\/projects\/[^/]+\/(claim-proposals|research-runs\/[^/]+\/(proposals|experiments(\/[^/]+\/replays)?))\/?$/.test(url.pathname) && !limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji modelu na minutę — odczekaj chwilę.' });
   }
-  const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
+  const maxBodyBytes = isVerifyUpload ? 2 * MAX_VERIFY_INPUT_BYTES + 65_536
+    : (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
     return json(res, 413, { error: 'payload_too_large', message: 'Przesłany materiał przekracza limit transportu.' });
@@ -454,7 +461,7 @@ const server = http.createServer(async (req, res) => {
       // Operator i tak dostaje ścieżkę w logu startowym.
       db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
       persistence: dbState.state,
-      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, entries: LEDGER_PERSISTENCE.entries },
+      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, store: LEDGER_PERSISTENCE.store, entries: LEDGER_PERSISTENCE.entries },
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health
@@ -518,7 +525,11 @@ server.listen(PORT, () => {
 // ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
 // (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
 if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
-  const worker = createFanOutAwareWorker(db, { artifactStorage });
+  // One worker identity per process, so a lease left by a killed process is attributable after restart.
+  // GENESIS_RESEARCH_WORKER_LEASE_MS bounds how long such an abandoned lease blocks recovery (default 30 s;
+  // the runtime rejects values outside 1 s..1 h at boot instead of guessing).
+  const leaseMs = process.env.GENESIS_RESEARCH_WORKER_LEASE_MS ? Number(process.env.GENESIS_RESEARCH_WORKER_LEASE_MS) : undefined;
+  const worker = createFanOutAwareWorker(db, { artifactStorage, workerId: `worker-research-run-${process.pid}`, ...(leaseMs === undefined ? {} : { leaseMs }) });
   let busy = false;
   setInterval(async () => {
     if (busy) return;

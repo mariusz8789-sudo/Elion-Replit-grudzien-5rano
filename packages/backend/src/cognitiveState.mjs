@@ -25,6 +25,7 @@ import { readKnowledgeRegistry, KNOWLEDGE_REGISTRY_DOMAIN } from './knowledgeReg
 import { verifyExperimentRecordChain } from './store.mjs';
 import { LAB_EVENT } from './campaign/labClosedLoop.mjs';
 import { buildBytProjection } from './bytProjection.mjs';
+import { anchoredResearchState, RESEARCH_RUN_DOMAIN } from './researchRun.mjs';
 import { buildVirtualLabDossier, VIRTUAL_EVENT } from './campaign/virtualLabClosedLoop.mjs';
 
 export const COGNITIVE_STATE_SCHEMA_VERSION = 1;
@@ -41,7 +42,7 @@ function researchRuns(db, projectId) {
   return listAgentRuns(db, projectId)
     .filter((run) => run.domain !== KNOWLEDGE_REGISTRY_DOMAIN)
     .map((run) => {
-      const { events, chain } = readResearchState(db, run.id);
+      const { events, chain } = run.domain === RESEARCH_RUN_DOMAIN ? anchoredResearchState(db, run.id) : readResearchState(db, run.id);
       if (!chain.ok) return { run, researchStateEvents: [], integrity: { ok: false, reason: 'STATE_INTEGRITY_FAILURE', brokenAt: chain.brokenAt, detail: chain.reason } };
       return {
         run,

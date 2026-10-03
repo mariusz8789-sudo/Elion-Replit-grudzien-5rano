@@ -96,7 +96,7 @@ describe('schema migration v15: users.account_profile', () => {
 
       const migrated = openDatabase(file);
       assert.equal(migrated.prepare('PRAGMA user_version').get().user_version, CURRENT_SCHEMA_VERSION);
-      assert.equal(CURRENT_SCHEMA_VERSION, 15);
+      assert.ok(CURRENT_SCHEMA_VERSION >= 15);
       assert.equal(getUserByEmail(migrated, 'old@lab.org').accountProfile, 'BADACZ');
       assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1);
       // The CHECK constraint refuses an unknown profile written behind the API's back.

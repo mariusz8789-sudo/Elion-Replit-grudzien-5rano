@@ -24,6 +24,7 @@ import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/act
 import { track } from './core/analytics';
 import { getLocale, t } from './core/i18n';
 import { fcText } from './components/flightControl/flightControlText';
+import { vText } from './components/verify/verifyText';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
@@ -104,6 +105,7 @@ const ReviewerRoomScreen = lazy(() => import('./components/ReviewerRoomScreen').
 const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
 const DiscoveryTrackScreen = lazy(() => import('./components/DiscoveryTrackScreen').then((m) => ({ default: m.DiscoveryTrackScreen })));
 const FlightControlScreen = lazy(() => import('./components/FlightControlScreen').then((m) => ({ default: m.FlightControlScreen })));
+const VerifyScreen = lazy(() => import('./components/VerifyScreen').then((m) => ({ default: m.VerifyScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -193,6 +195,7 @@ type Route =
   | { kind: 'mirror' }
   | { kind: 'discovery-track' }
   | { kind: 'flight-control' }
+  | { kind: 'verify' }
   | { kind: 'more' };
 
 export function parseHash(): Route {
@@ -280,6 +283,7 @@ export function parseHash(): Route {
   if (h === '#/mirror') return { kind: 'mirror' };
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
   if (h === '#/flight-control') return { kind: 'flight-control' };
+  if (h === '#/verify') return { kind: 'verify' };
   // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
   if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };
@@ -531,6 +535,16 @@ export default function App() {
         <div className="app">
           <TopBar title={`◎ ${fcText('kicker', getLocale())}`} onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><FlightControlScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'verify') {
+      return (
+        <div className="app">
+          <TopBar title={`✓ ${vText('kicker', getLocale())}`} onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><VerifyScreen /></HeavyRoute>
           {overlays}
         </div>
       );

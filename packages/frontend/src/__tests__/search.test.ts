@@ -41,4 +41,11 @@ describe('search index', () => {
     expect(filterSearchIndex(index, 'leki').map((e) => e.hash)).toContain('#/drug');
     expect(filterSearchIndex(index, 'mózg').map((e) => e.hash)).toContain('#/human-biology-lab');
   });
+
+  it('finds the Reality Navigator by plain words in Polish and English', () => {
+    const index = buildDestinationIndex();
+    for (const query of ['orbita', 'reality navigator', 'zapis sceny']) {
+      expect(filterSearchIndex(index, query).some((e) => e.hash === '#/reality'), query).toBe(true);
+    }
+  });
 });

@@ -116,6 +116,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log', variantOf: 'memory' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', variantOf: 'memory', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
+  { id: 'verify', label: 'Genesis Verify — sprawdź zapis wyniku', icon: '✓', hash: '#/verify', variantOf: 'memory', description: 'Wgraj zapis z Genesis: odciski sha256, rejestr i powtórzenie obliczenia, raport HTML' },
   { id: 'flight-control', label: 'Kontrola lotów nauki', icon: '◎', hash: '#/flight-control', description: 'Przebiegi badań, kolejka zadań i loty eksperymentów; wstrzymaj, wznów, anuluj' },
   // — Światy i symulacje —
   { id: 'worlds', label: 'Wizualizacje i światy', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },
@@ -128,6 +129,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'first-person-lab', label: 'Laboratorium — scenariusze', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass', variantOf: 'worlds' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline', variantOf: 'worlds' },
+  { id: 'reality', label: 'Nawigator rzeczywistości — orbita i jej warianty', icon: '🪐', hash: '#/reality', variantOf: 'worlds', description: 'Zmień masę gwiazdy lub orbitę, porównaj warianty, zapisz scenę i policz ją ponownie' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', variantOf: 'worlds', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
   { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix', variantOf: 'worlds' },
   { id: 'matrix-map', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix-map', variantOf: 'worlds' },
@@ -173,12 +175,14 @@ export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'Wszyst
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   { id: 'more-ls', label: 'Nauki o życiu', ids: ['campaign', 'chemistry', 'virtual-bio'] },
   { id: 'more-evidence', label: 'Dowody i weryfikacja', ids: ['memory', 'flight-control', 'meta-cognition'] },
-  { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
+  { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'sovereign'] },
   { id: 'more-physics', label: 'Fizyka, kwanty i CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
   { id: 'more-worlds', label: 'Świat i cyfrowy bliźniak', ids: ['worlds', 'whatif'] },
   { id: 'more-learning', label: 'Edukacja', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
   { id: 'more-system', label: 'Platforma', ids: ['account', 'projects', 'settings'] },
-  { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment'] },
+  // Cyber runs on a toy target application: the catalogue files it under
+  // "Demo only", so it is listed with the showcases, not as a public-sector product.
+  { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment', 'cyber'] },
 ];
 
 const byId = new Map(MORE_ITEMS.map((item) => [item.id, item] as const));

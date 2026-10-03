@@ -3,8 +3,14 @@ import type { CohortProfile } from '../agents/cohortModel';
 import type { EpidemicCityParams } from './epidemicCity';
 import type { HospitalCapacityParams } from './hospitalResource';
 import { compareScenarios, runScenario, SCENARIO_ENGINE_VERSION, type ScenarioComparison, type ScenarioId, type ScenarioRun } from './scenarioEngine';
-import { firstDivergentDay } from './scenarioCounterfactual';
-import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
+import {
+  firstDivergentDay,
+  SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+  type ScenarioCounterfactual,
+  type ScenarioCounterfactualSpec,
+} from './scenarioCounterfactual';
+import { GOVERNED_PREPAREDNESS_QUESTIONS } from './preparednessQuestions';
+import { buildTemporalTimeline, temporalStateAt, type TemporalStateEnvelope, type TemporalTimeline } from './temporalState';
 import {
   buildSavedScenarioRunContext,
   isSavedScenarioRunContext,
@@ -53,7 +59,17 @@ export interface TemporalMultiverseSpec {
   baseCohort?: CohortProfile;
   /** Przynajmniej jedna gałąź poza baseline — inaczej nie ma czego rozgałęziać. */
   branches: readonly TemporalBranchSpec[];
+  /**
+   * Rządzone pytanie, na które ten multiverse odpowiada — DEKLAROWANE W SPECU,
+   * czyli PRZED wykonaniem czegokolwiek (port z claude/temporal-engine-phase-1
+   * e016fe79). Kryterium dobrane po zobaczeniu wyników byłoby HARK-owaniem,
+   * a most dowodowy (`counterfactualEvidence.ts`) odmawia paczki bez tego pola.
+   * Samo pole NIE tworzy dowodu.
+   */
+  preparedness?: TemporalPreparedness;
 }
+
+export interface TemporalPreparedness { questionId: string; askedText: string; resolutionFingerprint: string }
 
 export interface TemporalBranchResult {
   branchId: string;
@@ -103,6 +119,11 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
   if (new Set(branchIds).size !== branchIds.length) {
     throw new Error(`Identyfikatory gałęzi muszą być unikalne: ${branchIds.join(', ')}.`);
   }
+  // Prerejestracja musi wskazywać pytanie, które ISTNIEJE w katalogu przed
+  // wykonaniem — wymyślony identyfikator kończy się błędem, nie ozdobnikiem.
+  if (spec.preparedness !== undefined && !GOVERNED_PREPAREDNESS_QUESTIONS.some((entry) => entry.questionId === spec.preparedness!.questionId)) {
+    throw new Error(`Pytanie ${spec.preparedness.questionId} nie istnieje w katalogu rządzonych pytań — prerejestracja musi wskazywać istniejące kryterium.`);
+  }
 
   const baseline = runScenario(spec.baselineScenarioId, armOptions(spec, spec.baselineInterventionStartDay ?? 0));
   const baselineTimeline = buildTemporalTimeline(baseline, 'BASELINE');
@@ -123,6 +144,8 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
   const fingerprintBase = {
     v: TEMPORAL_MULTIVERSE_CONTRACT_VERSION,
     baselineResult: baseline.resultFingerprint,
+    // Ten sam zestaw przebiegów pod innym pytaniem to inny eksperyment.
+    preparedness: spec.preparedness ?? null,
     branches: branches.map((branch) => ({
       branchId: branch.branchId,
       resultFingerprint: branch.run.resultFingerprint,
@@ -150,6 +173,8 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
  */
 export interface SavedTemporalMultiverse {
   contractVersion: string;
+  /** Prerejestrowane pytanie z chwili SPECU. */
+  preparedness?: TemporalPreparedness;
   baseline: SavedScenarioRunContext;
   branches: readonly {
     branchId: string;
@@ -162,12 +187,15 @@ export interface SavedTemporalMultiverse {
 }
 
 export function buildSavedTemporalMultiverse(multiverse: TemporalMultiverse): SavedTemporalMultiverse {
+  const preparedness = multiverse.spec.preparedness;
   return {
     contractVersion: TEMPORAL_MULTIVERSE_CONTRACT_VERSION,
-    baseline: buildSavedScenarioRunContext(multiverse.baseline),
+    ...(preparedness === undefined ? {} : { preparedness }),
+    // Prerejestracja schodzi do KAŻDEGO ramienia, jak w buildSavedScenarioCounterfactual.
+    baseline: buildSavedScenarioRunContext(multiverse.baseline, preparedness),
     branches: multiverse.branches.map((branch) => ({
       branchId: branch.branchId,
-      saved: buildSavedScenarioRunContext(branch.run),
+      saved: buildSavedScenarioRunContext(branch.run, preparedness),
       comparisonStatus: branch.comparisonToBaseline.status,
       firstDivergentDayFromBaseline: branch.firstDivergentDayFromBaseline,
     })),
@@ -191,6 +219,14 @@ export function isSavedTemporalMultiverse(value: unknown): value is SavedTempora
       && (branch.firstDivergentDayFromBaseline === null || Number.isFinite(branch.firstDivergentDayFromBaseline));
   });
   if (!branchesValid) return false;
+  // Prerejestracja opcjonalna, ale jeśli jest — kompletna; ułomny nośnik udawałby kryterium.
+  if (saved.preparedness !== undefined) {
+    const preparedness = saved.preparedness as Record<string, unknown> | null;
+    if (!preparedness || typeof preparedness !== 'object') return false;
+    const complete = ['questionId', 'askedText', 'resolutionFingerprint']
+      .every((key) => typeof preparedness[key] === 'string' && (preparedness[key] as string).trim().length > 0);
+    if (!complete) return false;
+  }
   return typeof saved.multiverseFingerprint === 'string' && saved.epistemicStatus === 'SIMULATION';
 }
 
@@ -299,6 +335,8 @@ export function replaySavedTemporalMultiverse(saved: unknown): TemporalMultivers
         scenarioId: branch.saved.scenarioId,
         interventionStartDay: branch.saved.interventionStartDay,
       })),
+      // Prerejestracja przeżywa odtworzenie.
+      ...(saved.preparedness === undefined ? {} : { preparedness: saved.preparedness }),
     },
     baseline,
     baselineTimeline: buildTemporalTimeline(baseline, 'BASELINE'),
@@ -308,4 +346,88 @@ export function replaySavedTemporalMultiverse(saved: unknown): TemporalMultivers
   };
 
   return { status: 'MATCH', reason: 'Baseline i wszystkie gałęzie policzono od nowa; multiverse odtworzył się co do rozjazdu każdej z nich.', baselineStatus: 'MATCH', branches, multiverse: rebuiltMultiverse };
+}
+
+/**
+ * DECYZYJNE POCHODZENIE GAŁĘZI (port z claude/temporal-engine-phase-1 4e832ae2).
+ *
+ * Czysty odczyt istniejącego multiverse: dla każdej gałęzi stan baseline w
+ * DEKLAROWANYM dniu decyzji i stan gałęzi w ZMIERZONYM dniu rozjazdu. Te dwa
+ * dni celowo są osobnymi polami — polityka wprowadzona dziś nie musi zmienić
+ * stanu świata od razu. Nic nie jest liczone drugi raz ani zapisywane.
+ */
+export interface TemporalDecisionLineage {
+  branchId: string;
+  /** Dzień, w którym ta gałąź DEKLARUJE wejście interwencji — nie zmierzony. */
+  declaredInterventionStartDay: number;
+  /** Stan baseline w dniu decyzji; `null`, gdy dzień leży poza osią baseline. */
+  decisionState: TemporalStateEnvelope | null;
+  /** Dzień MIERZONY, w którym ta gałąź faktycznie rozeszła się z baseline. */
+  firstDivergentDayFromBaseline: number | null;
+  /** Stan gałęzi w dniu zmierzonego rozjazdu; `null` bez rozjazdu, bez osi czasu (NOT_MODELED) albo poza zasięgiem. */
+  branchState: TemporalStateEnvelope | null;
+}
+
+export function temporalDecisionLineage(multiverse: TemporalMultiverse): readonly TemporalDecisionLineage[] {
+  return multiverse.branches.map((branch) => {
+    const declaredInterventionStartDay = multiverse.spec.branches.find((entry) => entry.branchId === branch.branchId)?.interventionStartDay ?? 0;
+    const decisionState = temporalStateAt(multiverse.baselineTimeline, declaredInterventionStartDay);
+    const branchState = branch.timeline && branch.firstDivergentDayFromBaseline !== null
+      ? temporalStateAt(branch.timeline, branch.firstDivergentDayFromBaseline)
+      : null;
+    return { branchId: branch.branchId, declaredInterventionStartDay, decisionState, firstDivergentDayFromBaseline: branch.firstDivergentDayFromBaseline, branchState };
+  });
+}
+
+/**
+ * GAŁĄŹ MULTIVERSE JAKO KONTRFAKTYK (port z 5bfc858b).
+ *
+ * Gałąź względem wspólnego baseline jest kontrfaktykiem z definicji: te same
+ * warunki startowe, różni się zadeklarowanym scenariuszem i/lub dniem wejścia.
+ * Porównanie NIE jest liczone drugi raz — `branch.comparisonToBaseline` jest
+ * przekładane na istniejący kontrakt `ScenarioCounterfactual`, a odcisk liczony
+ * tym samym wzorem co `runScenarioCounterfactual`. `null`, gdy gałęzi nie ma
+ * albo jej porównanie nie jest COMPLETED.
+ */
+export function multiverseBranchAsCounterfactual(multiverse: TemporalMultiverse, branchId: string): ScenarioCounterfactual | null {
+  const branch = multiverse.branches.find((entry) => entry.branchId === branchId);
+  const branchSpec = multiverse.spec.branches.find((entry) => entry.branchId === branchId);
+  if (branch === undefined || branchSpec === undefined || branch.comparisonToBaseline.status !== 'COMPLETED') return null;
+
+  const spec: ScenarioCounterfactualSpec = {
+    baselineScenarioId: multiverse.spec.baselineScenarioId,
+    variantScenarioId: branchSpec.scenarioId,
+    days: multiverse.spec.days,
+    stepsPerDay: multiverse.spec.stepsPerDay,
+    baseParams: multiverse.spec.baseParams,
+    ...(multiverse.spec.baseHospital === undefined ? {} : { baseHospital: multiverse.spec.baseHospital }),
+    ...(multiverse.spec.baseCohort === undefined ? {} : { baseCohort: multiverse.spec.baseCohort }),
+    baselineInterventionStartDay: multiverse.spec.baselineInterventionStartDay ?? 0,
+    variantInterventionStartDay: branchSpec.interventionStartDay ?? 0,
+  };
+
+  const fingerprintBase = {
+    contractVersion: SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+    engineVersion: SCENARIO_ENGINE_VERSION,
+    baselineResult: multiverse.baseline.resultFingerprint,
+    variantResult: branch.run.resultFingerprint,
+    comparisonStatus: branch.comparisonToBaseline.status,
+    metrics: branch.comparisonToBaseline.metrics,
+    changedParameters: branch.comparisonToBaseline.changedParameters,
+    changedTiming: branch.comparisonToBaseline.changedTiming,
+    changedCapacity: branch.comparisonToBaseline.changedCapacity,
+    firstDivergentDay: branch.firstDivergentDayFromBaseline,
+  };
+
+  return {
+    contractVersion: SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+    engineVersion: SCENARIO_ENGINE_VERSION,
+    spec,
+    baseline: multiverse.baseline,
+    variant: branch.run,
+    comparison: branch.comparisonToBaseline,
+    firstDivergentDay: branch.firstDivergentDayFromBaseline,
+    counterfactualFingerprint: fnv1a(canonicalJson(fingerprintBase)),
+    epistemicStatus: 'SIMULATION',
+  };
 }

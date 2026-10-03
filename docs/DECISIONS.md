@@ -10414,3 +10414,13 @@ Note the shape of the evidence here, because it is the honest summary of all six
 **What this is not.** Not a result. +4.22 pp is in-sample: the candidates were measured on the set they were chosen on. Seal A's prediction for the fresh set (+1.5 to +4.0 pp, most likely PARTIAL) and every threshold are unchanged. C1(0.7) uses GNINA, so it cannot enter the product whatever Run 9 shows until GNINA's licensing is resolved. The one gap filled before sealing is how to cut seal A's similarity thirds (15 cases have no value and are reported apart); it is descriptive and decides nothing.
 
 **Evidence.** `docs/evidence/run9/run9-phase-d-report.md`, `docs/evidence/run9/run9-phase-d-result.json`, `docs/evidence/run9/run9-seal-b.json`, `docs/evidence/run9/run9-similarity-bins.json`; tests `scripts/test-run9-rankers.py`. Run 9 itself runs only on the owner's explicit GO.
+
+## D-161 — Discovery replay compares the hospital layer and names what differs
+
+**Date:** 2026-10-03. **Source:** recovery matrix item 1 (`docs/genesis1/RECOVERY-MATRIX.md`), ported semantically from `claude/test-quality-review` 680c4ef8.
+
+**Defect.** `core/discovery/discoveryReplay.ts` compared only S/E/I/R/D per day, while `resultFingerprint` also commits to the hospital layer (`occupiedBeds`, `occupiedIcu`, `unmetCare`, `bedOccupancy`, `icuOccupancy`, `status`). The fingerprint difference is excluded from the verdict, so a run that differed only in hospital numbers had no substantive difference and was reported `WITHIN_TOLERANCE` ("every metric fits within tolerance 0") — numbers declared reproduced when they were not. The DRIFT message also printed `firstDifferingDay (11 → 11)`, a label with no content.
+
+**Change in verdicts.** Replay now compares exactly the per-day fields the fingerprint commits to. A hospital-only divergence is now **DRIFT**, not `WITHIN_TOLERANCE`. The first differing day also emits `series.day<N>.<field>` with both values, and a difference whose two sides are equal is rendered as `field = value`, never `a → a`. Untouched cases still replay `MATCH`. `ScenarioDaySample.isolated` / `.hospitalized` remain outside both the fingerprint and replay; widening the fingerprint would invalidate stored ones and is a separate Scientific Core decision.
+
+**Evidence.** `packages/frontend/src/__tests__/replayDriftCoverage.test.ts` (5 tests; 3 of the 4 ported ones failed on the unmodified code).

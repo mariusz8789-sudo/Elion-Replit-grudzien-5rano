@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MORE_ITEMS, MORE_SECTIONS, NAV_ITEMS, NAV_SECTIONS, activeNavId, navVariants } from '../core/navigation';
+import { SCIENTIFIC_OS } from '../core/scientificOs/catalogue';
 
 /**
  * NAVIGATION ↔ ROUTER CONSISTENCY.
@@ -64,6 +65,14 @@ describe('navigation entries point at routes the router actually has', () => {
    * dome-world falsification had a route and a screen before it had any way
    * in.
    */
+  it('the Reality Navigator (#/reality) is reachable from Worlds, not only from itself and one lab', () => {
+    const entry = MORE_ITEMS.find((i) => i.hash === '#/reality');
+    expect(entry, 'no menu entry navigates to #/reality').toBeDefined();
+    expect(entry!.variantOf).toBe('worlds');
+    expect(navVariants('worlds').map((item) => item.id)).toContain(entry!.id);
+    expect(activeNavId('#/reality')).toBe(entry!.id);
+  });
+
   it('the dome-world falsification is reachable from the menu, not only by URL', () => {
     const entry = MORE_ITEMS.find((i) => i.hash === '#/dome-world');
     expect(entry, 'no menu entry navigates to #/dome-world').toBeDefined();
@@ -136,5 +145,33 @@ describe('Ask is an action in the bottom bar, not a menu entry', () => {
     expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Człowiek', 'Lab']);
     expect(ASK_ITEM.kind).toBe('chat');
     expect(NAV_SECTIONS.flatMap((section) => section.items).some((item) => item.kind === 'chat')).toBe(false);
+  });
+});
+
+describe('demo-only capabilities sit with the showcases, not in a product group', () => {
+  // The catalogue (core/scientificOs/catalogue.ts) is the audit truth: whatever
+  // it files under a "Demo only" subgroup must not be offered in the menu as a
+  // product of that sector.
+  const demoOnly = new Set(
+    SCIENTIFIC_OS.flatMap((group) => group.subgroups ?? [])
+      .filter((sub) => sub.label === 'Demo only')
+      .flatMap((sub) => sub.ids),
+  );
+  const sectionOf = (id: string) => MORE_SECTIONS.filter((section) => section.items.some((item) => item.id === id)).map((s) => s.id);
+
+  it('the catalogue still marks Cyber as demo-only (premise)', () => {
+    expect(demoOnly.has('cyber')).toBe(true);
+  });
+
+  it('every demo-only capability that has a menu entry is in the showcase group only', () => {
+    const inMenu = [...demoOnly].filter((id) => sectionOf(id).length > 0);
+    expect(inMenu).toContain('cyber');
+    for (const id of inMenu) expect(sectionOf(id), id).toEqual(['more-showcase']);
+  });
+
+  it('Cyber stays reachable from the menu at its real route', () => {
+    const cyber = MORE_SECTIONS.flatMap((s) => s.items).find((item) => item.id === 'cyber');
+    expect(cyber?.hash).toBe('#/cyber');
+    expect(cyber?.status).not.toBe('planned');
   });
 });

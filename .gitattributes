@@ -7,6 +7,7 @@
 /packages/backend/src/campaign/glp1rActivity.json -text
 /packages/backend/src/campaign/giprActivity.json -text
 /packages/backend/src/compute/cms-zmumu/Zmumu.csv -text
+/packages/backend/src/fixtures/literature-raw/** -text
 /data/transcription/**/*.psv -text
 /data/transcription/**/*.rowhash -text
 # Pinned structure files (sha256 in each SOURCE.json) and captured tool logs are kept

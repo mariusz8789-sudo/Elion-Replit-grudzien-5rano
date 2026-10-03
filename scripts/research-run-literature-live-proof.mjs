@@ -21,6 +21,7 @@ import { handleApi } from '../packages/backend/src/api.mjs';
 import { canonicalJson, sha256Hex } from '../packages/backend/src/determinism.mjs';
 import { queryEuropePmc } from '../packages/backend/src/literature/europePmcConnector.mjs';
 import { openDatabase } from '../packages/backend/src/store.mjs';
+import { readSourceRecord } from '../packages/backend/src/sourceRecordStore.mjs';
 
 const OUTPUT_DIR = path.resolve('artifacts/research-run-literature-live-proof');
 const QUERY = 'GLP-1 receptor';
@@ -79,6 +80,26 @@ try {
   assert.equal(retrieved.status, 201, JSON.stringify(retrieved.body));
   const snapshot = retrieved.body.snapshot;
   assert.equal(snapshot.status, 'METADATA_RETRIEVED');
+  // The exact bodies the connectors read, exported as RECORDED live fixtures (same manifest shape as
+  // packages/backend/src/fixtures/literature-raw/MANIFEST.json) so offline tests can use real captures.
+  const rawDir = path.join(OUTPUT_DIR, 'raw');
+  mkdirSync(rawDir, { recursive: true });
+  const recorded = snapshot.rawResponses.map((ref) => {
+    const read = readSourceRecord(db, ref.sha256);
+    assert.equal(read.status, 'INTACT');
+    const fileName = `${ref.provider.toLowerCase()}-${ref.sha256.slice(0, 16)}.json`;
+    writeFileSync(path.join(rawDir, fileName), read.body);
+    return { file: fileName, provider: ref.provider, route: ref.requestUrl, sha256: ref.sha256, bytes: ref.bytes };
+  });
+  writeFileSync(path.join(rawDir, 'MANIFEST.json'), `${JSON.stringify({
+    schemaVersion: 'genesis.literature-raw-fixtures@1',
+    label: 'RECORDED LIVE RESPONSES',
+    captureStatus: 'RECORDED_LIVE',
+    recordedAt: snapshot.retrievedAt,
+    testedCommit,
+    epistemicStatus: 'NOT_EVIDENCE',
+    files: recorded,
+  }, null, 2)}\n`);
   assert.equal(snapshot.epistemicStatus, 'NOT_EVIDENCE');
   assert.equal(snapshot.primary.sources.length, LIMIT);
   assert.equal(snapshot.contradictionSearch.sources.length, LIMIT);

@@ -36,6 +36,8 @@ import { recordClaimProposal } from './knowledgeRegistry.mjs';
 import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningProvider.mjs';
 import { executorPromptLines, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 import { researchRunProvenance } from './provenanceClass.mjs';
+import { hypothesisLiteratureOf, literatureCatalogOf } from './literature/runCitations.mjs';
+import { datasetsOf, resolveDatasetCell } from './datasets/runDatasets.mjs';
 
 export const RESEARCH_RUN_DOMAIN = 'genesis.research-run';
 export const RESEARCH_RUN_CONTRACT_VERSION = 'research-run@1';
@@ -57,6 +59,8 @@ Answer with exactly one JSON object and nothing else:
     "assumptions": string[],
     "supportingEvidenceRefs": string[],
     "contradictingEvidenceRefs": string[],
+    "sourceRefs": string[],
+    "contradictingSourceRefs": string[],
     "missingEvidence": string[],
     "uncertainty": { "level": "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN", "statement": string },
     "falsificationProposal": string,
@@ -76,7 +80,9 @@ Rules:
 7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean, "expectedValue"?: number, "surpriseTolerance"?: positive number }, naming only these engines and observables:
 ${executorPromptLines().join('\n')}
    Predictions are frozen before the engine runs and cannot be changed afterwards. expectedValue and surpriseTolerance are optional, must be supplied together for numeric observables, and define only the deterministic anomaly rule abs(observed - expectedValue) > surpriseTolerance. They are not confidence or uncertainty intervals.
-8. challengesHypothesisIndex is null unless this hypothesis is an explicit attempt to falsify an earlier hypothesis in this same array. It may reference only a lower array index. The relationship is a proposal, never evidence.`;
+8. challengesHypothesisIndex is null unless this hypothesis is an explicit attempt to falsify an earlier hypothesis in this same array. It may reference only a lower array index. The relationship is a proposal, never evidence.
+9. sourceRefs and contradictingSourceRefs may name only literature source ids from the list you are given, exactly as written: sourceRefs for sources you propose support the claim, contradictingSourceRefs for sources you propose contradict it. Never put a literature source id in an evidence reference field. If no listed source bears on the claim, leave both empty: that is reported as UNKNOWN.
+10. An experiment may take its input from a registered dataset: put "datasetRef": { "datasetId": string, "row": integer (0-based data row), "column": string } in parameters instead of the value. Use only dataset ids and columns from the list you are given.`;
 
 /* ---------------- identity, isolation, dedupe ---------------- */
 
@@ -168,6 +174,7 @@ function view(db, run) {
   const literatureSnapshots = researchState.events.filter((event) => event?.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
   const plan = last('HYPOTHESES_GENERATED');
   const experiments = experimentsOf(researchState);
+  const datasets = datasetsOf(researchState);
   return {
     researchRunId: run.id,
     run,
@@ -175,8 +182,9 @@ function view(db, run) {
     problem: last('PROBLEM_FORMALIZED'),
     plan,
     literatureSnapshots,
+    datasets,
     experiments,
-    provenance: researchRunProvenance({ plan, literatureSnapshots, experiments }),
+    provenance: researchRunProvenance({ plan, literatureSnapshots, experiments, datasets }),
     researchState,
     nextStep: nextStepOf(run, researchState),
   };
@@ -321,7 +329,7 @@ export function startResearchRun(db, projectId, input, { userId = null } = {}) {
 /* ---------------- the model proposes ---------------- */
 
 /** Validates the model's plan. Pure apart from ENTITY-3's evidence lookups. Nothing here is stored. */
-export function validateResearchPlan(value, { db, projectId, selfModel, question, researchRunId }) {
+export function validateResearchPlan(value, { db, projectId, selfModel, question, researchRunId, literatureCatalog = new Map(), datasets = [] }) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, status: 'REJECTED_MALFORMED_RESPONSE', reason: 'not_an_object' };
   const rejected = [];
 
@@ -340,7 +348,8 @@ export function validateResearchPlan(value, { db, projectId, selfModel, question
     const hypothesisId = `hyp-${fnv1a(canonicalJson({ researchRunId, index, claim: STR(h?.claim) }))}`;
     const v = validateClaimProposal(h, { db, projectId, selfModel, question, hypothesisId });
     if (!v.ok) { rejected.push({ kind: 'HYPOTHESIS', index, reason: v.reason }); continue; }
-    let proposal = v.proposal;
+    let proposal = { ...v.proposal, literature: hypothesisLiteratureOf(h, literatureCatalog) };
+    proposal = bindExperimentDataset(proposal, { db, datasets });
     const challengeIndex = h?.challengesHypothesisIndex;
     if (challengeIndex !== undefined && challengeIndex !== null) {
       const challenged = Number.isInteger(challengeIndex) && challengeIndex >= 0 && challengeIndex < index
@@ -372,6 +381,29 @@ export function validateResearchPlan(value, { db, projectId, selfModel, question
   return { ok: true, subProblems, hypotheses, nextActions, rejected };
 }
 
+/**
+ * An experiment whose parameters name a registered dataset cell gets its input from the verified bytes,
+ * and the binding (dataset, cell, value hash) is stored with it. A reference Genesis cannot resolve
+ * blocks the experiment (BLOCKED_BY_DATA); no value is ever guessed for it.
+ */
+function bindExperimentDataset(proposal, { db, datasets }) {
+  const exp = proposal.experimentProposal;
+  const ref = exp?.parameters?.datasetRef;
+  if (!exp || ref === undefined) return proposal;
+  const resolved = db ? resolveDatasetCell(db, datasets, ref) : { ok: false, reason: 'DATASET_STORE_UNAVAILABLE' };
+  if (!resolved.ok) {
+    return { ...proposal, experimentProposal: { ...exp, decision: 'BLOCKED_BY_DATA', reason: resolved.reason, datasetBinding: null } };
+  }
+  const degradations = typeof exp.parameters.smiles === 'string' && exp.parameters.smiles.trim() !== resolved.value
+    ? [...proposal.degradations, { field: 'experimentProposal.parameters.smiles', from: exp.parameters.smiles, to: resolved.value, reason: 'DATASET_VALUE_REPLACES_MODEL_VALUE' }]
+    : proposal.degradations;
+  return {
+    ...proposal,
+    degradations,
+    experimentProposal: { ...exp, parameters: { ...exp.parameters, smiles: resolved.value }, datasetBinding: resolved.binding },
+  };
+}
+
 const PROVIDER_FAILURE = { NOT_CONFIGURED: 'BLOCKED_BY_PROVIDER_CONFIGURATION', TIMEOUT: 'PROVIDER_TIMEOUT', REFUSED: 'PROVIDER_REFUSED', UPSTREAM: 'PROVIDER_ERROR' };
 
 function evidenceRefsOf(db, projectId) {
@@ -394,19 +426,25 @@ export async function proposeResearchPlan(db, projectId, runId, { provider, self
   if (!provider?.configured) return { ok: false, status: 'BLOCKED_BY_PROVIDER_CONFIGURATION', reason: provider?.reason ?? 'NO_PROVIDER' };
 
   const question = before.question;
-  const literature = before.literatureSnapshots.at(-1);
-  const literatureLines = literature ? [
+  const literatureCatalog = literatureCatalogOf(before.literatureSnapshots);
+  const catalogEntries = [...literatureCatalog.values()];
+  const literatureLines = catalogEntries.length ? [
     '',
-    'Literature metadata available for context only (NOT_EVIDENCE; never copy these ids into evidence reference fields):',
-    ...[...literature.primary.sources, ...literature.contradictionSearch.sources]
-      .filter((source, index, all) => all.findIndex((candidate) => candidate.sourceId === source.sourceId) === index)
-      .slice(0, 20)
-      .map((source) => `- ${source.sourceId}: ${source.title} [licence=${source.licenceStatus}]`),
-    `Contradiction-search candidates: ${literature.contradictionSearch.sources.length}; every relationship remains PROPOSED/UNKNOWN until reviewed.`,
+    'Literature metadata available for context only (NOT_EVIDENCE; cite these ids only in sourceRefs / contradictingSourceRefs, never in evidence reference fields):',
+    ...catalogEntries.slice(0, 40)
+      .map((source) => `- ${source.sourceId}: ${source.title} [${[source.doi && `doi=${source.doi}`, source.pmid && `pmid=${source.pmid}`].filter(Boolean).join(' ')} licence=${source.licenceStatus} retrieval=${source.retrievalRole}]`),
+    `Contradiction-search candidates: ${catalogEntries.filter((source) => source.retrievalRole === 'CONTRADICTION_SEARCH').length}; every relationship remains PROPOSED/UNKNOWN until reviewed.`,
+  ] : [];
+  const datasets = datasetsOf(before.researchState);
+  const datasetLines = datasets.length ? [
+    '',
+    'Registered datasets (NOT_EVIDENCE; reference cells with parameters.datasetRef):',
+    ...datasets.slice(0, 10).map((d) => `- ${d.datasetId}: ${d.name} [${d.mediaType}; columns=${(d.columns ?? []).join(',')}; rows=${d.rowCount ?? 'n/a'}; licence=${d.licenceStatus}]`),
   ] : [];
   const prompt = [
     buildProposalPrompt({ question, hypothesisId: null, evidenceRefs: evidenceRefsOf(db, projectId), selfModel }),
     ...literatureLines,
+    ...datasetLines,
     '',
     `Research run: ${runId}`,
   ].join('\n');
@@ -419,7 +457,7 @@ export async function proposeResearchPlan(db, projectId, runId, { provider, self
   }
   const parsed = parseProposalText(completion?.text);
   if (!parsed.ok) return { ok: false, status: 'REJECTED_MALFORMED_RESPONSE', reason: parsed.reason };
-  const plan = validateResearchPlan(parsed.value, { db, projectId, selfModel, question, researchRunId: runId });
+  const plan = validateResearchPlan(parsed.value, { db, projectId, selfModel, question, researchRunId: runId, literatureCatalog, datasets });
   if (!plan.ok) return plan;
 
   const generatedBy = {

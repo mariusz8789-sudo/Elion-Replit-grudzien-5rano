@@ -85,7 +85,8 @@ import { executeResearchExperiment, listResearchExperimentReplays, replayResearc
 import { controlResearchRunExecution, enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
-import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { literatureReplaysOf, replayResearchRunLiterature, retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { attachResearchRunDataset, listResearchRunDatasets } from './researchRunDatasets.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { renderVerifyReportHtml, verifySubmittedRecord } from './genesisVerify.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -911,10 +912,38 @@ export function handleApi(db, ctx) {
             options: ctx.literatureOptions,
             userId: user.id,
           });
+          // An unreachable source is BLOCKED with its reason: the attempt is recorded, but it is never a success.
+          if (result.ok && result.status === 'BLOCKED') {
+            return { status: 503, body: { error: 'BLOCKED', reason: result.snapshot.blockedReason ?? null, accessBlockers: [...result.snapshot.primary.accessBlockers, ...result.snapshot.contradictionSearch.accessBlockers], snapshot: result.snapshot } };
+          }
           if (result.ok) return ok(result, result.deduped ? 200 : 201);
-          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
+          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, SOURCE_RECORD_TAMPERED: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
           return { status, body: { error: result.status, reason: result.reason ?? null } };
         })();
+      }
+      if (seg.length === 5 && seg[4] === 'literature-replays') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        return ok({ literatureReplays: literatureReplaysOf(current.researchState) });
+      }
+      if (seg.length === 7 && seg[4] === 'literature' && seg[6] === 'replay') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const result = await replayResearchRunLiterature(db, projectId, current.researchRunId, seg[5], {});
+          if (result.ok && result.status === 'TAMPERED') return { status: 409, body: { error: 'SOURCE_RECORD_TAMPERED', ...result } };
+          if (result.ok) return ok(result, result.recorded ? 201 : 200);
+          const status = { NOT_FOUND: 404, SNAPSHOT_NOT_FOUND: 404, SNAPSHOT_NOT_REPLAYABLE: 409, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null } };
+        })();
+      }
+      if (seg.length === 5 && seg[4] === 'datasets') {
+        if (method === 'GET') return ok({ datasets: listResearchRunDatasets(db, current) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = attachResearchRunDataset(db, projectId, current.researchRunId, body ?? {}, { userId: user.id });
+        if (result.ok) return ok(result, result.deduped ? 200 : 201);
+        const status = { NOT_FOUND: 404, INVALID_DATASET: 400, DATASET_HASH_MISMATCH: 422, RUN_NOT_WRITABLE: 409, STATE_INTEGRITY_FAILURE: 409, SOURCE_RECORD_TAMPERED: 409 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null } };
       }
       if (seg.length === 5 && seg[4] === 'customer-delivery') {
         if (method !== 'POST') return err(405, 'method_not_allowed');

@@ -22,6 +22,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
 import { ensureAccessSchema } from './access.mjs';
+import { ensureSourceRecordSchema } from './sourceRecordStore.mjs';
 import { hashSecret, looksHashed } from './secrets.mjs';
 import { ACCOUNT_PROFILES, DEFAULT_ACCOUNT_PROFILE, normalizeAccountProfile } from './accountProfiles.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
@@ -701,6 +702,7 @@ export function openDatabase(filename = ':memory:', { backupDir = null } = {}) {
       db.exec(SCHEMA);
       migrate(db);
       ensureAccessSchema(db);
+      ensureSourceRecordSchema(db);
       db.exec('COMMIT');
     } catch (error) {
       if (db.isTransaction) db.exec('ROLLBACK');

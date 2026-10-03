@@ -82,7 +82,7 @@ remaining value · recommendation · tests · provenance note.
 | City / high-fidelity district / road topology / scenario command center | manus/high-fidelity-city-view, manus/current-genesis-continuation, manus/scenario-engine-command-center | Manus | Yes — `City3DWebGLScreen`, `ScenarioCommandCenterPanel`, `core/simulation/scenarioCommandCenter.ts` (nav: Worlds → Miasto 3D) | ALREADY_IN_MAIN |
 | First-person foundation `core/world/firstPerson.ts` | manus/world-runtime-foundation | Manus | Deleted in af395a1c (dead code); replaced by `core/three/firstPersonController.ts` | ALREADY_ABSORBED_DIFFERENT_IMPLEMENTATION |
 | Many-worlds branching from one T0, state bookmarks | claude/temporal-engine-phase-1 (fb6e46a0 on main by patch-id) | Claude | Yes — `core/simulation/temporalMultiverse.ts`, `temporalStateBookmark.ts`, `TemporalMultiversePanel` in City 3D | ALREADY_IN_MAIN |
-| **Branch → Evidence/lineage bridge** (decision lineage, pre-registered question per branch, branch as counterfactual into Evidence Pack, RO-Crate branch context, next-experiment loop) | claude/temporal-engine-phase-1: 4e832ae2, e016fe79, 5bfc858b, 14e3277c, b342101d, 33fdda0d (also on manus/product-access-control) | Claude | **No.** `multiverseEvidence.ts` only in `legacy/temporal-engine-2026-09/` (not built); `TemporalDecisionLineage`, `multiverseBranchAsCounterfactual` absent; 5% of added lines in main's `temporalMultiverse.ts` | **NEEDS_PORT** |
+| **Branch → Evidence/lineage bridge** (decision lineage, pre-registered question per branch, branch as counterfactual into Evidence Pack, RO-Crate branch context, next-experiment loop) | claude/temporal-engine-phase-1: 4e832ae2, e016fe79, 5bfc858b, 14e3277c, b342101d, 33fdda0d (also on manus/product-access-control) | Claude | Was: only in `legacy/temporal-engine-2026-09/`. Now: `temporalMultiverse.ts` (preregistration, `temporalDecisionLineage`, `multiverseBranchAsCounterfactual`), `experimentFabric/multiverseEvidence.ts`, `evidencePack.ts` `multiverseBranchContext`, `evidencePackRoCrate.ts` round-trip; wired in `TemporalMultiversePanel` | **PORTED on g1/recovery-b d1ac3444** (+ gate: question must match the branch's scenario pair) |
 | Counterfactual worlds (world-level) | several | Claude/Codex | Yes — `core/worldModel/discovery/worldCounterfactual.ts` (15 users) | ALREADY_IN_MAIN |
 | Tesseract / 4D visualisation | (merged history) | — | Yes — via Science Chat → experimentFabric parser/router/executor; `core/generator/catalog.ts` | ALREADY_IN_MAIN |
 | Epidemic digital twin / population (SEIR, agents, hotspots, interventions) | manus/high-fidelity-epidemic-digital-twin, claude/genesis-p0-fabric-audit, manus/visual-p1-world (bee4182b, cca903d1) | Manus | Yes — `core/epidemic/*`, `events/epidemicTransmissionAnalysis.ts`, City 3D, `#/calibration` | ALREADY_IN_MAIN |
@@ -112,14 +112,14 @@ remaining value · recommendation · tests · provenance note.
 | Experiment Fabric v0 discovery pipeline: preregistered protocols on backend, research packets (RBAC), backend replay receipt, human review decision, seeded uncertainty, Virtual CERN geometry admission | manus/visual-p1-world (50 commits, 08-21/22) | Archived in `legacy/manus-visual-p1-world-2026-08/`; capability now done by backend **ResearchRun** (plan → frozen prediction → engine → verdict → replay → next) | ALREADY_ABSORBED_DIFFERENT_IMPLEMENTATION. Residual: CERN geometry source-asset admission (ea294273, c1ec3a13) — UNKNOWN value, reference only |
 | Precision reference analysis, natural-product pool, RDKit transport | claude/temporal-engine-phase-1, manus/product-access-control | Yes (81–100%) | ALREADY_IN_MAIN |
 | Research access control, audit trail | manus/product-access-control (#6 cherry-pick) | Yes | ALREADY_IN_MAIN (branch is DUPLICATE of temporal-engine-phase-1 + #6) |
-| Scene capture + epistemic status + replay for Reality Navigator ("Observer at the Junction") | claude/observer-junction-scene 36464523 | No — no `sceneCapture` on main; `core/sceneProvenance/*` labels lab scenes only | NEEDS_PORT (medium). Tests: `realitySceneCapture.test.ts` (176 lines) |
+| Scene capture + epistemic status + replay for Reality Navigator ("Observer at the Junction") | claude/observer-junction-scene 36464523 | Now `core/reality/sceneCapture.ts` (closed status set, limit codes), `RealityNavigator.tsx`, PL/EN `components/reality/realitySceneText.ts`; `#/reality` in Worlds menu | **PORTED on g1/recovery-b 149d6efc** |
 
 ### 2.3 Science labs, physics, chemistry
 
 | Capability | Branch · commit | On main? | Verdict |
 |---|---|---|---|
-| Double-slit density extracted into Scientific Core | claude/double-slit-core-extraction 22c6d6dd | No (`labs/quantum.ts` still inline; no `doubleSlit` in `core/physics.ts`) | NEEDS_PORT (refactor + 176-line test). |
-| Bloch decoherence / measurement / Born rule extracted from renderer | claude/quantum-tunneling-audit a0ec0375 | No | NEEDS_PORT (refactor + 165-line test) |
+| Double-slit density extracted into Scientific Core | claude/double-slit-core-extraction 22c6d6dd | `core/physics.ts` `doubleSlitProbabilityDensity`/`doubleSlitProfile`; `labs/quantum.ts` calls it | **PORTED on g1/recovery-b a3e5ddd2** |
+| Bloch decoherence / measurement / Born rule extracted from renderer | claude/quantum-tunneling-audit a0ec0375 | `labs/experiments/quantum-bloch.ts` (`stepBlochVectorLength`, `probabilityOfZero`, `collapseByMeasurement`) | **PORTED on g1/recovery-b a3e5ddd2** |
 | Universe labs (Kepler/three-body/Hubble/Lorenz) chat routing proof; Schwarzschild/Epidemic/Particle chat suggestions | claude/genesis-phase3-science-labs | Routing code yes; test `universeLabsScienceChatRouting.test.ts` no | PARTIALLY_ABSORBED → port test only |
 | Chemistry as 2nd WorldLeverCatalog domain | claude/chemistry-discovery-verify-i30c1u c46de7b9 | Yes, separate implementation 3dfe9256 (same day) | ALREADY_ABSORBED_DIFFERENT_IMPLEMENTATION; main has no `chemistryLeverCatalog.test.ts` — optional test port |
 | Specialist solvers (logistic growth, 1D diffusion) | final-science / universe / spacetime / overnight branches 3224cf4d, 2d521802 | No | REJECTED earlier (post-freeze audit). Keep rejected. |
@@ -136,7 +136,7 @@ remaining value · recommendation · tests · provenance note.
 
 | Capability | Branch · commit | On main? | Verdict |
 |---|---|---|---|
-| **A/B counterfactual over the protocol's own arms in Pilot** (wires existing `compareCounterfactual`) | claude/ab-counterfactual 9b4ca0a4 (= 1aae869d on campaign-evidence-interop) | **No** — `compareCounterfactual` still has no UI caller (only `scenarioCapsule.ts`) | NEEDS_PORT (S–M) |
+| **A/B counterfactual over the protocol's own arms in Pilot** (wires existing `compareCounterfactual`) | claude/ab-counterfactual 9b4ca0a4 (= 1aae869d on campaign-evidence-interop) | `ExperimentPilotScreen` A/B panel via `experimentFabric/protocolArmComparison.ts` → `compareCounterfactual` | **PORTED on g1/recovery-b d3695ca6** |
 | Protocol Evidence Pack / RO-Crate export in Pilot | claude/campaign-evidence-interop e589df99 | Yes (`ExperimentPilotScreen.tsx` RO-Crate button) | ALREADY_IN_MAIN |
 | Campaign evidence boundary + "reach Campaign from natural phrases" | c202921f / d14795ed | Not found | UNKNOWN relevance after ResearchRun; reference only |
 | Research Launcher in Ask | claude/research-launcher-nrboog (PR #31 closed) | Replaced by research console domain choice (#69) and Ask engine choice (#33) | ALREADY_ABSORBED_DIFFERENT_IMPLEMENTATION |
@@ -196,10 +196,10 @@ remaining value · recommendation · tests · provenance note.
 4. **Remove "TODO" from user-visible chat** — source `manus/high-fidelity-epidemic-digital-twin` 1b0fcc7f, d0ca7c12. Target `components/ScienceChat.tsx` (tag label), `core/scienceChat/resolveCommand.ts` (equation fallback) + 12-line test in `scienceChat.test.ts`. Effort XS.
 5. **Event registry O(1) index** — source `claude/matrix-foundation-sprint` be6887b8. Target `core/events/eventRegistry.ts` + `__tests__/eventRegistryScaling.test.ts`. Effort XS.
 6. **Replay volatility probe test** — source `claude/next-audit-be9c56f` 419e1cbb `evidenceReplayVolatility.test.ts`. Target `packages/frontend/src/__tests__/`. Effort XS (test only; adapt mocks to current client).
-7. **Pilot A/B counterfactual** — source `claude/ab-counterfactual` 9b4ca0a4 (`ExperimentPilotScreen.tsx` hunk, styles, `campaignEvidenceBoundary.test.ts`). Target `components/ExperimentPilotScreen.tsx` calling existing `experimentFabric/counterfactualCompare.ts`. Effort S–M (screen has changed a lot).
-8. **Multiverse branch → Evidence/lineage** — source `claude/temporal-engine-phase-1` 4e832ae2, e016fe79, 5bfc858b, 14e3277c, b342101d, 33fdda0d; file `legacy/temporal-engine-2026-09/packages/frontend/src/core/experimentFabric/multiverseEvidence.ts`. Target `core/simulation/temporalMultiverse.ts`, `core/experimentFabric/evidencePack*.ts`, `TemporalMultiversePanel.tsx`; better: express a branch as a ResearchRun counterfactual instead of a second Evidence path. Effort M. This is the only Manus-era "branching worlds" piece not on main.
-9. **Scientific Core extractions** — double-slit (22c6d6dd → `core/physics.ts`, `labs/quantum.ts`, `doubleSlitModel.test.ts`) and Bloch decoherence (a0ec0375 → `labs/experiments/quantum-bloch*.ts`, `blochDecoherenceModel.test.ts`). Effort S each. Value: the two quantum labs become testable models instead of renderer code.
-10. **Reality Navigator scene capture + replay** — source `claude/observer-junction-scene` 36464523 (`core/reality/sceneCapture.ts`, `RealityNavigator.tsx`, test). Target `core/reality/`; also link `#/reality` from Worlds (today only reachable from itself and one lab). Effort M.
+7. ~~**Pilot A/B counterfactual**~~ PORTED on g1/recovery-b d3695ca6 — source `claude/ab-counterfactual` 9b4ca0a4 (`ExperimentPilotScreen.tsx` hunk, styles, `campaignEvidenceBoundary.test.ts`). Target `components/ExperimentPilotScreen.tsx` calling existing `experimentFabric/counterfactualCompare.ts`. Effort S–M (screen has changed a lot).
+8. ~~**Multiverse branch → Evidence/lineage**~~ PORTED on g1/recovery-b d1ac3444 — source `claude/temporal-engine-phase-1` 4e832ae2, e016fe79, 5bfc858b, 14e3277c, b342101d, 33fdda0d; file `legacy/temporal-engine-2026-09/packages/frontend/src/core/experimentFabric/multiverseEvidence.ts`. Target `core/simulation/temporalMultiverse.ts`, `core/experimentFabric/evidencePack*.ts`, `TemporalMultiversePanel.tsx`; better: express a branch as a ResearchRun counterfactual instead of a second Evidence path. Effort M. This is the only Manus-era "branching worlds" piece not on main.
+9. ~~**Scientific Core extractions**~~ PORTED on g1/recovery-b a3e5ddd2 — double-slit (22c6d6dd → `core/physics.ts`, `labs/quantum.ts`, `doubleSlitModel.test.ts`) and Bloch decoherence (a0ec0375 → `labs/experiments/quantum-bloch*.ts`, `blochDecoherenceModel.test.ts`). Effort S each. Value: the two quantum labs become testable models instead of renderer code.
+10. ~~**Reality Navigator scene capture + replay**~~ PORTED on g1/recovery-b 149d6efc — source `claude/observer-junction-scene` 36464523 (`core/reality/sceneCapture.ts`, `RealityNavigator.tsx`, test). Target `core/reality/`; also link `#/reality` from Worlds (today only reachable from itself and one lab). Effort M.
 11. Optional test-only ports: `universeLabsScienceChatRouting.test.ts` (e33f1606), `chemistryLeverCatalog.test.ts` + `worldDiscoveryChemistryMemory.test.ts` (c46de7b9, adapt to main's catalogue). Effort S.
 
 Not to port: everything in §2.8, specialist solvers, pain use case, MP4 encoder, epistemicStatus duplicate, spacetime visualization, earthquake chat handoff, contractCompat, physicsWorld, c1 rooms.
@@ -215,7 +215,7 @@ Routes in `App.tsx` without any link from nav, catalogue, Start or screens:
 | `#/monetize` → `MonetizeScreen` | Commercial ledger (tenant, engagement, fail-closed PAID) D-057 | INTERNAL link from Settings/Platform, or leave hidden until a payment adapter exists |
 | `#/character` → `CharacterLabScreen` | Character lab | UNKNOWN value; decide link or delete |
 | `#/concept`, `#/compare` | Concept film, model compare | Reachable only through Ask commands |
-| `#/reality` → `RealityNavigator` | Place/time observer | Only from itself and `universe-orbital-consequence` lab |
+| `#/reality` → `RealityNavigator` | Place/time observer | Linked from Worlds (variant of "Wizualizacje i światy") and search — g1/recovery-b 149d6efc |
 | Labs `atom`, `biology`, `civilization`, `discovery`, `mathematics` (`#/lab/<id>`) | Canvas labs | Only via Search/Ask/dynamic links, not in menu |
 
 Modules documented in `ALLOWED_ORPHANS` (`__tests__/moduleReachability.test.ts`):
@@ -228,7 +228,7 @@ Modules documented in `ALLOWED_ORPHANS` (`__tests__/moduleReachability.test.ts`)
 - Owner-held after the 29 Sep Start redesign: `GenesisDashboard`, `ScaleJourney`, `TimeTransport`, `WorkspaceStage`, `GenesisCapabilityShowcase`, `GenesisCommandCenterHero`, `crossDomainSynthesis`, `genesisPulseScene`, `sceneRegistry`, `AskGenesisMic`, `EngineCoreHolo`, `liveMatrix/*`.
 
 `packages/core/src` subtrees with no importer outside their own tests/scripts:
-`chemistry/` (chemistry knowledge v0.2.1, SMILES parser; only `scripts/chemistry*Audit.ts`), `evidence/evidenceContainer.ts` + `verifyContainer.cli.ts` (a delta/hash evidence container with a verify CLI — overlaps Genesis Verify in PR #75; reconcile, don't build twice), `reports/auditReportGenerator.ts`, `glue/genesisBindings.ts`.
+`chemistry/` (chemistry knowledge v0.2.1, SMILES parser; only `scripts/chemistry*Audit.ts`), `evidence/evidenceContainer.ts` + `verifyContainer.cli.ts` (a delta/hash evidence container with a verify CLI — overlaps Genesis Verify; reconciled in §7: Genesis Verify is canonical), `reports/auditReportGenerator.ts`, `glue/genesisBindings.ts`.
 
 Navigation inconsistency: catalogue marks Cyber "Demo only", but `core/navigation.ts` lists `cyber` in the product group "Administracja i sektor publiczny". Move it to the showcase group. **ALREADY_IN_MAIN-pending** (PORTED on g1/recovery-a bb161907: Cyber listed under "Pokazy (eksperymenty)", still reachable at `#/cyber`).
 
@@ -258,8 +258,43 @@ Outstanding valuable unintegrated work (exact list):
 4. `manus/high-fidelity-epidemic-digital-twin` 1b0fcc7f + d0ca7c12 — user-visible "TODO" in chat.
 5. `claude/matrix-foundation-sprint` be6887b8 — event registry O(1).
 6. `claude/next-audit-be9c56f` 419e1cbb — replay volatility probe test.
-7. `claude/ab-counterfactual` 9b4ca0a4 — Pilot A/B counterfactual.
-8. `claude/temporal-engine-phase-1` 4e832ae2…33fdda0d — multiverse branch → Evidence/lineage.
-9. `claude/double-slit-core-extraction` 22c6d6dd and `claude/quantum-tunneling-audit` a0ec0375 — quantum model extraction.
-10. `claude/observer-junction-scene` 36464523 — Reality Navigator scene capture/replay.
+7. ~~`claude/ab-counterfactual` 9b4ca0a4 — Pilot A/B counterfactual.~~ PORTED d3695ca6
+8. ~~`claude/temporal-engine-phase-1` 4e832ae2…33fdda0d — multiverse branch → Evidence/lineage.~~ PORTED d1ac3444
+9. ~~`claude/double-slit-core-extraction` 22c6d6dd and `claude/quantum-tunneling-audit` a0ec0375 — quantum model extraction.~~ PORTED a3e5ddd2
+10. ~~`claude/observer-junction-scene` 36464523 — Reality Navigator scene capture/replay.~~ PORTED 149d6efc
 11. Optional tests: e33f1606, c46de7b9.
+
+---
+
+## 7. Reconciliation: `packages/core/src/evidence/evidenceContainer.ts` vs Genesis Verify
+
+Checked 2026-10-03 — **CLOSED on g1/recovery-b 0a070ad9** (read-only comparison, one small hardening).
+
+| | `core/evidence/evidenceContainer.ts` + `verifyContainer.cli.ts` | `backend/src/genesisVerify.mjs` (Genesis Verify) |
+|---|---|---|
+| Input | A zip it builds itself: `container.json` (input state + `set`/`add` deltas + state-hash chain) and `manifest.json` | The record a ResearchRun already persists (execution bundle or EXPERIMENT_HANDOFF record), as bytes or JSON, plus the sha256 the customer was given |
+| Who produces the input | Nobody. No screen, route, engine or script builds a container; only its own test does | Every executed ResearchRun experiment |
+| Checks | Manifest hash, recomputed state-hash chain, final fingerprint | File hash vs given hash, provenance completeness, content hashes, ledger anchor (hash-chained research state), replay through the same replayer as the Scientific Run verifier, tolerance |
+| Verdicts | `ok: boolean` + error codes | `MATCH / DRIFT / TAMPERED / BLOCKED` with plain-language steps and an HTML report |
+| Product surface | CLI file only, no `bin`, not in any npm script | API + customer report; offer "Genesis Verify" in the monetization doc |
+
+**Recommendation: Genesis Verify is canonical.** It verifies the evidence Genesis actually produces and is the
+customer-facing product. The container is a second, unconnected format; building it out would be the
+"two evidence paths" the owner rules forbid.
+
+**What is worth absorbing later (not done here, each needs its own design):**
+1. *Offline mode with zero dependencies* — the container verifier runs on a bare file with no server. Genesis Verify
+   already accepts `db = null`; packaging it as a standalone `npx`/CLI over an execution bundle would give the same
+   third-party story on the canonical format.
+2. *Intermediate state-hash chain* — when an engine exposes intermediate states, Genesis Verify could check a chain of
+   hashes, not only input/output. Only relevant once a ResearchRun engine records intermediate states.
+3. The stored zip writer/reader (`zipStore`/`parseZip`) is not needed: the execution bundle is JSON.
+
+**Done on this branch (tiny, safe):** `verifyContainerOffline` no longer passes silently when `manifest.json` does
+not list `container.json` (now `MANIFEST_ENTRY_MISSING`), and returns `UNREADABLE_JSON` / `MALFORMED_CONTAINER`
+instead of throwing on a corrupt file. Two tests in `packages/core/src/__tests__/genesisCoreExpansion.test.ts`.
+This is a false-green fix in an unused module, not an absorb into Genesis Verify.
+
+**Suggested next step (owner decision):** mark `core/evidence/*` as INTERNAL/DEPRECATED in favour of Genesis Verify,
+or delete it together with its test once item 1 above exists.
+

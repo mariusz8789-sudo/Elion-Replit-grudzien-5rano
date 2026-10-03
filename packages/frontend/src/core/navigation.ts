@@ -128,6 +128,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'first-person-lab', label: 'Laboratorium — scenariusze', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass', variantOf: 'worlds' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline', variantOf: 'worlds' },
+  { id: 'reality', label: 'Nawigator rzeczywistości — orbita i jej warianty', icon: '🪐', hash: '#/reality', variantOf: 'worlds', description: 'Zmień masę gwiazdy lub orbitę, porównaj warianty, zapisz scenę i policz ją ponownie' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', variantOf: 'worlds', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
   { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix', variantOf: 'worlds' },
   { id: 'matrix-map', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix-map', variantOf: 'worlds' },

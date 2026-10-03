@@ -65,6 +65,7 @@ const DESTINATIONS: readonly { hash: string; icon: string; name: string; tagline
   { hash: '#/evidence', icon: '📋', name: 'Evidence & Replay', tagline: 'Pochodzenie wyników i powtórzenie', extra: 'dowod replay powtorzenie' },
   { hash: '#/flight-control', icon: '◎', name: 'Kontrola lotów nauki', tagline: 'Przebiegi badań, kolejka zadań i loty eksperymentów', extra: 'science flight control kolejka queue worker lease dzierzawa przebieg research run wstrzymaj wznow anuluj pause resume cancel lot' },
   { hash: '#/cern-complex', icon: '⚛', name: 'Kompleks CERN', tagline: 'Hala, tunel i komora detektora', extra: 'cern lhc fizyka czastki detektor' },
+  { hash: '#/reality', icon: '🪐', name: 'Nawigator rzeczywistości', tagline: 'Orbita i jej warianty: zapis sceny i ponowne przeliczenie', extra: 'reality navigator rzeczywistosc orbita kepler gwiazda planeta galaz wariant scena zapis replay odtworz czas swiata' },
   { hash: '#/physics/cms-z', icon: '⚛', name: 'CERN CMS Z→μμ', tagline: 'Prawdziwe dane CMS: pik bozonu Z', extra: 'cern cms bozon z mion fizyka czastki open data' },
 ];
 

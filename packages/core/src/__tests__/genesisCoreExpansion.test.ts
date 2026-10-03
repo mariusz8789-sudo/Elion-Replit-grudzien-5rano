@@ -37,6 +37,18 @@ describe('evidence container', () => {
     const tampered = zipStore([{ name: 'container.json', data: new TextEncoder().encode(JSON.stringify(payload)) }, { name: 'manifest.json', data: map.get('manifest.json')! }]);
     expect(verifyContainerOffline(tampered).ok).toBe(false);
   });
+  it('fails closed when the manifest does not list container.json (was a silent pass)', () => {
+    const map = parseZip(buildContainerBundle(input, deltas, clock));
+    const noEntry = zipStore([{ name: 'container.json', data: map.get('container.json')! }, { name: 'manifest.json', data: new TextEncoder().encode('{"entries":[]}') }]);
+    const res = verifyContainerOffline(noEntry);
+    expect(res.ok).toBe(false);
+    expect(res.errors).toContain('MANIFEST_ENTRY_MISSING');
+  });
+  it('fails closed on unreadable JSON instead of throwing', () => {
+    const map = parseZip(buildContainerBundle(input, deltas, clock));
+    const broken = zipStore([{ name: 'container.json', data: new TextEncoder().encode('{not json') }, { name: 'manifest.json', data: map.get('manifest.json')! }]);
+    expect(verifyContainerOffline(broken)).toMatchObject({ ok: false, errors: ['UNREADABLE_JSON'] });
+  });
 });
 describe('audit report generator', () => {
   it('maps deltas to visual states', () => { expect(mapDeltaToVisual({ step: 0, metric: 'p', value: 1, thresholdWarning: 2, thresholdCritical: 5 })).toBe('NORMAL'); expect(mapDeltaToVisual({ step: 1, metric: 'p', value: 3, thresholdWarning: 2, thresholdCritical: 5 })).toBe('WARNING'); expect(mapDeltaToVisual({ step: 2, metric: 'p', value: 6, thresholdWarning: 2, thresholdCritical: 5 })).toBe('CRITICAL'); });

@@ -93,10 +93,22 @@ export function verifyContainerOffline(bundle: Uint8Array): VerifyResult {
   if (!containerRaw) errors.push('MISSING_CONTAINER');
   if (!manifestRaw) errors.push('MISSING_MANIFEST');
   if (!containerRaw || !manifestRaw) return { ok: false, errors, recomputedFingerprint: '', storedFingerprint: '' };
-  const manifest = JSON.parse(new TextDecoder().decode(manifestRaw)) as { entries: { name: string; sha256: string }[] };
-  const me = manifest.entries.find(e => e.name === 'container.json');
-  if (me && me.sha256 !== sha256Bytes(containerRaw)) errors.push('MANIFEST_HASH_MISMATCH');
-  const payload = JSON.parse(new TextDecoder().decode(containerRaw)) as EvidenceContainerPayload;
+  // Fail closed (2026-10 reconciliation, docs/genesis1/RECOVERY-MATRIX.md §7): an unreadable file or a
+  // manifest that does not list container.json used to throw or silently skip the hash check (ok=true).
+  let manifest: { entries?: { name: string; sha256: string }[] };
+  let payload: EvidenceContainerPayload;
+  try {
+    manifest = JSON.parse(new TextDecoder().decode(manifestRaw)) as typeof manifest;
+    payload = JSON.parse(new TextDecoder().decode(containerRaw)) as EvidenceContainerPayload;
+  } catch {
+    return { ok: false, errors: ['UNREADABLE_JSON'], recomputedFingerprint: '', storedFingerprint: '' };
+  }
+  const me = Array.isArray(manifest.entries) ? manifest.entries.find(e => e.name === 'container.json') : undefined;
+  if (!me) errors.push('MANIFEST_ENTRY_MISSING');
+  else if (me.sha256 !== sha256Bytes(containerRaw)) errors.push('MANIFEST_HASH_MISMATCH');
+  if (!Array.isArray(payload.deltas) || !Array.isArray(payload.stateHashes)) {
+    return { ok: false, errors: [...errors, 'MALFORMED_CONTAINER'], recomputedFingerprint: '', storedFingerprint: String(payload.resultFingerprint ?? '') };
+  }
   const { hashes } = computeStateHashes(payload.inputState, payload.deltas);
   if (stableStringify(hashes) !== stableStringify(payload.stateHashes)) errors.push('STATE_HASH_CHAIN_MISMATCH');
   const recomputed = hashes[hashes.length - 1];

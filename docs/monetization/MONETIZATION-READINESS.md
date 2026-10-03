@@ -1,6 +1,6 @@
 # Genesis monetization readiness — 2026-10-03
 
-Base: `origin/main` 5f52356a plus branch `g1/monetization-verify` (this document and Genesis Verify). Sources: the code paths named below, `docs/evidence/GENESIS-CENTRAL-AUDIT-2026-10-03.md`, `docs/GENESIS_SAAS_ENTERPRISE_READINESS.md`, `docs/astra/COMMERCIAL_LICENSE_GATE.md`, `docs/astra/CUSTOMER_RESEARCH_WORKFLOW.md`.
+Base: `origin/main` 5f52356a plus branch `g1/monetization-verify` (this document and Genesis Verify). **Extended 3 Oct 20:40 UTC on c4810531 (PR #78) with the full monetization matrix below (§6–§8); the dashboard is `docs/genesis1/GENESIS-STATUS.md`.** Production is still b3be8635; main 09147752 is 361 commits ahead. Sources: the code paths named below, `docs/evidence/GENESIS-CENTRAL-AUDIT-2026-10-03.md`, `docs/GENESIS_SAAS_ENTERPRISE_READINESS.md`, `docs/astra/COMMERCIAL_LICENSE_GATE.md`, `docs/astra/CUSTOMER_RESEARCH_WORKFLOW.md`.
 
 Ground rules for everything below:
 
@@ -70,7 +70,7 @@ Related, existing, but not this product's flow:
 **What is missing.**
 - It verifies only **Genesis-produced** ResearchRun records. A customer's own pipeline output (a Schrödinger or Gaussian log, a notebook) cannot be submitted; it has to be re-run in Genesis first (the supervised recipe above).
 - Replay exists for 4 engines (RDKit, PySCF, Vina, ADMET-AI). There is no OpenMM replay, and ADMET-AI is licence-blocked commercially.
-- No upload UI in the frontend; API only.
+- ~~No upload UI in the frontend; API only.~~ Update 3 Oct evening (PR #78, c4810531, not on main yet): `#/verify` (`packages/frontend/src/components/VerifyScreen.tsx`, `verifyScreen.test.tsx`) lets a signed-in user upload or paste a record, or export an executed experiment's record with its sha256 (`GET /api/projects/:id/research-runs/:rid/experiments/:eid/record`, real-RDKit test in `genesisVerify.test.mjs`: export → MATCH, edited → TAMPERED), and download the HTML report.
 - No operator-authored plan entry: turning a customer's claimed number into a frozen prediction goes through the reasoning provider's plan today.
 - Signature UNSIGNED (no CSRN key). There is no PDF export; the HTML page prints to PDF from a browser.
 - Not deployed (production is 315 commits behind).
@@ -226,3 +226,210 @@ Smallest real next step (not done here): wrap `posebusters-unseen-benchmark.py`'
 **Commercial blockers.** Everything above, plus no legal entity and no reference customers.
 
 **Readiness: 15%.**
+
+---
+
+# Monetization matrix — 3 October 2026, 20:40 UTC
+
+Base: c4810531 (PR #78, open) on top of main 09147752. Production: b3be8635 (29 Sep), 361 commits behind main. Dashboard: `docs/genesis1/GENESIS-STATUS.md`.
+
+Rules for this part (same as above):
+
+- **No customers, no LOI, no revenue exist.** Nothing below implies otherwise.
+- **Every price is a HYPOTHESIS**, quoted verbatim from `/mnt/project-files/granty/monetyzacja-source-of-truth-2026-09-29.md` ("Initial pricing hypotheses — to be validated with first customers."). Where the sheet has no price, none is given.
+- Reports and certificates are **UNSIGNED** (CSRN key not generated): "fingerprints and replay".
+- **TECH %** = share of the offer's delivery flow with real code and a passing test or committed evidence file. **PRODUCT %** = how much of the sellable package exists: screen, deployed, terms, licence clearance, delivery recipe. Both are judgements, ±10 points.
+- Engines are third-party tools under their own licences. We sell the workflow (TASK → COMPUTE → FALSIFICATION → EVIDENCE → REPLAY → NEXT DECISION, sheet §7), not engines.
+
+## 6. Measured runtime anchors (for COMPUTE COST)
+
+| # | What was measured | Value | Source |
+|---|---|---|---|
+| M1 | CI job "Real engines through ResearchRun and the durable queue" on main 09147752: install + tests over RDKit, PySCF, Vina, OpenMM, ADMET | 4 min 35 s wall, whole job | GitHub check run, 3 Oct 20:13–20:18 UTC |
+| M2 | CI job "Real PySCF benchmark" | 40 s wall, whole job | same commit |
+| M3 | Genesis prep arm, 10 complexes | 5.3 machine-s (PROVISIONAL, loaded machine) | `docs/evidence/prep-time-study/genesis-arm.json` |
+| M4 | Vina docking, Run 6 | 425 dockings in about 4 h on 4 cores ≈ 16 core-h ≈ 2.3 core-min per docking | as recorded in `docs/evidence/posebusters-unseen-benchmark-prereg.json` (`estimatedWallClock`) |
+| M5 | GNINA rescoring (benchmark only) | 0.40–0.45 s per pose on 4 CPUs; Run 7 full pass 4 539 s | `docs/evidence/astex-next-scorer-audit.md`, `astex-run7-gnina-rescore.json` |
+| M6 | Run 8, 308 cases | prereg estimate 15–20 h docking on 4 cores (scaled from M4). The recorded 2 974 s is the final resumed process only and **must not** be quoted as cost | `posebusters-run8-unseen-benchmark.md` |
+| M7 | Live literature retrieval | 195 sources (metadata only) in 2.0 s | `docs/evidence/literature-live-scale-44188bc2.json` |
+
+**€ per CPU-hour: UNKNOWN.** No hosting invoice is in the repo. To measure: (a) the Railway bill for one worker container divided by its CPU-hours; (b) per-job durations from the `jobs` table (claim → completion) for each offer's typical job; (c) LLM tokens per ResearchRun from the provider's usage export. Tokens are **not metered** anywhere in Genesis today.
+
+## 7. The offers
+
+### 7.1 GENESIS VERIFY
+
+- **CUSTOMER:** biotech or CRO teams, grant applicants, due-diligence firms, journal reviewers.
+- **PROBLEM:** a reported computational number may be altered, irreproducible, or not from the stated engine and inputs.
+- **INPUT:** a Genesis execution record + its sha256. Supervised mode: SMILES, parameters and the values the customer claims.
+- **GENESIS WORKFLOW:** `researchRun.mjs` → `researchRunExecution.mjs` · `executeResearchExperiment` → `GET /api/projects/:id/research-runs/:rid/experiments/:eid/record` (#78) → `POST /api/projects/:id/genesis-verify` → `genesisVerify.mjs` · `verifySubmittedRecord` (integrity, provenance, ledger anchor, `campaign/verify.mjs` · `replayCapabilityInputs` through heavy-compute admission and the ADMET licence gate) → `renderVerifyReportHtml`. Screen: `#/verify` (`VerifyScreen.tsx`, #78).
+- **DELIVERABLE:** one-page HTML report per record (MATCH / DRIFT / TAMPERED / BLOCKED, six checks, what was NOT checked, UNSIGNED), JSON with `reportFingerprint`, the original bundle.
+- **HUMAN SUPERVISION:** required: scoping which claims replay, creating runs, reading every non-MATCH, cover note.
+- **RUNTIME:** compute seconds to minutes per record (M1–M3). Delivery of 10–50 claims: 2–5 working days (estimate, never measured with a customer).
+- **COMPUTE COST:** negligible next to operator hours (M1–M3); € UNKNOWN (see §6).
+- **LEGAL/LICENSE BLOCKERS:** ADMET records `BLOCKED_BY_LICENSE` for commercial use (tested, a99f281a); RDKit (BSD-3), Vina and PySCF (Apache-2.0) are CONDITIONAL in `docs/astra/COMMERCIAL_LICENSE_GATE.md` until the shipped distributions are pinned; no invoicing entity; reports UNSIGNED.
+- **TECHNICAL READINESS:** 70% (`genesisVerify.test.mjs` real RDKit: export → MATCH, edited → TAMPERED; `verifyScreen.test.tsx`). Missing: only Genesis-produced records; 4 replayable engines; operator-authored plan entry.
+- **PRODUCT READINESS:** 45% (screen exists on #78; not merged, not deployed; no SOW, no entity).
+- **PRICING HYPOTHESIS:** €3k–€8k / audit.
+- **PATH TO FIRST REVENUE:** merge #78 → "wdrażaj" → add operator plan entry → SOW listing what is NOT checked → entity → one design partner (CRO, grant applicant) → paid pilot at the low end.
+
+### 7.2 GENESIS BENCHMARK
+
+- **CUSTOMER:** docking/scoring method developers, pharma computational teams choosing a method, technical due diligence.
+- **PROBLEM:** method claims tuned on contaminated benchmarks; buyers want preregistered, every-failure-counted comparisons.
+- **INPUT:** the customer's method (binary/container or score files), the benchmark or their dataset, acceptance metrics agreed before the run.
+- **GENESIS WORKFLOW:** offline scripts, operator-run: `scripts/posebusters-unseen-benchmark.py`, `astex-redock-benchmark.py`, `astex-multiseed-ensemble.py`, replays `astex-multiseed-replay.py`, `astex-gnina-replay.py`; prereg fingerprint refusal; projection `customerResearchDelivery.mjs` · `GENESIS_BENCHMARK`.
+- **DELIVERABLE:** preregistration with fingerprint, per-case results incl. every failure, paired comparison, verdict by the frozen criterion, replay of a subset, report like `docs/evidence/posebusters-run8-unseen-benchmark.md`.
+- **HUMAN SUPERVISION:** heavy: preparation, contamination check, prereg review, write-up.
+- **RUNTIME:** 2–6 weeks per project (estimate).
+- **COMPUTE COST:** ≈ 60–80 core-hours of Vina for a 300-case, 5-seed set (scaled from M4/M6, not measured for a customer); GNINA rescoring adds ≈ 0.4 s/pose (M5). € UNKNOWN.
+- **LEGAL/LICENSE BLOCKERS:** GNINA product admission BLOCKED (Run 8 DOES_NOT_GENERALISE); Meeko (LGPL) and Vina review not confirmed; PoseBusters data CC BY 4.0 CONDITIONAL; third-party customer binaries need the sandbox.
+- **TECHNICAL READINESS:** 45% (two complete preregistered campaigns with replays; no in-product harness).
+- **PRODUCT READINESS:** 15%.
+- **PRICING HYPOTHESIS:** €5k–€15k / project.
+- **PATH TO FIRST REVENUE:** one method developer with their own scoring command; wrap the prereg-check/run/report stages of `posebusters-unseen-benchmark.py` as one job type; deliver as a founder-run service.
+
+### 7.3 DISCOVERY SPRINT
+
+- **CUSTOMER:** early-stage biotech or academic lab with one bounded question.
+- **PROBLEM:** getting from a question to a falsifiable, executed, replayable experiment and a justified next step is slow and undocumented.
+- **INPUT:** question, molecules or target, acceptance criteria, data classification (`customerResearchDelivery.mjs` · `onboardingOf`).
+- **GENESIS WORKFLOW:** `researchRun.mjs` (`startResearchRun`, `proposeResearchPlan`) → `researchRunLiterature.mjs` (Europe PMC + PubMed) → `researchRunExecution.mjs` → `researchRunJobs.mjs` lease queue → fan-out (`researchRunFanOut.test.mjs`) and advance (`researchRunAdvance.test.mjs`, stops at human review) → `researchRunEvidencePack.mjs` → `customerResearchDelivery.mjs` · `GENESIS_RESEARCH_SPRINT`; monitored on `#/flight-control`.
+- **DELIVERABLE:** computational report: sources, hypotheses, frozen predictions, engine runs, protocol verdicts, replay, next experiments, Evidence Pack, Verify reports.
+- **HUMAN SUPERVISION:** scientist reviews the plan, every verdict and each next step; evidence publication is a human decision by design.
+- **RUNTIME:** 2–4 weeks (estimate). Per experiment: seconds (RDKit) to minutes (Vina ≈ 2.3 core-min per docking, M4).
+- **COMPUTE COST:** engine CPU small (M1, M4); LLM tokens UNKNOWN (not metered); € UNKNOWN.
+- **LEGAL/LICENSE BLOCKERS:** the sheet's Sprint includes "ADMET/Tox", which is `BLOCKED_BY_LICENSE` for commercial use today; Meeko licence to confirm; engines are not on production ("subject to runtime availability"); ChEMBL CC BY-SA share-alike for any delivered data.
+- **TECHNICAL READINESS:** 55% (`goldenResearchRun.e2e.test.mjs`, `researchRunEngines.real.test.mjs`, `customerResearchDelivery.test.mjs`). No real model in the loop in tests; no customer-scale run.
+- **PRODUCT READINESS:** 25%.
+- **PRICING HYPOTHESIS:** €10k–€25k / pilot (subject to runtime availability).
+- **PATH TO FIRST REVENUE:** deploy + one Railway worker with Vina live → one real question run end to end → chemist prep-time measurement → offer to a Verify customer as the next step.
+
+### 7.4 DEEP DISCOVERY — not technically justified today
+
+- Sheet scope: Sprint + PySCF + OpenMM + falsification + AiZynthFinder retrosynthesis.
+- Reality: PySCF works (small molecules, small bases); OpenMM is a TIP3P water reference only, no protein–ligand MD, no replay; AiZynthFinder reports `BLOCKED_BY_RUNTIME: MODEL_FILES_MISSING` (`docs/GENESIS_RETROSYNTHESIS.md`) and is in no CI job; commercial retrosynthesis BLOCKED by admission.
+- TECH 25% · PRODUCT 5%. **Do not offer** until a protein–ligand MD path with replay and a retrosynthesis runtime exist.
+- PRICING HYPOTHESIS (not offered now): €20k–€50k / project (subject to runtime availability).
+
+### 7.5 EVIDENCE PLATFORM
+
+- **CUSTOMER:** research organisations that want their computations recorded with custody, replay and evidence review.
+- **PROBLEM:** notebooks and pipelines lose tamper-evident, replayable provenance tied to claims.
+- **INPUT:** their users and projects; computations run through Genesis.
+- **GENESIS WORKFLOW:** hash-chained research state (`agentRun.mjs`), evidence ledger (`knowledgeApi.mjs`; on #78 SQLite schema V16, safe with several processes), Evidence Pack (`researchRunEvidencePack.mjs`), artifact custody (`researchRunArtifacts.mjs`), BYT (`bytProjection.mjs`), Reviewer Room `#/reviewer`, Verify for exports.
+- **DELIVERABLE:** hosted workspace + Evidence Pack and Verify exports.
+- **HUMAN SUPERVISION:** operator for onboarding/support; reviewer for evidence publication.
+- **RUNTIME:** weeks to onboard once infrastructure exists (estimate).
+- **COMPUTE COST:** hosting + artifact storage growth; € UNKNOWN (measure DB + artifact bytes per run).
+- **LEGAL/LICENSE BLOCKERS:** data-processing terms, no GDPR export/deletion workflow, no billing, UNSIGNED.
+- **TECHNICAL READINESS:** 50% (`docs/genesis1/BYT-VERIFICATION.md`: 12 requirements PASS on #78; `knowledgeLedgerMultiInstance.test.mjs`; `researchRunEvidencePack.test.mjs`). One host, one SQLite file, no backup drill (only a pre-migration snapshot, `dbPreMigrationSnapshot.test.mjs`), no tenant model.
+- **PRODUCT READINESS:** 15%.
+- **PRICING HYPOTHESIS:** €30k–€80k / year (sheet: after first successful pilots).
+- **PATH TO FIRST REVENUE:** convert a successful Verify or Sprint customer into an annual pilot after deploy + backup/restore drill.
+
+### 7.6 ENTERPRISE GENESIS
+
+- **CUSTOMER:** pharma, large CROs, institutions needing a dedicated or on-prem deployment.
+- **PROBLEM / INPUT / WORKFLOW:** Evidence Platform under SSO, compliance and procurement; inputs are IdP, residency rules, security questionnaire.
+- **DELIVERABLE:** dedicated deployment, SLA, compliance evidence.
+- **HUMAN SUPERVISION:** dedicated support and security staff.
+- **RUNTIME:** 6–12 months after infrastructure decisions (estimate).
+- **COMPUTE COST:** UNKNOWN (dedicated infrastructure not designed).
+- **LEGAL/LICENSE BLOCKERS:** no SSO/SAML/OIDC, MFA, SCIM, API keys, billing, KMS, SOC 2/ISO evidence, pen-test, entity (`docs/evidence/consolidation/saas-readiness-2026-10-03.md`: ENTERPRISE_BLOCKED).
+- **TECHNICAL READINESS:** 25% (scrypt auth, hashed sessions, RBAC, audit chain, licence gate). **PRODUCT READINESS:** 5%.
+- **PRICING HYPOTHESIS:** €80k–€200k+ / year (after first successful pilots).
+- **PATH TO FIRST REVENUE:** only after Evidence Platform pilots; not before.
+
+### 7.7 UNIVERSITY / RESEARCH INSTITUTE
+
+- **CUSTOMER:** academic computational chemistry groups, research institutes, grant offices.
+- **PROBLEM:** reproducibility of computational results for papers and grant applications; methods teaching (`docs/GENESIS_PRODUCT_WEDGE.md` §3 recommended "reproducible computational experiments for research-methods courses").
+- **INPUT:** the group's computations or questions.
+- **GENESIS WORKFLOW:** Verify (7.1) and Sprint (7.3) paths; Virtual Labs and Human Explorer for teaching context.
+- **DELIVERABLE:** Verify reports for a paper or grant; a Sprint report.
+- **HUMAN SUPERVISION / RUNTIME / COMPUTE COST:** as 7.1 / 7.3.
+- **LEGAL/LICENSE BLOCKERS:** academic procurement; the Education line (Learn/Study/Teach) does not exist (no Teach mode, no classes or LMS).
+- **TECHNICAL READINESS:** 50%. **PRODUCT READINESS:** 20%.
+- **PRICING HYPOTHESIS:** Verify €3k–€8k / audit, Sprint €10k–€25k / pilot. No separate academic price in the sheet. Education / Human Lab €5k–€20k / institution / year is a future vertical (sheet §4), **not offered**.
+- **PATH TO FIRST REVENUE:** a reproducibility audit paid from a grant budget.
+
+### 7.8 BIOTECH / PHARMA
+
+- **CUSTOMER:** small biotech (entry), pharma computational groups (method choice, later enterprise).
+- **PROBLEM:** decide which computational result or method to trust before spending wet-lab money.
+- **INPUT / WORKFLOW / DELIVERABLE:** entry through Verify (7.1) or Benchmark (7.2), expansion to Sprint (7.3), long term Discovery Partnership (7.11).
+- **HUMAN SUPERVISION:** scientist and chemist; no wet-lab partner exists.
+- **RUNTIME / COMPUTE COST:** as the underlying offers.
+- **LEGAL/LICENSE BLOCKERS:** ADMET and retrosynthesis BLOCKED_BY_LICENSE commercially; GNINA benchmark-only; no candidate has passed Winner Gate (GLP-1R: NO GRANT-READY CANDIDATE YET).
+- **TECHNICAL READINESS:** 45%. **PRODUCT READINESS:** 15%.
+- **PRICING HYPOTHESIS:** as the underlying offers; Discovery Partnership €100k–€300k+ / programme (after pilots).
+- **PATH TO FIRST REVENUE:** Verify or Benchmark first; never lead with "discovery".
+
+### 7.9 PUBLIC / INSTITUTIONAL PILOT
+
+Two items have real functionality; the rest of the sheet's §3 does not.
+
+**D-063 Public Evidence** — claim audit + trigger certificate + evidence.
+- WORKFLOW: `packages/frontend/src/core/govServices/govClaimAudit.ts` · `runClaimAudit`, `govParametricTrigger.ts`, `core/reviewer/tamperChallenge.ts` in Reviewer Room `#/reviewer`.
+- Tests: `d063BaselineComparisonAndGovServices.test.ts`, `reviewerTamperChallenge.test.ts`.
+- Limit: runs on pinned SURPASS-2 bytes, not a customer's data; trigger certificate UNSIGNED.
+- TECH 45% · PRODUCT 15%. PRICING HYPOTHESIS: €10k–€30k / pilot (sheet §3: after pilot / validation).
+
+**CLOCKWORK** — official deadlines/processes + audit.
+- WORKFLOW: `packages/core/src/mythos/clockwork/ClockworkEngine.ts` (KPA deadline arithmetic), `ClockworkDashboard` at `#/clockwork`.
+- Tests: `clockwork.test.ts`, `clockworkDashboard.test.tsx`, `clockworkRegister.test.ts`.
+- Limit: no integration with any office system; roles later.
+- TECH 40% · PRODUCT 15%. PRICING HYPOTHESIS: €10k–€30k / pilot.
+
+Common: CUSTOMER public agencies and auditors; HUMAN SUPERVISION full; RUNTIME weeks (estimate); COMPUTE COST negligible (browser-side); LEGAL procurement, data-processing agreements, entity. PATH: one demonstration on a public body's own published claim, then a paid pilot.
+
+Not offered: Government Drug Discovery (method/showcase only), Policy Evaluation (the causal engine has no computed real run; the B1 DEFRA AURN jobs in CI only fetch data), Resilience / Digital Twin (synthetic data).
+
+### 7.10 SOVEREIGN / PUBLIC SECTOR — not offered
+
+The sheet lists Sovereign under "DO NOT SELL YET" (§5, "Sovereign (planned)"). No route or module implements it (`docs/genesis1/RECOVERY-MATRIX.md`: PLAN, no route). TECH 0–5% · PRODUCT 0%. No price is attached here.
+
+### 7.11 Recovered offers
+
+| Offer | Where it came from | State | Tech / Product | Price (HYPOTHESIS) |
+|---|---|---|---|---|
+| Retrosynthesis / Synthesis Pack | owner sheet §1 | `campaign/retrosynthesis.mjs`, `compute/retrosynthesisAdmission.mjs`, `docs/evidence/imatinib-retrosynthesis-2026-09-27.json`; `retrosynthesis.test.mjs`. Runtime BLOCKED (model files missing), commercial BLOCKED, no UI, founder-run | 25 / 5 | €5k–€15k / project (subject to runtime availability) |
+| Private Scientific Compute | owner sheet §2 | worker images chem-light / structural / admet; container gate `railway-scientific-workers.yml` green 3 times (manual); never deployed | 30 / 5 | €20k–€100k+ / year + compute |
+| Discovery Partnership | owner sheet §2 | needs a lab partner and a measurement; none exists | 20 / 5 | €100k–€300k+ / programme |
+| Developer API (RDKit-as-a-service) | `docs/legacy/genesis-2026-07/COMMERCIALIZATION.md` (July) | Stripe → API-key code only in `legacy/`; no per-customer keys today; conflicts with sheet §7 "we do not sell individual engines" | 20 / 0 | none in sheet; **rejected as an offer** |
+| Med-chem triage app | same legacy document | superseded by Discovery Sprint | — | — |
+| Commercial ledger `#/monetize` (D-057) | `MonetizeScreen`, `core/commercial/*` | internal engagement ledger, no payment adapter, unlinked | internal tool | — |
+| Education / Human Lab | owner sheet §4 | Virtual Labs exist; Teach mode, classes, LMS do not | 35 / 10 | €5k–€20k / institution / year; **later**, not offered |
+
+Never offered (sheet §5 and `RECOVERY-MATRIX.md` §2.8): Cyber (ToyVulnerableApp demo), synthetic earthquake, Mirror, CICADA without data, Sovereign, speculative physics, OMNICORE / 9D / Supreme, GNINA as a product dependency, a self-driving lab without a hardware-verified adapter.
+
+## 8. Summary and best picks
+
+| Offer | Tech | Prod | Price (HYPOTHESIS) |
+|---|---|---|---|
+| Verify | 70 | 45 | €3k–€8k / audit |
+| Benchmark | 45 | 15 | €5k–€15k / project |
+| Discovery Sprint | 55 | 25 | €10k–€25k / pilot* |
+| Deep Discovery | 25 | 5 | not offered now |
+| Synthesis Pack | 25 | 5 | €5k–€15k / project* |
+| Evidence Platform | 50 | 15 | €30k–€80k / year |
+| Enterprise | 25 | 5 | €80k–€200k+ / year |
+| University / institute | 50 | 20 | Verify / Sprint ranges |
+| Biotech / pharma | 45 | 15 | underlying offers |
+| D-063 Public Evidence | 45 | 15 | €10k–€30k / pilot |
+| CLOCKWORK | 40 | 15 | €10k–€30k / pilot |
+| Private Compute | 30 | 5 | €20k–€100k+ / year + compute |
+| Partnership | 20 | 5 | €100k–€300k+ / programme |
+| Sovereign | 0–5 | 0 | not offered |
+
+\* subject to runtime availability of required scientific engines.
+
+**MONETIZATION READINESS: 30%** (portfolio, weighted toward the "now" offers Verify, Benchmark, Sprint). Fastest single offer: Genesis Verify 55% (mean of 70 and 45).
+
+- **FASTEST FIRST REVENUE: Genesis Verify.** The whole flow (record export → verify → one-page report, `#/verify`) is tested with a real engine; what remains is deploy, entity, SOW and one design partner, not software. Smallest price, shortest delivery.
+- **BEST MARGIN: Genesis Verify.** Compute is seconds per record (M1–M3), no GPU, no licensed model; cost is almost entirely reviewer hours. The margin itself is unmeasured: no hours or € have been recorded.
+- **BEST RECURRING: Evidence Platform.** The only annual product built directly on what already exists and is tested (Evidence Pack, SQLite evidence ledger, BYT restart proofs, Verify); it is the natural renewal for Verify and Sprint customers.
+- **BEST ENTERPRISE: Evidence Platform → Genesis Enterprise.** Same evidence layer with SSO, tenancy and compliance added; the highest ticket in the sheet, but ENTERPRISE_BLOCKED today (SSO, billing, backup drill, multi-replica).
+- **BEST PUBLIC-SECTOR: D-063 Public Evidence.** It reuses the tamper-evident claim audit that Verify also rests on (`runClaimAudit`, tamper challenge, tests above), so one evidence layer serves both markets. Runner-up: CLOCKWORK, which the owner's deck marks "closest to B2G" but which has no evidence/replay differentiator.
+- **BEST SCIENTIFIC DIFFERENTIATOR: Genesis Benchmark.** Preregistered, contamination-checked, every failure counted, and willing to publish a negative result (Run 8: DOES_NOT_GENERALISE). That is the falsification + replay discipline made visible to a buyer.

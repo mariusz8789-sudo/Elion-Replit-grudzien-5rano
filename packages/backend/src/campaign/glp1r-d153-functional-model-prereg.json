@@ -1,0 +1,85 @@
+{
+  "decisionId": "D-153",
+  "title": "GLP-1R functional-agonism subset — model validation under the unchanged frozen gate",
+  "question": "Does a model trained on the FUNCTIONAL_AGONISM subset established by D-152, and only that subset, pass the existing frozen GLP-1R validation gate?",
+  "frozenAt": "2026-10-03T02:05:00Z",
+  "author": "Claude, for Mariusz (mariusz8789-sudo)",
+  "baseCommit": "122ef7dad760812922b9368c24357f244170ffc0",
+  "authorisation": "Mariusz, 2026-10-03 01:52Z, in the project thread: rebase the GLP-1R closed-loop plan on current main, then item A — a NEW preregistered validation of the functional-agonism subset under the UNCHANGED existing GLP-1R validation gate.",
+
+  "whyThisExists": {
+    "whatD152DidAndDidNot": "D-152 established that the functional-agonism subset is large enough to split: 320 rows, 206 compounds, 89 scaffolds, production split train 193 / calibration 74 / test 53. That is endpoint and data-scope sufficiency. It is NOT model validation, and it says nothing about whether a model fitted to those rows predicts anything.",
+    "whatD144Established": "D-144 arm H-COMBINED-ALL fitted all 638 mixed rows and reached MAE 1.0118 against MAX_MAE 1.0 — a gate failure by 0.0118. Arm I (small molecules) reached MAE 0.9547 with R2 -0.1352, which is a low MAE with no predictive power, and the gate correctly refused it on R2 and nTest.",
+    "theOpenQuestion": "Those arms mixed functional EC50 with binding IC50/Ki on one pActivity axis. If that mixing was a material part of the error, a model fitted to the functional arm alone should do better. If the error is dominated by the representation rather than the endpoint mixture, it will not. Nobody knows which, and this decision is the test.",
+    "whyItIsPreregistered": "The answer is a number that will be read as a verdict on the whole GLP-1R axis. Writing the criteria, the prediction and every allowed outcome down before the first row is counted is the only thing that stops the result being reinterpreted after it is seen."
+  },
+
+  "gate": {
+    "status": "UNCHANGED — NOT TOUCHED BY THIS DECISION",
+    "file": "packages/backend/src/campaign/glp1r-validation-gate.json",
+    "ruleFingerprint": "d2f77a7e6042f0fc",
+    "values": { "algorithm": "ridge-ecfp4-morgan-r2-512bit", "lambda": 1.0, "conformalAlpha": 0.1, "splitMethod": "scaffold-hash-mod10", "MIN_TRAIN": 150, "MIN_TEST": 40, "MAX_MAE": 1.0, "MIN_R2": 0.25 },
+    "commitment": "The runner loads this gate through loadGlp1rValidationGate() and asserts the fingerprint equals d2f77a7e6042f0fc before doing anything else. If it differs, the run aborts and reports GATE_FINGERPRINT_MISMATCH. No threshold in it is read, copied, relaxed or reinterpreted by this decision.",
+    "algorithmIsPartOfTheGate": "The gate NAMES ridge-ecfp4-morgan-r2-512bit. D-144 refuted that representation on GLP-1R small molecules. This decision therefore does NOT get to swap the representation: a different featurization needs its own sealed gate, which D-144 already recorded. This run tests the ENDPOINT-MIXTURE hypothesis within the gate as frozen, and nothing else."
+  },
+
+  "dataset": {
+    "source": "The FUNCTIONAL_AGONISM arm exactly as D-152 classified it. Rows are rebuilt by the same path D-152 used (the D-144 combined set: 287 pin rows + 351 A1xA2 rows = 638), then filtered to the assays D-152 filed as FUNCTIONAL_AGONISM.",
+    "roleSourceOfTruth": "packages/backend/src/campaign/glp1r-assay-roles-d152.json — the sealed per-assay roles. Roles are READ, never recomputed, so this decision cannot move a single assay between roles.",
+    "expectedRows": 320,
+    "expectedCompounds": 206,
+    "ifCountsDiffer": "If the rebuilt set is not exactly 320 rows and 206 distinct compounds, the run aborts with DATASET_DRIFT and reports both numbers. A changed dataset is not silently validated.",
+    "deduplication": "Unchanged from D-144/D-152. No row is dropped, merged or aggregated for any reason not already in those decisions.",
+    "replicates": "Replicate rows are NOT averaged. Aggregating them would change the data contract the gate was frozen against. The replicate count and its median standard deviation are REPORTED as a limitation, not acted on.",
+    "trainingDataHash": "canonicalHash of the admitted rows (canonicalSmiles, standardType, pActivity, assayId), recorded in the sealed artefact and fed to trainAndValidate as trainingDataHash."
+  },
+
+  "split": {
+    "method": "The production scaffoldSplit() from packages/backend/src/campaign/glp1rQsar.mjs, over scaffolds from the production rdkitAdapter. Buckets 0-1 test, 2-3 calibration, 4-9 train, by scaffoldBucket() djb2 mod 10 — the gate's own splitMethod.",
+    "noAlternativeSplit": "No other split is computed, tried or reported. Trying several splits and reporting the kindest one is the failure mode this clause exists to forbid.",
+    "expected": { "train": 193, "calibration": 74, "test": 53 },
+    "ifSplitDiffers": "Report the actual numbers and continue only if train >= MIN_TRAIN and test >= MIN_TEST. Otherwise the outcome is MODEL_GATE_FAILED with the size reasons, exactly as trainAndValidate already reports them."
+  },
+
+  "leakageControls": {
+    "note": "All four are computed BEFORE the metrics are looked at, and each has its own prespecified threshold. They can only make the outcome worse, never better.",
+    "compoundDisjointness": "Count of canonicalSmiles appearing in both train and test. REQUIRED: 0.",
+    "scaffoldDisjointness": "Count of scaffolds appearing in both train and test. REQUIRED: 0.",
+    "assayConcentration": "Largest single assay's share of the test rows. If it exceeds 0.50, the test set is one assay wearing a disguise and the outcome is INSUFFICIENT_INDEPENDENCE.",
+    "testAssayCoverage": "Number of distinct assays contributing test rows. If fewer than 3, the outcome is INSUFFICIENT_INDEPENDENCE.",
+    "whatIsNotClaimedAsAControl": "Train and test MAY share assays. That is normal for one target and is not leakage by itself, because the split is over scaffolds and no compound crosses. It is recorded, not treated as a defect."
+  },
+
+  "frozenPrediction": {
+    "writtenBeforeAnyRowWasCounted": true,
+    "primary": "MODEL_GATE_FAILED.",
+    "reasoning": "D-144 showed the mixed 638-row set at MAE 1.0118 and the small-molecule arm at R2 -0.1352. The functional arm is cleaner in endpoint but smaller (320 vs 638 rows) and still mostly peptides, and Morgan r=2 512-bit was already refuted on this target's small molecules. Removing the endpoint mixture should help a little; it is not expected to recover 0.0118 of MAE and 'a little' is not a prediction worth hiding.",
+    "intervals": { "mae": [0.90, 1.25], "r2": [0.15, 0.55] },
+    "whatWouldSurpriseMe": "MAE below 0.95 together with R2 above 0.40. If that happens, the endpoint mixture was a material part of D-144's error, and that is a real finding about the data rather than about the model.",
+    "commitment": "This prediction is recorded so that neither a pass nor a failure can afterwards be presented as the expected one."
+  },
+
+  "allowedOutcomes": {
+    "MODEL_GATE_PASS": "Every gate condition met: train >= 150, test >= 40, MAE <= 1.0, R2 >= 0.25, and a conformal interval exists. This licenses exactly one thing: a GLP-1R efficacy axis that is EVALUABLE. It does not nominate a candidate, does not rank anything, and is not evidence that any molecule works.",
+    "MODEL_GATE_FAILED": "One or more gate conditions not met. This is a valid scientific result and is reported as the headline, not buried. The GLP-1R efficacy axis stays BLOCKED and molecularMission keeps returning NO_WINNER, which is correct behaviour.",
+    "INSUFFICIENT_INDEPENDENCE": "A leakage control above failed its prespecified threshold. No metric is reported as a gate verdict in this case, because a number from a leaking split is not a measurement.",
+    "noFourthOption": "There is no partial pass, no 'close enough', and no outcome in which a failed threshold is described as nearly met without the word FAILED."
+  },
+
+  "forbidden": [
+    "editing glp1r-validation-gate.json or any sealed artefact",
+    "changing the split, the lambda, the representation or any threshold after seeing any number",
+    "dropping, averaging or reweighting rows for any reason not written above",
+    "recomputing or moving any assay role fixed by D-151 or D-152",
+    "running more than one split or more than one model configuration and reporting the better one",
+    "describing a failed gate as a success, a near-miss as a pass, or D-152's SUFFICIENT as model validation",
+    "ranking any candidate, naming any winner, or touching DEFAULT_DOCKING_TARGET",
+    "reading a low MAE as predictive power when R2 says otherwise — D-144 arm I is the worked example"
+  ],
+
+  "outputs": [
+    "packages/backend/src/campaign/glp1r-d153-functional-model.sealed.json — the admitted set, its hash, the split, the four leakage controls, the gate verdict with its reasons, the model fingerprint, and the stated limitations"
+  ],
+
+  "boundary": "A validation run over data already in this repository, using the repository's own gate, split, featurization and trainAndValidate. No new data, no network access, no biological claim, no candidate, no change to any product surface."
+}

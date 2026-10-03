@@ -24,8 +24,6 @@ import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../packages/backend/src/provenance.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json');
-const OUT_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d154-structure-selection.sealed.json');
 
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(name);
@@ -33,9 +31,17 @@ const argOf = (name, fallback) => {
 };
 const SRC = argOf('--source-dir', path.join(ROOT, 'docs/evidence/source-data/glp1r-2026-10-03'));
 const SRC_REF = argOf('--source-ref', null);
+/* Plumbing only (D-156): which decision this run seals, which candidates it reads, and where the
+ * seal goes. No criterion is a flag — every threshold below stays a frozen constant read from
+ * D-154's preregistration. The rule file itself is always D-154's. */
+const DECISION_ID = argOf('--decision', 'D-154');
+const CANDIDATE_PREREG_PATH = path.resolve(ROOT, argOf('--prereg', 'packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json'));
+const PREREG_FROZEN_AT = argOf('--prereg-commit', '4252acf7');
+const OUT_PATH = path.resolve(ROOT, argOf('--out', 'packages/backend/src/campaign/glp1r-d154-structure-selection.sealed.json'));
+const PREREG_PATH = path.join(ROOT, 'packages/backend/src/campaign/glp1r-d154-structure-selection-prereg.json');
 
 /* ------------------------------- frozen constants ------------------------------ */
-const CANDIDATES = ['7C2E', '7S15'];
+const CANDIDATES = argOf('--candidates', '7C2E,7S15').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
 const HUMAN_GLP1R_UNIPROT = 'P43220';   // E1
 const MAX_RESOLUTION_A = 4.0;           // E2
 const LIGAND_MIN_HEAVY_ATOMS = 10;      // R2
@@ -46,7 +52,7 @@ const LIGAND_MAX_HEAVY_ATOMS = 60;      // R2
 const TM_PFAM_NAME_FRAGMENT = '7 transmembrane receptor';
 
 const fail = (code, reason) => {
-  const out = { decisionId: 'D-154', outcome: 'BLOCKED_BY_SOURCE_DATA', code, reason };
+  const out = { decisionId: DECISION_ID, outcome: 'BLOCKED_BY_SOURCE_DATA', code, reason };
   fs.writeFileSync(OUT_PATH, `${JSON.stringify(out, null, 2)}\n`);
   console.error(`${code}: ${reason}`);
   process.exit(1);
@@ -325,7 +331,17 @@ const smallMoleculeLigand = (c) => c.nonpolymers.find((n) => n.heavyAtomsFromCif
 
 /* ----------------------------------- run it ------------------------------------ */
 const prereg = JSON.parse(fs.readFileSync(PREREG_PATH, 'utf8'));
-const preregFingerprint = canonicalHash(prereg).slice(0, 16);
+const candidatePrereg = JSON.parse(fs.readFileSync(CANDIDATE_PREREG_PATH, 'utf8'));
+const preregFingerprint = canonicalHash(candidatePrereg).slice(0, 16);
+const ruleFileSha256 = createHash('sha256').update(fs.readFileSync(PREREG_PATH)).digest('hex');
+// A candidate list that is not the one frozen in the decision's own preregistration aborts.
+const frozenList = candidatePrereg.candidateSet?.frozenList ?? ['7C2E', '7S15'];
+if (JSON.stringify([...frozenList].sort()) !== JSON.stringify([...CANDIDATES].sort())) {
+  fail('CANDIDATE_LIST_MISMATCH', `run asked for ${CANDIDATES.join(',')}, ${DECISION_ID} froze ${frozenList.join(',')}`);
+}
+if (candidatePrereg.theRule?.ruleFileSha256 && candidatePrereg.theRule.ruleFileSha256 !== ruleFileSha256) {
+  fail('RULE_FILE_CHANGED', `${DECISION_ID} froze rule sha256 ${candidatePrereg.theRule.ruleFileSha256}, the file now hashes to ${ruleFileSha256}`);
+}
 
 const described = CANDIDATES.map(describe);
 const assessed = described.map((c) => ({ ...c, eligibility: eligibility(c), smallMoleculeLigand: smallMoleculeLigand(c) }));
@@ -363,9 +379,10 @@ if (eligible.length === 0) {
 }
 
 const sealed = {
-  decisionId: 'D-154',
+  decisionId: DECISION_ID,
   preregFingerprint,
-  preregFrozenAtCommit: '4252acf7',
+  preregFrozenAtCommit: PREREG_FROZEN_AT,
+  ruleFrom: { file: path.relative(ROOT, PREREG_PATH), sha256: ruleFileSha256, frozenAtCommit: '4252acf7' },
   computedAt: new Date().toISOString(),
   sourceData: {
     dir: path.relative(ROOT, SRC) || SRC,

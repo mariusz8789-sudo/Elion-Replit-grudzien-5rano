@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
-import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { INCOMPLETE_RESPONSE_LABEL, resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
 import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
 import { runResearchRunAction } from '../core/scienceChat/researchRunTurn';
@@ -84,7 +84,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * otwiera zjawiska (reuse generatora), steruje parametrami AKTUALNEJ symulacji
  * (przez core/simContext), wyjaśnia stan, pokazuje równania/założenia i buduje
  * zadania. Ścieżka sterująca jest deterministyczna (core/scienceChat) — bez
- * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
+ * atrap; funkcje niegotowe są jawnie oznaczone w odpowiedzi jako VERIFY_REQUIRED.
  */
 
 interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
@@ -1053,7 +1053,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           <div key={i} className={`sc-turn sc-${t.role}`}>
             {t.role === 'genesis' && t.tag && (
               <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>
-                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
+                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ` · ${INCOMPLETE_RESPONSE_LABEL}` : ''}
               </span>
             )}
             <div className="sc-text"><TurnText turn={t} /></div>

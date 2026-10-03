@@ -173,12 +173,14 @@ export const MORE_OVERVIEW_ITEM: NavItem = { id: 'scientific-os', label: 'Wszyst
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   { id: 'more-ls', label: 'Nauki o życiu', ids: ['campaign', 'chemistry', 'virtual-bio'] },
   { id: 'more-evidence', label: 'Dowody i weryfikacja', ids: ['memory', 'flight-control', 'meta-cognition'] },
-  { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'cyber', 'sovereign'] },
+  { id: 'more-public', label: 'Administracja i sektor publiczny', ids: ['clockwork', 'protection-priority', 'sovereign'] },
   { id: 'more-physics', label: 'Fizyka, kwanty i CERN', ids: ['physics', 'black-hole', 'universe', 'cern-complex', 'lab-fpv'] },
   { id: 'more-worlds', label: 'Świat i cyfrowy bliźniak', ids: ['worlds', 'whatif'] },
   { id: 'more-learning', label: 'Edukacja', ids: ['investor-demo', 'inquiry', 'dome-world', 'glossary'] },
   { id: 'more-system', label: 'Platforma', ids: ['account', 'projects', 'settings'] },
-  { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment'] },
+  // Cyber runs on a toy target application: the catalogue files it under
+  // "Demo only", so it is listed with the showcases, not as a public-sector product.
+  { id: 'more-showcase', label: 'Pokazy (eksperymenty)', ids: ['myths-theories', 'decipherment', 'cyber'] },
 ];
 
 const byId = new Map(MORE_ITEMS.map((item) => [item.id, item] as const));

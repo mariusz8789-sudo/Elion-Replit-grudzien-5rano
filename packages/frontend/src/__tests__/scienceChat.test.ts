@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { resolveCommand, type ChatSimSnapshot } from '../core/scienceChat/resolveCommand';
+import { INCOMPLETE_RESPONSE_LABEL, resolveCommand, type ChatSimSnapshot } from '../core/scienceChat/resolveCommand';
 import { _resetRecipes } from '../core/generator/recipe';
 import { registerCatalog } from '../core/generator/catalog';
 import { registerActiveObservationControl } from '../core/activeObservationControl';
@@ -581,5 +583,24 @@ describe('scienceChat: /świat — Looking Glass pytany z jednego czatu', () => 
     const r = resolveCommand('/świat', null);
     expect(r.action).toBeUndefined();
     expect(r.intent).toBe('HELP');
+  });
+});
+
+describe('scienceChat: no internal "TODO" shown to users', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('labels missing equations as unavailable metadata without implying a solver', () => {
+    const r = resolveCommand('pokaż równanie', ctx({ labId: 'unknown', experimentId: 'unknown-model', experimentName: 'Nieznany model' }));
+    expect(r.todo).toBe(true);
+    expect(r.text).toContain('MODEL_METADATA_UNAVAILABLE');
+    expect(r.text).toContain('nie uruchomiono dodatkowego solvera');
+    expect(r.text).not.toContain('TODO');
+  });
+
+  it('the chat tag for an incomplete response reads VERIFY_REQUIRED, never TODO', () => {
+    expect(INCOMPLETE_RESPONSE_LABEL).toBe('VERIFY_REQUIRED');
+    const src = readFileSync(resolve(__dirname, '../components/ScienceChat.tsx'), 'utf8');
+    expect(src).not.toMatch(/t\.todo \? '[^']*TODO/);
+    expect(src).toContain('INCOMPLETE_RESPONSE_LABEL');
   });
 });

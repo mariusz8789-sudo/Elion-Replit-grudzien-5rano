@@ -148,6 +148,13 @@ export interface ChatResponse {
   equations?: string[];
 }
 
+/**
+ * Etykieta pokazywana użytkownikowi przy odpowiedzi z `todo: true`. Wewnętrzne
+ * „TODO" nie jest komunikatem dla użytkownika — mówi, że odpowiedź wymaga
+ * weryfikacji, a nie że coś policzono.
+ */
+export const INCOMPLETE_RESPONSE_LABEL = 'VERIFY_REQUIRED';
+
 /** Migawka aktualnej symulacji dla resolvera (odsprzężona od żywego mostu — testowalna). */
 export interface ChatSimSnapshot {
   labId: string;
@@ -1047,7 +1054,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // --- Równania ---
   if (has(norm, 'rownanie', 'rownania', 'wzor', 'wzory', 'equation')) {
     const eqs = recipe?.equations ?? [];
-    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. TODO: uzupełnić metadane modelu.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
+    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. Status: MODEL_METADATA_UNAVAILABLE — nie uruchomiono dodatkowego solvera ani nie wyprowadzono równania.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
     return { text: `Równania modelu „${ctx.experimentName}":`, tag: 'MODEL', intent: 'SHOW_EQUATION', equations: eqs };
   }
 

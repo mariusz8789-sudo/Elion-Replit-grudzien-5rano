@@ -7,6 +7,11 @@ resolution, mutations, ligands, method) is read from RCSB's own Data API JSON, n
 inferred. Nothing here registers a docking target, trains a model or compares candidates.
 
 usage: fetch-glp1r-sources.py OUT_DIR
+       fetch-glp1r-sources.py OUT_DIR --structures-only PDBID [PDBID ...]
+
+--structures-only fetches the RCSB artefacts of the named entries and nothing else, and writes
+only the per-file provenance (no summary of their contents), so a preregistered rule can read
+them first.
 """
 import datetime
 import hashlib
@@ -84,11 +89,11 @@ def structure_meta(entry, polymers, nonpolymers):
     }
 
 
-def main(out):
+def main(out, structures=STRUCTURES, structures_only=False):
     f = Fetcher(out)
     summary = {"structures": {}, "reactome": {}, "hpa": {}, "chembl": {}}
 
-    for pdb in STRUCTURES:
+    for pdb in structures:
         d = "rcsb/%s" % pdb
         f.get(pdb, "https://files.rcsb.org/download/%s.cif" % pdb, d + "/%s.cif" % pdb, "mmCIF")
         entry = json.loads(f.get(pdb, "https://data.rcsb.org/rest/v1/core/entry/%s" % pdb,
@@ -110,6 +115,15 @@ def main(out):
         except Exception as e:  # recorded, never guessed
             summary.setdefault("notFetched", []).append({"sourceId": pdb, "what": "validation report", "error": str(e)})
         summary["structures"][pdb] = structure_meta(entry, polys, nonp)
+
+    if structures_only:
+        with open(os.path.join(out, "SOURCES.json"), "w") as fh:
+            json.dump({"kind": "glp1r-source-fetch-structures-only", "rawFilesUnmodified": True,
+                       "entries": list(structures), "files": f.records,
+                       "notFetched": summary.get("notFetched", [])}, fh, indent=1)
+            fh.write("\n")
+        print("fetched %d files for %s" % (len(f.records), ", ".join(structures)))
+        return
 
     f.get("reactome-version", "https://reactome.org/ContentService/data/database/version",
           "reactome/database-version.txt", "reactome-version")
@@ -143,6 +157,9 @@ def main(out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) > 3 and sys.argv[2] == "--structures-only":
+        main(sys.argv[1], [x.upper() for x in sys.argv[3:]], structures_only=True)
+    elif len(sys.argv) == 2:
+        main(sys.argv[1])
+    else:
         sys.exit(__doc__)
-    main(sys.argv[1])

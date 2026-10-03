@@ -119,7 +119,7 @@ describe('literature in the canonical ResearchRun', () => {
 
     const pending = call('POST', `${base}/research-runs/${runId}/literature`, {}, owner.token);
     await bothStarted;
-    const paused = call('POST', `${base}/research-runs/${runId}/pause`, { reason: 'Operator paused during retrieval' }, owner.token);
+    const paused = await call('POST', `${base}/research-runs/${runId}/pause`, { reason: 'Operator paused during retrieval' }, owner.token);
     assert.equal(paused.status, 200);
     releaseRetrieval();
 

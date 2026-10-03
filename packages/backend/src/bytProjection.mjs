@@ -127,7 +127,7 @@ function necropolisOf(entries) {
   }));
 }
 
-export function buildBytProjection({ runs = [], registry = null, selfModel = null, flightControl = [] } = {}) {
+export function buildBytProjection({ runs = [], registry = null, selfModel = null, flightControl = null } = {}) {
   const canonicalRuns = runs.filter((item) => item.run?.domain === CANONICAL_RESEARCH_RUN_DOMAIN);
   const predictionLedger = predictionEntries(canonicalRuns);
   const registryValid = registry?.chain?.ok === true;
@@ -138,7 +138,8 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
     ok: item.integrity?.ok === true,
     ...(item.integrity?.ok ? { head: item.integrity.head, events: item.integrity.events } : { reason: item.integrity?.reason ?? 'STATE_INTEGRITY_FAILURE', brokenAt: item.integrity?.brokenAt ?? null }),
   }));
-  const flightRecords = flightControl.filter((flight) => (
+  // null = the caller did not rebuild Flight Control; that is NOT_COMPUTED, never "available with zero flights".
+  const flightRecords = (flightControl ?? []).filter((flight) => (
     typeof flight?.flightFingerprint === 'string'
     && flight?.bytUpdate?.mode === 'DERIVED_READ_MODEL_ONLY'
     && flight?.bytUpdate?.persistence === 'NONE'
@@ -182,7 +183,14 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
       }))),
       limitation: 'Only preregistered numeric absolute-error rules are evaluated. A detected surprise is NOT_EVIDENCE and is independent from protocol falsification.',
     },
-    scienceFlightControl: {
+    scienceFlightControl: flightControl === null ? {
+      status: 'NOT_COMPUTED',
+      flights: [],
+      verified: null,
+      blocked: null,
+      rejectedUntraceableRecords: null,
+      limitation: 'Flight Control was not rebuilt for this projection; read the full cognitive state for it.',
+    } : {
       status: 'AVAILABLE',
       flights: flightRecords,
       verified: flightRecords.filter((flight) => flight.status === 'VERIFIED').length,

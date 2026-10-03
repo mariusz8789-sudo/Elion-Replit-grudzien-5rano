@@ -62,7 +62,8 @@ function preflightOf(planEvent) {
     },
     {
       check: 'RESEARCH_GATE',
-      status: plan.researchGate?.reason === 'SAFETY_VETO' ? 'FAIL' : 'PASS',
+      // A plan that never recorded its research gate is not cleared by default: fail closed like the other checks.
+      status: !plan.researchGate || typeof plan.researchGate.verdict !== 'string' || plan.researchGate.reason === 'SAFETY_VETO' ? 'FAIL' : 'PASS',
       detail: plan.researchGate ?? { verdict: 'UNKNOWN', reason: 'NOT_RECORDED' },
     },
     {
@@ -127,10 +128,11 @@ function executionDeltaOf(planEvent, resultEvent) {
 
 function failureOf({ preflight, resultEvent, dispatchFailureEvent, replayEvent }) {
   if (preflight.decision !== 'CLEARED') {
-    const gateFailed = preflight.checks.some((check) => check.check === 'RESEARCH_GATE' && check.status === 'FAIL');
+    const gate = preflight.checks.find((check) => check.check === 'RESEARCH_GATE');
+    const gateFailed = gate?.status === 'FAIL';
     return {
       layer: gateFailed ? FAILURE_LAYER.RESEARCH_GATE : FAILURE_LAYER.PREFLIGHT,
-      code: gateFailed ? 'SAFETY_VETO' : 'PREFLIGHT_REFUSED',
+      code: gateFailed ? (gate.detail?.reason === 'SAFETY_VETO' ? 'SAFETY_VETO' : 'RESEARCH_GATE_NOT_RECORDED') : 'PREFLIGHT_REFUSED',
       retryable: false,
       source: preflight.source,
     };

@@ -6,7 +6,9 @@ import test from 'node:test';
 import { handleApi } from './api.mjs';
 import { openDatabase } from './store.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
-import { createResearchRunWorker } from './researchRunJobs.mjs';
+import { createResearchRunWorker, queueFor } from './researchRunJobs.mjs';
+import { controlResearchRun } from './researchRun.mjs';
+import { buildCognitiveState } from './cognitiveState.mjs';
 
 const RDKIT = rdkitDetect();
 const skip = RDKIT.available ? false : `RDKit runtime unavailable: ${RDKIT.reason}`;
@@ -124,5 +126,98 @@ test('cancelling a queued job means it never executes; a corrupted run chain dea
     assert.equal(dead.attempts, 1);
     assert.equal(dead.failure.code, 'STATE_INTEGRITY_FAILURE');
     assert.equal(dead.result, null);
+  } finally { ctx.db.close(); }
+});
+
+test('run pause withdraws queued jobs, resume re-enqueues them, cancel withdraws them for good', async () => {
+  const ctx = await setup();
+  try {
+    const runUrl = `${ctx.base}/research-runs/${ctx.runId}`;
+    const queued = await ctx.call('POST', `${runUrl}/experiments`, { token: ctx.owner.token, body: { async: true } });
+    assert.equal(queued.status, 202);
+
+    const paused = await ctx.call('POST', `${runUrl}/pause`, { token: ctx.owner.token, body: { reason: 'budget review' } });
+    assert.equal(paused.status, 200);
+    assert.equal(paused.body.researchRun.run.status, 'PAUSED');
+    assert.deepEqual(paused.body.queue.withdrawn, [queued.body.job.jobId]);
+    const pauseSeq = paused.body.researchRun.researchState.events.at(-1).seq;
+    const withdrawn = (await ctx.call('GET', queued.body.poll, { token: ctx.owner.token })).body.job;
+    assert.equal(withdrawn.state, 'CANCELLED');
+    assert.equal(withdrawn.cancelReason, `RUN_PAUSED:${pauseSeq}`);
+    const worker = createResearchRunWorker(ctx.db, { workerId: 'worker-rr-paused' });
+    assert.equal((await worker.runOnce()).state, 'IDLE', 'a paused run has nothing claimable');
+
+    const refused = await ctx.call('POST', `${runUrl}/experiments`, { token: ctx.owner.token, body: { async: true } });
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body.error, 'RUN_NOT_EXECUTABLE');
+
+    const resumed = await ctx.call('POST', `${runUrl}/resume`, { token: ctx.owner.token });
+    assert.equal(resumed.status, 200);
+    assert.equal(resumed.body.queue.requeued.length, 1);
+    const requeuedId = resumed.body.queue.requeued[0];
+    assert.notEqual(requeuedId, queued.body.job.jobId, 'a withdrawn job is history; resume opens a new generation');
+    const requeued = (await ctx.call('GET', `${runUrl}/experiment-jobs/${requeuedId}`, { token: ctx.owner.token })).body.job;
+    assert.equal(requeued.state, 'QUEUED');
+
+    const cancelled = await ctx.call('POST', `${runUrl}/cancel`, { token: ctx.owner.token });
+    assert.equal(cancelled.status, 200);
+    assert.deepEqual(cancelled.body.queue.withdrawn, [requeuedId]);
+    const gone = (await ctx.call('GET', `${runUrl}/experiment-jobs/${requeuedId}`, { token: ctx.owner.token })).body.job;
+    assert.equal(gone.state, 'CANCELLED');
+    assert.equal(gone.cancelReason, 'RUN_CANCELLED');
+    assert.equal((await worker.runOnce()).state, 'IDLE');
+    assert.equal((await ctx.call('GET', runUrl, { token: ctx.owner.token })).body.researchRun.experiments.length, 0, 'nothing executed');
+  } finally { ctx.db.close(); }
+});
+
+test('pause reports a claimed job as in flight; cancel revokes its lease so the worker cannot complete it', async () => {
+  const ctx = await setup();
+  try {
+    const runUrl = `${ctx.base}/research-runs/${ctx.runId}`;
+    const queued = await ctx.call('POST', `${runUrl}/experiments`, { token: ctx.owner.token, body: { async: true } });
+    const claimed = (await queueFor(ctx.db).claim('worker-rr-inflight', 30_000)).job;
+    assert.equal(claimed.jobId, queued.body.job.jobId);
+
+    const paused = await ctx.call('POST', `${runUrl}/pause`, { token: ctx.owner.token });
+    assert.deepEqual(paused.body.queue.inFlight, [claimed.jobId]);
+    assert.deepEqual(paused.body.queue.withdrawn, []);
+
+    const cancelled = await ctx.call('POST', `${runUrl}/cancel`, { token: ctx.owner.token });
+    assert.deepEqual(cancelled.body.queue.withdrawn, [claimed.jobId]);
+    const completed = await queueFor(ctx.db).complete(claimed.jobId, claimed.leaseId, { record: {} });
+    assert.equal(completed.ok, false);
+    assert.equal(completed.error, 'LEASE_NOT_ACTIVE');
+  } finally { ctx.db.close(); }
+});
+
+test('a job whose run was paused behind the queue is withdrawn as CANCELLED, not reported as an engine failure', async () => {
+  const ctx = await setup();
+  try {
+    const queued = await ctx.call('POST', `${ctx.base}/research-runs/${ctx.runId}/experiments`, { token: ctx.owner.token, body: { async: true } });
+    // Direct status change without the queue-aware control: the race the worker must still handle honestly.
+    assert.equal(controlResearchRun(ctx.db, ctx.project.id, ctx.runId, 'PAUSE').ok, true);
+    const result = await createResearchRunWorker(ctx.db, { workerId: 'worker-rr-race' }).runOnce();
+    assert.equal(result.state, 'DEAD_LETTER');
+    const job = (await ctx.call('GET', queued.body.poll, { token: ctx.owner.token })).body.job;
+    assert.equal(job.failure.status, 'CANCELLED');
+    assert.equal(job.failure.code, 'RUN_NOT_RUNNING');
+  } finally { ctx.db.close(); }
+});
+
+test('cognitive state lists queued and claimed ResearchRun jobs from the lease queue', async () => {
+  const ctx = await setup();
+  try {
+    const before = buildCognitiveState(ctx.db, ctx.project.id);
+    assert.equal(before.pendingExperiments.filter((item) => item.kind === 'RESEARCH_RUN_JOB').length, 0);
+    const queued = await ctx.call('POST', `${ctx.base}/research-runs/${ctx.runId}/experiments`, { token: ctx.owner.token, body: { async: true } });
+    const pending = buildCognitiveState(ctx.db, ctx.project.id).pendingExperiments.filter((item) => item.kind === 'RESEARCH_RUN_JOB');
+    assert.deepEqual(pending.map((item) => [item.id, item.researchRunId]), [[queued.body.job.jobId, ctx.runId]]);
+    await queueFor(ctx.db).claim('worker-rr-visible', 30_000);
+    const state = buildCognitiveState(ctx.db, ctx.project.id);
+    assert.equal(state.pendingExperiments.filter((item) => item.kind === 'RESEARCH_RUN_JOB').length, 0);
+    const running = state.runningExperiments.filter((item) => item.kind === 'RESEARCH_RUN_JOB');
+    assert.equal(running.length, 1);
+    assert.equal(running[0].workerId, 'worker-rr-visible');
+    assert.equal(typeof running[0].leaseExpiresAt, 'number');
   } finally { ctx.db.close(); }
 });

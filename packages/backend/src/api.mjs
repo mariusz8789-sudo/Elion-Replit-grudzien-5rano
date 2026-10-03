@@ -77,10 +77,10 @@ import { synthesizeKnowledge } from './knowledgeSynthesis.mjs';
 import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
-import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
+import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
-import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { controlResearchRunExecution, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
@@ -816,10 +816,13 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        const result = controlResearchRun(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
-        if (result.ok) return ok(result);
-        const status = result.status === 'NOT_FOUND' ? 404 : 409;
-        return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+        // The control reaches the lease queue too: pause/cancel withdraw queued jobs, resume re-enqueues them.
+        return (async () => {
+          const result = await controlResearchRunExecution(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
+          if (result.ok) return ok(result);
+          const status = result.status === 'NOT_FOUND' ? 404 : 409;
+          return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+        })();
       }
       if (seg.length === 5 && seg[4] === 'steering') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
@@ -963,7 +966,7 @@ export function handleApi(db, ctx) {
           // Same execution path as below, started by a queue worker instead of this request.
           return (async () => {
             const queued = await enqueueResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
-            if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
+            if (!queued.ok) return { status: { NOT_FOUND: 404, RUN_NOT_EXECUTABLE: 409 }[queued.status] ?? 422, body: { error: queued.status, reason: queued.reason ?? null } };
             return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
           })();
         }

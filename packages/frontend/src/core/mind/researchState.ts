@@ -29,6 +29,9 @@ export type ResearchStateEventType =
   | 'EVIDENCE_UPDATE'
   | 'SELF_FALSIFICATION'
   | 'NEXT_EXPERIMENT'
+  | 'GENERATED_ANALYSIS_PROPOSED'
+  | 'GENERATED_ANALYSIS_EXECUTED'
+  | 'GENERATED_ANALYSIS_REPLAYED'
   | 'TERMINAL';
 
 export interface ResearchStateEvent {

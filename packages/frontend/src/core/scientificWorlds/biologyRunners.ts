@@ -115,7 +115,8 @@ function scopeModeFor(m: MagnificationLevel, requested: unknown): HyperscopeCapt
 export function createBiologyExperimentRunner(worldId: string, ledger: EvidenceLedger): ExperimentRunner<BiologyArtifact> {
   return (experimentId, seed, inputs: SessionInputs): ExperimentRunResult<BiologyArtifact> => {
     const sink = createLedgerSink(ledger, worldId);
-    const tissue = oneOf(inputs.tissue, TISSUES, 'EPITHELIUM');
+    // No tissue named → the generic reference tissue, never a specific one passed off as the organ's own.
+    const tissue = oneOf(inputs.tissue, TISSUES, 'GENERIC');
     const specimenOf = (): Specimen => new SpecimenRegistry(sink).create({ label: `Wirtualna próbka referencyjna (${tissue}, ziarno ${seed})`, tissueType: tissue, sourceDescription: 'Virtual reference specimen of this world; no physical material exists.', storageState: 'SIMULATED', evidenceIds: [], epistemic: 'MODEL' });
     switch (experimentId as BiologyExperimentId) {
       case 'physiology-state': {

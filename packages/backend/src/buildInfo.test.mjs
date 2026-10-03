@@ -66,28 +66,22 @@ test('P0.3 resolveBuildInfo czyta realny HEAD tego repo', () => {
  * P0.3 istnieje.
  */
 test('P0.3 resolveBuildInfo czyta HEAD z git worktree (.git jako plik gitdir:)', async () => {
-  const { mkdtempSync, rmSync } = await import('node:fs');
-  const { execFileSync } = await import('node:child_process');
+  const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
-  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-'));
+  const dir = path.join(root, 'checkout');
+  const gitDir = path.join(root, 'git-metadata', 'worktrees', 'checkout');
+  const sha = 'c'.repeat(40);
   try {
-    execFileSync('git', ['worktree', 'add', dir, 'HEAD', '--detach'], { cwd: REPO, stdio: 'ignore' });
+    mkdirSync(dir, { recursive: true });
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(dir, '.git'), `gitdir: ${gitDir}\n`);
+    writeFileSync(path.join(gitDir, 'HEAD'), `${sha}\n`);
     const info = resolveBuildInfo({ env: {}, repoDir: dir });
     assert.equal(info.commitSource, 'git', `.git jako "gitdir: ..." musi dać się odczytać, dostałem ${info.commitSource}`);
-    assert.match(info.commit, /^[0-9a-f]{40}$/);
-    const real = resolveBuildInfo({ env: {}, repoDir: REPO });
-    assert.equal(info.commit, real.commit, 'worktree wskazuje ten sam commit co repo macierzyste');
+    assert.equal(info.commit, sha);
   } finally {
-    // On Windows Git can remove the worktree metadata and contents yet return
-    // 128 because the now-empty temp root is still momentarily held open by
-    // the Node test process. That cleanup race must not hide the assertion
-    // above. Prune any metadata and let rmSync retry the empty directory.
-    try {
-      execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
-    } catch {
-      execFileSync('git', ['worktree', 'prune'], { cwd: REPO, stdio: 'ignore' });
-    }
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -98,25 +92,27 @@ test('P0.3 resolveBuildInfo czyta HEAD z git worktree (.git jako plik gitdir:)',
  * katalogu per-worktree — `resolveCommonDir` istnieje dokładnie po to.
  */
 test('P0.3 resolveBuildInfo czyta HEAD z git worktree na gałęzi (ref: przez commondir)', async () => {
-  const { mkdtempSync, rmSync } = await import('node:fs');
-  const { execFileSync } = await import('node:child_process');
+  const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
-  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-branch-'));
-  const branch = `zz-buildinfo-worktree-test-${Date.now()}`;
+  const root = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-branch-'));
+  const dir = path.join(root, 'checkout');
+  const commonDir = path.join(root, 'git-common');
+  const gitDir = path.join(commonDir, 'worktrees', 'checkout');
+  const branch = 'refs/heads/test-branch';
+  const sha = 'd'.repeat(40);
   try {
-    execFileSync('git', ['worktree', 'add', '-b', branch, dir, 'HEAD'], { cwd: REPO, stdio: 'ignore' });
+    mkdirSync(dir, { recursive: true });
+    mkdirSync(path.join(commonDir, 'refs', 'heads'), { recursive: true });
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(dir, '.git'), `gitdir: ${gitDir}\n`);
+    writeFileSync(path.join(gitDir, 'HEAD'), `ref: ${branch}\n`);
+    writeFileSync(path.join(gitDir, 'commondir'), '../..\n');
+    writeFileSync(path.join(commonDir, branch), `${sha}\n`);
     const info = resolveBuildInfo({ env: {}, repoDir: dir });
     assert.equal(info.commitSource, 'git', `HEAD na gałęzi w worktree musi się dać odczytać, dostałem ${info.commitSource}`);
-    const real = resolveBuildInfo({ env: {}, repoDir: REPO });
-    assert.equal(info.commit, real.commit);
+    assert.equal(info.commit, sha);
   } finally {
-    try {
-      execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
-    } catch {
-      execFileSync('git', ['worktree', 'prune'], { cwd: REPO, stdio: 'ignore' });
-    }
-    execFileSync('git', ['branch', '-D', branch], { cwd: REPO, stdio: 'ignore' });
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 

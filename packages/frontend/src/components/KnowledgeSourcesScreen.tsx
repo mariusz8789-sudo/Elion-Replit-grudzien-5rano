@@ -122,7 +122,7 @@ export function KnowledgeSourcesScreen() {
   const groups = listing ? groupByStatus(listing.proposals) : null;
 
   return (
-    <main className="settings-view" id="main-content" tabIndex={-1} data-testid="knowledge-sources-screen">
+    <main className="settings-view knowledge-sources-view" id="main-content" tabIndex={-1} data-testid="knowledge-sources-screen">
       <section className="settings-section">
         <h2>Wiedza i źródła publiczne</h2>
         <p className="settings-hint">

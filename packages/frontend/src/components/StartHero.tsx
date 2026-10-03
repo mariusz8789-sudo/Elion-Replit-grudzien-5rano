@@ -216,7 +216,7 @@ function Compute(): React.ReactElement {
         <summary>Show engines</summary>
         <ul>
           {labels.map(({ e, s }) => (
-            <li key={e.name} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}><b>{e.name}</b><span className={`cc-tone-${s.tone}`}>{s.text}</span></li>
+            <li key={e.name} data-testid={`home-engine-${e.name.toLowerCase().replace(/[^a-z]+/g, '-')}`}><b>{e.name}</b><span className={`cc-tone-${s.tone}`} title={s.detail}>{s.text}</span></li>
           ))}
         </ul>
       </details>

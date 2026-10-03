@@ -12,7 +12,8 @@
  *   HYPOTHESES_GENERATED  sub-problems, hypotheses, experiment proposals and next actions the model
  *                         PROPOSED; each hypothesis validated and degraded by ENTITY-3's rules, each
  *                         experiment judged by Genesis (decideExperimentProposal), nothing run
- * Execution, falsification, evidence and the next experiment are R1-b.
+ * R1-b (researchRunExecution.mjs) adds the rest of one experiment, in the same chain:
+ *   PREDICTIONS_FROZEN, EXPERIMENT_HANDOFF, SELF_FALSIFICATION, EVIDENCE_UPDATE, NEXT_EXPERIMENT.
  *
  * Guarantees:
  *  - the model can never set FACT / SUPPORTED: every item it returns is status PROPOSED,
@@ -29,10 +30,11 @@
  * On any provider failure, malformed answer or conflict nothing is written and the run stays as it was.
  */
 import { canonicalJson, fnv1a } from './determinism.mjs';
-import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, getAgentRun, listAgentRuns, readResearchState } from './agentRun.mjs';
+import { AGENT_RUN_STATUS, appendServerResearchStateEvent, createAgentRun, getAgentRun, listAgentRuns, readResearchState, updateAgentRunStatus } from './agentRun.mjs';
 import { buildProposalPrompt, parseProposalText, validateClaimProposal } from './claimProposal.mjs';
 import { recordClaimProposal } from './knowledgeRegistry.mjs';
 import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningProvider.mjs';
+import { executorPromptLines, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 
 export const RESEARCH_RUN_DOMAIN = 'genesis.research-run';
 export const RESEARCH_RUN_CONTRACT_VERSION = 'research-run@1';
@@ -57,6 +59,7 @@ Answer with exactly one JSON object and nothing else:
     "missingEvidence": string[],
     "uncertainty": { "level": "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN", "statement": string },
     "falsificationProposal": string,
+    "challengesHypothesisIndex": integer | null,
     "experimentProposal": null | { "engineId": string | null, "kind": "COMPUTATIONAL" | "BIOLOGICAL" | "WET_LAB" | "CLINICAL", "description": string, "parameters": object, "parameterChanges": [{ "target": string, "to": any }] }
   }],
   "nextActions": string[]
@@ -68,7 +71,11 @@ Rules:
 3. Propose engines only from the list of engines you are given.
 4. Never propose changing a preregistered threshold, gate or acceptance criterion.
 5. Every falsificationProposal must say what observation would show the hypothesis is wrong.
-6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.`;
+6. If you do not know, say so in uncertainty. An honest UNKNOWN is a good answer.
+7. Genesis can run an experiment itself only if its parameters give the engine's input and at most ${MAX_PREDICTIONS} machine-checkable predictions, each { "observable": string, "operator": ${PREDICTION_OPERATORS.map((o) => `"${o}"`).join(' | ')}, "value": number | boolean, "critical": boolean, "expectedValue"?: number, "surpriseTolerance"?: positive number }, naming only these engines and observables:
+${executorPromptLines().join('\n')}
+   Predictions are frozen before the engine runs and cannot be changed afterwards. expectedValue and surpriseTolerance are optional, must be supplied together for numeric observables, and define only the deterministic anomaly rule abs(observed - expectedValue) > surpriseTolerance. They are not confidence or uncertainty intervals.
+8. challengesHypothesisIndex is null unless this hypothesis is an explicit attempt to falsify an earlier hypothesis in this same array. It may reference only a lower array index. The relationship is a proposal, never evidence.`;
 
 /* ---------------- identity, isolation, dedupe ---------------- */
 
@@ -83,7 +90,7 @@ function ownRun(db, projectId, runId) {
   return run && run.projectId === projectId && run.domain === RESEARCH_RUN_DOMAIN ? run : null;
 }
 
-function inWriteTransaction(db, fn) {
+export function inWriteTransaction(db, fn) {
   db.exec('BEGIN IMMEDIATE');
   try {
     const out = fn();
@@ -97,6 +104,20 @@ function inWriteTransaction(db, fn) {
 
 /* ---------------- read and resume ---------------- */
 
+/** The run's experiments, one entry per experiment id, in the order they were frozen. */
+export function experimentsOf(researchState) {
+  const byId = new Map();
+  const slot = { PREDICTIONS_FROZEN: 'frozen', EXPERIMENT_HANDOFF: 'execution', SELF_FALSIFICATION: 'falsification', EVIDENCE_UPDATE: 'evidence', NEXT_EXPERIMENT: 'next' };
+  for (const e of researchState.events) {
+    const key = slot[e.type];
+    const id = e.payload?.experimentId;
+    if (!key || !id) continue;
+    if (!byId.has(id)) byId.set(id, { experimentId: id, frozen: null, execution: null, falsification: null, evidence: null, next: null });
+    byId.get(id)[key] = e.payload;
+  }
+  return [...byId.values()];
+}
+
 /** What the run should do next, derived only from its persisted, verified state. */
 export function nextStepOf(run, researchState) {
   if (!researchState.chain.ok) return 'STATE_INTEGRITY_FAILURE';
@@ -104,18 +125,26 @@ export function nextStepOf(run, researchState) {
   const types = new Set(researchState.events.map((e) => e.type));
   if (!types.has('PROBLEM_FORMALIZED')) return 'FORMALIZE_PROBLEM';
   if (!types.has('HYPOTHESES_GENERATED')) return 'PROPOSE_PLAN';
-  return 'AWAITING_EXECUTION'; // R1-b: engine choice, preregistration, execution
+  const experiments = experimentsOf(researchState);
+  const open = experiments.find((x) => !x.next);
+  if (open) return !open.execution ? 'EXECUTE_EXPERIMENT' : !open.evidence ? 'PROPOSE_EVIDENCE' : 'PROPOSE_NEXT_EXPERIMENT';
+  const last = experiments.at(-1);
+  if (!last) return 'AWAITING_EXECUTION';
+  return last.next.proposal?.action === 'EXECUTE_NEXT_HYPOTHESIS' ? 'AWAITING_EXECUTION' : 'AWAITING_HUMAN_REVIEW';
 }
 
 function view(db, run) {
   const researchState = readResearchState(db, run.id);
   const last = (type) => researchState.events.filter((e) => e.type === type).at(-1)?.payload ?? null;
+  const literatureSnapshots = researchState.events.filter((event) => event.type === 'KNOWLEDGE_SNAPSHOT').map((event) => event.payload);
   return {
     researchRunId: run.id,
     run,
     question: last('PROBLEM_FORMALIZED')?.question ?? run.goal,
     problem: last('PROBLEM_FORMALIZED'),
     plan: last('HYPOTHESES_GENERATED'),
+    literatureSnapshots,
+    experiments: experimentsOf(researchState),
     researchState,
     nextStep: nextStepOf(run, researchState),
   };
@@ -130,6 +159,94 @@ export function listResearchRuns(db, projectId) {
   return listAgentRuns(db, projectId).filter((r) => r.domain === RESEARCH_RUN_DOMAIN).map((run) => {
     const v = view(db, run);
     return { researchRunId: v.researchRunId, question: v.question, status: run.status, nextStep: v.nextStep, events: v.researchState.events.length, createdAt: run.createdAt };
+  });
+}
+
+const CONTROL_TRANSITIONS = Object.freeze({
+  PAUSE: { from: [AGENT_RUN_STATUS.RUNNING], to: AGENT_RUN_STATUS.PAUSED },
+  RESUME: { from: [AGENT_RUN_STATUS.PAUSED], to: AGENT_RUN_STATUS.RUNNING },
+  CANCEL: { from: [AGENT_RUN_STATUS.RUNNING, AGENT_RUN_STATUS.PAUSED], to: AGENT_RUN_STATUS.CANCELLED },
+});
+
+/**
+ * Controls the canonical AgentRun behind a ResearchRun. The transition is recorded in the same
+ * verified research-state chain before the status changes, so pause/resume/cancel survive restart
+ * and remain attributable without a second scheduler or lifecycle store.
+ */
+export function controlResearchRun(db, projectId, runId, action, { userId = null, reason = null } = {}) {
+  const normalized = typeof action === 'string' ? action.trim().toUpperCase() : '';
+  const transition = CONTROL_TRANSITIONS[normalized];
+  if (!transition) return { ok: false, status: 'INVALID_CONTROL_ACTION' };
+  return inWriteTransaction(db, () => {
+    const run = ownRun(db, projectId, runId);
+    if (!run) return { ok: false, status: 'NOT_FOUND' };
+    const state = readResearchState(db, run.id);
+    if (!state.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', chain: state.chain };
+    if (!transition.from.includes(run.status)) {
+      return { ok: false, status: 'INVALID_CONTROL_TRANSITION', from: run.status, action: normalized };
+    }
+    const appended = appendServerResearchStateEvent(db, run.id, 'RUN_CONTROLLED', {
+      contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+      researchRunId: run.id,
+      action: normalized,
+      fromStatus: run.status,
+      toStatus: transition.to,
+      reason: STR(reason, 500),
+      actor: { kind: 'USER', userId },
+    });
+    if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
+    updateAgentRunStatus(db, run.id, transition.to);
+    return { ok: true, status: transition.to, researchRun: getResearchRun(db, projectId, run.id) };
+  });
+}
+
+export function researchSteeringOf(researchState) {
+  const abandoned = new Set();
+  let focusedHypothesisId = null;
+  const context = [];
+  for (const event of researchState?.events ?? []) {
+    if (event.type !== 'RESEARCH_STEERING') continue;
+    const payload = event.payload ?? {};
+    if (payload.action === 'FOCUS_HYPOTHESIS') focusedHypothesisId = payload.hypothesisId;
+    if (payload.action === 'ABANDON_HYPOTHESIS') {
+      abandoned.add(payload.hypothesisId);
+      if (focusedHypothesisId === payload.hypothesisId) focusedHypothesisId = null;
+    }
+    if (payload.action === 'RESTORE_HYPOTHESIS') abandoned.delete(payload.hypothesisId);
+    if (payload.action === 'ADD_CONTEXT') context.push({ text: payload.text, eventSeq: event.seq });
+  }
+  return { focusedHypothesisId, abandonedHypothesisIds: [...abandoned].sort(), context };
+}
+
+const STEERING_ACTIONS = new Set(['FOCUS_HYPOTHESIS', 'ABANDON_HYPOTHESIS', 'RESTORE_HYPOTHESIS', 'ADD_CONTEXT']);
+
+/** Appends human steering to the canonical ResearchRun chain; it never rewrites the frozen plan. */
+export function steerResearchRun(db, projectId, runId, input, { userId = null } = {}) {
+  const action = typeof input?.action === 'string' ? input.action.trim().toUpperCase() : '';
+  if (!STEERING_ACTIONS.has(action)) return { ok: false, status: 'INVALID_STEERING_ACTION' };
+  return inWriteTransaction(db, () => {
+    const current = getResearchRun(db, projectId, runId);
+    if (!current) return { ok: false, status: 'NOT_FOUND' };
+    if (!current.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
+    if (current.run.status !== AGENT_RUN_STATUS.RUNNING) return { ok: false, status: 'RUN_NOT_STEERABLE', reason: current.run.status };
+    if (!current.plan) return { ok: false, status: 'RUN_NOT_STEERABLE', reason: 'PLAN_NOT_AVAILABLE' };
+    const hypothesisId = STR(input?.hypothesisId, 200);
+    const text = STR(input?.text, 2000);
+    if (action === 'ADD_CONTEXT' ? !text : !hypothesisId) return { ok: false, status: 'INVALID_STEERING_INPUT' };
+    if (hypothesisId && !current.plan.hypotheses.some((hypothesis) => hypothesis.hypothesisId === hypothesisId)) {
+      return { ok: false, status: 'HYPOTHESIS_NOT_FOUND' };
+    }
+    const appended = appendServerResearchStateEvent(db, runId, 'RESEARCH_STEERING', {
+      contractVersion: RESEARCH_RUN_CONTRACT_VERSION,
+      researchRunId: runId,
+      action,
+      hypothesisId,
+      text,
+      actor: { kind: 'USER', userId },
+    });
+    if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
+    const researchRun = getResearchRun(db, projectId, runId);
+    return { ok: true, status: 'RECORDED', steering: researchSteeringOf(researchRun.researchState), researchRun };
   });
 }
 
@@ -185,12 +302,34 @@ export function validateResearchPlan(value, { db, projectId, selfModel, question
   }
 
   const hypotheses = [];
+  const hypothesesByInputIndex = new Map();
   for (const [index, h] of (Array.isArray(value.hypotheses) ? value.hypotheses : []).entries()) {
     if (hypotheses.length >= MAX_HYPOTHESES) { rejected.push({ kind: 'HYPOTHESIS', index, reason: 'over_limit' }); continue; }
     const hypothesisId = `hyp-${fnv1a(canonicalJson({ researchRunId, index, claim: STR(h?.claim) }))}`;
     const v = validateClaimProposal(h, { db, projectId, selfModel, question, hypothesisId });
     if (!v.ok) { rejected.push({ kind: 'HYPOTHESIS', index, reason: v.reason }); continue; }
-    hypotheses.push(v.proposal);
+    let proposal = v.proposal;
+    const challengeIndex = h?.challengesHypothesisIndex;
+    if (challengeIndex !== undefined && challengeIndex !== null) {
+      const challenged = Number.isInteger(challengeIndex) && challengeIndex >= 0 && challengeIndex < index
+        ? hypothesesByInputIndex.get(challengeIndex)
+        : null;
+      if (challenged) {
+        proposal = { ...proposal, challengesHypothesisId: challenged.hypothesisId };
+      } else {
+        proposal = {
+          ...proposal,
+          degradations: [...proposal.degradations, {
+            field: 'challengesHypothesisIndex',
+            from: challengeIndex,
+            to: null,
+            reason: 'CHALLENGE_MUST_REFERENCE_AN_ACCEPTED_EARLIER_HYPOTHESIS',
+          }],
+        };
+      }
+    }
+    hypotheses.push(proposal);
+    hypothesesByInputIndex.set(index, proposal);
   }
 
   const nextActions = (Array.isArray(value.nextActions) ? value.nextActions : [])
@@ -223,8 +362,19 @@ export async function proposeResearchPlan(db, projectId, runId, { provider, self
   if (!provider?.configured) return { ok: false, status: 'BLOCKED_BY_PROVIDER_CONFIGURATION', reason: provider?.reason ?? 'NO_PROVIDER' };
 
   const question = before.question;
+  const literature = before.literatureSnapshots.at(-1);
+  const literatureLines = literature ? [
+    '',
+    'Literature metadata available for context only (NOT_EVIDENCE; never copy these ids into evidence reference fields):',
+    ...[...literature.primary.sources, ...literature.contradictionSearch.sources]
+      .filter((source, index, all) => all.findIndex((candidate) => candidate.sourceId === source.sourceId) === index)
+      .slice(0, 20)
+      .map((source) => `- ${source.sourceId}: ${source.title} [licence=${source.licenceStatus}]`),
+    `Contradiction-search candidates: ${literature.contradictionSearch.sources.length}; every relationship remains PROPOSED/UNKNOWN until reviewed.`,
+  ] : [];
   const prompt = [
     buildProposalPrompt({ question, hypothesisId: null, evidenceRefs: evidenceRefsOf(db, projectId), selfModel }),
+    ...literatureLines,
     '',
     `Research run: ${runId}`,
   ].join('\n');

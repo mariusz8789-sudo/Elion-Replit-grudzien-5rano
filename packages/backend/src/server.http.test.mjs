@@ -112,6 +112,10 @@ describe('server HTTP persistence', () => {
     assert.deepEqual(unknown, [], 'no toolchain entry may report an unknown id');
     assert.ok(j.toolchain.some((t) => t.id === 'rdkit'), 'the real rdkit engine must be identifiable by id');
     for (const tool of j.toolchain) assert.ok(typeof tool.status === 'string' && tool.status.length > 0, `${tool.id} must report a status`);
+    assert.equal(j.toolchain.find((tool) => tool.id === 'rdkit').status, 'UNVALIDATED', 'cold public health is passive and does not run the local RDKit reference case');
+
+    const self = await (await fetch(base + '/api/genesis/self')).json();
+    assert.equal(self.engines.find((engine) => engine.toolId === 'rdkit').localStatus, 'UNVALIDATED', 'cold public self-model is passive too');
   });
 
   test('full round-trip: register → project → trial → list, over HTTP', async () => {

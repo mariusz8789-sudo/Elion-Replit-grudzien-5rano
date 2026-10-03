@@ -310,9 +310,24 @@ describe('Test: deterministic dedupe', () => {
     const owner = register('lab-dedupe-req@lab.org');
     const project = makeProject(owner.token);
     const { campaignId, candidateId } = seedCampaignAndCandidate(db, project.id, owner.user.id);
-    const body = { candidateId, objective: 'x', endpointPlan: [{ endpointId: 'e1' }], governedManualRequest: governedManualRequest() };
+    const body = {
+      candidateId,
+      objective: 'x',
+      endpointPlan: [{ endpointId: 'e1' }],
+      externalProvider: { providerId: 'acme-cro', providerType: 'CRO' },
+      governedManualRequest: governedManualRequest(),
+    };
     const first = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/lab-validation`, { token: owner.token, body });
-    const second = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/lab-validation`, { token: owner.token, body });
+    const second = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/lab-validation`, {
+      token: owner.token,
+      body: {
+        ...body,
+        externalProvider: {
+          ...body.externalProvider,
+          ignoredClientField: 'must not affect the normalized provider identity',
+        },
+      },
+    });
     assert.equal(first.body.request.requestId, second.body.request.requestId);
     assert.equal(second.body.deduped, true);
     assert.equal(campaignStore.listEvents(db, campaignId).filter((e) => e.type === 'LAB_VALIDATION_REQUESTED').length, 1);

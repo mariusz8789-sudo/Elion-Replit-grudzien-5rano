@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "genesis.research-run-ui-proof-summary@1",
+  "testedCommit": "5301ad52d96645503ab709e82c541b2e032ee9ad",
+  "testedAt": "2026-10-02T00:20:58.472Z",
+  "status": "PASS",
+  "command": "npm run proof:research-run-ui",
+  "viewports": [
+    { "mode": "desktop", "width": 1440, "height": 900 },
+    { "mode": "mobile", "width": 390, "height": 844 }
+  ],
+  "result": {
+    "cases": 2,
+    "passed": 2,
+    "failed": 0,
+    "experimentsPerCase": 2,
+    "eventCountPerCase": 12,
+    "verdicts": ["SUPPORTED_WITHIN_PROTOCOL", "FALSIFIED_WITHIN_PROTOCOL"],
+    "replays": ["MATCH", "MATCH"],
+    "decisionReasons": [
+      "SELF_FALSIFICATION_CHALLENGE_IN_PLAN",
+      "NO_FURTHER_EXECUTABLE_EXPERIMENT_IN_PLAN"
+    ],
+    "canonicalChainVerified": true,
+    "runtimeErrors": 0,
+    "unintendedHorizontalOverflow": 0
+  },
+  "runtimeTruth": {
+    "frontend": "production build served by the real local backend",
+    "identity": "real owner registration, session and project through HTTP",
+    "scienceChat": "real product UI and commands",
+    "engine": "real local RDKit execution",
+    "reasoningProvider": "deterministic local OpenAI-compatible plan provider; it proposes the frozen plan but does not produce scientific results",
+    "directScientificStateWrites": false,
+    "engineMocks": false,
+    "browserMocks": false
+  },
+  "sourceSha256": {
+    "scripts/research-run-ui-proof.mjs": "d445530ccfb3431a7b07bd37371dc2da2f35ee6374f8a8ec76407a2df7f72990",
+    "packages/frontend/src/components/ScienceChat.tsx": "28860b658e9861cc6556f50f3959530d25826a92e6d8c5b421418d3529610893",
+    "packages/frontend/src/App.tsx": "8a4b8099d6174d1e91bf0b033f2acd799816e106fe549a8db667d14242ad8b2a",
+    "packages/backend/src/researchRun.mjs": "394090bc474ba9264ae705d7405a592b91a313f16fb428153df1a3fdb9d7e948",
+    "packages/backend/src/researchRunExecution.mjs": "c6335d16ab8b95820b33c406f0d1d8d239b6c46bf5a6d7648035321158219000"
+  },
+  "rawReport": {
+    "path": "artifacts/research-run-ui-proof/report.json",
+    "sha256": "8c447691d4b785a9769f5139a8670863a8fcf336e688772f47470491f6eadd64"
+  },
+  "screenshotHashes": {
+    "desktop.png": "edd3b7bb367605f87dff3820041f93e5738f33569dfc460f76dcccb859a214fe",
+    "mobile.png": "82dba316120ce01b2d5f9a7065f92e707631a5cf8c96b734503cdb097425b155"
+  },
+  "limitations": [
+    "Headless Edge/Chromium is not a physical-device proof.",
+    "SwiftShader/software rendering is not a real-GPU performance proof.",
+    "The deterministic local reasoning provider proves the product boundary and frozen-plan flow, not external model quality or availability.",
+    "Evidence remains a proposal until the existing human publication gate approves it.",
+    "The raw report and PNG files remain local review artifacts; their hashes are pinned here."
+  ]
+}

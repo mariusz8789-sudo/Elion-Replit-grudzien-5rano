@@ -117,7 +117,7 @@ function candidateRows(db, campaignId, candidates, events, runs) {
     const dock = myRuns.find((r) => r.capability === 'molecular-docking');
     const qm = myRuns.find((r) => r.capability?.startsWith('quantum'));
     const admetRuns = myRuns.filter((r) => r.engine === 'ADMET-AI');
-    const admetEvent = mine.find((e) => e.payload?.reason === 'ADMET_COMPUTED');
+    const admetEvent = [...mine].reverse().find((e) => e.payload?.reason === 'ADMET_COMPUTED');
     return {
       candidateId: c.id,
       canonicalSmiles: c.canonicalSmiles,
@@ -168,6 +168,33 @@ function candidateRows(db, campaignId, candidates, events, runs) {
       synthesisReadiness: classifySynthesisReadiness({ origin: 'DERIVED', canonicalSmiles: c.canonicalSmiles }, {}),
     };
   });
+}
+
+/** Evidence proposals created by the canonical Virtual Lab API, joined back to
+ * the Science Run that produced them. This is a projection over campaign_events;
+ * it does not create another Evidence store. */
+function virtualEvidenceLinksOf(events) {
+  const resultByExecution = new Map(
+    events
+      .filter((event) => event.type === 'VIRTUAL_EXPERIMENT_RESULT' && event.payload?.executionId)
+      .map((event) => [event.payload.executionId, event.payload]),
+  );
+  return events
+    .filter((event) => event.type === 'VIRTUAL_EXPERIMENT_EVIDENCE_PROPOSED')
+    .map((event) => {
+      const result = resultByExecution.get(event.payload?.executionId);
+      return {
+        eventId: event.id,
+        executionId: event.payload?.executionId ?? null,
+        runId: result?.scienceRunId ?? null,
+        candidateId: event.payload?.candidateId ?? result?.candidateId ?? null,
+        proposalId: event.payload?.proposalId ?? null,
+        evidenceContentHash: event.payload?.evidenceContentHash ?? null,
+        mode: event.payload?.mode ?? null,
+        status: event.payload?.status ?? null,
+      };
+    })
+    .filter((entry) => entry.runId && entry.proposalId);
 }
 
 /**
@@ -276,7 +303,7 @@ export function buildCandidateProtocol(db, campaignId) {
       })(),
     }));
   const verifications = runs.flatMap((r) => listScienceRunVerifications(db, r.id).map((v) => ({
-    runId: r.id, engine: r.engine, verdict: v.verdict,
+    verificationId: v.id, runId: r.id, engine: r.engine, verdict: v.verdict,
     originalOutputHash: v.originalOutputHash, replayOutputHash: v.replayOutputHash,
     originalEngineVersion: v.originalEngineVersion, replayEngineVersion: v.replayEngineVersion,
   })));
@@ -322,6 +349,7 @@ export function buildCandidateProtocol(db, campaignId) {
     uncertainty: uncertaintyOf(target, runs, memory),
     evidence: {
       scienceRuns: runs.map((r) => ({ id: r.id, capability: r.capability, engine: r.engine, engineVersion: r.engineVersion ?? null, status: r.status, inputHash: r.inputHash ?? null, outputHash: r.outputHash ?? null, environmentHash: r.environmentHash ?? null, durationMs: r.durationMs })),
+      proposalLinks: virtualEvidenceLinksOf(events),
       eventCount: events.length,
       experimentRecords: {
         preregistrationId: memory.preregistration?.id ?? null,

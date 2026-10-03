@@ -18,6 +18,9 @@ function readCommitHash(): string {
   }
 }
 
+/** Where `/api` is proxied in dev/preview. Default: the backend on :8080; override to point a preview at another backend. */
+const API_PROXY_TARGET = process.env.GENESIS_API_PROXY || 'http://localhost:8080';
+
 export default defineConfig({
   resolve: {
     alias: { '@genesis/core': resolve(__dirname, '../core/src') },
@@ -54,12 +57,12 @@ export default defineConfig({
     port: 5000,
     allowedHosts: true,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': API_PROXY_TARGET,
     },
   },
   preview: {
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': API_PROXY_TARGET,
     },
   },
 });

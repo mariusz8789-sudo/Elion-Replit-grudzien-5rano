@@ -217,7 +217,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
   );
 
   return (
-    <main className="settings-view" id="main-content" tabIndex={-1}>
+    <main className="settings-view research-console" id="main-content" tabIndex={-1}>
       <section className="settings-section">
         <h2>Genesis Research Console</h2>
         <textarea
@@ -260,7 +260,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
             </label>
           </>
         )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
+        <div className="research-console-actions">
           <button type="button" className="chip-btn primary" onClick={() => void start()} disabled={busy}>
             {busy ? 'Running…' : 'Run full scientific process'}
           </button>

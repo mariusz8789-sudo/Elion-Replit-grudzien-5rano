@@ -1,9 +1,10 @@
 /**
  * Adapter ADMET + Toksyczność (ADMET-AI) — most Node → realny zespół D-MPNN
  * (Chemprop) wytrenowany na benchmarku Therapeutics Data Commons (TDC) ADMET
- * Benchmark Group. Swanson i in. 2024, "ADMET-AI: A machine learning platform
- * to predict ADMET properties" (Bioinformatics), licencja MIT. Wagi modelu są
- * dołączone w zainstalowanym pakiecie (bez sieci przy inferencji).
+ * Benchmark Group. Kod/pakiet ADMET-AI jest udostępniany na licencji MIT.
+ * Wagi są dołączone w zainstalowanym pakiecie (bez sieci przy inferencji), ale
+ * ich dokładny hash oraz licencje poszczególnych zbiorów treningowych wymagają
+ * osobnego audytu przed użyciem komercyjnym.
  *
  * Uruchamiane przez krótkotrwały proces `python3 admet_worker.py`
  * (execFileSync) z twardym limitem czasu. Adapter NIGDY nie zmyśla wyniku:

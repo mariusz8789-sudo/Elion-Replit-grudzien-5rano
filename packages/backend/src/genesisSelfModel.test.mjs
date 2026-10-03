@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENESIS_IDENTITY } from './genesisIdentity.mjs';
 import { buildSelfModel, engineSelfView, countAwaitingMeasurements, readSealedGateFailures } from './genesisSelfModel.mjs';
-import { listToolIds, TOOL_STATUS } from './campaign/toolchain.mjs';
+import { listToolIds, TOOL_STATUS, _resetValidation, _validationRunCount } from './campaign/toolchain.mjs';
 import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { createCampaign, addEvent } from './campaign/persistence.mjs';
@@ -40,8 +40,13 @@ function bootAndReadSelf(dbPath) {
       clearTimeout(timer);
       try {
         const res = await fetch(`http://127.0.0.1:${started.port}/api/genesis/self`);
-        resolve({ status: res.status, body: await res.json() });
-      } catch (err) { reject(err); } finally { proc.kill('SIGKILL'); }
+        const result = { status: res.status, body: await res.json() };
+        proc.once('exit', () => resolve(result));
+        proc.kill('SIGTERM');
+      } catch (err) {
+        proc.once('exit', () => reject(err));
+        proc.kill('SIGTERM');
+      }
     });
   });
 }
@@ -55,7 +60,8 @@ describe('ENTITY-1 GenesisIdentity', () => {
   });
 
   test('constitutionVersion names the constitution actually in the repo (an edit forces a new version)', () => {
-    const sha = createHash('sha256').update(readFileSync(path.join(REPO, 'docs/GENESIS_CONSTITUTION.md'))).digest('hex');
+    const canonicalText = readFileSync(path.join(REPO, 'docs/GENESIS_CONSTITUTION.md'), 'utf8').replace(/\r\n/g, '\n');
+    const sha = createHash('sha256').update(canonicalText).digest('hex');
     assert.equal(GENESIS_IDENTITY.constitutionVersion, `GENESIS_CONSTITUTION@${sha.slice(0, 16)}`);
   });
 
@@ -104,6 +110,14 @@ describe('ENTITY-1 SelfModel', () => {
     assert.deepEqual(model.engines.map((e) => e.toolId), ['future-engine']);
     const real = buildSelfModel({ runtime: { engines: [] }, ingestion: { sources: [] } });
     assert.deepEqual(real.engines.map((e) => e.toolId), listToolIds());
+  });
+
+  test('the default public self model reads a cold toolchain without executing reference cases', () => {
+    _resetValidation();
+    const model = buildSelfModel({ runtime: { engines: [] }, ingestion: { sources: [] } });
+    assert.equal(_validationRunCount(), 0);
+    assert.ok(model.engines.length > 0);
+    assert.ok(model.engines.every((engine) => engine.localStatus === TOOL_STATUS.UNVALIDATED));
   });
 
   test('an engine whose reference case failed is BLOCKED, with the adapter still acknowledged', () => {

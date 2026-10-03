@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "genesis.test-evidence@1",
+  "capability": "Full local regression after generated-analysis ResearchRun and Science Chat integration",
+  "testedHead": "4b333dd8b4c535c95a18917caf49f0a16d44a1a3",
+  "recordedAt": "2026-10-02T01:13:33.9530050Z",
+  "results": {
+    "frontendControlledFull": {
+      "command": "npm run test --workspace=packages/frontend -- --maxWorkers=4 --testTimeout=30000",
+      "status": "PASS",
+      "files": { "passed": 703, "failed": 0 },
+      "tests": { "passed": 7555, "failed": 0, "skipped": 1 },
+      "durationSeconds": 162.22
+    },
+    "backendFull": {
+      "command": "npm run test --workspace=packages/backend",
+      "status": "PASS",
+      "suites": 328,
+      "tests": { "total": 1480, "passed": 1399, "failed": 0, "cancelled": 0, "skipped": 81, "todo": 0 },
+      "durationMs": 322500.9662
+    },
+    "core": {
+      "command": "npm run test:core",
+      "status": "PASS",
+      "files": 37,
+      "tests": 344
+    },
+    "lint": {
+      "command": "npm run lint",
+      "status": "PASS",
+      "errors": 0,
+      "warnings": 13,
+      "warningBoundary": "Existing no-console warnings in E2E/audit scripts; no lint error."
+    },
+    "productionBuild": {
+      "command": "npm run build",
+      "status": "PASS",
+      "modulesTransformed": 1161,
+      "warningBoundary": "Existing browser externalization, mixed import and large-chunk warnings; no TypeScript or build error."
+    }
+  },
+  "resourceSensitivityProbe": {
+    "initialDefaultFullFrontend": {
+      "status": "FAIL_TIMEOUT",
+      "filesPassed": 687,
+      "filesTimedOut": 16,
+      "testsPassed": 7513,
+      "testsTimedOut": 42,
+      "assertionFailures": 0,
+      "timeoutMs": 5000
+    },
+    "exactTimedOutFilesRerun": {
+      "command": "vitest run <the exact 16 files> --maxWorkers=1 --testTimeout=30000",
+      "status": "PASS",
+      "files": 16,
+      "tests": 265,
+      "failures": 0,
+      "durationSeconds": 169.72
+    },
+    "conclusion": "The first red run was worker-pool starvation against the 5 s default, not an assertion/product regression. No repository timeout or test threshold was changed."
+  },
+  "truthBoundary": {
+    "localStatus": "GREEN_WITH_CONTROLLED_FRONTEND_POOL",
+    "linuxCiStatus": "PENDING",
+    "runtimeSkips": "The 81 explicit backend skips do not prove unavailable external engines, sandbox, queue, object storage or licensed model bundles."
+  }
+}

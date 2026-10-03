@@ -74,4 +74,3 @@ export function hypothesisLiteratureOf(raw, catalog) {
     unresolvedSourceRefs,
   };
 }
-

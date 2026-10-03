@@ -46,3 +46,14 @@ describe('CERN world: measurement, reconstruction, model and simulation stay apa
     expect(src('CernComplexView.tsx')).not.toMatch(/LIVE: ZDERZENIE/);
   });
 });
+
+describe('CMS Open Data screen language', () => {
+  it('opens in the language chosen for the app, not always in English', async () => {
+    const { setLocale } = await import('../core/i18n');
+    const { PhysicsCmsZScreen } = await import('../components/PhysicsCmsZScreen');
+    setLocale('pl');
+    expect(renderToStaticMarkup(<PhysicsCmsZScreen />)).toContain('lang="pl"');
+    setLocale('en');
+    expect(renderToStaticMarkup(<PhysicsCmsZScreen />)).toContain('lang="en"');
+  });
+});

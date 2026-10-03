@@ -80,7 +80,7 @@ import { proposeScientificClaim } from './claimProposal.mjs';
 import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
 import { recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
-import { enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
+import { enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
@@ -835,6 +835,14 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && seg[4] === 'advance') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (body?.async === true) {
+          // The queued form: a worker runs the steps in a killable child process, this request returns at once.
+          return (async () => {
+            const queued = await enqueueResearchAdvance(db, projectId, current.researchRunId, { maxSteps: body?.maxSteps, userId: user.id });
+            if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
+            return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
+          })();
+        }
         return runHeavyComputeAsync(db, ctx, `research-run:${current.researchRunId}`, async () => {
           const result = await advanceResearchRun(db, projectId, current.researchRunId, {
             maxSteps: body?.maxSteps, userId: user.id,

@@ -1,8 +1,10 @@
 import { deduplicateLiteratureSources, LITERATURE_RETRIEVAL_STATUS } from './literatureContracts.mjs';
 import { queryEuropePmc } from './europePmcConnector.mjs';
+import { queryPubmed } from './pubmedConnector.mjs';
 
 const DEFAULT_CONNECTORS = Object.freeze([
   { id: 'EUROPE_PMC', query: queryEuropePmc },
+  { id: 'PUBMED', query: queryPubmed },
 ]);
 
 export async function searchLiterature(query, options = {}) {

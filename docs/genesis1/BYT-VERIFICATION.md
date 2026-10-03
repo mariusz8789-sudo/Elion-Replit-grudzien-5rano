@@ -12,7 +12,7 @@ persistent scientific state it projects is the canonical set, unchanged by this 
 | ResearchRun identity + state | `src/agentRun.mjs`, `src/researchRun.mjs` | `agent_runs` + hash-chained `agent_run_steps` (`RESEARCH_STATE_EVENT_TYPES`) |
 | Scientific Memory | `src/experimentMemory.mjs` | `experiment_records` (append-only by DB trigger, hash-chained per key) |
 | Engine output + replays | `src/store.mjs`, `src/campaign/verify.mjs` | `science_runs`, `science_run_verifications` |
-| Evidence ledger | `src/knowledgeApi.mjs` | JSON snapshot beside the DB, chain verified at boot |
+| Evidence ledger | `src/knowledgeApi.mjs` | `evidence_ledger_entries` (schema V16, append-only + chained by DB trigger) in the same SQLite file; JSON beside the DB kept as an export |
 | Lease queue | `src/researchRunJobs.mjs`, `src/compute/workerInfrastructureContract.mjs` | `jobs` (V15 lease columns) |
 | Evidence Pack | `src/researchRunEvidencePack.mjs` | derived, every hash recomputable |
 
@@ -43,7 +43,8 @@ Legend: **PASS** = proven by a passing test in this run. **GAP** = not proven / 
 | 8e | Never a phantom COMPLETED | `bytVerification.test.mjs` : *a forged SUCCEEDED job row creates no result…*; every corruption test asserts `job.result === null`, empty Prediction Ledger, Evidence Pack refused | PASS |
 | 9 | Schema/version migration | `bytVerification.test.mjs` : *a schema v14 database holding a ResearchRun opens as v15 with the same chain, BYT and Evidence Pack, and its queue works*; `storeMigration.test.mjs` : pre-v2 legacy DB, downgrade guard (*kod ODMAWIA otwarcia bazy nowszej…*), idempotent reopen | PASS (v14 fixture is synthesized by dropping the V15 columns, not a historical file) |
 | 10 | Shared durable storage, multiple workers (processes) | `bytRecovery.e2e.test.mjs` : *six processes race for one job: exactly one claims it; an expired lease of a SIGKILLed holder is reclaimed exactly once* | PASS (one host, one SQLite file) |
-| 11 | Multi-instance consistency | `bytRecovery.e2e.test.mjs` : *two backend instances on one database: every queued experiment is executed exactly once and both read the same state* | PASS for SQLite state; **GAP** for the evidence ledger (below) |
+| 11 | Multi-instance consistency | `bytRecovery.e2e.test.mjs` : *two backend instances on one database: every queued experiment is executed exactly once and both read the same state* (now also: each run's evidence proposal is in the one ledger exactly once, both instances serve the identical ledger, `PROPOSE` rows = runs); `knowledgeLedgerMultiInstance.test.mjs` : *four processes propose concurrently…*, *two server.mjs instances… concurrent publish/reject of one proposal has one winner; a restart serves the same ledger* | PASS (SQLite state and evidence ledger; one host, one SQLite file) |
+| 11b | Evidence ledger: restart, migration, tampering | `knowledgeLedgerMultiInstance.test.mjs` : *a restart preserves the ledger…*, *an existing JSON ledger migrates once, with identical entries and hashes, even when two processes boot on it at once*, *tampering is detected…*, *a stale or edited JSON export… is ignored*; `knowledgeLedgerPersistence.test.mjs` (legacy no-DB mode, unchanged) | PASS |
 | 12 | Restart/recovery E2E with real process kill | `bytRecovery.e2e.test.mjs` : *SIGKILL inside the engine call and inside the replay: a new process restores the same run and produces exactly one valid result* | PASS |
 
 ### The kill E2E, step by step (req. 12)
@@ -93,12 +94,53 @@ uses it), where it signals and blocks. The test SIGKILLs only the PID it spawned
    (`worker-research-run-<pid>`, so a lease left by a killed process is attributable) and reads
    `GENESIS_RESEARCH_WORKER_LEASE_MS` (default unchanged, 30 s; invalid values fail at boot).
 
+## Evidence ledger with several instances (fix 5, branch `g1/ledger-multi`)
+
+**Before:** each process held the ledger in memory and rewrote `evidence-ledger.json` from that memory after every
+append. Measured with the old code path (JSON-only mode, 4 processes × 25 concurrent proposals): **25 of 100 entries
+survived** in the file — every process overwrote the others. With the fix, the same race keeps 100.
+
+**Design (the canonical ledger, `src/knowledgeApi.mjs`; no second ledger, `EvidenceLedger` in core unchanged):**
+
+- SQLite (the same `genesis.db` as the run state) is the source of truth when the server has a database
+  (`openKnowledgeLedgerPersistence(path, { db })` in `src/server.mjs`). Schema **V16** adds
+  `evidence_ledger_entries` (one row per chain entry: the entry JSON verbatim, its columns, and `effect_json` — what the
+  entry did: the proposed record, or the decided proposal and approver) and `evidence_ledger_base` (one row, only for
+  a migrated JSON ledger). Both are append-only by trigger; a further `BEFORE INSERT` trigger refuses any entry whose
+  `idx` is not the row count or whose `prev_hash` is not the hash of the previous row, so no code path can fork,
+  reorder or skip the chain.
+- Every mutation (propose, structured-evidence propose incl. its dedupe check, publish, reject, ingest batch) runs
+  under `BEGIN IMMEDIATE` (a `SAVEPOINT` if the caller is already in a transaction): the process catches up to the
+  database head, applies the mutation on the current head, inserts its entries, rewrites the JSON export, commits.
+  On any error the whole write rolls back and the in-memory ledger is reloaded from the database. Reads catch up first
+  (a one-row head query; a full reload only when another process appended).
+- Loading = base state + replay of every effect in order; each row is checked against its entry JSON, each effect
+  against its entry (record id, content hash, recomputed `contentHashOf`), then `EvidenceLedger.fromSnapshot`
+  re-verifies the whole hash chain. Any failure: `REJECTED_IN_MEMORY` with a reason, nothing written (same
+  semantics as a rejected JSON snapshot before).
+- **Migration:** at boot, if the table is empty and a JSON ledger exists, it is verified with the existing
+  `restoreLedger` and imported in the same `BEGIN IMMEDIATE` transaction (two processes booting at once import it
+  exactly once): entries verbatim, state as the base row, source SHA-256 recorded. A tampered JSON is refused, not
+  imported, left untouched. The export rewritten from the database is **byte-for-byte the legacy file** (tested).
+- **JSON is now an export** (same `evidence-ledger-snapshot/1` schema, still at `GENESIS_LEDGER_PATH`), rewritten
+  inside the write transaction so exports land in database order; it is never read back while the table has rows,
+  so a stale file written by an old process cannot win. Without a database the old single-process JSON mode is
+  unchanged; `':memory:'` stays in memory.
+
+**Why not a file lock + re-read + atomic rename:** it would be correct only if every process honoured the lock
+(an advisory lock on a JSON file is not enforced against an older binary still running), Node has no portable
+`flock`, and a lock file left by a SIGKILLed holder needs staleness heuristics. SQLite already gives the backend a
+tested cross-process write lock (`BEGIN IMMEDIATE`, WAL, `busy_timeout`) that the job queue relies on, plus
+crash-atomic commits and triggers that make the chain invariants hold regardless of the writer.
+
 ## Remaining gaps (honest)
 
-- **Evidence ledger is not multi-instance safe (GAP, by code inspection).** Each process holds the ledger in memory
-  and rewrites `evidence-ledger.json` after every append; two instances on one data directory overwrite each
-  other's proposals. The two-instance test proves the SQLite state only. Moving the ledger into SQLite would be a
-  redesign, out of scope here. `CURRENT_WORKER_INFRASTRUCTURE.multiReplicaSafe` stays `false`.
+- **Evidence ledger: open-time downgrade guard only.** The schema is now V16, so an older backend refuses to open the
+  database (`GENESIS DB SCHEMA TOO NEW`) instead of writing the old JSON beside it. A tamper made *while* a process
+  runs is caught at that process's next reload (another process's append or a restart), not on every read —
+  as before with the JSON snapshot. `CURRENT_WORKER_INFRASTRUCTURE.multiReplicaSafe` stays `false` because of the
+  multi-host gap below, not the ledger.
+
 - **Multi-host / network storage (GAP).** Proven: several OS processes on one host sharing one SQLite file
   (`BEGIN IMMEDIATE`, WAL). Not proven and still blocked by `admitMultiReplicaWorkerInfrastructure`: replicas on
   different hosts, network-mounted SQLite, object storage.
@@ -130,3 +172,11 @@ uses it), where it signals and blocks. The test SIGKILLs only the PID it spawned
   1625 tests, 1537 pass, 0 fail, 88 skipped.
 - `npx eslint packages/backend/src --quiet`: clean.
 - New tests: `bytVerification.test.mjs` 10 tests, `bytRecovery.e2e.test.mjs` 3 tests — all PASS.
+
+### Runs after the evidence-ledger fix (branch `g1/ledger-multi` from `4399e9e9`, 2026-10-03)
+
+- `cd packages/backend && npm test`: **1651 tests, 1563 pass, 0 fail, 88 skipped** (same 88 `ENGINE_UNAVAILABLE`
+  skips; +13 tests: 6 in `knowledgeLedgerMultiInstance.test.mjs` and its suites, ledger assertions added to the
+  two-instance E2E).
+- `GENESIS_REQUIRE_ENGINES=rdkit node --test src/bytRecovery.e2e.test.mjs src/bytVerification.test.mjs`: 13/13 PASS.
+- `npx eslint packages/backend/src --quiet`: clean.

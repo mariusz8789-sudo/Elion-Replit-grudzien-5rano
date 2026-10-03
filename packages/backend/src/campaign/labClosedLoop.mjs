@@ -69,7 +69,7 @@ const BASE64_ONLY = /^[A-Za-z0-9+/]*={0,2}$/;
  * Strict decode on purpose: Buffer.from(x, 'base64') discards anything it does not recognise, so
  * a corrupted upload would otherwise hash cleanly as whatever survived.
  */
-function decodeRawArtifact(base64) {
+export function decodeRawArtifact(base64) {
   if (typeof base64 !== 'string' || base64.length === 0) return { present: false };
   const compact = base64.replace(/\s+/g, '');
   if (!BASE64_ONLY.test(compact) || compact.length % 4 !== 0) {
@@ -89,6 +89,8 @@ function decodeRawArtifact(base64) {
 
 const CLAIM_BOUNDARY =
   'A laboratory observation is an external measurement artifact. It is not automatically clinical efficacy, safety, therapeutic approval, or proof that a candidate is a medicine.';
+
+export const LAB_CLAIM_BOUNDARY = CLAIM_BOUNDARY;
 
 function boundedString(value, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -126,7 +128,7 @@ function requireCampaignCandidate(db, campaignId, candidateId) {
  * `compareModelToLabObservation` (below) may only read this frozen binding
  * back; it never accepts an outputKey/unit/tolerance from its own caller.
  */
-function sanitizeTolerance(raw) {
+export function sanitizeTolerance(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const absolute = finiteOrNull(raw.absolute);
   const relative = finiteOrNull(raw.relative);
@@ -702,7 +704,7 @@ function acceptedReviewFor(db, campaignId, observationId) {
   return latest?.payload?.verdict === 'ACCEPTED_AS_OBSERVATION' ? latest : null;
 }
 
-function toleranceChecks(deltaAbs, deltaRel, tolerance) {
+export function toleranceChecks(deltaAbs, deltaRel, tolerance) {
   const checks = [];
   if (typeof tolerance?.absolute === 'number' && Number.isFinite(tolerance.absolute) && tolerance.absolute >= 0) {
     checks.push({ kind: 'absolute', threshold: tolerance.absolute, actual: deltaAbs, pass: deltaAbs <= tolerance.absolute });

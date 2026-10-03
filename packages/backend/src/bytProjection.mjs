@@ -33,6 +33,7 @@ function predictionEntries(runs) {
       const evidence = lastByExperiment(events, 'EVIDENCE_UPDATE', frozen.experimentId);
       const next = lastByExperiment(events, 'NEXT_EXPERIMENT', frozen.experimentId);
       const surprise = lastByExperiment(events, 'SURPRISE_DETECTED', frozen.experimentId);
+      const measured = events.filter((e) => e.type === 'LAB_MODEL_MEASUREMENT_COMPARED' && e.payload?.experimentId === frozen.experimentId).map((e) => e.payload.comparison);
       const criteria = (falsification?.criteria ?? frozen.criteria ?? []).map((criterion) => ({
         criterionId: criterion.id,
         observable: criterion.observable ?? null,
@@ -70,6 +71,12 @@ function predictionEntries(runs) {
           sealRecordRef: evidence.sealRecordId ? `experiment_record:${evidence.sealRecordId}` : null,
         } : null,
         replay: next?.replay ?? null,
+        // REAL MEASUREMENT vs model, from human-reviewed laboratory observations only. Never a protocol verdict: it neither
+        // falsifies nor supports the frozen hypothesis, it records how the model value met a measurement.
+        measurements: measured.map((c) => ({
+          comparisonId: c.comparisonId, endpointId: c.endpointId, unit: c.unit, modelValue: c.model?.value ?? null, measuredValue: c.measurement?.value ?? null,
+          deltaAbs: c.deltaAbs, verdict: c.verdict, observationId: c.observationId, requestId: c.requestId, evidenceClass: 'REAL_MEASUREMENT',
+        })),
         proposedNextExperiment: next?.proposal ?? null,
         decisionTrace: next?.decisionTrace ?? null,
         surprises: (surprise?.items ?? []).map((entry) => ({
@@ -105,6 +112,20 @@ function calibrationOf(entries) {
     probabilisticCalibration: 'NOT_AVAILABLE',
     limitation: 'ResearchRun freezes threshold criteria, not a universal probability or X ± Y interval. Threshold agreement is not probabilistic calibration.',
     byEngine,
+  };
+}
+
+function measurementCalibrationOf(entries) {
+  const rows = entries.flatMap((entry) => entry.measurements.map((m) => ({ researchRunId: entry.researchRunId, experimentId: entry.experimentId, engineId: entry.engineId ?? 'unknown', ...m })));
+  const agrees = rows.filter((row) => row.verdict === 'AGREES_WITHIN_TOLERANCE').length;
+  return {
+    status: rows.length ? 'PARTIAL' : 'NOT_AVAILABLE',
+    evidenceClass: 'REAL_MEASUREMENT',
+    compared: rows.length,
+    agreesWithinTolerance: agrees,
+    disagreesOutsideTolerance: rows.length - agrees,
+    comparisons: rows,
+    limitation: 'Each row is one human-accepted external laboratory observation against one frozen model value and tolerance. Agreement is numerical for that endpoint only; it is not clinical efficacy, safety, or a general accuracy rate.',
   };
 }
 
@@ -166,6 +187,7 @@ export function buildBytProjection({ runs = [], registry = null, selfModel = nul
     } : { status: 'UNKNOWN', reason: 'SELF_MODEL_UNAVAILABLE' },
     predictionLedger,
     calibration: calibrationOf(predictionLedger),
+    measurementCalibration: measurementCalibrationOf(predictionLedger),
     necropolis: necropolisOf(predictionLedger),
     decisionTraces: predictionLedger.filter((entry) => entry.decisionTrace).map((entry) => ({
       researchRunId: entry.researchRunId,

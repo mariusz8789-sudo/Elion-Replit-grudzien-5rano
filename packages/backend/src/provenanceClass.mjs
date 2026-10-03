@@ -38,12 +38,25 @@ export function executionProvenanceClass(execution) {
  * Per-section provenance of a ResearchRun view. Derived on read from the persisted chain, so no stored
  * record or fingerprint changes. `realMeasurements` is always empty here: no lab adapter feeds a ResearchRun.
  */
-export function researchRunProvenance({ plan, literatureSnapshots = [], experiments = [] }) {
+export function researchRunProvenance({ plan, literatureSnapshots = [], experiments = [], datasets = [] }) {
   return {
     plan: plan ? PROVENANCE_CLASS.MODEL_PROPOSAL : null,
     literatureSources: literatureSnapshots.some((s) => (s.sourceCount ?? 0) > 0) ? PROVENANCE_CLASS.SOURCE_FACT : null,
     claimSourceLinks: literatureSnapshots.length > 0 ? 'PER_LINK' : null,
-    experimentExecutions: experiments.map((x) => ({ experimentId: x.experimentId, provenanceClass: executionProvenanceClass(x.execution) })),
+    // Per hypothesis: SOURCE_FACT when it cites a source this run retrieved, UNKNOWN when it cites none.
+    hypothesisCitations: (plan?.hypotheses ?? []).map((h) => ({
+      hypothesisId: h.hypothesisId,
+      provenanceClass: h.literature?.provenanceClass ?? PROVENANCE_CLASS.UNKNOWN,
+      citedSourceIds: (h.literature?.citations ?? []).map((c) => c.sourceId),
+      unresolvedSourceRefs: (h.literature?.unresolvedSourceRefs ?? []).map((u) => u.ref),
+    })),
+    // A registered dataset's origin is declared, not fetched by Genesis: UNKNOWN, with its content hash.
+    datasets: datasets.map((d) => ({ datasetId: d.datasetId, sha256: d.sha256, licenceStatus: d.licenceStatus, originUrl: d.originUrl, provenanceClass: d.provenanceClass ?? PROVENANCE_CLASS.UNKNOWN })),
+    experimentExecutions: experiments.map((x) => ({
+      experimentId: x.experimentId,
+      provenanceClass: executionProvenanceClass(x.execution),
+      datasetId: x.frozen?.datasetBinding?.datasetId ?? null,
+    })),
     realMeasurements: [],
   };
 }

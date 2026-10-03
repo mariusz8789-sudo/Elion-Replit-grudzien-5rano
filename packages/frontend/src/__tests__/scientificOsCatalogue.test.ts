@@ -102,7 +102,9 @@ describe('Search finds goals first and the hidden capabilities', () => {
     const idx = buildCapabilityIndex();
     const find = (q: string) => filterSearchIndex(idx, q);
     expect(find('retrosynthesis')[0]?.hash).toBe('#/reviewer');
-    expect(find('openmm')[0]?.ask).toBe('Uruchom OpenMM na białku 1VII');
+    // Engine names still find the capability; the Ask command names the capability, not the engine.
+    expect(find('openmm')[0]?.ask).toBe('Uruchom dynamikę molekularną białka 1VII');
+    expect(find('pyscf')[0]?.ask).toBe('Policz energię Hartree-Fock RHF dla H2');
     expect(find('ro-crate')[0]?.hash).toBe('#/pilot');
     expect(find('tournament')[0]?.hash).toBe('#/conflict');
     expect(find('d-063')[0]?.hash).toBe('#/research-console?panel=gov');

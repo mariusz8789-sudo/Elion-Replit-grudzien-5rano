@@ -156,9 +156,11 @@ describe('provenance classes', () => {
       plan: 'MODEL_PROPOSAL',
       literatureSources: 'SOURCE_FACT',
       claimSourceLinks: 'PER_LINK',
-      experimentExecutions: [{ experimentId: 'e1', provenanceClass: 'GENESIS_COMPUTATION' }, { experimentId: 'e2', provenanceClass: 'UNKNOWN' }],
+      hypothesisCitations: [],
+      datasets: [],
+      experimentExecutions: [{ experimentId: 'e1', provenanceClass: 'GENESIS_COMPUTATION', datasetId: null }, { experimentId: 'e2', provenanceClass: 'UNKNOWN', datasetId: null }],
       realMeasurements: [],
     });
-    assert.deepEqual(researchRunProvenance({ plan: null }), { plan: null, literatureSources: null, claimSourceLinks: null, experimentExecutions: [], realMeasurements: [] });
+    assert.deepEqual(researchRunProvenance({ plan: null }), { plan: null, literatureSources: null, claimSourceLinks: null, hypothesisCitations: [], datasets: [], experimentExecutions: [], realMeasurements: [] });
   });
 });

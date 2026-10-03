@@ -98,7 +98,7 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory,
       });
       setPrepared(next);
       setPhase('READY');
-      setDetail(`FINISHED · ${next.candidates.length} candidates selected for a bounded RDKit test`);
+      setDetail(`FINISHED · ${next.candidates.length} candidates selected for a bounded molecular analysis test`);
     } catch (error) {
       setPhase('BLOCKED');
       setDetail(`BLOCKED · ${error instanceof Error ? error.message : String(error)}`);
@@ -110,7 +110,7 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory,
     if (!token || !prepared || phase === 'EXECUTING') return;
     onActivateLaboratory();
     setPhase('EXECUTING');
-    setDetail('STARTED · requesting the registered RDKit engine');
+    setDetail('STARTED · requesting the registered molecular analysis engine');
     setLiveResult(null);
     try {
       const completed = await executeDrugResearchJourney({
@@ -120,7 +120,7 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory,
           if (event.type === 'EXPERIMENT_STARTED') {
             setLivePlan(event.plan);
             setLiveResult(null);
-            setDetail(`STARTED · RDKit candidate ${event.candidateIndex + 1} of ${event.candidateCount}`);
+            setDetail(`STARTED · molecular analysis, candidate ${event.candidateIndex + 1} of ${event.candidateCount}`);
           } else if (event.type === 'EXPERIMENT_FINISHED') {
             setLiveResult(event.result);
             setDetail(`FINISHED · candidate ${event.candidateIndex + 1} of ${event.candidateCount}: ${event.result.status}`);
@@ -173,14 +173,14 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory,
           </small>
           <div className="journey-actions">
             <button className="primary-btn journey-start" type="button" onClick={openLiveLab} data-testid="drug-open-live-lab">Uruchom na żywo w laboratorium</button>
-            <button className="chip-btn" type="button" onClick={() => { void prepareInChat(); }}>Szybki test RDKit w czacie</button>
+            <button className="chip-btn" type="button" onClick={() => { void prepareInChat(); }}>Szybka analiza molekularna w czacie</button>
           </div>
         </div>
       )}
 
       {phase === 'READY' && (
         <button className="primary-btn journey-start" type="button" onClick={() => { void execute(); }}>
-          Enter Laboratory · start live RDKit experiment
+          Enter Laboratory · start live molecular analysis
         </button>
       )}
 

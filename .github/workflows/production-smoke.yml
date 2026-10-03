@@ -12,6 +12,14 @@ on:
         description: Commit production should be serving (40 characters); empty skips the commit check
         required: false
         default: ''
+      base_url:
+        description: Site to check
+        required: false
+        default: 'https://genesis-physics.com'
+      attempts:
+        description: Health attempts, 15 s apart
+        required: false
+        default: '20'
 
 permissions:
   contents: read
@@ -20,28 +28,35 @@ jobs:
   smoke:
     if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'production'))
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
-      BASE: https://genesis-physics.com
+      BASE: ${{ inputs.base_url || vars.GENESIS_PRODUCTION_URL || 'https://genesis-physics.com' }}
       EXPECTED_SHA: ${{ github.event.deployment.sha || inputs.expected_sha }}
+      ATTEMPTS: ${{ inputs.attempts || '20' }}
     steps:
       - name: Health reports the deployed commit and a persistent database
         run: |
-          set -e
-          for i in $(seq 1 20); do
-            if curl -sf --max-time 20 "$BASE/api/health" > health.json; then
-              node -e "
+          last=''
+          for i in $(seq 1 "$ATTEMPTS"); do
+            code=$(curl -sS -L -o health.json -w '%{http_code} %{url_effective}' --max-time 20 "$BASE/api/health" 2>curl.err) || code="000 $(tr '\n' ' ' < curl.err) dns=$(getent hosts "$(echo "$BASE" | sed -E 's#^https?://##; s#/.*##')" | head -1)"
+            if [ "${code%% *}" = 200 ]; then
+              if last=$(node -e "
                 const h = require('./health.json');
                 const want = process.env.EXPECTED_SHA;
-                if (!h.ok) throw new Error('health not ok');
-                if (want && h.commit !== want) throw new Error('commit ' + h.commit + ' != expected ' + want);
-                if (h.db?.durability !== 'PERSISTENT') throw new Error('db durability ' + h.db?.durability);
-                console.log('health OK', h.commit, h.db.durability);
-              " && exit 0
+                const problems = [];
+                if (!h.ok) problems.push('health not ok');
+                if (want && h.commit !== want) problems.push('commit ' + h.commit + ' != expected ' + want);
+                if (h.db?.durability !== 'PERSISTENT') problems.push('db durability ' + h.db?.durability);
+                if (problems.length) { console.log(problems.join('; ')); process.exit(1); }
+                console.log('health OK ' + h.commit + ' ' + h.db.durability);
+              "); then echo "::notice title=Production health::$last"; exit 0; fi
+            else
+              last="HTTP $code body=$(head -c 200 health.json 2>/dev/null | tr '\n' ' ')"
             fi
+            echo "attempt $i: $last"
             sleep 15
           done
-          cat health.json || true
+          echo "::error title=Production health::$last | body: $(head -c 600 health.json 2>/dev/null | tr '\n' ' ')"
           exit 1
 
       - name: Customer-critical pages and API answer

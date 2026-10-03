@@ -217,6 +217,8 @@ export interface TwinHandle {
   setIsolated(nodeIds: readonly string[]): void;
   /** D-131: real section plane through the twin (schematic — clipping reveals model proxies, not tissue). */
   setCutaway(state: CutawayState): void;
+  /** The section plane while a cut is open (null when closed), so layers added over the body can share it. */
+  getCutawayPlane(): THREE_NS.Plane | null;
   /** D-131: the surface presentation of the BODY shell (x-ray is a stylised view of a model, never a radiograph). */
   setSurface(mode: TwinSurfaceMode): void;
   /**
@@ -506,6 +508,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     getAtlasGroup() { return atlasGroup; },
     setProxiesHidden(hidden) { proxiesHidden = hidden; applyOrgans(); },
     setAtlasFade(fade) { atlasFade = fade; applyOrgans(); },
+    getCutawayPlane() { return cutawayOn ? cutaway.plane : null; },
     setCutaway(state) {
       cutawayOn = state.enabled;
       const visibleBody = lodLevel === 'FULL_ASSET' && asset ? asset.root : body.root;

@@ -23,6 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
 import { ensureAccessSchema } from './access.mjs';
 import { hashSecret, looksHashed } from './secrets.mjs';
+import { ACCOUNT_PROFILES, DEFAULT_ACCOUNT_PROFILE, normalizeAccountProfile } from './accountProfiles.mjs';
 import { canonicalJson, sha256Hex } from './determinism.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
@@ -611,7 +612,18 @@ function migrate(db) {
   if (version < 12) db.exec('PRAGMA user_version = 12');
   if (version < 13) db.exec('PRAGMA user_version = 13');
   if (version < 14) db.exec('PRAGMA user_version = 14');
+  // v15: profil konta (accountProfiles.mjs). Kolumna dodawana nie-destrukcyjnie i
+  // tylko gdy jej brak (idempotentne także poza bramką wersji); istniejące konta
+  // dostają DEFAULT_ACCOUNT_PROFILE (BADACZ), więc nikt nie traci dotychczasowego dostępu.
+  ensureAccountProfileColumn(db);
   if (version < 15) db.exec('PRAGMA user_version = 15');
+}
+
+function ensureAccountProfileColumn(db) {
+  const cols = db.prepare('PRAGMA table_info(users)').all();
+  if (cols.some((c) => c.name === 'account_profile')) return;
+  const allowed = ACCOUNT_PROFILES.map((p) => `'${p}'`).join(',');
+  db.exec(`ALTER TABLE users ADD COLUMN account_profile TEXT NOT NULL DEFAULT '${DEFAULT_ACCOUNT_PROFILE}' CHECK (account_profile IN (${allowed}))`);
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -639,7 +651,13 @@ export function openDatabase(filename = ':memory:') {
 
 function toUser(row) {
   if (!row) return null;
-  return { id: row.id, email: row.email, displayName: row.display_name, createdAt: row.created_at };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    accountProfile: normalizeAccountProfile(row.account_profile) ?? DEFAULT_ACCOUNT_PROFILE,
+    createdAt: row.created_at,
+  };
 }
 function toProject(row, role) {
   if (!row) return null;
@@ -707,18 +725,20 @@ function toMergeRequest(row) {
 /* ---------------- Użytkownicy ---------------- */
 
 /** Tworzy użytkownika. Rzuca Error('email_taken') przy duplikacie adresu. */
-export function createUser(db, { email, displayName, passwordHash }) {
+export function createUser(db, { email, displayName, passwordHash, accountProfile = DEFAULT_ACCOUNT_PROFILE }) {
   const id = newId();
   const now = Date.now();
+  const profile = normalizeAccountProfile(accountProfile);
+  if (!profile) throw new Error('invalid_account_profile');
   try {
     db.prepare(
-      'INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(id, email, displayName, passwordHash, now);
+      'INSERT INTO users (id, email, display_name, password_hash, account_profile, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, email, displayName, passwordHash, profile, now);
   } catch (err) {
     if (String(err?.message ?? '').includes('UNIQUE')) throw new Error('email_taken', { cause: err });
     throw err;
   }
-  return { id, email, displayName, createdAt: now };
+  return { id, email, displayName, accountProfile: profile, createdAt: now };
 }
 
 export function getUserByEmail(db, email) {

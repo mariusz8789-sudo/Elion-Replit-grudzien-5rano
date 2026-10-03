@@ -53,6 +53,16 @@ describe('VoiceEngine state machine', () => {
     expect(p.spoken.length).toBe(1);
   });
 
+  it('a voice that ends inside speak() (a browser with no usable voice) neither throws nor sticks in SPEAKING', () => {
+    const instant: VoiceProvider = {
+      name: 'instant', available: () => true,
+      speak(_u, _s, onEnd) { onEnd(); return { cancel: () => {}, pause: () => {}, resume: () => {} }; },
+    };
+    const e = new VoiceEngine([instant]);
+    expect(() => e.speak(U)).not.toThrow();
+    expect(e.state).toBe('READY');
+  });
+
   it('a new utterance cancels the previous one — one voice at a time', () => {
     const p = fakeProvider('fake');
     const e = new VoiceEngine([p.provider]);

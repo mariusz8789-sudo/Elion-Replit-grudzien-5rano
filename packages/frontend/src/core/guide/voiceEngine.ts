@@ -110,8 +110,18 @@ export class VoiceEngine {
     this.cancelCurrent();
     for (const p of this.providers) {
       if (!p.available()) continue;
-      const h = p.speak(u, this.settingsValue, () => { if (this.handle === h) { this.handle = null; this.set('READY'); } });
-      if (h !== null) { this.handle = h; this.lastProvider = p.name; this.set('SPEAKING'); return true; }
+      // A browser with no usable voice can fire onerror inside speak(), before `h` exists; that ends the utterance at once.
+      let h: SpeechHandle | null = null;
+      let endedEarly = false;
+      h = p.speak(u, this.settingsValue, () => {
+        if (h === null) { endedEarly = true; return; }
+        if (this.handle === h) { this.handle = null; this.set('READY'); }
+      });
+      if (h !== null) {
+        this.lastProvider = p.name;
+        if (endedEarly) { this.set('READY'); return true; }
+        this.handle = h; this.set('SPEAKING'); return true;
+      }
     }
     this.lastProvider = null;
     this.set('READY');

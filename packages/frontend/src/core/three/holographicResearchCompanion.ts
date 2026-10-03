@@ -51,7 +51,7 @@ export function companionModeForAgentState(
  */
 export function createHolographicResearchCompanion(
   THREE: typeof THREE_NS,
-  position: THREE_NS.Vector3Tuple = [-3.15, 0.08, 1.9],
+  position: THREE_NS.Vector3Tuple = [-3.3, 0.08, 0.9],
 ): HolographicResearchCompanion {
   const root = new THREE.Group();
   root.name = 'holographic-research-companion';

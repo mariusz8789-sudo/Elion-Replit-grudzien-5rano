@@ -134,6 +134,7 @@ import { buildRetrosynthesisHandoff } from './campaign/retrosynthesisHandoff.mjs
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
+import { CAPABILITIES, capabilityDecision, canUseCapability } from './accountProfiles.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
 import { createComputeAdmission } from './compute/computeAdmission.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
@@ -199,6 +200,37 @@ function sanitizeNumberMap(obj, maxKeys = 64) {
   }
   return out;
 }
+
+/* ---------------- Bramka profilu konta (accountProfiles.mjs) ---------------- */
+
+/** 403 z powodem po polsku, gdy profil zalogowanego użytkownika nie ma danego obszaru; null gdy wolno. */
+function profileDenied(user, capability) {
+  const decision = capabilityDecision(user?.accountProfile, capability);
+  if (decision.allowed) return null;
+  return { status: 403, body: { error: 'profile_capability_denied', capability, accountProfile: user?.accountProfile ?? null, message: decision.reason } };
+}
+
+/**
+ * Trasy obliczeniowe są dziś publiczne (local-first: laboratoria weryfikują
+ * wynik na serwerze bez konta), więc anonimowe wywołanie zachowuje dotychczasowe
+ * zachowanie. Zalogowany użytkownik jest oceniany wg swojego profilu.
+ */
+function profileDeniedForCaller(db, ctx, capability) {
+  const user = getUserByToken(db, ctx.token);
+  return user ? profileDenied(user, capability) : null;
+}
+
+/** POST-y, które uruchamiają silnik obliczeniowy (obszar compute_run). */
+function isComputeRunRoute(seg, method) {
+  if (method !== 'POST') return false;
+  if (seg[0] === 'quantum') return seg[1] === 'run' && seg.length === 2;
+  if (seg[0] !== 'compute') return false;
+  return (seg[1] === 'run' && seg.length === 2)
+    || (seg.length === 3 && ((seg[1] === 'fabric' && seg[2] === 'run') || (seg[1] === 'admet' && seg[2] === 'predict') || (seg[1] === 'qm' && seg[2] === 'singlepoint')));
+}
+
+/** Podzasoby projektu, których ZAPIS uruchamia pracę odkrywania leków (obszar drug_discovery); odczyt wyników zostaje otwarty. */
+const DRUG_DISCOVERY_WRITE_SEGMENTS = new Set(['targets', 'candidates', 'jobs', 'campaigns', 'research-intake']);
 
 /**
  * @param db  otwarta baza (store.mjs)
@@ -282,6 +314,11 @@ export function handleApi(db, ctx) {
       return user ? ok({ user }) : err(401, 'unauthorized');
     }
     return err(404, 'not_found');
+  }
+
+  if (isComputeRunRoute(seg, method)) {
+    const denied = profileDeniedForCaller(db, ctx, CAPABILITIES.COMPUTE_RUN);
+    if (denied) return denied;
   }
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
@@ -484,9 +521,27 @@ export function handleApi(db, ctx) {
     // /api/projects/:id
     if (seg.length === 2 && method === 'GET') return ok({ project: { ...project, role, accessLevel: accessLevelForProject(db, projectId, project.visibility) } });
 
-    // Research credentials/status: never returns secret values.
+    // Bramka profilu: projekt RESTRICTED (źródła instytucjonalne) jest widoczny z nazwy
+    // i poziomu dostępu, ale jego zawartość i uruchomienia wymagają obszaru restricted_sources.
+    const projectAccessLevel = accessLevelForProject(db, projectId, project.visibility);
+    const readsAccessPolicy = seg[2] === 'access' && seg.length === 3 && method === 'GET';
+    if (projectAccessLevel === 'RESTRICTED' && !readsAccessPolicy) {
+      const denied = profileDenied(user, CAPABILITIES.RESTRICTED_SOURCES);
+      if (denied) return denied;
+    }
+    if (method !== 'GET' && DRUG_DISCOVERY_WRITE_SEGMENTS.has(seg[2])) {
+      const denied = profileDenied(user, CAPABILITIES.DRUG_DISCOVERY);
+      if (denied) return denied;
+    }
+
+    // Research credentials/status: never returns secret values. Each source says whether THIS profile may use it.
     if (seg[2] === 'research-access' && seg.length === 3 && method === 'GET') {
-      return ok({ projectId, ...researchAccessStatus() });
+      const status = researchAccessStatus();
+      const sources = status.sources.map((source) => ({
+        ...source,
+        profileAllowed: source.access !== 'RESTRICTED' || canUseCapability(user.accountProfile, CAPABILITIES.RESTRICTED_SOURCES),
+      }));
+      return ok({ projectId, ...status, sources });
     }
 
     // Product access policy and append-only audit trail.
@@ -495,6 +550,10 @@ export function handleApi(db, ctx) {
       if (method === 'GET') return ok({ projectId, accessLevel, role, canRun: canUseAccessLevel(accessLevel, role, 'run') });
       if (method === 'PUT') {
         if (!atLeast(role, 'admin')) return err(403, 'forbidden', 'Zmiana poziomu dostępu wymaga roli admin lub owner.');
+        if (body.level === 'RESTRICTED') {
+          const denied = profileDenied(user, CAPABILITIES.RESTRICTED_SOURCES);
+          if (denied) return denied;
+        }
         const result = setProjectAccess(db, { projectId, level: body.level, userId: user.id });
         if (!result.ok) return err(400, result.error, 'Poziom dostępu musi być PUBLIC, RESEARCH albo RESTRICTED.');
         appendAccessAudit(db, { projectId, userId: user.id, action: 'access_policy_changed', accessLevel: result.level, workflow: 'access-control', details: { previous: accessLevel, next: result.level } });
@@ -1325,6 +1384,7 @@ function register(db, body) {
     email: v.value.email,
     displayName: v.value.displayName,
     passwordHash: hashPassword(v.value.password),
+    accountProfile: v.value.accountProfile,
   });
   return issueSession(db, user);
 }
@@ -1810,6 +1870,10 @@ function runFabricHandler(db, ctx, body) {
     const role = project && user ? getRole(db, body.projectId, user.id) : null;
     const accessLevel = project ? accessLevelForProject(db, body.projectId, project.visibility) : 'RESTRICTED';
     if (!user || !project || !role) return err(404, 'not_found');
+    if (accessLevel === 'RESTRICTED') {
+      const denied = profileDenied(user, CAPABILITIES.RESTRICTED_SOURCES);
+      if (denied) return denied;
+    }
     if (!canUseAccessLevel(accessLevel, role, 'run')) return err(403, 'access_denied', `Uruchomienie z poziomu ${accessLevel} wymaga zatwierdzonego dostępu.`);
   }
   const delegated = runComputeHandler(db, ctx, body);

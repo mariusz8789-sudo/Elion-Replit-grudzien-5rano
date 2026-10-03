@@ -16,11 +16,14 @@
  */
 
 import type { GenesisSpatialDataset } from '../experimentFabric/spatialImport';
+import type { AccountProfile } from '../accountProfiles';
 
 export interface User {
   id: string;
   email: string;
   displayName: string;
+  /** Profil konta wybrany przy rejestracji (backend: users.account_profile). Starsze zapisane sesje mogą go nie mieć do pierwszego /auth/me. */
+  accountProfile?: AccountProfile;
   createdAt: number;
 }
 
@@ -133,8 +136,8 @@ async function request<T>(
 
 /* ---------------- Uwierzytelnianie ---------------- */
 
-export function register(email: string, password: string, displayName?: string): Promise<ApiResult<Session>> {
-  return request<Session>('POST', '/auth/register', { body: { email, password, displayName } });
+export function register(email: string, password: string, displayName?: string, accountProfile?: AccountProfile): Promise<ApiResult<Session>> {
+  return request<Session>('POST', '/auth/register', { body: { email, password, displayName, accountProfile } });
 }
 
 export function login(email: string, password: string): Promise<ApiResult<Session>> {

@@ -89,6 +89,7 @@ const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').
 const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
 const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
 const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
+import { LaboratoryModeBar } from './components/LaboratoryModeBar';
 const ScientificWorldsScreen = lazy(() => import('./components/ScientificWorldsScreen').then((m) => ({ default: m.ScientificWorldsScreen })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -837,7 +838,8 @@ export default function App() {
     if (route.kind === 'lab-fpv') {
       return (
         <div className="app">
-          <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="🧪 Laboratorium — Kwantowy FPV" onSearch={() => setSearchOpen(true)} />
+          <LaboratoryModeBar active="quantum" />
           <HeavyRoute>
             <LabFpvView />
           </HeavyRoute>
@@ -1032,7 +1034,8 @@ export default function App() {
     if (route.kind === 'first-person-lab') {
       return (
         <div className="app">
-          <TopBar title="Wirtualne laboratorium" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Laboratorium — scenariusze" onSearch={() => setSearchOpen(true)} />
+          <LaboratoryModeBar active="scenarios" />
           <HeavyRoute>
             <FirstPersonLabScreen />
           </HeavyRoute>

@@ -96,6 +96,8 @@ export function createDockerScientificSandboxBackend({ docker = 'docker', proces
         processLimit: true,
         outputLimit: true,
         available: true,
+        // Flags describe the hardened `docker run` arguments this backend always passes; no running container is inspected.
+        attestationBasis: 'DECLARED_POLICY_ENFORCED_BY_RUN_ARGUMENTS',
         runtimeVersion: version.stdout.trim(),
       };
     },

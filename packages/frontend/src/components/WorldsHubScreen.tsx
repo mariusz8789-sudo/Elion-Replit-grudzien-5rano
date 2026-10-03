@@ -44,7 +44,7 @@ export const WORLDS: readonly WorldEntry[] = [
     visual: 'Miasto WebGL, humanoidy, światła — scena pokazuje stan modelu, nie liczy go.',
   },
   {
-    id: 'lab-3d', preview: 'vessel', hash: '#/lab-3d', glyph: '⌬', title: 'Wirtualne laboratorium', domain: 'Virtual Lab', featured: true,
+    id: 'lab-3d', preview: 'vessel', hash: '#/lab-3d', glyph: '⌬', title: 'Laboratorium — scenariusze', domain: 'Virtual Lab', featured: true,
     purpose: 'Hipoteza → eksperyment → obserwacja → dowód → wynik, z kamerą naukową prowadzoną przez zdarzenia.',
     real: 'Scenario Engine: realny przebieg, porównanie A/B, replay z fingerprintem.',
     visual: 'Hala laboratoryjna, naczynie reakcyjne, ujęcia kamery.',

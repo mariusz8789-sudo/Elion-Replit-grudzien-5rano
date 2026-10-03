@@ -215,3 +215,8 @@ export function buildCognitiveState(db, projectId, { selfModel = null, now = () 
     },
   };
 }
+
+/** BYT projection only (no campaigns, jobs or flight control): enough for cross-run memory such as the Necropolis. */
+export function buildProjectBytProjection(db, projectId) {
+  return buildBytProjection({ runs: researchRuns(db, projectId), registry: readKnowledgeRegistry(db, projectId), selfModel: null, flightControl: [] });
+}

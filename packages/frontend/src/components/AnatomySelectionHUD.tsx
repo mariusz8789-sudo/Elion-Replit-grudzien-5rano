@@ -66,12 +66,16 @@ export function microCaption(artifact: BiologyArtifact, genericSample = false): 
   const generic = genericSample ? ` · ${tx('genericSample')}` : '';
   if (artifact.kind === 'histology') {
     const tissue = artifact.slide.tissueType;
-    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}${generic}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}` };
+    // The pancreas tile is drawn from textbook histology (acini, ducts, an islet), not from any scanned section.
+    const schematic = tissue === 'PANCREAS' ? ` · ${tx('textbookSchematic')}` : '';
+    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}${generic}${schematic}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}` };
   }
   if (artifact.kind === 'hyperscope' && artifact.cell) {
     const m = artifact.capture.request.magnification;
     const tissue = artifact.cell.tissueType;
-    const what = tissue === 'BLOOD' ? tx('blood') : m >= 500 ? `${tx('cellInside')}${generic}` : `${tx('cell')}: ${tissueName(tissue)}${generic}`;
+    // Below the tissue level every organ shares one generic cell model; for the pancreas, say it is not a beta cell.
+    const cellNote = tissue === 'PANCREAS' ? ` · ${tx('genericCell')}` : generic;
+    const what = tissue === 'BLOOD' ? tx('blood') : m >= 500 ? `${tx('cellInside')}${cellNote}` : `${tx('cell')}: ${tissueName(tissue)}${cellNote}`;
     return { title: `${what} · ${m}×`, detail: `${tx('scale')} ≈ ${m >= 500 ? '1 µm' : '10 µm'} · ${tx('virtualScope')} · ${tx('modelNotPatient')}` };
   }
   return null;

@@ -46,7 +46,7 @@ export type BiologyArtifact = PhysiologyArtifact | NeuroArtifact | HyperscopeArt
 /** A short reference coding sequence (ATG … stop) used when a command names none: 12 codons of a made-up ORF, labelled as such. */
 export const DEFAULT_CODING_SEQUENCE = 'ATGGCCTTAGTGAAGCACGGTACCTTCGAATGGTGA';
 
-const TISSUES: readonly TissueType[] = ['BLOOD', 'EPITHELIUM', 'MUSCLE', 'NEURAL', 'CONNECTIVE', 'BONE', 'LIVER', 'LUNG', 'CARDIAC', 'GENERIC'];
+const TISSUES: readonly TissueType[] = ['BLOOD', 'EPITHELIUM', 'MUSCLE', 'NEURAL', 'CONNECTIVE', 'BONE', 'LIVER', 'LUNG', 'CARDIAC', 'PANCREAS', 'GENERIC'];
 const IMAGING_MODES: readonly ImagingRequest['mode'][] = ['XRAY', 'CT_RECONSTRUCTION', 'MRI_LIKE', 'ULTRASOUND_LIKE', 'FLUORESCENCE'];
 const AXES: readonly ImagingRequest['sliceAxis'][] = ['AXIAL', 'CORONAL', 'SAGITTAL'];
 

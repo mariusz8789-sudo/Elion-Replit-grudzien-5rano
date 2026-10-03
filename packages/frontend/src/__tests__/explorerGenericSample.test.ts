@@ -7,7 +7,7 @@ import { setLocale } from '../core/i18n';
 describe('generic tissue samples are labelled, never silent', () => {
   it('flags exactly the organs without their own tissue model', () => {
     const generic = EXPLORER_ORGANS.filter((o) => o.genericSample).map((o) => o.organId).sort();
-    expect(generic).toEqual(['left-kidney', 'pancreas', 'right-kidney', 'small-intestine', 'stomach']);
+    expect(generic).toEqual(['left-kidney', 'right-kidney', 'small-intestine', 'stomach']);
     for (const o of EXPLORER_ORGANS) expect(o.genericSample === true).toBe(o.tissue === 'EPITHELIUM');
   });
   it('says "próbka ogólna" beside a generic slide and nothing beside an organ-specific one', () => {

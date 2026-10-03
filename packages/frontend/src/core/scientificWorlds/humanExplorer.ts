@@ -39,7 +39,7 @@ export function explorerTruthLabel(mode: ExplorerEvidenceMode): string { return 
  * `genericSample`: no tissue model exists for this organ yet, so its slide is a generic epithelium
  * reference, not this organ's tissue. The UI must say so next to the slide (never a silent stand-in).
  */
-export interface ExplorerOrgan { readonly organId: string; readonly tissue: 'CARDIAC' | 'NEURAL' | 'LUNG' | 'LIVER' | 'EPITHELIUM'; readonly labelKey: string; readonly keywords: readonly string[]; readonly genericSample?: true; }
+export interface ExplorerOrgan { readonly organId: string; readonly tissue: 'CARDIAC' | 'NEURAL' | 'LUNG' | 'LIVER' | 'PANCREAS' | 'EPITHELIUM'; readonly labelKey: string; readonly keywords: readonly string[]; readonly genericSample?: true; }
 
 /** Organs the ladder can start from — each one is an ORGAN node of the V3 atlas. */
 const EXPLORER_ORGANS_RAW: readonly ExplorerOrgan[] = [
@@ -52,7 +52,7 @@ const EXPLORER_ORGANS_RAW: readonly ExplorerOrgan[] = [
   { organId: 'right-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['prawa nerk', 'right kidney'], genericSample: true },
   { organId: 'stomach', tissue: 'EPITHELIUM', labelKey: 'explorer.stomach', keywords: ['zoladek', 'zoladk', 'stomach', 'estomago', 'المعدة'], genericSample: true },
   { organId: 'liver', tissue: 'LIVER', labelKey: 'explorer.liver', keywords: [] },
-  { organId: 'pancreas', tissue: 'EPITHELIUM', labelKey: 'explorer.pancreas', keywords: ['trzustk', 'pancreas', 'البنكرياس'], genericSample: true },
+  { organId: 'pancreas', tissue: 'PANCREAS', labelKey: 'explorer.pancreas', keywords: ['trzustk', 'pancreas', 'البنكرياس'] },
   { organId: 'small-intestine', tissue: 'EPITHELIUM', labelKey: 'explorer.smallIntestine', keywords: ['jelit', 'intestine', 'intestino', 'الأمعاء'], genericSample: true },
 ];
 export const EXPLORER_ORGANS: readonly ExplorerOrgan[] = EXPLORER_ORGANS_RAW.filter((o, i, arr) => arr.findIndex((x) => x.organId === o.organId) === i);

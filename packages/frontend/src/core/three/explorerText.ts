@@ -84,6 +84,8 @@ const TEXT = {
   approach: ['Podejdź do człowieka', 'Walk up to the human', 'اقترب من الإنسان'],
   lab: ['Laboratorium', 'Laboratory', 'المختبر'],
   genericSample: ['próbka ogólna, nie z tego narządu', 'generic sample, not from this organ', 'عينة عامة، ليست من هذا العضو'],
+  textbookSchematic: ['schemat podręcznikowy, nie skan tkanki', 'textbook schematic, not a tissue scan', 'مخطط من كتاب دراسي، ليس مسحًا للنسيج'],
+  genericCell: ['model komórki ogólnej, nie komórki beta', 'generic cell model, not a beta cell', 'نموذج خلية عامة، ليس خلية بيتا'],
   surfaceSkin: ['Skóra', 'Skin', 'الجلد'],
   surfaceXray: ['RTG', 'X-ray', 'أشعة سينية'],
   surfaceGhost: ['Duch', 'Ghost', 'شفاف'],
@@ -135,6 +137,7 @@ export function ladderName(level: string, fallback: string): string { const t = 
 const TISSUE: Readonly<Record<string, Triple>> = {
   CARDIAC: ['mięsień sercowy', 'heart muscle', 'عضلة القلب'], NEURAL: ['tkanka nerwowa', 'nerve tissue', 'نسيج عصبي'],
   LUNG: ['pęcherzyki płucne', 'lung alveoli', 'الحويصلات الرئوية'], LIVER: ['zraziki wątroby', 'liver lobules', 'فصيصات الكبد'],
+  PANCREAS: ['trzustka · gronka i wysepka Langerhansa', 'pancreas · acini and an islet of Langerhans', 'البنكرياس · العنيبات وجزيرة لانغرهانس'],
   EPITHELIUM: ['nabłonek', 'epithelium', 'ظهارة'], GENERIC: ['tkanka ogólna', 'generic tissue', 'نسيج عام'], BLOOD: ['krew · rozmaz referencyjny', 'blood · reference smear', 'دم · لطاخة مرجعية'],
 };
 export function tissueName(type: string): string { const t = TISSUE[type]; return t ? pick(t) : type.toLowerCase(); }

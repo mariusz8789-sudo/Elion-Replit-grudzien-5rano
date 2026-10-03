@@ -22,7 +22,7 @@ PR #54's lifecycle is `PROBLEM_FORMALIZED → HYPOTHESES_GENERATED → PREDICTIO
 
 ## Schema and example
 
-[schema.json](./schema.json) is a documentation contract for a thin index, version `research-run-envelope@1`. [example.json](./example.json) shows a synthetic, unexecuted run with a PROBLEM_FORMALIZED event locator and empty scientific result arrays. It claims no actual run, rights clearance, approval, valid integrity or Replay. The schema may also describe an executed index; it does not carry duplicate record bodies.
+[schema.json](./schema.json) is the contract for the index, version `research-run-envelope@1`, extended with the embedded experiment records described under Implementation. [example.json](./example.json) shows a synthetic, unexecuted run with a PROBLEM_FORMALIZED event locator and empty scientific result arrays. It claims no actual run, rights clearance, approval, valid integrity or Replay. The schema also describes an executed pack, which embeds the experiment events' payloads so their hashes can be recomputed (see Implementation).
 
 | Envelope field | Resolution |
 |---|---|
@@ -40,7 +40,7 @@ Execution SHA-256 hashes and canonical ScienceRun hashes are not interchangeable
 
 ## Semantic checks beyond JSON Schema
 
-The future serializer/verifier must resolve all references against the caller's project, verify existing state/memory chains, match run/experiment/protocol identity, check execution before/after ordering, preserve hashes in their original namespaces and resolve Evidence publication through its existing authority. Source/report/licence artifact references require actual retained bytes and access rights. Missing, cross-project, mismatched or unresolvable references fail delivery. JSON Schema cannot prove any of these facts.
+The serializer/verifier must resolve all references against the caller's project, verify existing state/memory chains, match run/experiment/protocol identity, check execution before/after ordering (implemented: chain order freeze → execution → falsification → evidence → next), preserve hashes in their original namespaces and resolve Evidence publication through its existing authority. Source/report/licence artifact references require actual retained bytes and access rights. Missing, cross-project, mismatched or unresolvable references fail delivery. JSON Schema cannot prove any of these facts.
 
 Each material report claim needs exact source passage/table/version or execution observation and a rights decision; a proposal/UNKNOWN can be reported as such but cannot become a factual conclusion. Negative outcomes and counter-evidence survive export. Scientific Memory is referenced through existing experiment records and knowledge sources, never copied to a competing store.
 
@@ -56,4 +56,28 @@ Canonical Replay distinguishes `MATCH`, `DRIFT`, `ENGINE_VERSION_CHANGED`, `BLOC
 
 `VALID_INTEGRITY_ONLY` means verified fingerprints, references and relevant replay checks, without organizational authenticity. `VALID_TRUSTED` is PLANNED until a real signing key, trusted digest/signature distribution and verification exist; it is intentionally excluded from this schema. No signature is fabricated in the example. A report cannot upgrade any underlying outcome.
 
-Production serializer, resolver, organizational signing and durable customer-delivery workflow remain implementation work. Schema and example completion do not claim those features are implemented.
+Organizational signing, report/licence-decision artifact producers and a durable customer-delivery workflow remain implementation work.
+
+## Implementation (2026-10-03)
+
+`packages/backend/src/researchRunEvidencePack.mjs` builds and verifies RESOLVED_EXPORT packs from the existing records; it adds no table, ledger or chain.
+
+- `buildResearchRunEvidencePack(db, projectId, runId, { artifactStorage })` projects every closed experiment (frozen → handoff → falsification → evidence → next, plus ARTIFACT_PERSISTED). A run with no real execution returns `BLOCKED` (`NO_EXECUTED_EXPERIMENT` / `EXPERIMENT_NOT_EXECUTED`); nothing is assembled from a mock or substitute.
+- `verifyResearchRunEvidencePack(pack, { db, projectId, artifactStorage })` recomputes, offline: input and output SHA-256, the prediction fingerprint (`hypothesisFingerprint`) and preregistration content hash from the frozen payload, the criteria statuses and `deriveVerdict` from the observed output, the execution-bundle digest of the artifact, each embedded payload's chain fingerprint, the chain head and the pack hash. With `db` it anchors every locator, payload, experiment record, Scientific Run, Replay row and Evidence proposal to the stored records, and with `artifactStorage` it re-reads the artifact bytes. Rejections name the class: `PARAMETER_MUTATED`, `DATA_MUTATED`, `ARTIFACT_MUTATED`, `ANALYSIS_MUTATED`, `ENGINE_OR_ENVIRONMENT_MUTATED`, `PROVENANCE_MISSING` (plus chain/anchor/pack-hash codes).
+- Routes: `GET /api/projects/:projectId/research-runs/:runId/evidence-pack` (409 `BLOCKED` without an executed experiment) and `POST …/evidence-pack/verify` with `{ pack }`.
+- Integrity is at most `VALID_INTEGRITY_ONLY`; without artifact storage it stays `UNVERIFIED`. Report and licence-decision artifacts have no producer, so `completeness` is `INCOMPLETE` and `delivery` is `BLOCKED` for every real pack today; they are listed in `verification.missing`, never invented.
+- Science Run hashes (`sha256Hex16`) are compared only with the stored Scientific Run and its Replay rows, never with execution SHA-256.
+
+### Schema changes made with the implementation
+
+The schema followed the code where they differed; the synthetic example is unchanged and still validates.
+
+| Change | Reason (code name) |
+|---|---|
+| `eventRefs[].type` enum = all `RESEARCH_STATE_EVENT_TYPES` | The chain also carries `SURPRISE_DETECTED`, `RESEARCH_STEERING`, `RUN_CONTROLLED`, `ARTIFACT_PERSISTED`, `GENERATED_ANALYSIS_*` (agentRun.mjs) |
+| optional `eventRefs[].payloadFingerprint`, `transitionFingerprint` | The chain's own field names; needed to recompute the head offline |
+| `producerCommit` may be `"unknown"` (never for ELIGIBLE) | `buildInfo.mjs` reports `unknown` instead of inventing a hash |
+| new `experiments[]` (embedded event payloads, Replay rows, `summary`) and `integrity` (section digests, chain head, `packHash`), required for RESOLVED_EXPORT | The pack must carry what the verifier recomputes. This deliberately copies the experiment events' payloads; the chain stays authoritative and the anchored check compares them byte for byte |
+| execution bundle artifact id in `experiments[].summary.artifactId` | ARTIFACT_PERSISTED bundles are neither source, report nor licence artifacts |
+
+Validated with `jsonschema` Draft 2020-12 (metaschema, a real built pack, `example.json`) and in `researchRunEvidencePack.test.mjs`.

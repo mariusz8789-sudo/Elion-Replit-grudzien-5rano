@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { LaboratoryModeBar } from './LaboratoryModeBar';
 import { useThreeLoop } from '../core/three/useThreeLoop';
 import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type HumanTwinLodPreference, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
 import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
@@ -1074,6 +1075,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       )}
 
       <div className="sw-world-controls">
+        <LaboratoryModeBar variant="select" active={world === 'biology' ? 'biology' : 'physics'} />
         <button type="button" className="sw-world-btn" data-testid="sw-details" aria-expanded={detailsOpen}
           onClick={() => { setDetailsOpen((open) => !open); if (!detailsOpen) setEvidenceOpen(true); }}>
           {detailsOpen ? 'Ukryj szczegóły' : 'Szczegóły'}

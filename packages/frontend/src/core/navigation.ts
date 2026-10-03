@@ -106,7 +106,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   // read as absent, so it stands as its own capability with the detector chamber folded under it.
   { id: 'cern-complex', label: 'Kompleks CERN', icon: '◉', hash: '#/cern-complex', description: 'Przejście przez halę, tunel i komorę detektora — model zderzeń, oddzielnie od danych CMS' },
   { id: 'collider', label: 'CERN — komora detektora', icon: '⚛', hash: '#/cern-complex?room=detector', variantOf: 'cern-complex' },
-  { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
+  { id: 'lab-fpv', label: 'Laboratorium — Kwantowy FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement', variantOf: 'lab-fpv' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
   // — Człowiek i biologia —
@@ -124,7 +124,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal', variantOf: 'worlds' },
   { id: 'city3d', label: 'Miasto 3D (WebGL)', icon: '🏙', hash: '#/city3d', variantOf: 'worlds' },
   { id: 'scientific-city', label: 'Scientific City', icon: '🏗', hash: '#/scientific-city', variantOf: 'worlds' },
-  { id: 'first-person-lab', label: 'Laboratorium 1. osoby', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
+  { id: 'first-person-lab', label: 'Laboratorium — scenariusze', icon: '🔬', hash: '#/first-person-lab', variantOf: 'worlds' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass', variantOf: 'worlds' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline', variantOf: 'worlds' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', variantOf: 'worlds', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },

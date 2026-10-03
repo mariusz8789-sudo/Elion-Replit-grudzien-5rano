@@ -6084,3 +6084,12 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 }
 /* The ring is an estimate of TIME. This note keeps it from being read as progress. */
 .gx-loading-note { font-size: 0.72em; color: var(--text-faint); white-space: nowrap; }
+
+/* ---- One Laboratory, several modes ---- */
+.lab-mode-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 1rem; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
+.lab-mode-link { padding: 0.4rem 0.85rem; border-radius: 999px; font: 500 0.8rem/1.4 inherit; color: #cbd5e1; text-decoration: none; border: 1px solid rgba(148, 163, 184, 0.3); min-height: 36px; display: inline-flex; align-items: center; }
+.lab-mode-link.is-active { color: #e2e8f0; border-color: rgba(34, 211, 238, 0.7); background: rgba(34, 211, 238, 0.12); }
+.sw-world-controls { display: flex; gap: 0.5rem; align-items: center; }
+.lab-mode-select { display: inline-flex; align-items: center; gap: 0.4rem; }
+.lab-mode-select-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lab-mode-select select { padding: 0.45rem 0.7rem; border-radius: 999px; min-height: 44px; font: 500 0.78rem/1.4 inherit; color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.72); }

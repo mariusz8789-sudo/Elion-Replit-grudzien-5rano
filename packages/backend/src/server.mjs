@@ -512,18 +512,16 @@ server.listen(PORT, () => {
 // Jeden lokalny worker opróżnia trwałą kolejkę zadań ResearchRun (research-run:experiment-jobs). To ta sama
 // ścieżka wykonania co synchroniczne POST .../experiments; kolejka tylko odracza start. Dowód jest jednowęzłowy
 // (SQLite), nie wieloreplikowy. GENESIS_RESEARCH_WORKER=0 wyłącza pętlę.
-let researchWorkerTimer = null;
 if (db && process.env.GENESIS_RESEARCH_WORKER !== '0') {
   const worker = createResearchRunWorker(db);
   let busy = false;
-  researchWorkerTimer = setInterval(async () => {
+  setInterval(async () => {
     if (busy) return;
     busy = true;
     try {
       for (let i = 0; i < 8; i += 1) if ((await worker.runOnce()).state === 'IDLE') break;
     } catch (error) { log('error', 'research_worker_failed', { error: String(error?.message ?? error) }); } finally { busy = false; }
-  }, 500);
-  researchWorkerTimer.unref();
+  }, 500).unref();
 }
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.

@@ -142,3 +142,21 @@ test('artifact custody: a cancelled job executes nothing and stores no artifact'
     assert.equal(artifactEvents(run).length, 0);
   } finally { ctx.db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('artifact route: no token is 401, another account cannot read it, the response never carries the storage root path', { skip }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-rr-artifact-'));
+  const storage = createLocalContentAddressedArtifactStorage({ rootDir: path.join(dir, 'artifacts') });
+  const ctx = await setup(dir, storage);
+  try {
+    await ctx.enqueue();
+    await createResearchRunWorker(ctx.db, { artifactStorage: storage }).runOnce();
+    const x = (await ctx.view()).experiments[0];
+    const url = `${ctx.base}/research-runs/${ctx.runId}/experiments/${x.experimentId}/artifact`;
+    assert.equal((await ctx.call('GET', url)).status, 401);
+    const stranger = ctx.call('POST', '/api/auth/register', { body: { email: 'stranger@genesis.test', password: 'password123' } }).body;
+    assert.ok([403, 404].includes((await ctx.call('GET', url, { token: stranger.token })).status));
+    const ok = await ctx.call('GET', url, { token: ctx.owner.token });
+    assert.equal(ok.status, 200);
+    assert.ok(!JSON.stringify(ok.body).includes(dir), 'no server path leaks');
+  } finally { ctx.db.close(); rmSync(dir, { recursive: true, force: true }); }
+});

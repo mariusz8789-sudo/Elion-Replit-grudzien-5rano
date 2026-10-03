@@ -11,7 +11,7 @@ import { getResearchRun, inWriteTransaction, RESEARCH_RUN_CONTRACT_VERSION } fro
 export const ARTIFACT_BUNDLE_KIND = 'genesis-research-run-execution-bundle/v1';
 export const ARTIFACT_PRODUCER = 'genesis-research-run';
 
-const safeId = (value) => String(value).replace(/[^A-Za-z0-9._:-]/g, '_').slice(0, 120);
+const safeId = (value) => String(value).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
 export function buildExecutionBundle(runId, experiment) {
   const x = experiment.execution;

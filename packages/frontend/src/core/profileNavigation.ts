@@ -21,6 +21,7 @@
 import {
   MORE_SECTIONS,
   NAV_SECTIONS,
+  PRIMARY_NAV_ITEMS,
   navVariants,
   type NavItem,
   type NavSection,
@@ -44,11 +45,11 @@ export interface ProfileMenuRule {
 /** Zawsze widoczne w „Więcej”, dla każdego profilu. */
 export const ALWAYS_VISIBLE: readonly string[] = ['account', 'settings'];
 
-const UCZEN_MAIN = ['home', 'human-biology-lab', 'scientific-worlds'] as const;
+const UCZEN_MAIN = ['home', 'chat', 'human-biology-lab', 'scientific-worlds'] as const;
 const UCZEN_MORE = ['glossary', 'dome-world', 'black-hole', 'universe', 'investor-demo', 'chemistry', 'virtual-bio'] as const;
 
-const STUDENT_MAIN = [...UCZEN_MAIN, 'evidence', 'cms-open-data', 'reviewer'] as const;
-const STUDENT_MORE = [...UCZEN_MORE, 'physics', 'cern-complex', 'lab-fpv', 'memory'] as const;
+const STUDENT_MAIN = [...UCZEN_MAIN, 'evidence', 'cms-open-data', 'reviewer', 'memory'] as const;
+const STUDENT_MORE = [...UCZEN_MORE, 'physics', 'cern-complex', 'lab-fpv'] as const;
 
 /**
  * TABELA MENU — jedyne miejsce, w którym profil → widoczne pozycje menu.
@@ -128,4 +129,23 @@ export function visibleMenuIds(profile: AccountProfile | null): { main: string[]
     main: menu.main.flatMap((section) => section.items.map((item) => item.id)),
     more: menu.more.flatMap((section) => section.items.map((item) => item.id)),
   };
+}
+
+/** How many places the mobile tab bar holds before More. */
+export const TAB_BAR_PLACES = 4;
+
+/**
+ * The mobile tab bar for a menu: the primary places the profile can see, in
+ * order, topped up with its next main places, so a pupil never gets a tab that
+ * leads to a locked screen nor a half-empty bar.
+ */
+export function primaryForMenu(menu: ProfileMenu): readonly NavItem[] {
+  const visible = menu.main.flatMap((section) => section.items).filter((item) => item.status !== 'planned');
+  const ids = new Set(visible.map((item) => item.id));
+  const picked: NavItem[] = PRIMARY_NAV_ITEMS.filter((item) => ids.has(item.id));
+  for (const item of visible) {
+    if (picked.length >= TAB_BAR_PLACES) break;
+    if (!picked.includes(item)) picked.push(item);
+  }
+  return picked.slice(0, TAB_BAR_PLACES);
 }

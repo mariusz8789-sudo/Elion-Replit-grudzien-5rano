@@ -20,12 +20,9 @@ function collectErrors(page: Page): string[] {
 /** Chemistry lives in the ONE main Laboratory: the research-mode entry opens it at the titration station. */
 async function openFromMenu(page: Page): Promise<void> {
   await page.goto('/#/');
-  const more = page.locator('.shell-nav-more');
-  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
-  // Każda grupa w „Więcej” jest zwinięta; rozwiń wszystkie.
-  const groups = page.locator('.shell-nav-group-toggle[aria-expanded="false"]');
-  while (await groups.count() > 0) await groups.first().click();
-  await page.getByRole('button', { name: /Chemia — stanowisko miareczkowania/ }).first().click();
+  // „Więcej” in the sidebar opens the More explorer; chemistry is in Life sciences.
+  await page.getByTestId('nav-more').click();
+  await page.getByTestId('nav-explorer').getByRole('link', { name: /Chemia — stanowisko miareczkowania/ }).first().click();
   await expect(page.getByTestId('chem-live-lab')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('chem-live-lab')).toHaveAttribute('data-embedded', 'true');
   expect(page.url()).toContain('#/scientific-worlds?station=st-titration');

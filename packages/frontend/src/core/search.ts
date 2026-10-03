@@ -1,5 +1,8 @@
 import { getLabs } from './registry';
 import { SCIENTIFIC_OS, labelOf } from './scientificOs/catalogue';
+import { MORE_ITEMS, NAV_SECTIONS } from './navigation';
+import { navDescription, navLabel } from './navigationText';
+import { getLocale, type Locale } from './i18n';
 
 /**
  * Indeks wyszukiwania globalnego — płaska lista laboratoriów i ich
@@ -58,24 +61,45 @@ export function buildCapabilityIndex(): SearchEntry[] {
     })));
 }
 
-/** Product screens that are not plugin labs (so the registry never listed them), in grant order. */
-const DESTINATIONS: readonly { hash: string; icon: string; name: string; tagline: string; extra: string }[] = [
-  { hash: '#/drug', icon: '💊', name: 'Drug Discovery', tagline: 'Docking, retrosynteza, Evidence i Replay', extra: 'leki lek chemia docking imatinib vina' },
-  { hash: '#/human-biology-lab', icon: '🧍', name: 'Human Explorer', tagline: 'Atlas człowieka: skóra, szkielet, narządy, mózg', extra: 'czlowiek cialo szkielet mozg narzad anatomia biologia' },
-  { hash: '#/reviewer', icon: '🔎', name: 'Reviewer Room', tagline: 'Sprawdź dowody i podpis CSRN', extra: 'recenzent dowod podpis csrn' },
-  { hash: '#/evidence', icon: '📋', name: 'Evidence & Replay', tagline: 'Pochodzenie wyników i powtórzenie', extra: 'dowod replay powtorzenie' },
-  { hash: '#/verify', icon: '✓', name: 'Genesis Verify', tagline: 'Sprawdź zapis wyniku: odciski, rejestr i powtórzenie', extra: 'weryfikacja zweryfikuj zapis rekord record sha256 hash odcisk raport report tampered drift match' },
-  { hash: '#/flight-control', icon: '◎', name: 'Kontrola lotów nauki', tagline: 'Przebiegi badań, kolejka zadań i loty eksperymentów', extra: 'science flight control kolejka queue worker lease dzierzawa przebieg research run wstrzymaj wznow anuluj pause resume cancel lot' },
-  { hash: '#/cern-complex', icon: '⚛', name: 'Kompleks CERN', tagline: 'Hala, tunel i komora detektora', extra: 'cern lhc fizyka czastki detektor' },
-  { hash: '#/reality', icon: '🪐', name: 'Nawigator rzeczywistości', tagline: 'Orbita i jej warianty: zapis sceny i ponowne przeliczenie', extra: 'reality navigator rzeczywistosc orbita kepler gwiazda planeta galaz wariant scena zapis replay odtworz czas swiata' },
-  { hash: '#/physics/cms-z', icon: '⚛', name: 'CERN CMS Z→μμ', tagline: 'Prawdziwe dane CMS: pik bozonu Z', extra: 'cern cms bozon z mion fizyka czastki open data' },
-];
+/**
+ * Extra words people type for a place, by navigation id. The places themselves
+ * (name, line, route) come from `core/navigation.ts`, the one navigation truth:
+ * every main place is searchable, plus the More places listed here. These words
+ * only match; they are never shown, so they may name an engine.
+ */
+const DESTINATION_WORDS: Readonly<Record<string, string>> = {
+  discover: 'research console konsola badan run przebieg kandydaci winner gate falsyfikacja',
+  inquiry: 'hipoteza hypothesis inquiry dochodzenie autonomiczne',
+  science: 'drug discovery leki lek chemia docking dokowanie imatinib vina retrosynteza retrosynthesis',
+  'human-biology-lab': 'human explorer czlowiek cialo szkielet mozg narzad anatomia biologia',
+  molecule: 'molecule world czasteczka molekula 3d wiazania',
+  'cms-open-data': 'cern cms bozon z mion fizyka czastki open data',
+  'scientific-worlds': 'laboratorium laboratory symulacja simulation eksperyment',
+  evidence: 'dowod replay powtorzenie',
+  reviewer: 'recenzent dowod podpis csrn',
+  memory: 'pamiec memory prerejestracja preregistration pochodzenie provenance',
+  verify: 'weryfikacja zweryfikuj zapis rekord record sha256 hash odcisk raport report tampered drift match',
+  'flight-control': 'science flight control kolejka queue worker lease dzierzawa przebieg research run wstrzymaj wznow anuluj pause resume cancel lot',
+  dossier: 'candidate dossier kandydat pobierz download',
+  pilot: 'eksport export pakiet pack ro-crate pobierz download',
+  'cern-complex': 'cern lhc fizyka czastki detektor',
+  reality: 'reality navigator rzeczywistosc orbita kepler gwiazda planeta galaz wariant scena zapis sceny replay odtworz czas swiata',
+};
 
-export function buildDestinationIndex(): SearchEntry[] {
-  return DESTINATIONS.map((d) => ({
-    labId: d.hash, expId: '__base', icon: d.icon, labName: d.name, expName: d.name, tagline: d.tagline, hash: d.hash,
-    keywords: normalize(`${d.name} ${d.tagline} ${d.extra}`),
-  }));
+export function buildDestinationIndex(locale: Locale = getLocale()): SearchEntry[] {
+  const places = [
+    ...NAV_SECTIONS.flatMap((section) => section.items).filter((item) => item.hash !== undefined && item.hash !== '#/'),
+    ...MORE_ITEMS.filter((item) => item.hash !== undefined && DESTINATION_WORDS[item.id] !== undefined),
+  ];
+  return places.map((item) => {
+    const name = navLabel(item, locale);
+    const tagline = navDescription(item, locale) ?? '';
+    const words = [item.label, item.description ?? '', navLabel(item, 'en'), navDescription(item, 'en') ?? '', DESTINATION_WORDS[item.id] ?? ''].join(' ');
+    return {
+      labId: item.hash!, expId: '__base', icon: item.icon, labName: name, expName: name, tagline, hash: item.hash,
+      keywords: normalize(`${name} ${tagline} ${words}`),
+    };
+  });
 }
 
 const PL_MAP: Record<string, string> = {

@@ -18,6 +18,7 @@
  */
 
 import { scryptSync, randomBytes, timingSafeEqual, randomUUID } from 'node:crypto';
+import { normalizeAccountProfile, DEFAULT_ACCOUNT_PROFILE } from './accountProfiles.mjs';
 
 const SCRYPT_KEYLEN = 64;
 const SCRYPT_COST = 16_384; // N=2^14 — rozsądny koszt dla logowania interaktywnego
@@ -62,9 +63,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Walidacja poświadczeń rejestracji. Zwraca { ok, error?, value? } — jawne
  * komunikaty (po polsku), które API może oddać klientowi bez ujawniania
  * szczegółów implementacji. Nazwa wyświetlana jest opcjonalna (domyślnie z
- * części adresu przed @).
+ * części adresu przed @). Profil konta (accountProfiles.mjs) musi być jednym
+ * ze znanych kodów; brak pola → DEFAULT_ACCOUNT_PROFILE (zgodność ze starszymi
+ * klientami API), nieznana wartość → błąd.
  */
-export function validateRegistration({ email, password, displayName } = {}) {
+export function validateRegistration({ email, password, displayName, accountProfile } = {}) {
   const e = String(email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(e) || e.length > 254) {
     return { ok: false, error: 'Podaj poprawny adres e-mail.' };
@@ -73,5 +76,9 @@ export function validateRegistration({ email, password, displayName } = {}) {
   if (p.length < 8) return { ok: false, error: 'Hasło musi mieć co najmniej 8 znaków.' };
   if (p.length > 200) return { ok: false, error: 'Hasło jest zbyt długie (max 200 znaków).' };
   const name = String(displayName ?? '').trim().slice(0, 80) || e.split('@')[0];
-  return { ok: true, value: { email: e, password: p, displayName: name } };
+  const profile = accountProfile === undefined || accountProfile === null || accountProfile === ''
+    ? DEFAULT_ACCOUNT_PROFILE
+    : normalizeAccountProfile(accountProfile);
+  if (!profile) return { ok: false, error: 'Wybierz jeden z profili konta: Uczeń, Student, Nauczyciel, Badacz albo Instytucja.' };
+  return { ok: true, value: { email: e, password: p, displayName: name, accountProfile: profile } };
 }

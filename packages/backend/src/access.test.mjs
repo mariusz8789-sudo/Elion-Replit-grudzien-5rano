@@ -7,9 +7,10 @@ function call(db, method, pathname, options = {}) {
   return handleApi(db, { method, pathname, token: options.token ?? null, body: options.body ?? {}, query: options.query ?? {} });
 }
 
-function setup() {
+// RESTRICTED (institutional) sources belong to the INSTYTUCJA account profile (accountProfiles.mjs).
+function setup(accountProfile = 'INSTYTUCJA') {
   const db = openDatabase();
-  const registered = call(db, 'POST', '/api/auth/register', { body: { email: 'researcher@example.org', password: 'password123' } }).body;
+  const registered = call(db, 'POST', '/api/auth/register', { body: { email: 'researcher@example.org', password: 'password123', accountProfile } }).body;
   const project = call(db, 'POST', '/api/projects', { token: registered.token, body: { name: 'Genesis vertical slice' } }).body.project;
   return { db, token: registered.token, project };
 }

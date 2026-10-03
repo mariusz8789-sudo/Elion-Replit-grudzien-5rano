@@ -7,6 +7,8 @@ import {
   type Project, type Capability, type Target, type Candidate, type CandidatePassport, type RankedCandidate, type ResearchIntakeResponse,
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
+import { ProfileLockedScreen } from './ProfileLockedScreen';
+import { CAPABILITIES, canUseCapability, profileOfUser } from '../core/accountProfiles';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
@@ -57,6 +59,10 @@ export function DrugDiscoveryScreen() {
         note="To nie jest narzędzie diagnostyczne ani deklaracja skuteczności leku."
       />
     );
+  }
+  const profile = profileOfUser(session.user)!;
+  if (!canUseCapability(profile, CAPABILITIES.DRUG_DISCOVERY)) {
+    return <ProfileLockedScreen icon="💊" title="Drug Discovery" profile={profile} capability={CAPABILITIES.DRUG_DISCOVERY} />;
   }
   return <DrugWorkspace />;
 }

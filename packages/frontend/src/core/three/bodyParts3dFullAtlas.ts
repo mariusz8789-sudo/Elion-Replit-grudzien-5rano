@@ -66,8 +66,18 @@ export interface FullAtlasOrganMesh {
   readonly partCount: number;
 }
 
+/** Where one structure sits inside its system's merged geometry (index range) and its bounds in atlas meters. */
+export interface FullAtlasPartRange {
+  readonly name: string;
+  readonly start: number;
+  readonly count: number;
+  readonly bounds: readonly [readonly number[], readonly number[]];
+}
+
 export interface FullAtlasSystemMesh {
   readonly system: string;
+  /** Every structure of the system, in merge order: any of them can be found and named from a tap. */
+  readonly parts?: readonly FullAtlasPartRange[];
   readonly geometry: THREE_NS.BufferGeometry;
   readonly partCount: number;
   readonly triangles: number;
@@ -163,7 +173,9 @@ export async function loadFullAtlas(
   const systems: FullAtlasSystemMesh[] = [];
   for (const [system, parts] of bySystem) {
     const geometry = mergeSystemParts(THREE, parts, buffers);
-    systems.push({ system, geometry, partCount: parts.length, triangles: (geometry.index?.count ?? 0) / 3 });
+    let start = 0;
+    const ranges = parts.map((p) => { const r = { name: p.name, start, count: p.indexCount, bounds: p.bounds }; start += p.indexCount; return r; });
+    systems.push({ system, geometry, parts: ranges, partCount: parts.length, triangles: (geometry.index?.count ?? 0) / 3 });
   }
   const organs = new Map<string, FullAtlasOrganMesh>();
   for (const [organId, selects] of Object.entries(FULL_ATLAS_ORGAN_PARTS)) {

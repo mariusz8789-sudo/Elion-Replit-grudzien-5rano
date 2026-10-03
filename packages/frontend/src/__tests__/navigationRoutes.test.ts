@@ -122,8 +122,8 @@ describe('research mode shows one entry per capability; alternative screens fold
 describe('the main menu is the owner\'s list, in his order', () => {
   it('lists the eight destinations first, navigation only; everything else sits under "Więcej"', () => {
     expect(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.label))).toEqual([
-      'Dashboard', 'Drug Discovery', 'Human Explorer', 'Reviewer Room', 'Evidence & Replay',
-      'Laboratory', 'CERN / CMS', 'Research Console',
+      'Start', 'Odkrywanie leków', 'Człowiek · Human Explorer', 'Pokój recenzenta', 'Dowody i powtórzenie',
+      'Laboratorium', 'CERN · dane CMS', 'Konsola badań',
     ]);
     const main = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.hash)));
     expect(MORE_ITEMS.filter((item) => item.hash !== undefined && main.has(item.hash))).toEqual([]);
@@ -131,9 +131,9 @@ describe('the main menu is the owner\'s list, in his order', () => {
 });
 
 describe('Ask is an action in the bottom bar, not a menu entry', () => {
-  it('bottom bar reads Home, Ask, Lab; the menu has no chat item', async () => {
+  it('bottom bar reads Start, Ask, Człowiek, Lab; the menu has no chat item', async () => {
     const { ASK_ITEM, PRIMARY_NAV_ITEMS } = await import('../core/navigation');
-    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Home', 'Ask', 'Lab']);
+    expect(PRIMARY_NAV_ITEMS.map((item) => item.shortLabel ?? item.label)).toEqual(['Start', 'Zapytaj', 'Człowiek', 'Lab']);
     expect(ASK_ITEM.kind).toBe('chat');
     expect(NAV_SECTIONS.flatMap((section) => section.items).some((item) => item.kind === 'chat')).toBe(false);
   });

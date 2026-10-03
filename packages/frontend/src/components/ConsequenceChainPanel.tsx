@@ -66,11 +66,13 @@ export function ConsequenceChainPanel({
   honesty,
   honestyNote,
   experimentId,
+  sceneId,
 }: {
   spec: LabConsequenceSpec;
   honesty: HonestyLevel;
   honestyNote: string;
   experimentId: string;
+  sceneId?: string;
 }) {
   const { graph, params, outputs, headline, domainGuard } = spec;
   const [, setVersion] = useState(0);
@@ -181,7 +183,7 @@ export function ConsequenceChainPanel({
 
   return (
     <div className="consequence-panel">
-      <HonestyBadge level={honesty} note={honestyNote} />
+      <HonestyBadge level={honesty} note={honestyNote} sceneId={sceneId} />
       <div className="consequence-headline">{headline}</div>
 
       {violation && (

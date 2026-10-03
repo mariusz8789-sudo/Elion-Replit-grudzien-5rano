@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "genesis.sync-evidence@1",
+  "purpose": "Synchronize canonical PR #56 with current main without losing work",
+  "rollbackCommit": "55c3221faf3675494086d801df002b6a981b8440",
+  "mainCommit": "fc5c88ce",
+  "mergeCommit": "d9afd1a1b45b62280bc9eba5dd671889019708e9",
+  "recordedAt": "2026-10-02T04:04:41.0169645Z",
+  "merge": {
+    "method": "git merge --no-ff origin/main",
+    "forcePush": false,
+    "conflicts": [],
+    "mainIsAncestorAfterMerge": true,
+    "behindMainAfterMerge": 0,
+    "treeBefore": "dced6090e5ccb1554eb1e3da241ee0fa19b28ad3",
+    "treeAfter": "dced6090e5ccb1554eb1e3da241ee0fa19b28ad3",
+    "contentChangedByMerge": false,
+    "explanation": "Current main contained PR #54, PR #55 and a literature subset whose file content was already present in the newer PR #56 tree. The merge connected histories without replacing the newer implementation."
+  },
+  "qualityGates": {
+    "core": { "command": "npm run test:core", "status": "PASS", "files": 37, "passed": 344, "failed": 0 },
+    "frontend": {
+      "command": "npm run test --workspace=packages/frontend -- --maxWorkers=4 --testTimeout=30000",
+      "status": "PASS", "files": 703, "passed": 7555, "failed": 0, "skipped": 1, "durationSeconds": 167.74
+    },
+    "backend": {
+      "command": "npm run test --workspace=packages/backend",
+      "status": "PASS", "suites": 328, "total": 1480, "passed": 1399, "failed": 0, "cancelled": 0, "skipped": 81, "durationMs": 322789.4847
+    },
+    "lint": { "command": "npm run lint", "status": "PASS", "errors": 0, "warnings": 13 },
+    "productionBuild": { "command": "npm run build", "status": "PASS", "modulesTransformed": 1161 },
+    "criticalBrowserE2E": {
+      "command": "RESEARCH_RUN_UI_PROOF_OUT=artifacts/research-run-code-analysis-ui-proof-synced npm run proof:research-run-ui",
+      "status": "PASS", "cases": 2, "failures": 0,
+      "rawReportSha256": "fff813a87be34ec4aeddb173de7bfbf58e70c773c20f5c5c8b009d5e7e23fdeb",
+      "desktopScreenshotSha256": "7abff38ebe7691c8554a342f0e89cfdec29829f73d486c8418cf217c8e31f1dd",
+      "mobileScreenshotSha256": "16f80fc6cec5425ae062a143ca7887077571605a5569a3b3950dfd25da9b09a7"
+    }
+  },
+  "truthBoundary": {
+    "localStatus": "GREEN",
+    "linuxCiStatus": "PENDING_PUSH",
+    "externalBlockersUnchanged": [
+      "BLOCKED_EXTERNAL_SANDBOX",
+      "BLOCKED_EXTERNAL_SHARED_QUEUE",
+      "BLOCKED_EXTERNAL_OBJECT_STORAGE",
+      "BLOCKED_EXTERNAL_LICENSE_REVIEW",
+      "BLOCKED_EXTERNAL_WET_LAB"
+    ],
+    "runtimeSkipMeaning": "The 81 backend skips remain explicit absence of external runtimes or artefacts, not successful runtime proof."
+  }
+}

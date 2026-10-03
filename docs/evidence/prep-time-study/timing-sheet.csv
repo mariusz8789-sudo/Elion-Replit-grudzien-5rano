@@ -1,0 +1,17 @@
+# Preparation time study - timing sheet. One row per complex, in the order you did them.
+# active_minutes = time your hands and attention were on it. Do NOT include waiting on the computer.
+# waiting_minutes = time you sat idle while a computation ran.
+# interrupted_minutes = coffee, email, phone. Rough is fine.
+# accepted_by_gate = leave blank; filled in when scripts/prep-time-study-check.py is run.
+# ai_assistant_used = none / name of the tool, and what for.
+order,pdb_id,ligand,active_minutes,waiting_minutes,interrupted_minutes,tools_used,ai_assistant_used,gave_up,notes
+1,,,,,,,,,
+2,,,,,,,,,
+3,,,,,,,,,
+4,,,,,,,,,
+5,,,,,,,,,
+6,,,,,,,,,
+7,,,,,,,,,
+8,,,,,,,,,
+9,,,,,,,,,
+10,,,,,,,,,

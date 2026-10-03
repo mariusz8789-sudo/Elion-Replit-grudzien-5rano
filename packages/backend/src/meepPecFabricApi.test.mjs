@@ -6,6 +6,7 @@ import { detect } from './compute/meepAdapter.mjs';
 
 const runtime = detect();
 const db = openDatabase(':memory:');
+const authToken = handleApi(db, { method: 'POST', pathname: '/api/auth/register', body: { email: 'meep-pec-fabric@lab.org', password: 'password123' }, query: {}, token: null }).body.token;
 const request = {
   contractVersion: '1.0.0', modelId: 'electrodynamics-maxwell-fdtd-pec-reflection', domainId: 'electrodynamics',
   sourceText: 'Uruchom benchmark PyMeep odbicia PEC frequency=1 resolution=80.',
@@ -23,7 +24,7 @@ test('Fabric exposes the bounded real PyMeep PEC reflection benchmark', () => {
 
 if (runtime.available) {
   test('Fabric runs real PyMeep PEC reflection and preserves external-engine provenance', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 200);
     assert.equal(response.body.run.status, 'ok');
     assert.ok(Math.abs(response.body.run.outputs.computedReflectance - 1) <= 0.003);
@@ -34,7 +35,7 @@ if (runtime.available) {
   });
 } else {
   test('Fabric API rejects PEC reflection instead of emitting a fabricated result without runtime', () => {
-    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: authToken });
     assert.equal(response.status, 400);
     assert.equal(response.body.run.status, 'rejected');
     assert.equal(response.body.run.error, 'capability_unavailable');

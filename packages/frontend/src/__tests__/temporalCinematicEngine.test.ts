@@ -210,7 +210,7 @@ describe('Temporal Cinematic Engine — canonical capture evidence', () => {
       viewMode: 'street',
     });
     expect(contentHash).toHaveLength(64);
-    expect(ledger.getActive()[0]?.claim).toContain('sha256=' + 'a'.repeat(64));
+    expect(ledger.getProposals()[0]?.record.claim).toContain('sha256=' + 'a'.repeat(64));
     expect(ledger.verifyLedger()).toEqual({ ok: true, errors: [] });
     expect(() => recordTemporalCaptureArtifact(ledger, {
       worldId: 'x', place: 'x', year: 2026, seconds: 0, artifactFile: 'x.png', artifactSha256: 'bad', semanticFingerprint: 'deadbeef', viewMode: 'street',

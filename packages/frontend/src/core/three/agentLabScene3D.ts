@@ -1243,8 +1243,9 @@ export class AgentLabScene3D implements Sim3D {
       // the view narrows — one isolated organ, or an active section — and eases back out when it widens.
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
-      // The glass cylinder is part of the subject: it stays, only its rim dims once the view goes inside.
-      if (this.chamberGlass) this.chamberGlass.visible = true;
+      // Keep the vitrine around the full body, but open it for the offset macro stage:
+      // its additive rim otherwise paints a blue band across organs, tissue and cells.
+      if (this.chamberGlass) this.chamberGlass.visible = this.macroMicro?.group.visible !== true;
       if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.

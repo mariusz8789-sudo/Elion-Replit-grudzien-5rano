@@ -1,0 +1,416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:genesis:documentation:research-run-envelope:1",
+  "title": "ResearchRun reference export projection",
+  "description": "Documentation schema only. Existing Genesis records own state. Shape validation does not resolve references, verify hashes, establish rights or approve delivery.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "const": "research-run-envelope@1"
+    },
+    "researchRunContract": {
+      "const": "research-run@1"
+    },
+    "recordMode": {
+      "enum": [
+        "SYNTHETIC_EXAMPLE",
+        "RESOLVED_EXPORT"
+      ]
+    },
+    "domain": {
+      "const": "genesis.research-run"
+    },
+    "researchRunId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "producerCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "stateChainRef": {
+      "const": "agent_run_steps"
+    },
+    "eventRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/eventRef"
+      }
+    },
+    "experimentRecordRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/experimentRef"
+      }
+    },
+    "executionRecordRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/executionRef"
+      }
+    },
+    "scienceRunRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/scienceRunRef"
+      }
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "replayRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/replayRef"
+      }
+    },
+    "sourceArtifactRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifactId"
+      }
+    },
+    "reportArtifactRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifactId"
+      }
+    },
+    "licenceDecisionArtifactRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifactId"
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "referenceResolution": {
+          "enum": [
+            "UNVERIFIED",
+            "MATCH",
+            "FAILED"
+          ]
+        },
+        "integrity": {
+          "enum": [
+            "UNVERIFIED",
+            "VALID_INTEGRITY_ONLY",
+            "INVALID"
+          ]
+        },
+        "completeness": {
+          "enum": [
+            "INCOMPLETE",
+            "COMPLETE"
+          ]
+        },
+        "delivery": {
+          "enum": [
+            "NOT_EVALUATED",
+            "BLOCKED",
+            "ELIGIBLE"
+          ]
+        },
+        "missing": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "referenceResolution",
+        "integrity",
+        "completeness",
+        "delivery",
+        "missing"
+      ]
+    }
+  },
+  "required": [
+    "contract",
+    "researchRunContract",
+    "recordMode",
+    "domain",
+    "researchRunId",
+    "projectId",
+    "producerCommit",
+    "stateChainRef",
+    "eventRefs",
+    "experimentRecordRefs",
+    "executionRecordRefs",
+    "scienceRunRefs",
+    "evidenceRefs",
+    "replayRefs",
+    "sourceArtifactRefs",
+    "reportArtifactRefs",
+    "licenceDecisionArtifactRefs",
+    "verification"
+  ],
+  "$defs": {
+    "eventRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agentRunId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "enum": [
+            "PROBLEM_FORMALIZED",
+            "KNOWLEDGE_SNAPSHOT",
+            "HYPOTHESES_GENERATED",
+            "PREDICTIONS_FROZEN",
+            "EXPERIMENT_HANDOFF",
+            "SELF_FALSIFICATION",
+            "EVIDENCE_UPDATE",
+            "NEXT_EXPERIMENT",
+            "TERMINAL"
+          ]
+        }
+      },
+      "required": [
+        "agentRunId",
+        "seq",
+        "type"
+      ]
+    },
+    "executionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agentRunId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "const": "EXPERIMENT_HANDOFF"
+        }
+      },
+      "required": [
+        "agentRunId",
+        "seq",
+        "type"
+      ]
+    },
+    "experimentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "kind": {
+          "enum": [
+            "PREREGISTRATION",
+            "SESSION"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ]
+    },
+    "scienceRunRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "proposalId"
+      ]
+    },
+    "replayRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verificationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "scienceRunId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "verificationId",
+        "scienceRunId"
+      ]
+    },
+    "artifactId": {
+      "type": "string",
+      "pattern": "^artifact:[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "recordMode": {
+            "const": "SYNTHETIC_EXAMPLE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "referenceResolution": {
+                "const": "UNVERIFIED"
+              },
+              "integrity": {
+                "const": "UNVERIFIED"
+              },
+              "delivery": {
+                "const": "NOT_EVALUATED"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "delivery": {
+                "const": "ELIGIBLE"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recordMode": {
+            "const": "RESOLVED_EXPORT"
+          },
+          "verification": {
+            "properties": {
+              "referenceResolution": {
+                "const": "MATCH"
+              },
+              "integrity": {
+                "const": "VALID_INTEGRITY_ONLY"
+              },
+              "completeness": {
+                "const": "COMPLETE"
+              },
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          },
+          "eventRefs": {
+            "minItems": 1
+          },
+          "experimentRecordRefs": {
+            "minItems": 2
+          },
+          "executionRecordRefs": {
+            "minItems": 1
+          },
+          "scienceRunRefs": {
+            "minItems": 1
+          },
+          "evidenceRefs": {
+            "minItems": 1
+          },
+          "replayRefs": {
+            "minItems": 1
+          },
+          "reportArtifactRefs": {
+            "minItems": 1
+          },
+          "licenceDecisionArtifactRefs": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "completeness": {
+                "const": "COMPLETE"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "missing": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

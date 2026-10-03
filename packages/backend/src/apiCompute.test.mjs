@@ -2,6 +2,7 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
+import { createComputeAdmission } from './compute/computeAdmission.mjs';
 
 /** Backend Compute Engine przez router API (żywa baza in-memory). */
 
@@ -56,6 +57,60 @@ describe('compute API', () => {
     assert.equal(r.body.run.status, 'ok');
     assert.ok(Math.abs(r.body.run.outputs.lorentzGammaFactor - 1.66667) < 0.001);
     assert.ok(r.body.run.provenance.formula.length > 0);
+  });
+
+  test('heavy external-engine runs require authentication before validation or execution', () => {
+    const heavy = {
+      contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry',
+      sourceText: 'security admission test', inputs: { bondLengthAngstrom: 99 },
+    };
+    const anonymous = call('POST', '/api/compute/fabric/run', { body: heavy });
+    assert.equal(anonymous.status, 401);
+    assert.equal(anonymous.body.error, 'unauthorized');
+    assert.equal(call('POST', '/api/compute/run', {
+      body: { modelId: heavy.modelId, inputs: heavy.inputs },
+    }).status, 401);
+    assert.equal(call('POST', '/api/compute/admet/predict', {
+      body: { smiles: ['CCO'] },
+    }).status, 401);
+    assert.equal(call('POST', '/api/compute/qm/singlepoint', {
+      body: { atoms: [{ element: 'H', x: 0, y: 0, z: 0 }] },
+    }).status, 401);
+
+    const researcher = reg('heavy-runner@lab.org');
+    const authenticated = call('POST', '/api/compute/fabric/run', { token: researcher.token, body: heavy });
+    assert.equal(authenticated.status, 400);
+    assert.equal(authenticated.body.run.error, 'out_of_range');
+    const admet = call('POST', '/api/compute/admet/predict', {
+      token: researcher.token,
+      body: { smiles: ['CCO'] },
+    });
+    assert.equal(admet.status, 403);
+    assert.equal(admet.body.error, 'BLOCKED_BY_LICENSE');
+    assert.equal(admet.body.message, 'ADMET_WEIGHTS_AND_TRAINING_DATA_LICENSE_UNVERIFIED');
+  });
+
+  test('heavy execution fails fast when the process is busy or the principal budget is exhausted', () => {
+    const researcher = reg('bounded-runner@lab.org');
+    const heavy = {
+      contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry',
+      sourceText: 'security admission test', inputs: { bondLengthAngstrom: 0.74 },
+    };
+    const busyAdmission = createComputeAdmission({ limit: 2, maxActive: 1 });
+    const held = busyAdmission.acquire('another-principal');
+    assert.equal(held.ok, true);
+    const busy = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', token: researcher.token, body: heavy, query: {}, computeAdmission: busyAdmission });
+    assert.equal(busy.status, 503);
+    assert.equal(busy.body.error, 'compute_busy');
+    held.release();
+
+    const limitedAdmission = createComputeAdmission({ limit: 1, maxActive: 1 });
+    const spent = limitedAdmission.acquire(researcher.user.id);
+    assert.equal(spent.ok, true);
+    spent.release();
+    const limited = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', token: researcher.token, body: heavy, query: {}, computeAdmission: limitedAdmission });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.body.error, 'compute_rate_limited');
   });
 
   test('invalid inputs → 400 rejected; unknown model → 500 error surfaced', () => {

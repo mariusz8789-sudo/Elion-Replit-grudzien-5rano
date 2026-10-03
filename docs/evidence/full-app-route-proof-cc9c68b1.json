@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "genesis.full-app-route-proof-summary@1",
+  "testedCommit": "cc9c68b17d84c2c2c46e1760ff8118eb0493585c",
+  "testedAt": "2026-10-01T23:49:49.779Z",
+  "status": "PASS",
+  "routeCount": 94,
+  "caseCount": 188,
+  "viewports": [
+    { "mode": "desktop", "width": 1440, "height": 900 },
+    { "mode": "mobile", "width": 390, "height": 844 }
+  ],
+  "failures": 0,
+  "representativeScreenshots": 14,
+  "observedSecurityBoundaries": [
+    { "status": 401, "count": 2, "classification": "AUTHENTICATION_BOUNDARY" },
+    { "status": 429, "count": 38, "classification": "RATE_LIMIT_BOUNDARY" }
+  ],
+  "sourceHashes": {
+    "packages/frontend/src/core/navigation.ts": "ddd2d5b57880e299a48f901e7991107c241c33cbae1cbd873b9ac45a299c908b",
+    "packages/frontend/src/App.tsx": "8a4b8099d6174d1e91bf0b033f2acd799816e106fe549a8db667d14242ad8b2a"
+  },
+  "rawReport": {
+    "path": "artifacts/full-app-route-proof/report.json",
+    "sha256": "18ecfde6d0ae75427c8546660709c310ccfbada5c58ac1c1bd038650051c3e40"
+  },
+  "screenshotHashes": {
+    "desktop-home.png": "e0a92ec99859699b94d072c5a5252335e224eaf46a3f1a6143ded4121f89501d",
+    "desktop-drug.png": "23689f2539c3f8a38d3c6117b42b0ce0be7cbac7bb12393e37ea485281a194d5",
+    "desktop-evidence.png": "6e334695e3540fa3adc922a4fa6b17e1f9418cce67ea96a74d648a591b3a1fd8",
+    "desktop-human-biology-lab.png": "092f2e1b91c6c8f5ec2ac8cdc69d24293afa503b81298919714337abc969dcf5",
+    "desktop-more.png": "0467cfdfb9b071292cf44d1372941440c503ff933a2307b2048253bd52daecb3",
+    "desktop-research-console.png": "f141843bbd6907eb085b1013395cd842b152167abfd156bc05b0784d8505e419",
+    "desktop-scientific-worlds.png": "ab3f0235710055335af44300eb10c7e289e09b301bed678ffde2ad0c9c856652",
+    "mobile-home.png": "1ef48e4ae558438974151f9ef0a3bcefd069f4fd0fb08f6cc965e21ba088b841",
+    "mobile-drug.png": "0b05631b422cb2217dc5a682e39d032ddefee00a6b3ccea8ba3732420221db9f",
+    "mobile-evidence.png": "9f437dfb7735fe8026f0b8e18fe2287160ed8c0e0145a9e5784854993d8ef343",
+    "mobile-human-biology-lab.png": "613465c26e0036dad6862900ad4c49a8da1a80653eaad6d5a821c7dca62d754e",
+    "mobile-more.png": "881b00f9f6f3ec58bcc119c8fa86e8669e1fa95b2939c4641237bf0a0841c5ba",
+    "mobile-research-console.png": "e04b6d7d43447b3254498eba3fddbd337a01c7642d5f3a4d5b558310391dc7df",
+    "mobile-scientific-worlds.png": "215e034d9a315a3aeb831a22f56b2298f826a38914d675813653dfa24cf0c1ec"
+  },
+  "limitations": [
+    "Headless Edge/Chromium is not physical-device proof.",
+    "SwiftShader/software rendering is not real-GPU performance proof.",
+    "Authentication and rate-limit responses were recorded as security boundaries; populated authenticated states need their own product-flow tests.",
+    "The raw report and PNG files remain local review artifacts; their hashes are pinned here."
+  ]
+}

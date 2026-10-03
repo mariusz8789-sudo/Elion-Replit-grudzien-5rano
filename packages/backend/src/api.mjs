@@ -61,15 +61,28 @@ import { hashPassword, verifyPassword, generateToken, validateRegistration } fro
 import { createHash } from 'node:crypto';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
-import { listCapabilities } from './compute/capabilities.mjs';
+import { listCapabilities, listCapabilitiesMetadata } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
 import { runJob, requestCancel, enqueueJob } from './compute/jobs.mjs';
 import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
-import { listToolchain, getTool } from './campaign/toolchain.mjs';
+import { listToolchain, listToolchainMetadata, getToolMetadata } from './campaign/toolchain.mjs';
+import { createAgentRun, getAgentRun, listAgentRuns, readResearchState, appendResearchStateEvent } from './agentRun.mjs';
+import { readKnowledgeRegistry, openGap, resolveGap, recordContradiction, resolveContradiction } from './knowledgeRegistry.mjs';
+import { buildCognitiveState } from './cognitiveState.mjs';
+import { buildSelfModel } from './genesisSelfModel.mjs';
+import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
+import { proposeScientificClaim } from './claimProposal.mjs';
+import { controlResearchRun, getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
+import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
+import { retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
+import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGeneratedScientificAnalysis } from './generatedScientificAnalysis.mjs';
+import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
+import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
+import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
 import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
@@ -86,6 +99,7 @@ import {
   linkLabEvidenceProposal,
   reviewExternalLabObservation,
 } from './campaign/labClosedLoop.mjs';
+import { createCanonicalCandidateLabHandoff } from './campaign/candidateLabHandoff.mjs';
 import { buildLabObservationEvidenceInput } from './campaign/labEvidenceBridge.mjs';
 import {
   planVirtualExperiment,
@@ -119,6 +133,7 @@ import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { CAPABILITIES, capabilityDecision, canUseCapability } from './accountProfiles.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
+import { createComputeAdmission } from './compute/computeAdmission.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
 import { runIngest, listProposals, publishProposal, rejectProposal, proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { runQuantum, describeQuantum } from './quantumApi.mjs';
@@ -137,6 +152,7 @@ const TRIAL_STATUSES = new Set(['baseline', 'draft', 'promising', 'failed']);
 let localVideoRuntimeCache = null;
 let localVideoRuntimeCachedAt = 0;
 const LOCAL_VIDEO_RUNTIME_CACHE_MS = 60_000;
+const heavyComputeAdmission = createComputeAdmission();
 
 const ok = (body, status = 200) => ({ status, body });
 const err = (status, error, message) => ({ status, body: { error, ...(message ? { message } : {}) } });
@@ -217,6 +233,66 @@ const DRUG_DISCOVERY_WRITE_SEGMENTS = new Set(['targets', 'candidates', 'jobs', 
  * @param db  otwarta baza (store.mjs)
  * @param ctx { method, pathname, token, body }  body już sparsowane (obiekt) lub null
  */
+/** The backend reasoning provider comes from server.mjs (built from its environment); without one, it is blocked. */
+const BLOCKED_REASONING_PROVIDER = createReasoningProvider({});
+function reasoningProviderOf(ctx) {
+  return ctx.reasoningProvider ?? BLOCKED_REASONING_PROVIDER;
+}
+
+function isHeavyRegistryModel(modelId) {
+  const model = getModel(String(modelId ?? ''));
+  const honesty = model?.provenance?.honesty;
+  return model?.kind === 'external-engine'
+    || model?.kind === 'external-data'
+    || (typeof honesty === 'string' && honesty.startsWith('real_external_engine'));
+}
+
+function heavyComputeRoute(seg, method, body) {
+  if (method !== 'POST' || seg[0] !== 'compute') return null;
+  if (seg.length === 3 && seg[1] === 'admet' && seg[2] === 'predict') return 'admet-predict';
+  if (seg.length === 3 && seg[1] === 'qm' && seg[2] === 'singlepoint') return 'qm-singlepoint';
+  if (seg.length === 2 && seg[1] === 'run' && isHeavyRegistryModel(body.modelId)) return `model:${body.modelId}`;
+  if (seg.length === 3 && seg[1] === 'fabric' && seg[2] === 'run' && isHeavyRegistryModel(body.modelId)) return `model:${body.modelId}`;
+  return null;
+}
+
+function runHeavyCompute(db, ctx, operation, execute) {
+  const user = getUserByToken(db, ctx.token);
+  if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić kosztowne obliczenie naukowe.');
+  const admission = ctx.computeAdmission ?? heavyComputeAdmission;
+  const ticket = admission.acquire(user.id);
+  if (!ticket.ok) {
+    if (ticket.reason === 'busy') return err(503, 'compute_busy', 'Inne kosztowne obliczenie jest już wykonywane. Spróbuj ponownie później.');
+    if (ticket.reason === 'rate_limited') return err(429, 'compute_rate_limited', 'Limit kosztownych obliczeń dla tego użytkownika został wyczerpany.');
+    return err(403, 'compute_admission_denied');
+  }
+  try {
+    return execute(user, operation);
+  } finally {
+    ticket.release();
+  }
+}
+
+function runHeavyComputeAsync(db, ctx, operation, execute) {
+  const user = getUserByToken(db, ctx.token);
+  if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić kosztowne obliczenie naukowe.');
+  const admission = ctx.computeAdmission ?? heavyComputeAdmission;
+  const ticket = admission.acquire(user.id);
+  if (!ticket.ok) {
+    if (ticket.reason === 'busy') return err(503, 'compute_busy', 'Inne kosztowne obliczenie jest już wykonywane. Spróbuj ponownie później.');
+    if (ticket.reason === 'rate_limited') return err(429, 'compute_rate_limited', 'Limit kosztownych obliczeń dla tego użytkownika został wyczerpany.');
+    return err(403, 'compute_admission_denied');
+  }
+  return Promise.resolve()
+    .then(() => execute(user, operation))
+    .finally(() => ticket.release());
+}
+
+function admitCommercialAdmet() {
+  const admission = admitAdmetUse({ purpose: ADMET_USE_PURPOSE.COMMERCIAL_PRODUCT });
+  return admission.ok ? null : err(403, admission.status, admission.failureCode);
+}
+
 export function handleApi(db, ctx) {
   const { method, pathname } = ctx;
   const body = ctx.body ?? {};
@@ -244,6 +320,15 @@ export function handleApi(db, ctx) {
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
   if (seg[0] === 'compute') {
+    const heavyOperation = heavyComputeRoute(seg, method, body);
+    if (heavyOperation) {
+      return runHeavyCompute(db, ctx, heavyOperation, () => {
+        if (seg.length === 2 && seg[1] === 'run') return runComputeHandler(db, ctx, body);
+        if (seg.length === 3 && seg[1] === 'fabric' && seg[2] === 'run') return runFabricHandler(db, ctx, body);
+        if (seg.length === 3 && seg[1] === 'admet' && seg[2] === 'predict') return runAdmetHandler(body);
+        return runQuantumSinglePointHandler(body);
+      });
+    }
     if (seg[1] === 'local-video' && seg[2] === 'runtime' && seg.length === 3 && method === 'GET') {
       return ok({
         capabilities: listLocalVideoCapabilities(),
@@ -275,7 +360,7 @@ export function handleApi(db, ctx) {
         return err(400, 'scientific_state_promotion_rejected', error instanceof Error ? error.message : String(error));
       }
     }
-    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilities() });
+    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilitiesMetadata() });
     if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
     if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {
       const m = getModel(seg[2]);
@@ -284,10 +369,10 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
     if (seg[1] === 'fabric' && seg[2] === 'contract' && seg.length === 3 && method === 'GET') return ok({ contract: buildFabricContract(listModels()) });
     if (seg[1] === 'fabric' && seg[2] === 'run' && seg.length === 3 && method === 'POST') return runFabricHandler(db, ctx, body);
-    // Rejestr Toolchain (P6): status silników ustalony w runtime realną walidacją.
-    if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchain() });
+    // Publiczny, pasywny widok rejestru; walidacja zachodzi na chronionych ścieżkach wykonania.
+    if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchainMetadata() });
     if (seg[1] === 'toolchain' && seg.length === 3 && method === 'GET') {
-      const t = getTool(seg[2]);
+      const t = getToolMetadata(seg[2]);
       return t ? ok({ tool: t }) : err(404, 'not_found');
     }
     // Runtime scientific-environment audit (Priority 1): realna sonda + persystencja.
@@ -299,13 +384,10 @@ export function handleApi(db, ctx) {
       return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
     if (seg[1] === 'admet' && seg[2] === 'predict' && seg.length === 3 && method === 'POST') {
-      const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
-      const r = predictAdmet(smiles);
-      return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+      return runAdmetHandler(body);
     }
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
-      const r = runQuantumSinglePoint(body ?? {});
-      return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+      return runQuantumSinglePointHandler(body);
     }
     return err(404, 'not_found');
   }
@@ -638,6 +720,284 @@ export function handleApi(db, ctx) {
       }
     }
 
+    // ---- Genesis Mind research state (ENTITY-0): a run's append-only, hash-chained transition log ----
+    // Stored as steps of an existing agent run (agentRun.mjs), never as a second memory. Reads
+    // re-verify the chain and report a broken one as it is; writes only extend the current head.
+    // ENTITY-2: the cognitive state is a view rebuilt on every read; the registry is the only new memory.
+    if (seg[2] === 'cognitive-state' && seg.length === 3) {
+      if (method !== 'GET') return err(405, 'method_not_allowed');
+      return (async () => {
+        let selfModel;
+        try { selfModel = buildSelfModel({ db, runtime: await buildScientificRuntimeStatus(db), reasoningModel: reasoningProviderOf(ctx).describe() }); } catch { selfModel = null; }
+        return ok({ cognitiveState: buildCognitiveState(db, projectId, { selfModel }) });
+      })();
+    }
+    // ENTITY-3: an external model proposes; the answer is validated and stored as PROPOSED, never as knowledge.
+    if (seg[2] === 'claim-proposals' && seg.length === 3) {
+      if (method === 'GET') {
+        const { chain, claims } = readKnowledgeRegistry(db, projectId);
+        return chain.ok ? ok({ chain, proposals: claims }) : { status: 409, body: { error: 'state_integrity_failure', chain } };
+      }
+      if (method !== 'POST') return err(405, 'method_not_allowed');
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+      return (async () => {
+        const provider = reasoningProviderOf(ctx);
+        let selfModel;
+        try {
+          selfModel = buildSelfModel({
+            db,
+            runtime: await buildScientificRuntimeStatus(db),
+            reasoningModel: provider.describe(),
+            toolchain: listToolchain(),
+            capabilities: listCapabilities(),
+          });
+        } catch { selfModel = null; }
+        const result = await proposeScientificClaim(db, projectId, body, { provider, selfModel, userId: user.id });
+        if (result.ok) return ok(result, result.deduped ? 200 : 201);
+        const status = { INVALID_REQUEST: 400, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null, chain: result.chain ?? null } };
+      })();
+    }
+    if (seg[2] === 'knowledge-registry') {
+      const registryResult = (result, created = false) => {
+        if (result.ok) return ok(result, created && !result.deduped ? 201 : 200);
+        const status = result.error === 'state_integrity_failure' || result.error === 'gap_not_open' || result.error === 'contradiction_not_open' ? 409
+          : result.error === 'not_found' ? 404
+            : result.error.startsWith('invalid_') ? 400 : 422;
+        return { status, body: { error: result.error, reason: result.reason ?? null, unresolved: result.unresolved ?? null, chain: result.chain ?? null } };
+      };
+      if (seg.length === 3) {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        const { chain, gaps, contradictions } = readKnowledgeRegistry(db, projectId);
+        return ok({ chain, gaps, contradictions });
+      }
+      if (method !== 'POST') return err(405, 'method_not_allowed');
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+      if (seg[3] === 'gaps' && seg.length === 4) return registryResult(openGap(db, projectId, body, user.id), true);
+      if (seg[3] === 'gaps' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveGap(db, projectId, seg[4], body, user.id));
+      if (seg[3] === 'contradictions' && seg.length === 4) return registryResult(recordContradiction(db, projectId, body, user.id), true);
+      if (seg[3] === 'contradictions' && seg.length === 6 && seg[5] === 'resolve') return registryResult(resolveContradiction(db, projectId, seg[4], body, user.id));
+      return err(404, 'not_found');
+    }
+    // ---- R1-a Research Run: one question → one run id → the model PROPOSES a plan (researchRun.mjs) ----
+    // A research run is an agent run of RESEARCH_RUN_DOMAIN; only the server writes its research state.
+    if (seg[2] === 'research-runs') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ researchRuns: listResearchRuns(db, projectId) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const started = startResearchRun(db, projectId, body, { userId: user.id });
+        if (!started.ok) return started.error === 'invalid_research_run' ? err(400, 'invalid_research_run', 'question jest wymagane.') : { status: 409, body: { error: started.error } };
+        return ok({ deduped: started.deduped, researchRun: started.researchRun }, started.deduped ? 200 : 201);
+      }
+      const current = getResearchRun(db, projectId, seg[3]);
+      if (!current) return err(404, 'not_found');
+      if (seg.length === 4) {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        return ok({ researchRun: current });
+      }
+      if (seg.length === 5 && ['pause', 'resume', 'cancel'].includes(seg[4])) {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = controlResearchRun(db, projectId, current.researchRunId, seg[4], { userId: user.id, reason: body?.reason });
+        if (result.ok) return ok(result);
+        const status = result.status === 'NOT_FOUND' ? 404 : 409;
+        return { status, body: { error: result.status, from: result.from ?? null, action: result.action ?? null } };
+      }
+      if (seg.length === 5 && seg[4] === 'steering') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = steerResearchRun(db, projectId, current.researchRunId, body, { userId: user.id });
+        if (result.ok) return ok(result, 201);
+        const status = result.status === 'NOT_FOUND' || result.status === 'HYPOTHESIS_NOT_FOUND' ? 404 : 409;
+        return { status, body: { error: result.status, reason: result.reason ?? null } };
+      }
+      if (seg.length === 5 && seg[4] === 'literature') {
+        if (method === 'GET') return ok({ literatureSnapshots: current.literatureSnapshots });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const result = await retrieveResearchRunLiterature(db, projectId, current.researchRunId, body, {
+            port: ctx.literaturePort,
+            options: ctx.literatureOptions,
+            userId: user.id,
+          });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = { NOT_FOUND: 404, RUN_NOT_RETRIEVABLE: 409, STATE_INTEGRITY_FAILURE: 409, LITERATURE_PORT_NOT_CONFIGURED: 503 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null } };
+        })();
+      }
+      if (seg.length === 5 && seg[4] === 'customer-delivery') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const requiredItems = requiredCommercialItemsOf(current);
+        const productId = body?.productId ?? null;
+        const declaredUse = resolveCustomerDeclaredUse(productId, body?.declaredUse ?? 'CUSTOMER_REPORT_EXPORT');
+        let commercialDecision = { ok: false, status: 'BLOCKED_EXTERNAL_LICENSE_REVIEW', items: [] };
+        if (typeof ctx.commercialAdmissionProvider?.resolve === 'function') {
+          try {
+            commercialDecision = ctx.commercialAdmissionProvider.resolve({
+              projectId,
+              researchRunId: current.researchRunId,
+              releaseId: body?.releaseId ?? null,
+              declaredUse,
+              requiredItems,
+            });
+          } catch {
+            commercialDecision = { ok: false, status: 'COMMERCIAL_POLICY_PROVIDER_ERROR', items: [] };
+          }
+        }
+        const result = buildCustomerResearchDelivery(db, projectId, current.researchRunId, {
+          releaseId: body?.releaseId ?? null,
+          declaredUse,
+          productId,
+          onboarding: body?.onboarding ?? null,
+          items: commercialDecision?.ok && Array.isArray(commercialDecision.items)
+            ? commercialDecision.items
+            : [],
+          commercialDecisionSource: commercialDecision?.ok
+            ? 'SERVER_SIDE_COMMERCIAL_POLICY_PROVIDER'
+            : commercialDecision?.status ?? 'BLOCKED_EXTERNAL_LICENSE_REVIEW',
+        });
+        if (!result.ok) return err(404, result.status);
+        if (body?.includeExportArtifact === true) {
+          return ok({ ...result, exportArtifact: buildAuthorizedCustomerExport(result.delivery) });
+        }
+        return ok(result);
+      }
+      if (seg.length === 5 && seg[4] === 'generated-analyses') {
+        if (method === 'GET') return ok({ generatedAnalyses: generatedAnalysesOf(current.researchState) });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return runHeavyComputeAsync(db, ctx, `generated-analysis:${current.researchRunId}`, async () => {
+          const result = await generateAndExecuteScientificAnalysis(db, projectId, current.researchRunId, body, {
+            provider: reasoningProviderOf(ctx),
+            sandboxPort: ctx.scientificSandboxPort,
+            image: ctx.scientificSandboxImage,
+            userId: user.id,
+          });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = {
+            NOT_FOUND: 404,
+            INVALID_REQUEST: 400,
+            REJECTED_MALFORMED_RESPONSE: 422,
+            RUN_NOT_EXECUTABLE: 409,
+            STATE_INTEGRITY_FAILURE: 409,
+            BLOCKED_BY_PROVIDER_CONFIGURATION: 503,
+            BLOCKED_BY_CONFIGURATION: 503,
+            BLOCKED_BY_DATA: 422,
+            PROVIDER_TIMEOUT: 504,
+            PROVIDER_REFUSED: 502,
+            PROVIDER_ERROR: 502,
+            TIMEOUT: 504,
+            FAILED: 422,
+          }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, failureCode: result.failureCode ?? null } };
+        });
+      }
+      if (seg.length === 7 && seg[4] === 'generated-analyses' && seg[6] === 'replay') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return runHeavyComputeAsync(db, ctx, `generated-analysis-replay:${current.researchRunId}:${seg[5]}`, async () => {
+          const result = await replayGeneratedScientificAnalysis(db, projectId, current.researchRunId, seg[5], {
+            sandboxPort: ctx.scientificSandboxPort,
+            image: ctx.scientificSandboxImage,
+          });
+          if (result.ok) return ok(result, 201);
+          const status = {
+            NOT_FOUND: 404,
+            ANALYSIS_NOT_FOUND: 404,
+            ANALYSIS_NOT_REPLAYABLE: 409,
+            RUN_NOT_EXECUTABLE: 409,
+            STATE_INTEGRITY_FAILURE: 409,
+            BLOCKED_BY_CONFIGURATION: 503,
+          }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, failureCode: result.failureCode ?? null } };
+        });
+      }
+      if (seg.length === 5 && seg[4] === 'proposals') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return (async () => {
+          const provider = reasoningProviderOf(ctx);
+          let selfModel;
+          try {
+            selfModel = buildSelfModel({
+              db,
+              runtime: await buildScientificRuntimeStatus(db),
+              reasoningModel: provider.describe(),
+              toolchain: listToolchain(),
+              capabilities: listCapabilities(),
+            });
+          } catch { selfModel = null; }
+          const result = await proposeResearchPlan(db, projectId, current.researchRunId, { provider, selfModel, userId: user.id });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          const status = { NOT_FOUND: 404, RUN_NOT_PROPOSABLE: 409, BLOCKED_BY_PROVIDER_CONFIGURATION: 503, PROVIDER_TIMEOUT: 504, PROVIDER_REFUSED: 502, PROVIDER_ERROR: 502, STATE_INTEGRITY_FAILURE: 409 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, rejected: result.rejected ?? null } };
+        })();
+      }
+      // R1-b: a person starts the execution; the server freezes the prediction, runs the engine,
+      // falsifies, proposes evidence and the next experiment (researchRunExecution.mjs).
+      if (seg.length === 5 && seg[4] === 'experiments') {
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const hypothesisId = typeof body?.hypothesisId === 'string' && body.hypothesisId.trim() ? body.hypothesisId.trim().slice(0, 200) : null;
+        return runHeavyCompute(db, ctx, `research-run:${current.researchRunId}`, () => {
+          const result = executeResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
+          if (result.ok) return ok(result, result.deduped ? 200 : 201);
+          // A missing adapter is permanent (409); a missing or failing runtime can recover (503).
+          const status = result.reason === 'NO_RESEARCH_RUN_ADAPTER' ? 409 : { NOT_FOUND: 404, HYPOTHESIS_NOT_FOUND: 404, BLOCKED: 503, RUN_NOT_EXECUTABLE: 409, EXPERIMENT_IN_PROGRESS: 409, NO_EXECUTABLE_EXPERIMENT: 409, EXPERIMENT_NOT_EXECUTABLE: 409, STATE_INTEGRITY_FAILURE: 409, PREREGISTRATION_REFUSED: 409, EVIDENCE_PROPOSAL_FAILED: 502 }[result.status] ?? 422;
+          return { status, body: { error: result.status, reason: result.reason ?? null, engineId: result.engineId ?? null, skipped: result.skipped ?? null, experimentId: result.experimentId ?? null } };
+        });
+      }
+      // R1-c: replay one executed experiment through the existing Scientific Run verifier (campaign/verify.mjs).
+      if (seg.length === 7 && seg[4] === 'experiments' && seg[6] === 'replays') {
+        const x = current.experiments.find((e) => e.experimentId === seg[5]);
+        if (!x) return err(404, 'not_found');
+        if (method === 'GET') return ok({ experimentId: x.experimentId, replays: x.execution?.scienceRunId ? listResearchExperimentReplays(db, x.execution.scienceRunId) : [] });
+        if (method !== 'POST') return err(405, 'method_not_allowed');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = replayResearchExperiment(db, projectId, current.researchRunId, x.experimentId);
+        if (result.ok) return ok(result, 201);
+        const status = { NOT_FOUND: 404, EXPERIMENT_NOT_FOUND: 404, NOT_EXECUTED: 409, NOTHING_TO_REPLAY: 409, STATE_INTEGRITY_FAILURE: 409, REPLAY_FAILED: 502 }[result.status] ?? 422;
+        return { status, body: { error: result.status, reason: result.reason ?? null } };
+      }
+      return err(404, 'not_found');
+    }
+    if (seg[2] === 'agent-runs') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ runs: listAgentRuns(db, projectId) });
+        if (method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const goal = typeof body?.goal === 'string' ? body.goal.trim().slice(0, 2000) : '';
+          const domain = typeof body?.domain === 'string' ? body.domain.trim().slice(0, 200) : '';
+          if (!goal || !domain) return err(400, 'invalid_agent_run', 'goal i domain są wymagane.');
+          if (domain === RESEARCH_RUN_DOMAIN) return err(409, 'server_managed_run', 'Przebieg badawczy tworzy się przez /research-runs.');
+          return ok({ run: createAgentRun(db, { projectId, goal, domain, createdBy: user.id }) }, 201);
+        }
+        return err(405, 'method_not_allowed');
+      }
+      const run = getAgentRun(db, seg[3]);
+      if (!run || run.projectId !== projectId) return err(404, 'not_found');
+      if (seg.length === 4 && method === 'GET') return ok({ run, researchState: readResearchState(db, run.id) });
+      if (seg.length === 5 && seg[4] === 'research-state') {
+        if (method === 'GET') return ok({ researchState: readResearchState(db, run.id) });
+        if (method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          // R1-a: a research run's state is written only by the server, after validation.
+          if (run.domain === RESEARCH_RUN_DOMAIN) return err(409, 'server_managed_run', 'Stan tego przebiegu zapisuje wyłącznie serwer.');
+          const result = appendResearchStateEvent(db, run.id, body?.event);
+          if (!result.ok) {
+            const status = result.error === 'step_index_conflict' || result.error === 'chain_mismatch' || result.error === 'state_integrity_failure' ? 409 : 400;
+            return { status, body: { error: result.error, reason: result.reason ?? null, chain: result.chain ?? null } };
+          }
+          return ok({ event: result.event, head: result.head, deduped: result.deduped }, result.deduped ? 200 : 201);
+        }
+        return err(405, 'method_not_allowed');
+      }
+      return err(404, 'not_found');
+    }
+
     // ---- Research Intake: governed intake between a research question and the existing campaign engine ----
     if (seg[2] === 'research-intake' && seg.length === 3) {
       if (method === 'POST') return createResearchIntakeHandler(db, user, role, projectId, body);
@@ -677,12 +1037,34 @@ export function handleApi(db, ctx) {
         // /api/projects/:id/campaigns/:cid/stage (editor+) — uruchamia etap ciężki (docking/QM)
         if (seg[4] === 'stage' && method === 'POST') {
           if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (body?.admet?.enabled) {
+            const blocked = admitCommercialAdmet();
+            if (blocked) return blocked;
+          }
           if (campaign.status !== 'completed') return err(409, 'campaign_not_completed', 'Etapy multi-fidelity wymagają zakończonej kampanii bazowej.');
           const job = createJob(db, { projectId, type: 'campaign-stage', params: { campaignId, config: sanitizeStageConfig(body) }, createdBy: user.id });
           void enqueueJob(db, job.id);
           return ok({ jobId: job.id }, 202);
         }
-        // /api/projects/:id/campaigns/:cid/lab-validation?candidate=:candidateId — governed external-lab
+        // /api/projects/:id/campaigns/:cid/lab-handoff - server-derived candidate
+        // -> preclinical protocol -> governed external-lab request.
+        if (seg[4] === 'lab-handoff') {
+          if (method !== 'POST') return err(405, 'method_not_allowed');
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const result = createCanonicalCandidateLabHandoff(db, {
+            campaignId,
+            candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+            requiredWetLabId: typeof body?.requiredWetLabId === 'string' ? body.requiredWetLabId : null,
+            externalProvider: body?.externalProvider ?? null,
+            requestedBy: user.id,
+          });
+          if (!result.ok) return err(400, result.error, result.detail);
+          if (result.handoff?.outcome === 'NO_WINNER' || (result.handoff?.outcome === 'BLOCKED' && !result.eventId)) {
+            return ok({ handoff: result.handoff, deduped: false });
+          }
+          return ok({ handoff: result.handoff, eventId: result.eventId, deduped: result.deduped }, 201);
+        }
+        // /api/projects/:id/campaigns/:cid/lab-validation?candidate=:candidateId - governed external-lab
         // validation request/dossier (editor+ to create, viewer+ to read). See campaign/labClosedLoop.mjs.
         if (seg[4] === 'lab-validation') {
           const labCandidateId = typeof ctx.query?.candidate === 'string' ? ctx.query.candidate : typeof body?.candidateId === 'string' ? body.candidateId : null;
@@ -894,6 +1276,11 @@ export function handleApi(db, ctx) {
       }
       if (seg.length === 6 && seg[4] === 'virtual-lab' && seg[5] === 'execute' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const planned = campaignStore.listEvents(db, campaignId).find((event) => event.type === 'VIRTUAL_EXPERIMENT_PLANNED' && event.payload?.executionId === body.executionId);
+        if (planned && ['admet-estimation', 'toxicity-risk-estimation'].includes(planned.payload?.requestedCapability)) {
+          const blocked = admitCommercialAdmet();
+          if (blocked) return blocked;
+        }
         // Asynchronous like /api/knowledge/ingest: a configured private scientific worker may run
         // the engine (server.mjs awaits handleApi's result). Unconfigured capabilities run locally.
         return executeVirtualExperimentDispatched(db, {
@@ -931,6 +1318,10 @@ export function handleApi(db, ctx) {
         if (seg.length === 7 && seg[6] === 'verify' && method === 'POST') {
           // Editor+: replays the real engine (costs real compute — e.g. an ADMET-AI model reload).
           if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (['admet-estimation', 'toxicity-risk-estimation'].includes(run.capability)) {
+            const blocked = admitCommercialAdmet();
+            if (blocked) return blocked;
+          }
           const v = verifyScienceRun(db, run.id);
           if (!v.ok) return err(404, 'not_found', v.error);
           return ok({ verification: v.verification }, 201);
@@ -946,6 +1337,19 @@ export function handleApi(db, ctx) {
   }
 
   return err(404, 'not_found');
+}
+
+function runAdmetHandler(body) {
+  const blocked = admitCommercialAdmet();
+  if (blocked) return blocked;
+  const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
+  const r = predictAdmet(smiles);
+  return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+}
+
+function runQuantumSinglePointHandler(body) {
+  const r = runQuantumSinglePoint(body ?? {});
+  return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
 }
 
 /* ---------------- Handlery uwierzytelniania ---------------- */

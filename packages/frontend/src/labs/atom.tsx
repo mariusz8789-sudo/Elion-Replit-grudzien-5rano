@@ -261,6 +261,7 @@ function AtomView({ lab }: { lab: LabDefinition }) {
             honesty={atomBohrConsequence.honesty}
             honestyNote={atomBohrConsequence.honestyNote}
             experimentId={atomBohrConsequence.id}
+            sceneId="lab:atom:atom.bohr-consequence"
           />
         </div>
       )}
@@ -310,6 +311,7 @@ function AtomView({ lab }: { lab: LabDefinition }) {
               : mode === 'trends' ? trendsHonestyNote
                 : lab.honestyNote
         }
+        sceneId={mode === 'orbitals' || mode === 'orbitals2d' || mode === 'trends' ? `lab:atom:${mode}` : 'lab:atom:atom'}
       />
 
       {mode === 'trends' && (

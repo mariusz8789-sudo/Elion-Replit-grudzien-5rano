@@ -35,6 +35,13 @@ jobs:
       - name: Build the pinned worker image
         run: docker build -f "${{ matrix.dockerfile }}" -t "genesis-worker-${{ matrix.group }}:ci" .
 
+      - name: Create an ephemeral worker service token
+        run: |
+          set -euo pipefail
+          worker_token="$(openssl rand -hex 32)"
+          echo "::add-mask::$worker_token"
+          echo "GENESIS_SCIENTIFIC_WORKER_TOKEN=$worker_token" >> "$GITHUB_ENV"
+
       - name: Start the worker as its non-root image user
         run: |
           set -euo pipefail
@@ -42,9 +49,10 @@ jobs:
             -p 8090:8090 \
             -e PORT=8090 \
             -e GENESIS_WORKER_GROUP="${{ matrix.group }}" \
+            -e GENESIS_SCIENTIFIC_WORKER_TOKEN \
             "genesis-worker-${{ matrix.group }}:ci"
 
-      - name: Verify health, allowlist and every real reference case
+      - name: Wait for passive health
         run: |
           set -euo pipefail
           trap 'docker logs "genesis-worker-${{ matrix.group }}" || true' ERR
@@ -57,18 +65,85 @@ jobs:
           done
 
           node -e "const h=require('/tmp/worker-health.json'); if(!h.ok || h.workerGroup !== '${{ matrix.group }}') throw new Error('invalid health: '+JSON.stringify(h));"
-          curl --fail --silent http://127.0.0.1:8090/engines > /tmp/worker-engines.json
 
-          for engine in ${{ matrix.engines }}; do
-            curl --fail --silent --show-error \
-              -X POST "http://127.0.0.1:8090/engines/$engine/reference-case" \
-              -H 'content-type: application/json' \
-              -d '{}' > "/tmp/$engine.json"
-            ENGINE="$engine" node -e "const r=require('/tmp/'+process.env.ENGINE+'.json'); if(!r.ok || r.toolId !== process.env.ENGINE || r.status !== 'AVAILABLE' || !r.outputHash) throw new Error('reference case not AVAILABLE: '+JSON.stringify(r));"
-          done
+      - name: Execute the full authenticated container probe
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/engine-runtime
+          node scripts/verify-scientific-worker-runtime.mjs \
+            --url http://127.0.0.1:8090 \
+            --group "${{ matrix.group }}" \
+            --level LOCAL_CONTAINER_VERIFIED \
+            --out "artifacts/engine-runtime/worker-runtime-${{ matrix.group }}.json"
+
+      - name: Use Node.js 22 for the candidate handoff proof
+        if: matrix.group == 'structural'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install the main-service dependencies for the candidate handoff proof
+        if: matrix.group == 'structural'
+        run: npm ci
+
+      - name: Prove real candidate to Evidence, Replay and governed laboratory handoff
+        if: matrix.group == 'structural'
+        env:
+          GENESIS_STRUCTURAL_WORKER_URL: http://127.0.0.1:8090
+        run: |
+          node scripts/candidate-lab-handoff-proof.mjs \
+            --out artifacts/candidate-lab-handoff/candidate-lab-handoff-proof.json \
+            --commit "${{ github.sha }}"
+
+      - name: Upload candidate handoff evidence
+        if: always() && matrix.group == 'structural'
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-lab-handoff-proof-${{ github.sha }}
+          path: artifacts/candidate-lab-handoff
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload per-worker runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scientific-worker-runtime-${{ matrix.group }}-${{ github.sha }}
+          path: artifacts/engine-runtime
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Show bounded diagnostics and remove the worker
         if: always()
         run: |
           docker logs "genesis-worker-${{ matrix.group }}" 2>&1 | tail -n 200 || true
           docker rm -f "genesis-worker-${{ matrix.group }}" || true
+
+  engine-runtime-product-proof:
+    name: Consolidate runtime truth and commercial blockers
+    if: always()
+    needs: worker-container
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: scientific-worker-runtime-*-${{ github.sha }}
+          path: artifacts/engine-runtime-workers
+          merge-multiple: true
+      - name: Build the canonical engine proof receipt
+        run: |
+          node scripts/engine-runtime-product-proof.mjs \
+            --reports artifacts/engine-runtime-workers \
+            --out artifacts/engine-runtime-status/engine-runtime-product-proof.json \
+            --commit "${{ github.sha }}"
+      - name: Upload consolidated runtime and product-admission evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: engine-runtime-product-proof-${{ github.sha }}
+          path: artifacts/engine-runtime-status
+          if-no-files-found: warn
+          retention-days: 90

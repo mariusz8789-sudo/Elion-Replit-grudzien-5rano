@@ -15,12 +15,15 @@
  * was actually persisted.
  */
 import { newId } from './auth.mjs';
+import { canonicalJson, fnv1a } from './determinism.mjs';
 
 const J = (v) => JSON.stringify(v ?? null);
 const P = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 
 export const AGENT_RUN_STATUS = Object.freeze({
   RUNNING: 'RUNNING',
+  PAUSED: 'PAUSED',
+  CANCELLED: 'CANCELLED',
   RESOLVED: 'RESOLVED',
   BLOCKED: 'BLOCKED',
   BUDGET_EXHAUSTED: 'BUDGET_EXHAUSTED',
@@ -105,4 +108,111 @@ function toAgentStep(row) {
 
 export function listAgentSteps(db, agentRunId) {
   return db.prepare('SELECT * FROM agent_run_steps WHERE agent_run_id = ? ORDER BY step_index ASC, created_at ASC').all(agentRunId).map(toAgentStep);
+}
+
+/* ---------------- Research State (ENTITY-0) ----------------
+ *
+ * `frontend/src/core/mind/researchState.ts` is Genesis Mind's append-only,
+ * hash-chained transition log. Until ENTITY-0 it lived only in process memory,
+ * so a restart erased what the Mind was working on. Its events are stored HERE,
+ * as ordinary steps of an agent run — no new table and no second memory: one
+ * research-state event is one `agent_run_steps` row whose `tool_invoked` is
+ * RESEARCH_STATE_TOOL, `capability` is the event type, `step_index` is the
+ * event's `seq` and `observation_json` is the event itself (payload included).
+ *
+ * The chain rule is the frontend's, re-computed here with the backend's own
+ * twin of the same primitives (`determinism.mjs`), so a write that does not
+ * extend the current head is refused and a read reports a broken chain instead
+ * of repairing it. Nothing in this section ever edits or deletes a step.
+ */
+export const RESEARCH_STATE_TOOL = 'mind.researchState';
+export const RESEARCH_STATE_EVENT_TYPES = Object.freeze([
+  'PROBLEM_FORMALIZED', 'KNOWLEDGE_SNAPSHOT', 'HYPOTHESES_GENERATED', 'PREDICTIONS_FROZEN',
+  'EXPERIMENT_HANDOFF', 'EVIDENCE_UPDATE', 'SELF_FALSIFICATION', 'SURPRISE_DETECTED', 'NEXT_EXPERIMENT', 'RESEARCH_STEERING', 'RUN_CONTROLLED', 'TERMINAL',
+  'GENERATED_ANALYSIS_PROPOSED', 'GENERATED_ANALYSIS_EXECUTED', 'GENERATED_ANALYSIS_REPLAYED',
+]);
+export const RESEARCH_STATE_GENESIS_HEAD = fnv1a(canonicalJson({ genesis: 'research-state-v1' }));
+
+function researchTransition(previousHead, type, payloadFingerprint, seq) {
+  return fnv1a(canonicalJson({ prev: previousHead, type, payloadFingerprint, seq }));
+}
+
+function researchStateSteps(db, agentRunId) {
+  return listAgentSteps(db, agentRunId).filter((s) => s.toolInvoked === RESEARCH_STATE_TOOL);
+}
+
+/**
+ * Recomputes the whole chain from the genesis head. Never repairs: the first
+ * inconsistency is reported with its position and the chain stays broken.
+ */
+export function verifyResearchStateEvents(events) {
+  let head = RESEARCH_STATE_GENESIS_HEAD;
+  for (const [index, event] of events.entries()) {
+    const fail = (reason) => ({ ok: false, length: events.length, head: null, brokenAt: index, reason });
+    if (!event || typeof event !== 'object') return fail('malformed_event');
+    if (event.seq !== index) return fail('sequence_gap');
+    if (!RESEARCH_STATE_EVENT_TYPES.includes(event.type)) return fail('unknown_event_type');
+    if (!('payload' in event)) return fail('payload_missing');
+    if (fnv1a(canonicalJson(event.payload)) !== event.payloadFingerprint) return fail('payload_fingerprint_mismatch');
+    if (researchTransition(head, event.type, event.payloadFingerprint, event.seq) !== event.transitionFingerprint) return fail('transition_fingerprint_mismatch');
+    head = event.transitionFingerprint;
+  }
+  return { ok: true, length: events.length, head, brokenAt: null, reason: null };
+}
+
+/** The run's persisted research-state events, in order, and the verdict of re-verifying their chain. */
+export function readResearchState(db, agentRunId) {
+  const events = researchStateSteps(db, agentRunId).map((s) => s.observation);
+  return { events, chain: verifyResearchStateEvents(events) };
+}
+
+/**
+ * Appends one event. Accepted only if it extends the current head exactly; the
+ * same event sent twice is an idempotent no-op, anything else at an occupied or
+ * skipped position is refused. A run whose stored chain is already broken
+ * accepts nothing more (fail closed).
+ */
+export function appendResearchStateEvent(db, agentRunId, event) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return { ok: false, error: 'invalid_event' };
+  if (!Number.isInteger(event.seq) || event.seq < 0) return { ok: false, error: 'invalid_event', reason: 'seq' };
+  if (!RESEARCH_STATE_EVENT_TYPES.includes(event.type)) return { ok: false, error: 'invalid_event', reason: 'type' };
+  if (typeof event.at !== 'string') return { ok: false, error: 'invalid_event', reason: 'at' };
+  if (!('payload' in event)) return { ok: false, error: 'invalid_event', reason: 'payload' };
+  const stored = { seq: event.seq, type: event.type, at: event.at, payload: event.payload, payloadFingerprint: event.payloadFingerprint, transitionFingerprint: event.transitionFingerprint };
+
+  const current = readResearchState(db, agentRunId);
+  if (!current.chain.ok) return { ok: false, error: 'state_integrity_failure', chain: current.chain };
+  if (event.seq < current.events.length) {
+    const existing = current.events[event.seq];
+    return canonicalJson(existing) === canonicalJson(stored)
+      ? { ok: true, deduped: true, event: existing, head: current.chain.head }
+      : { ok: false, error: 'step_index_conflict' };
+  }
+  if (event.seq !== current.events.length) return { ok: false, error: 'step_index_conflict' };
+  if (fnv1a(canonicalJson(stored.payload)) !== stored.payloadFingerprint) return { ok: false, error: 'payload_fingerprint_mismatch' };
+  if (researchTransition(current.chain.head, stored.type, stored.payloadFingerprint, stored.seq) !== stored.transitionFingerprint) {
+    return { ok: false, error: 'chain_mismatch' };
+  }
+  addAgentStep(db, {
+    agentRunId, stepIndex: stored.seq, toolInvoked: RESEARCH_STATE_TOOL, capability: stored.type,
+    hypothesis: {}, observation: stored, nextAction: {},
+  });
+  return { ok: true, deduped: false, event: stored, head: stored.transitionFingerprint };
+}
+
+/**
+ * Server-side twin of the frontend's event builder (R1-a): the backend itself extends a run's
+ * research state, with the same chain rule, instead of trusting a client to compute the head.
+ * Goes through appendResearchStateEvent, so every check above still applies.
+ */
+export function appendServerResearchStateEvent(db, agentRunId, type, payload, at = new Date().toISOString()) {
+  const current = readResearchState(db, agentRunId);
+  if (!current.chain.ok) return { ok: false, error: 'state_integrity_failure', chain: current.chain };
+  const seq = current.events.length;
+  const stored = JSON.parse(canonicalJson(payload ?? null));
+  const payloadFingerprint = fnv1a(canonicalJson(stored));
+  return appendResearchStateEvent(db, agentRunId, {
+    seq, type, at, payload: stored, payloadFingerprint,
+    transitionFingerprint: researchTransition(current.chain.head, type, payloadFingerprint, seq),
+  });
 }

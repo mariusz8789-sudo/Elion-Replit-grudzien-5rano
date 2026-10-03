@@ -3,6 +3,7 @@ import { spacetimeMinkowski } from './experiments/spacetime-minkowski';
 import { spacetimeLightCone3D } from './experiments/spacetime-lightcone-3d';
 import { spacetimeRelativityConsequence } from './experiments/spacetime-relativity-consequence';
 import { spacetimeCSlider } from './experiments/spacetime-cslider';
+import { inverseLorentzGamma, lorentzGamma } from '../core/physics';
 
 /**
  * Space-Time Lab — dylatacja czasu na zegarach świetlnych.
@@ -36,7 +37,7 @@ class LightClockSim implements Sim {
 
   update(dt: number, p: SimParams) {
     const v = Number(p.v); // ułamek c
-    const gammaInv = Math.sqrt(1 - v * v); // = 1/γ
+    const gammaInv = inverseLorentzGamma(v); // = 1/γ
     const cSpeed = 1.4; // pełne cykle zegara spoczywającego na sekundę
 
     this.y1 += this.dir1 * cSpeed * 2 * dt;
@@ -127,7 +128,7 @@ export const spacetimeLab: LabDefinition = {
   experiments: [spacetimeMinkowski, spacetimeLightCone3D, spacetimeRelativityConsequence, spacetimeCSlider],
   narrate(p, stats) {
     const v = Number(p.v);
-    const gamma = 1 / Math.sqrt(1 - v * v);
+    const gamma = lorentzGamma(v);
     const trip = Number(p.tripYears);
     const travelerYears = trip / gamma;
     const t1 = Number(stats.ticks1 ?? 0);

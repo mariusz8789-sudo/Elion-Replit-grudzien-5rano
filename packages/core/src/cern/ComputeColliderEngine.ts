@@ -3,6 +3,7 @@ import { QuantumColliderEngine, type ColliderEvent } from '../collider/QuantumCo
 import { BlackHoleEventHorizonEngine, hawkingSpectrum, type FormationResult } from './BlackHoleEventHorizonEngine.js';
 import { MaterialsDiscoveryEngine, type CrystalStructure, type IonSpec } from './MaterialsDiscoveryEngine.js';
 import { EvidenceLedger, sha256hex, stableStringify, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
+import { proposeGeneratedRecord } from '../knowledge/generatedRecordAdmission.js';
 export interface TrackAttributes { readonly count: number; readonly aPT: Float32Array; readonly aPhi0: Float32Array; readonly aPzOverPt: Float32Array; readonly aCharge: Float32Array; readonly aType: Float32Array; }
 /** Compute-accelerated, bit-reproducible collider facade. Seed is anchored in EvidenceLedger contentHash. */
 export class ComputeColliderEngine {
@@ -20,7 +21,7 @@ export class ComputeColliderEngine {
   /** Re-anchor determinism: new seed derived from a ledger contentHash (auditable). */
   anchorSeed(label: string): string {
     const input: NewEvidenceInput = { sourceUrl: 'genesis://cern/seed/' + label, sourceTimestamp: null, claim: 'seed-anchor ' + label, claimType: 'model', confidence: 1, provenance: { sourceKind: 'dataset', retrievedBy: 'compute-collider-engine', independentSourceIds: [] } };
-    const h = this.ledger.addRecord(input).record.contentHash;
+    const h = proposeGeneratedRecord(this.ledger, input);
     this.seedBase = parseInt(h.slice(0, 8), 16);
     this.collider = new QuantumColliderEngine(this.seedBase, this.sqrtS);
     this.bh = new BlackHoleEventHorizonEngine(this.seedBase);
@@ -63,7 +64,7 @@ export class ComputeColliderEngine {
   commitBatch(events: readonly ColliderEvent[]): string {
     const batchHash = sha256hex(stableStringify({ seed: this.seedBase, hashes: events.map(e => e.eventHash) }));
     const input: NewEvidenceInput = { sourceUrl: 'genesis://cern/batch/' + batchHash.slice(0, 12), sourceTimestamp: null, claim: 'collision batch n=' + events.length + ' sqrtS=' + this.sqrtS + ' batchHash=' + batchHash, claimType: 'model', confidence: 1, provenance: { sourceKind: 'dataset', retrievedBy: 'compute-collider-engine', independentSourceIds: [] } };
-    return this.ledger.addRecord(input).record.contentHash;
+    return proposeGeneratedRecord(this.ledger, input);
   }
   commitHorizon(res: FormationResult): string { return this.bh.commitToLedger(this.ledger, res); }
   commitCrystal(c: CrystalStructure): string { return this.mats.commitToLedger(this.ledger, c); }

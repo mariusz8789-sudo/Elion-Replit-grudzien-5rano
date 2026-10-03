@@ -5,8 +5,8 @@
  *
  * Routes:
  *   GET  /health                                  liveness + what this worker may execute
- *   GET  /engines                                 the toolchain entry of each engine in this worker's allowlist
- *   POST /engines/:toolId/reference-case          the tool's own reference case (unauthenticated, as before)
+ *   GET  /engines                                 authenticated toolchain entries for this worker's allowlist
+ *   POST /engines/:toolId/reference-case          authenticated execution of a tool's reference case
  *   POST /capabilities/:capabilityId/execute      authenticated, bounded execution of ONE real
  *                                                 candidate computation (compute/scientificCapabilityContract.mjs)
  *
@@ -145,6 +145,17 @@ export function createWorkerServer({
     const presented = createHash('sha256').update(header.slice('Bearer '.length)).digest();
     return timingSafeEqual(presented, tokenDigest);
   };
+  const requireExecutionAuth = (req, res) => {
+    if (!tokenDigest) {
+      jsonResponse(res, 503, failure(DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE, 'WORKER_AUTH_NOT_CONFIGURED'));
+      return false;
+    }
+    if (!authorized(req.headers.authorization)) {
+      jsonResponse(res, 401, failure(DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE, 'UNAUTHORIZED'), { 'www-authenticate': 'Bearer' });
+      return false;
+    }
+    return true;
+  };
   const remember = (executionId, entry) => {
     idempotency.set(executionId, entry);
     while (idempotency.size > idempotencyCacheSize) idempotency.delete(idempotency.keys().next().value);
@@ -153,10 +164,7 @@ export function createWorkerServer({
   async function handleExecute(req, res, capabilityId) {
     if (req.method !== 'POST') return jsonResponse(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' });
     // Authenticate before reading a body or revealing anything about this worker.
-    if (!tokenDigest) return jsonResponse(res, 503, failure(DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE, 'WORKER_AUTH_NOT_CONFIGURED'));
-    if (!authorized(req.headers.authorization)) {
-      return jsonResponse(res, 401, failure(DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE, 'UNAUTHORIZED'), { 'www-authenticate': 'Bearer' });
-    }
+    if (!requireExecutionAuth(req, res)) return;
 
     const contract = getCapabilityContract(capabilityId);
     if (!contract) return jsonResponse(res, 404, failure(DISPATCH_STATE.BLOCKED_INVALID_INPUT, 'UNKNOWN_CAPABILITY'));
@@ -254,6 +262,7 @@ export function createWorkerServer({
       }
 
       if (req.method === 'GET' && url.pathname === '/engines') {
+        if (!requireExecutionAuth(req, res)) return;
         // getTool() per allowlisted id: listToolchain() would run the reference
         // case of every registry engine — engines this image does not even contain.
         const matrix = [...allowed].map((toolId) => getTool(toolId));
@@ -266,6 +275,8 @@ export function createWorkerServer({
       const execMatch = /^\/engines\/([a-z0-9-]+)\/reference-case$/.exec(url.pathname);
       if (execMatch) {
         if (req.method !== 'POST') return jsonResponse(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' });
+        // Authenticate before reading the body, checking the allowlist or starting validation.
+        if (!requireExecutionAuth(req, res)) return;
         const toolId = execMatch[1];
         if (!allowed.has(toolId)) {
           return jsonResponse(res, 404, { ok: false, error: 'ENGINE_NOT_IN_WORKER', toolId, workerGroup });

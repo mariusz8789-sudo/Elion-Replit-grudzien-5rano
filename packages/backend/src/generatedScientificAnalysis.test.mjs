@@ -196,6 +196,29 @@ describe('generated scientific analysis in canonical ResearchRun', () => {
     db.close();
   });
 
+  test('a failed analysis stays deduped until the user explicitly retries; the failure stays in the chain', async () => {
+    const db = openDatabase();
+    const { call, owner, base } = setup(db, 'generated-retry@lab.org', {
+      reasoningProvider: provider(),
+      scientificSandboxPort: sandbox([{ average: 2.5, n: 4 }, { mean: 2.5, n: 4 }]),
+    });
+    const started = await call('POST', `${base}/research-runs`, { question: 'Retry a failed generated analysis.' }, owner.token);
+    const runId = started.body.researchRun.researchRunId;
+    const route = `${base}/research-runs/${runId}/generated-analyses`;
+    const first = await call('POST', route, { objective: 'Compute the mean.' }, owner.token);
+    assert.equal(first.status, 422);
+    const again = await call('POST', route, { objective: 'Compute the mean.' }, owner.token);
+    assert.equal(again.status, 422, 'no retry without an explicit request');
+    const retried = await call('POST', route, { objective: 'Compute the mean.', retry: true }, owner.token);
+    assert.equal(retried.status, 201);
+    assert.equal(retried.body.execution.status, 'SUCCESS');
+    const listed = await call('GET', route, null, owner.token);
+    assert.deepEqual(listed.body.generatedAnalyses.map((a) => a.execution.status), ['FAILED', 'SUCCESS']);
+    const afterSuccess = await call('POST', route, { objective: 'Compute the mean.', retry: true }, owner.token);
+    assert.equal(afterSuccess.body.deduped, true, 'a successful analysis is never re-run by retry');
+    db.close();
+  });
+
   test('a pause during sandbox execution rejects the late result and keeps the canonical audit trail', async () => {
     const db = openDatabase();
     let release;

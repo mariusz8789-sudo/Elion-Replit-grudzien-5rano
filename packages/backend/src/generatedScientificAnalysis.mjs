@@ -203,7 +203,14 @@ export async function generateAndExecuteScientificAnalysis(db, projectId, runId,
   const objective = STR(input.objective, 4_000) ?? before.question;
   if (!objective) return { ok: false, status: 'INVALID_REQUEST', reason: 'objective' };
   const requestFingerprint = canonicalHash({ researchRunId: runId, objective });
-  const analysisId = `analysis-${requestFingerprint.slice(0, 24)}`;
+  const sameRequest = generatedAnalysesOf(before.researchState).filter((entry) => (entry.proposal?.requestFingerprint ?? null) === requestFingerprint);
+  const failedAttempts = sameRequest.filter((entry) => entry.execution && entry.execution.status !== 'SUCCESS').length;
+  const hasSuccess = sameRequest.some((entry) => entry.execution?.status === 'SUCCESS');
+  // A failed attempt stays in the append-only chain; an explicit retry is a new attempt with its own analysisId.
+  const attempt = input.retry === true && failedAttempts > 0 && !hasSuccess && sameRequest.every((entry) => entry.execution) ? failedAttempts : Math.max(0, sameRequest.length - 1);
+  const analysisId = attempt === 0
+    ? `analysis-${requestFingerprint.slice(0, 24)}`
+    : `analysis-${canonicalHash({ requestFingerprint, attempt }).slice(0, 24)}`;
   let analysis = generatedAnalysesOf(before.researchState).find((entry) => entry.analysisId === analysisId);
   if (analysis?.execution) {
     return {

@@ -85,9 +85,17 @@ describe('compute API', () => {
       token: researcher.token,
       body: { smiles: ['CCO'] },
     });
-    assert.equal(admet.status, 403);
-    assert.equal(admet.body.error, 'BLOCKED_BY_LICENSE');
-    assert.equal(admet.body.message, 'ADMET_WEIGHTS_AND_TRAINING_DATA_LICENSE_UNVERIFIED');
+    assert.notEqual(admet.body.error, 'BLOCKED_BY_LICENSE', 'technical validation is not a commercial release');
+    const previous = process.env.GENESIS_ENGINE_USE_PURPOSE;
+    process.env.GENESIS_ENGINE_USE_PURPOSE = 'COMMERCIAL_PRODUCT';
+    try {
+      const commercial = call('POST', '/api/compute/admet/predict', { token: researcher.token, body: { smiles: ['CCO'] } });
+      assert.equal(commercial.status, 403);
+      assert.equal(commercial.body.error, 'BLOCKED_BY_LICENSE');
+      assert.equal(commercial.body.message, 'ADMET_WEIGHTS_AND_TRAINING_DATA_LICENSE_UNVERIFIED');
+    } finally {
+      if (previous === undefined) delete process.env.GENESIS_ENGINE_USE_PURPOSE; else process.env.GENESIS_ENGINE_USE_PURPOSE = previous;
+    }
   });
 
   test('heavy execution fails fast when the process is busy or the principal budget is exhausted', () => {

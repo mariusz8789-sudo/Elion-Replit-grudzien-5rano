@@ -82,7 +82,8 @@ import { generateAndExecuteScientificAnalysis, generatedAnalysesOf, replayGenera
 import { buildAuthorizedCustomerExport, buildCustomerResearchDelivery, requiredCommercialItemsOf, resolveCustomerDeclaredUse } from './customerResearchDelivery.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
-import { admitAdmetUse, ADMET_USE_PURPOSE } from './compute/admetResearchRunExecutor.mjs';
+import { admitAdmetUse } from './compute/admetResearchRunExecutor.mjs';
+import { resolveEngineUsePurpose } from './compute/engineUsePurpose.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
 import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
@@ -257,7 +258,7 @@ function runHeavyComputeAsync(db, ctx, operation, execute) {
 }
 
 function admitCommercialAdmet() {
-  const admission = admitAdmetUse({ purpose: ADMET_USE_PURPOSE.COMMERCIAL_PRODUCT });
+  const admission = admitAdmetUse({ purpose: resolveEngineUsePurpose().admet });
   return admission.ok ? null : err(403, admission.status, admission.failureCode);
 }
 
@@ -1092,6 +1093,7 @@ export function handleApi(db, ctx) {
             projectId, campaignId,
             candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
             smiles: typeof body?.smiles === 'string' ? body.smiles : null,
+            usePurpose: resolveEngineUsePurpose().retrosynthesis,
             options: {
               iterationLimit: Number(body?.iterationLimit) || undefined,
               timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,

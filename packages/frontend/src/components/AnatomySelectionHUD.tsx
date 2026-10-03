@@ -68,7 +68,7 @@ export function microCaption(artifact: BiologyArtifact, genericSample = false): 
     const tissue = artifact.slide.tissueType;
     // The pancreas tile is drawn from textbook histology (acini, ducts, an islet), not from any scanned section.
     const schematic = tissue === 'PANCREAS' ? ` · ${tx('textbookSchematic')}` : '';
-    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}${generic}${schematic}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}` };
+    return { title: tissue === 'BLOOD' ? tx('bloodUnder') : `${tx('tissue')}: ${tissueName(tissue)}${generic}${schematic}`, detail: `${tx('scale')} ≈ 1 mm · ${tx('slide')} · ${tx('modelNotPatient')}${tissue === 'PANCREAS' || tissue === 'BLOOD' ? '' : ` · ${tx('layoutIllustrative')}`}` };
   }
   if (artifact.kind === 'hyperscope' && artifact.cell) {
     const m = artifact.capture.request.magnification;

@@ -10,7 +10,7 @@ import { createLocalContentAddressedArtifactStorage } from './compute/localArtif
 import { createSqliteScientificJobQueueBackend } from './compute/workerInfrastructureContract.mjs';
 import { createResearchRunWorker, enqueueResearchExperiment, queueFor, RESEARCH_REMOTE_CAPABILITY } from './researchRunJobs.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
-import { handleRemoteWorkerApi, REMOTE_OUTCOME_KIND, workerTokenMatches } from './remoteWorkerApi.mjs';
+import { forgetRemoteWorkers, handleRemoteWorkerApi, listRemoteWorkers, REMOTE_OUTCOME_KIND, workerTokenMatches } from './remoteWorkerApi.mjs';
 
 // Planning accepts an RDKit experiment only where the server itself has RDKit (the server also replays), so these need it.
 const RDKIT = rdkitDetect();
@@ -133,4 +133,25 @@ test('a completion is only as good as its artifact: wrong digest, wrong worker, 
     assert.equal(frozenEvents().at(-1), 'PREDICTIONS_FROZEN', 'no refused completion produced a result');
     assert.equal(ctx.db.prepare('SELECT status FROM jobs WHERE id = ?').get(claimed.jobId).status, 'CLAIMED', 'the lease stays with its worker');
   } finally { ctx.done(); }
+});
+
+test('the worker list shows a polling worker as IDLE, then SILENT once it stops, and nothing for a project that has no leases', async () => {
+  forgetRemoteWorkers();
+  const ctx = await setup();
+  try {
+    assert.deepEqual(listRemoteWorkers(ctx.db, ctx.project.id).workers, []);
+    await ctx.worker('POST', 'claim', { workerId: 'worker-unit-list', leaseMs: 5_000, engines: ['rdkit'] });
+    const now = Date.now();
+    const idle = listRemoteWorkers(ctx.db, ctx.project.id, { now });
+    assert.equal(idle.workers.length, 1);
+    assert.equal(idle.workers[0].workerId, 'worker-unit-list');
+    assert.equal(idle.workers[0].state, 'IDLE');
+    assert.deepEqual(idle.workers[0].leases, []);
+    assert.deepEqual(idle.workers[0].technicalDetails.engines, ['rdkit'], 'engine names are carried only as technical details');
+    assert.equal(listRemoteWorkers(ctx.db, ctx.project.id, { now: now + 120_000 }).workers[0].state, 'SILENT');
+    assert.equal(idle.queuedRemoteJobs, 0);
+    await enqueueResearchExperiment(ctx.db, ctx.project.id, ctx.runId, { remote: true });
+    assert.equal(listRemoteWorkers(ctx.db, ctx.project.id).queuedRemoteJobs, 1);
+    assert.equal(listRemoteWorkers(ctx.db, 'some-other-project').queuedRemoteJobs, 0, 'another project sees none of it');
+  } finally { forgetRemoteWorkers(); ctx.done(); }
 });

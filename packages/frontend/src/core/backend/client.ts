@@ -1919,6 +1919,35 @@ export interface GenesisCognitiveState {
   integrity: { researchRuns: { runId: string; ok: boolean; [key: string]: unknown }[]; knowledgeRegistry: { ok: boolean; brokenAt: number | null; reason: string | null } };
 }
 
+/* ---- Remote ResearchRun workers (backend remoteWorkerApi.mjs listRemoteWorkers) ---- */
+
+export type RemoteWorkerState = 'BUSY' | 'IDLE' | 'LEASE_EXPIRED' | 'SILENT';
+export interface RemoteWorkerLease {
+  jobId: string;
+  researchRunId: string;
+  kind: 'EXPERIMENT' | 'ADVANCE';
+  /** Set when the job is a fan-out child: the parent run that spawned it. */
+  fanOutParentRunId: string | null;
+  attempt: number;
+  maxAttempts: number;
+  lastHeartbeatAt: string;
+  leaseExpiresAt: string;
+  leaseState: 'ACTIVE' | 'EXPIRED';
+}
+export interface RemoteWorker {
+  workerId: string;
+  state: RemoteWorkerState;
+  lastSeenAt: string | null;
+  leases: RemoteWorkerLease[];
+  /** Engine names stay here, under Technical details on screen. null: the server has not seen this worker report them. */
+  technicalDetails: { engines: string[] | null };
+}
+export interface RemoteWorkersView { workers: RemoteWorker[]; queuedRemoteJobs: number; scope: string }
+
+export async function getRemoteWorkers(token: string, projectId: string): Promise<ApiResult<RemoteWorkersView>> {
+  return request('GET', `/projects/${projectId}/remote-workers`, { token });
+}
+
 export async function getCognitiveState(token: string, projectId: string): Promise<ApiResult<GenesisCognitiveState>> {
   const r = await request<{ cognitiveState: GenesisCognitiveState }>('GET', `/projects/${projectId}/cognitive-state`, { token });
   return r.ok ? { ok: true, data: r.data.cognitiveState } : r;

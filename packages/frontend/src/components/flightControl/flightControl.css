@@ -174,3 +174,10 @@
 .fc-dep .fc-small { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) { .fc-btn { transition: none; } }
+
+/* remote workers: one row per worker */
+.fc-workers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+.fc-worker { padding: 0.8rem 0; border-top: 1px solid var(--fc-line); display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.fc-worker-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; min-width: 0; }
+.fc-worker-leases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.fc-worker-leases li { display: flex; flex-direction: column; gap: 0.1rem; overflow-wrap: anywhere; }

@@ -30,7 +30,7 @@ have commits whose every patch is already on main by patch-id. The remaining 60 
 | OBSOLETE | **5** |
 | ARCHITECTURALLY_INVALID | **5** |
 | ACTIVE_WORK_ALREADY_OWNED | **1** |
-| NEEDS_PORT | **2** |
+| NEEDS_PORT | **1** (was 2; NP-1 merged as `8ab0ec9d`, see §2) |
 | **UNREVIEWED** | **0** |
 | **UNKNOWN** | **0** |
 | Total | **124** + `origin/main` = **125 refs** |
@@ -59,10 +59,11 @@ Per family (each adds up to its family total):
 
 ### The two NEEDS_PORT items, in one line each
 
-1. **`claude/grant-readiness-consolidation-rj04ng`** — three commits made *after* PR #81 was cut
-   from this branch. They add remote **advance** and remote **fan-out** over the worker API, a
-   dependency-free protocol module, a remote-worker registry route and the Flight Control view for
-   it. Nothing of it is on main. Details in §2.
+1. ~~**`claude/grant-readiness-consolidation-rj04ng`**~~ — **CLOSED 4 Oct 2026 02:30Z.** The three
+   commits made after PR #81 (remote **advance** and remote **fan-out** over the worker API, a
+   dependency-free protocol module, a remote-worker registry route and the Flight Control view)
+   were raised as PR #84, passed all 42 CI checks on head `a3befec0` and merged into `main` as
+   `8ab0ec9d`, recorded as D-170. Nothing of this branch is unmerged any more. Details in §2.
 2. **`claude/chemistry-discovery-verify-i30c1u`** — two test files for the chemistry
    `WorldLeverCatalog`. Main has its own catalogue implementation with a different API, so the tests
    do not run as written. Blocker and exact mismatch in §2.

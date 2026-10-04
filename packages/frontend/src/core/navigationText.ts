@@ -26,6 +26,8 @@ const ITEMS: Readonly<Record<string, { label: Pair; short?: Pair; description?: 
   'flight-control': { label: ['Science Flight Control'], description: ['Research runs, the job queue and experiment flights; pause, resume, cancel'] },
   dossier: { label: ['Candidates', 'المرشحون'], description: ['Saved candidates with their evidence; download the dossier'] },
   pilot: { label: ['Evidence packs & exports', 'حزم الأدلة والتصدير'], description: ['Plan → result → an evidence pack to download and replay'] },
+  'lab-handoff': { label: ['Lab handoff'], short: ['Lab'], description: ['A measurement request, the package for a laboratory, the result, a second person’s review and the comparison with the computation'] },
+  reports: { label: ['Reports'], description: ['Evidence packs, result records, Verify reports, laboratory packages and the customer export to download'] },
   'scientific-os': { label: ['All capabilities', 'كل الإمكانات'], description: ['The full catalogue, each entry with its audited status', 'الكتالوج الكامل، لكل بند حالته المدققة'] },
   account: { label: ['Account: sign in or sign up', 'الحساب: تسجيل الدخول أو إنشاء حساب'], description: ['Sign in, register and your account profile'] },
   settings: { label: ['Settings', 'الإعدادات'], description: ['Account, projects, research mode'] },

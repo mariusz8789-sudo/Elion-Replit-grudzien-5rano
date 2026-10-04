@@ -28,6 +28,8 @@ import { screenTitle } from './core/navigationText';
 import { plEn } from './core/capabilityNames';
 import { fcText } from './components/flightControl/flightControlText';
 import { vText } from './components/verify/verifyText';
+import { lText } from './components/labHandoff/labHandoffText';
+import { rText } from './components/reports/reportsText';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
@@ -109,6 +111,8 @@ const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').
 const DiscoveryTrackScreen = lazy(() => import('./components/DiscoveryTrackScreen').then((m) => ({ default: m.DiscoveryTrackScreen })));
 const FlightControlScreen = lazy(() => import('./components/FlightControlScreen').then((m) => ({ default: m.FlightControlScreen })));
 const VerifyScreen = lazy(() => import('./components/VerifyScreen').then((m) => ({ default: m.VerifyScreen })));
+const LabHandoffScreen = lazy(() => import('./components/LabHandoffScreen').then((m) => ({ default: m.LabHandoffScreen })));
+const ReportsScreen = lazy(() => import('./components/ReportsScreen').then((m) => ({ default: m.ReportsScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -199,6 +203,8 @@ type Route =
   | { kind: 'discovery-track' }
   | { kind: 'flight-control' }
   | { kind: 'verify' }
+  | { kind: 'lab-handoff' }
+  | { kind: 'reports' }
   | { kind: 'more' };
 
 export function parseHash(): Route {
@@ -287,6 +293,8 @@ export function parseHash(): Route {
   if (h === '#/discovery-track') return { kind: 'discovery-track' };
   if (h === '#/flight-control') return { kind: 'flight-control' };
   if (h === '#/verify' || h.startsWith('#/verify?')) return { kind: 'verify' };
+  if (h === '#/lab-handoff') return { kind: 'lab-handoff' };
+  if (h === '#/reports') return { kind: 'reports' };
   // Pełny pulpit Genesis (StartHero) dla profili, które domyślnie widzą uproszczony pulpit profilu.
   if (h === '#/?full') return { kind: 'home', full: true };
   return { kind: 'home' };
@@ -555,6 +563,26 @@ export default function App() {
         <div className="app">
           <TopBar title={`✓ ${vText('kicker', getLocale())}`} onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><VerifyScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'lab-handoff') {
+      return (
+        <div className="app">
+          <TopBar title={lText('kicker', getLocale())} onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><LabHandoffScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'reports') {
+      return (
+        <div className="app">
+          <TopBar title={rText('kicker', getLocale())} onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><ReportsScreen /></HeavyRoute>
           {overlays}
         </div>
       );

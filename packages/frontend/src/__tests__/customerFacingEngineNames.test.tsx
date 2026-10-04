@@ -217,3 +217,41 @@ describe('specialist screens name capabilities; engines only under Technical det
     expect(naturalDiscoveryTechnical(result).map((r) => r.value).join(' ')).toContain('ADMET-AI');
   });
 });
+
+describe('DELIVER screens: Lab handoff and Reports name capabilities; engines only under Technical details', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const executed = {
+    experimentId: 'x1',
+    frozen: { hypothesisId: 'h1', claim: 'Aspirin is moderately lipophilic.', engineId: 'rdkit', input: { smiles: 'CCO' }, inputHash: 'i', protocolId: 'p', predictionFingerprint: 'a', preregistrationFingerprint: 'b', criteria: [] },
+    execution: { status: 'EXECUTED', engine: { engineId: 'rdkit', engineLabel: 'RDKit', version: '2026.03' }, output: { crippenLogP: 1.31 }, inputHash: 'i', outputHash: 'o', scienceRunId: 's', startedAt: '', finishedAt: '' },
+    falsification: { verdict: 'SUPPORTED_WITHIN_PROTOCOL' as const, scope: '', criteria: [] },
+    evidence: { evidenceProposalId: 'ev', status: 'PROPOSED' as const, publication: 'REQUIRES_HUMAN_APPROVAL' as const },
+    next: { replay: { verdict: 'MATCH' as const }, proposal: { action: 'HUMAN_REVIEW' as const, reason: '' }, decidedBy: '' },
+  };
+
+  for (const locale of ['pl', 'en'] as const) {
+    it(`Lab handoff and Reports in ${locale.toUpperCase()}`, async () => {
+      stubWindow();
+      const { experimentRows } = await import('../components/labHandoff/labHandoffModel');
+      const { ExperimentsStep, HonestNotice } = await import('../components/labHandoff/LabHandoffView');
+      const { deliverablesOf } = await import('../components/reports/reportsModel');
+      const { ReportsList, ReportsUnsigned } = await import('../components/reports/ReportsView');
+      const { LabHandoffScreen } = await import('../components/LabHandoffScreen');
+      const { ReportsScreen } = await import('../components/ReportsScreen');
+      const run = { researchRunId: 'rr', question: 'Q', plan: null, experiments: [executed], nextStep: 'NONE' as const, researchState: { chain: { ok: true }, events: [] } };
+      const html = renderToStaticMarkup(
+        <>
+          <LabHandoffScreen />
+          <ReportsScreen />
+          <HonestNotice locale={locale} />
+          <ExperimentsStep locale={locale} rows={experimentRows([executed], [], locale)} onPrepare={() => {}} />
+          <ReportsUnsigned locale={locale} />
+          <ReportsList locale={locale} runs={[{ researchRunId: 'rr', question: 'Q', status: 'RUNNING', nextStep: 'NONE', events: 1, createdAt: 0 }]} byRun={{ rr: { status: 'ready', items: deliverablesOf('p', run, null) } }} items={{}} onAct={() => {}} />
+        </>,
+      );
+      expect(customerText(html).match(ENGINE_NAME_PATTERN)).toBeNull();
+      expect(html).toMatch(/data-technical-details[\s\S]*rdkit/);
+    });
+  }
+});

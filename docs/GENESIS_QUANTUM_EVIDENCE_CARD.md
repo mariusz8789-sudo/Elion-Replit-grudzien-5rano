@@ -44,4 +44,4 @@ Test musi potwierdzić, że prośba związana z Majorana tworzy kartę o trzech 
 [1]: https://www.nature.com/articles/s41586-024-08445-2 "Interferometric single-shot parity measurement in InAs–Al hybrid devices, Nature (2025)"
 [2]: https://link.aps.org/doi/10.1103/Physics.18.57 "APS — Experts Weigh in on Microsoft’s Topological Qubit Claim"
 [3]: https://link.aps.org/doi/10.1103/Physics.18.68 "APS — Microsoft’s Claim of a Topological Qubit Faces Tough Questions"
-[4]: /home/ubuntu/genesis_delivery/GENESIS_MAJORANA_AND_QUANTUM_SIMULATION_RESEARCH.md "Research Genesis"
+[4]: # "Research Genesis (GENESIS_MAJORANA_AND_QUANTUM_SIMULATION_RESEARCH.md; not in this repository)"

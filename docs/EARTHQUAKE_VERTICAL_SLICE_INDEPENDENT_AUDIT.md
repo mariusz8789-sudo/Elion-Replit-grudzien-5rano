@@ -7,7 +7,7 @@
 | Branch | `origin/claude/earthquake-vertical-slice` |
 | Audited head | `c0485926edf60ccc596b3914ff93fb6e1dcd28c9` |
 | Genesis merge base | `8e58a13aeb88c259c1c96efe5d3d1ee0b41fbd07` |
-| Audit method | Separate detached checkout at `/home/ubuntu/genesis-earthquake-audit` |
+| Audit method | Separate detached checkout, outside this repository |
 
 The branch includes the prior Phase 0 provenance foundation and the earthquake module. It is not merge-approved merely because it is isolated from City3D.
 

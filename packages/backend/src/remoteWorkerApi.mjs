@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { sha256Hex } from './determinism.mjs';
+import { redact } from './redact.mjs';
 import { ENGINE_EXECUTION_STATUS } from './compute/engineExecutionContract.mjs';
 import { executeResearchExperiment } from './researchRunExecution.mjs';
 import { RESEARCH_RUN_EXECUTORS } from './researchRunEngines.mjs';
@@ -267,7 +268,10 @@ export async function handleRemoteWorkerApi(db, { method, pathname, token, body,
       if (seg[2] === 'complete') return await complete(db, artifactStorage, jobId, body);
     }
   } catch (error) {
-    return fail(500, 'internal', { reason: String(error?.message ?? error) });
+    // The worker is a separate host holding only a shared bearer token; it is not the operator.
+    // An unexpected server error names the server's own files (a SQLite path, a module URL), so the
+    // reason crosses path-redacted (D-168). The unredacted error stays in the server's own log.
+    return fail(500, 'internal', { reason: redact(String(error?.message ?? error)) });
   }
   return fail(404, 'not_found');
 }

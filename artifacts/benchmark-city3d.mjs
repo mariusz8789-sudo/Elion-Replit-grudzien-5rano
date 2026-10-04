@@ -1,10 +1,17 @@
 import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Output root, derived from this file. It used to be the absolute path of the machine this
+// capture first ran on, which named that host in a committed artefact and wrote nowhere
+// useful in any other checkout (D-168).
+const ARTIFACTS = path.dirname(fileURLToPath(import.meta.url));
 
 const endpoint = 'http://127.0.0.1:9222';
 const benchmarkSuffix = process.env.GENESIS_BENCHMARK_SUFFIX ?? '';
 const output = benchmarkSuffix
-  ? `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/city3d-benchmark-${benchmarkSuffix}.json`
-  : '/home/ubuntu/genesis-epidemic-digital-twin/artifacts/city3d-benchmark.json';
+  ? `${ARTIFACTS}/city3d-benchmark-${benchmarkSuffix}.json`
+  : path.join(ARTIFACTS, 'city3d-benchmark.json');
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const targets = await (await fetch(`${endpoint}/json/list`)).json();
 const target = targets.find((candidate) => String(candidate.url).includes('#/city3d'))

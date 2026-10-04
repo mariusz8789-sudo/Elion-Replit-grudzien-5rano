@@ -486,7 +486,7 @@ $ git worktree add /tmp/claude-0/worktree-test HEAD --detach
 $ file /tmp/claude-0/worktree-test/.git
 /tmp/claude-0/worktree-test/.git: ASCII text
 $ cat /tmp/claude-0/worktree-test/.git
-gitdir: /home/user/Elion-Replit-grudzien-5rano/.git/worktrees/worktree-test
+gitdir: <repo>/.git/worktrees/worktree-test
 ```
 
 Test dodany PRZED naprawą (czerwony):

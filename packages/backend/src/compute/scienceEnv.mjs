@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolvePythonExecutable } from './pythonRuntime.mjs';
+import { redact } from '../redact.mjs';
 
 const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'env_probe.py');
 const PYTHON = resolvePythonExecutable();
@@ -26,7 +27,11 @@ export function probeEnvironment({ fresh = false } = {}) {
     const r = JSON.parse(out);
     cache = r.ok ? { ok: true, runtime: r.runtime, engines: r.engines } : { ok: false, error: r.error ?? 'probe_failed' };
   } catch (err) {
-    cache = { ok: false, error: `env_probe_unavailable: ${String(err?.message ?? err).slice(0, 160)}` };
+    // The failure text comes from a live spawn, so it carries the interpreter path and the probe
+    // script path verbatim ("Command failed: /opt/…/python3 /app/…/env_probe.py"). It is returned
+    // by the UNAUTHENTICATED GET /api/compute/environment, so it is path-redacted at the source —
+    // the same rule campaign/toolchain.mjs already applies to its own adapter failure text.
+    cache = { ok: false, error: redact(`env_probe_unavailable: ${String(err?.message ?? err).slice(0, 160)}`) };
   }
   return cache;
 }

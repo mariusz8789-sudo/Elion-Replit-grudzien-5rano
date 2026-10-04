@@ -51,4 +51,4 @@ Do tego czasu Genesis nie może mówić, że „podłączył CFD”; może uczci
 [2]: https://fenicsproject.org/download/ "FEniCSx — instalacja i składniki"
 [3]: https://einsteintoolkit.org/software-license.html "Einstein Toolkit — zasady licencjonowania"
 [4]: https://einsteintoolkit.org/download.html "Einstein Toolkit — release, pobieranie i wymagania"
-[5]: /home/ubuntu/genesis_delivery/solver_candidate_probe.json "Genesis — pasywny audit runtime"
+[5]: # "Genesis — pasywny audit runtime (solver_candidate_probe.json; nie ma go w tym repozytorium)"

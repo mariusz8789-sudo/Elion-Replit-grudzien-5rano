@@ -1,6 +1,9 @@
 import json,statistics,hashlib,datetime,os
 M=json.load(open("combined.json"))
-REPO="/home/claude/Elion-Replit-grudzien-5rano"
+import os as _os
+# Repository root, derived from this file: a hard-coded absolute path named the machine
+# the script happened to run on and broke every other checkout (D-168).
+REPO=_os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
 B=sorted([p for p in M if M[p]["classification"]=="B_SAMPLING_FAILURE"])
 S=[p for p in M if M[p]["success_run3"]]
 A=[p for p in M if M[p]["classification"]=="A_RANKING_FAILURE"]

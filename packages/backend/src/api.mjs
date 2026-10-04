@@ -102,6 +102,7 @@ import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
+import { redact } from './redact.mjs';
 import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
 import { resolveResearchIntake, prepareCampaignDraft, INPUT_KINDS as RESEARCH_INTAKE_INPUT_KINDS } from './campaign/researchIntake.mjs';
 import {
@@ -199,6 +200,43 @@ function publicLocalVideoRuntime(runtime) {
     onnxruntimeDirectml: packageStatus(runtime.onnxruntimeDirectml),
     ffmpeg: { ...packageStatus(runtime.ffmpeg), source: runtime.ffmpeg?.source ?? null },
     localModels: { configured: runtime.localModels?.configured === true, checkpointCount: runtime.localModels?.checkpoints?.length ?? 0 },
+  };
+}
+
+/**
+ * D-168 — the public projection of the runtime environment probe.
+ *
+ * `compute/env_probe.py` reports, for every binary engine it finds, the ABSOLUTE path
+ * `shutil.which()` resolved (`/opt/conda/envs/…/bin/vina`, `/usr/bin/obabel`), and for a
+ * broken import the raw exception text. GET /api/compute/environment is UNAUTHENTICATED,
+ * so that payload handed any visitor the deployment's filesystem layout and the names of
+ * its environments. The probe keeps reporting the path — the operator's env audit needs it
+ * — and this projection is what crosses the HTTP boundary: an allowlist of fields, with
+ * every free-text field path-redacted. Same shape as `publicLocalVideoRuntime` above, which
+ * is why `executable` never leaked from the local-video route.
+ */
+function publicEnvironment(environment) {
+  const runtime = environment?.runtime ?? {};
+  const engines = environment?.engines ?? {};
+  const publicEngine = (engine) => ({
+    kind: engine?.kind ?? null,
+    ...(engine?.module ? { module: engine.module } : {}),
+    ...(engine?.binary ? { binary: engine.binary } : {}),
+    status: engine?.status ?? null,
+    version: engine?.version ?? null,
+    // `path` is DELIBERATELY absent: an engine's presence is the answer, its location is not.
+    ...(engine?.reason ? { reason: redact(String(engine.reason)) } : {}),
+  });
+  return {
+    runtime: {
+      os: runtime.os ?? null, osRelease: runtime.osRelease ?? null, arch: runtime.arch ?? null,
+      python: runtime.python ?? null, cpuCount: runtime.cpuCount ?? null,
+      memoryGb: runtime.memoryGb ?? null, diskFreeGb: runtime.diskFreeGb ?? null,
+      processExecution: runtime.processExecution === true,
+      gpu: runtime.gpu === true, cuda: runtime.cuda === true,
+      ...(runtime.detail ? { detail: redact(String(runtime.detail)) } : {}),
+    },
+    engines: Object.fromEntries(Object.entries(engines).map(([id, engine]) => [id, publicEngine(engine)])),
   };
 }
 
@@ -2067,7 +2105,9 @@ function environmentHandler(db) {
   const last = latestEnvAudit(db);
   const stale = !last || Date.now() - last.createdAt > 3_600_000;
   const audit = stale ? saveEnvAudit(db, { runtime: probe.runtime, engines: probe.engines }) : last;
-  return ok({ environment: { runtime: probe.runtime, engines: probe.engines }, auditId: audit.id, auditedAt: audit.createdAt });
+  // The stored audit keeps the full probe (the operator needs the interpreter location);
+  // what leaves over HTTP is the public projection — see publicEnvironment (D-168).
+  return ok({ environment: publicEnvironment({ runtime: probe.runtime, engines: probe.engines }), auditId: audit.id, auditedAt: audit.createdAt });
 }
 
 /**

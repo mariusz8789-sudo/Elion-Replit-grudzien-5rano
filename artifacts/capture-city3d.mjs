@@ -1,12 +1,19 @@
 import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Output root, derived from this file. It used to be the absolute path of the machine this
+// capture first ran on, which named that host in a committed artefact and wrote nowhere
+// useful in any other checkout (D-168).
+const ARTIFACTS = path.dirname(fileURLToPath(import.meta.url));
 
 const endpoint = 'http://127.0.0.1:9222';
 const captureView = process.env.GENESIS_CAPTURE_VIEW ?? 'city';
 const captureSuffix = process.env.GENESIS_CAPTURE_SUFFIX ?? 'final';
 const runModelBeforeCapture = process.env.GENESIS_CAPTURE_REAL_RUN === '1';
 const realRunMilliseconds = Number(process.env.GENESIS_CAPTURE_REAL_RUN_MS ?? 3500);
-const screenshotPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/screenshots/city3d-${captureView}-${captureSuffix}.png`;
-const reportPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/city3d-live-metrics-${captureSuffix}.json`;
+const screenshotPath = `${ARTIFACTS}/screenshots/city3d-${captureView}-${captureSuffix}.png`;
+const reportPath = `${ARTIFACTS}/city3d-live-metrics-${captureSuffix}.json`;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const targets = await (await fetch(`${endpoint}/json/list`)).json();

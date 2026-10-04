@@ -1,4 +1,11 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Output root, derived from this file. It used to be the absolute path of the machine this
+// capture first ran on, which named that host in a committed artefact and wrote nowhere
+// useful in any other checkout (D-168).
+const ARTIFACTS = path.dirname(fileURLToPath(import.meta.url));
 
 const endpoint = 'http://127.0.0.1:9222';
 const configuredOrigin = process.env.GENESIS_RUNTIME_ORIGIN ?? 'http://127.0.0.1:5000/#/city3d';
@@ -10,9 +17,9 @@ const proofUrl = origin.includes('#')
   ? origin.replace('#', `?proof=${Date.now()}#`)
   : `${origin}${origin.includes('?') ? '&' : '?'}proof=${Date.now()}`;
 const suffix = process.env.GENESIS_PROOF_SUFFIX ? `-${process.env.GENESIS_PROOF_SUFFIX}` : '';
-const screenshotPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/screenshots/city3d-earthquake-demonstrator${suffix}-1920x1080.png`;
-const reportPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/earthquake-city3d-runtime-proof${suffix}.json`;
-const downloadDir = '/home/ubuntu/Downloads/genesis-earthquake-runtime-proof';
+const screenshotPath = `${ARTIFACTS}/screenshots/city3d-earthquake-demonstrator${suffix}-1920x1080.png`;
+const reportPath = `${ARTIFACTS}/earthquake-city3d-runtime-proof${suffix}.json`;
+const downloadDir = path.join(ARTIFACTS, 'earthquake-runtime-proof-downloads');
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const targets = await (await fetch(`${endpoint}/json/list`)).json();

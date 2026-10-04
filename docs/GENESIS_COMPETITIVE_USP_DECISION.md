@@ -59,4 +59,4 @@ Nie budujemy nowego dashboardu, edytora modeli, LLM parsera, zewnętrznego solve
 [3]: https://www.simscale.com/product/cloud-native-simulation/ "SimScale — Cloud-Native Simulation"
 [4]: https://www.esri.com/en-us/digital-twin/overview "Esri — Digital Twin"
 [5]: https://gama-platform.org/ "GAMA Platform"
-[6]: /home/ubuntu/genesis_repo/docs/GENESIS_CONTINUOUS_COMPETITIVE_RND.md "Genesis — Continuous Competitive R&D Policy"
+[6]: ./GENESIS_CONTINUOUS_COMPETITIVE_RND.md "Genesis — Continuous Competitive R&D Policy"

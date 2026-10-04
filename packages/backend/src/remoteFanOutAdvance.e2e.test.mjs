@@ -191,10 +191,15 @@ describe('remote fan-out and advance over HTTP only', () => {
       const fan = (await ctx.get(`/research-runs/${ctx.runId}/fanout`)).body.fanOut;
       for (const child of fan.children) {
         const state = inspect(ctx.dbPath, child.childRunId);
-        assert.equal(state.events.some((e) => e.type === 'EXPERIMENT_HANDOFF'), false, 'a cancelled child produced no result');
-        assert.equal(state.scienceRuns, 0);
         assert.ok(['CANCELLED', 'COMPLETED'].includes(child.state), child.state);
-        if (child.state === 'CANCELLED') assert.equal(jobStatus(ctx.dbPath, child.jobId), 'CANCELLED');
+        // Which child worker A reached first depends on the queue order; a child that finished before the cancel keeps its result.
+        if (child.state === 'CANCELLED') {
+          assert.equal(state.events.some((e) => e.type === 'EXPERIMENT_HANDOFF'), false, 'a cancelled child produced no result');
+          assert.equal(state.scienceRuns, 0);
+          assert.equal(jobStatus(ctx.dbPath, child.jobId), 'CANCELLED');
+        } else {
+          assert.equal(state.events.filter((e) => e.type === 'EXPERIMENT_HANDOFF').length, 1, 'a finished child keeps exactly its one result');
+        }
       }
       assert.ok(fan.children.some((c) => c.state === 'CANCELLED'));
       const parent = (await ctx.get(`/research-runs/${ctx.runId}`)).body.researchRun;

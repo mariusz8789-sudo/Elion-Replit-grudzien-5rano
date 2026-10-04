@@ -140,7 +140,7 @@ describe('the main menu is the owner\'s capability IA (3 Oct 2026), two levels a
     expect(ids('explore')).toEqual(['science', 'human-biology-lab', 'molecule', 'cms-open-data', 'scientific-worlds']);
     expect(ids('proof')).toEqual(['evidence', 'reviewer', 'memory', 'verify']);
     expect(ids('operations')).toEqual(['flight-control']);
-    expect(ids('deliver')).toEqual(['dossier', 'pilot']);
+    expect(ids('deliver')).toEqual(['dossier', 'pilot', 'lab-handoff', 'reports']);
   });
 
   it('no main place is also listed in More, and no main place has folded views (two levels)', () => {

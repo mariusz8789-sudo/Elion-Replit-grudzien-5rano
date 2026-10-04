@@ -79,6 +79,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
+import { campaignCycleTiming, discoveryTimingReport, genesisSpeedup } from './discoveryTiming.mjs';
 import { buildExecutionBundle, recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
@@ -903,6 +904,17 @@ export function handleApi(db, ctx) {
           return result.ok ? ok(result, result.deduped ? 200 : 202) : failure(result);
         })();
       }
+      // Read-only TIME-TO-DISCOVERY readout for one run: the per-stage timings and the GENESIS SPEEDUP
+      // indicator. The indicator reports TARGET_2X_NOT_YET_BENCHMARKED while no competitor baseline
+      // with provenance has been recorded, which is this repository's state.
+      if (seg.length === 5 && seg[4] === 'time-to-discovery') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        const timing = discoveryTimingReport(db, 'RESEARCH_RUN', current.researchRunId);
+        return ok({
+          timeToDiscovery: timing,
+          genesisSpeedup: genesisSpeedup(db, { scopeKind: 'RESEARCH_RUN', scopeId: current.researchRunId }),
+        });
+      }
       if (seg.length === 5 && seg[4] === 'steering') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
@@ -1273,6 +1285,16 @@ export function handleApi(db, ctx) {
 
       // /api/projects/:id/campaigns/:cid — inspekcja (viewer+)
       if (seg.length === 4 && method === 'GET') return ok({ campaign: inspectCampaign(db, campaignId) });
+
+      // Read-only: this campaign's measured discovery cycle (research question -> candidate set ->
+      // filtering -> ResearchRun -> falsification -> Replay -> Evidence Pack -> computational
+      // candidate -> chemistry handoff), aggregated over the campaign and every run linked to it.
+      if (seg.length === 5 && seg[4] === 'time-to-discovery' && method === 'GET') {
+        return ok({
+          timeToDiscovery: campaignCycleTiming(db, campaignId),
+          genesisSpeedup: genesisSpeedup(db, { scopeKind: 'CAMPAIGN', scopeId: campaignId }),
+        });
+      }
 
       if (seg.length === 5) {
         // /api/projects/:id/campaigns/:cid/start (editor+) — uruchamia realny orchestrator w tle

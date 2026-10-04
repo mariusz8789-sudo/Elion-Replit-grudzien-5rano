@@ -464,8 +464,17 @@ describe('INVARIANT: one stage-timing authority', () => {
   const TIMING = 'packages/backend/src/discoveryTiming.mjs';
 
   /** Every function in discoveryTiming.mjs that WRITES a row. Readers are listed separately. */
-  const WRITERS = ['openStage', 'closeStage', 'recordSpan', 'recordCount', 'recordMember', 'recordStageStatus', 'linkScopeToCampaign', 'recordCompetitorBaseline'];
-  const READERS = ['stageTimings', 'discoveryTimingReport', 'campaignCycleTiming', 'genesisSpeedup', 'getCompetitorBaseline', 'listCompetitorBaselines', 'campaignsOfScope'];
+  const STAGE_WRITERS = ['openStage', 'closeStage', 'recordSpan', 'recordCount', 'recordMember', 'recordStageStatus', 'linkScopeToCampaign', 'recordCompetitorBaseline'];
+  /**
+   * v19 human-work writers (D-172). They are writers under the same rule — routes report, the loop
+   * records — but they do not all belong to the loop's own transaction: the classification is a
+   * projection of a constant in code, synced at boot, so `server.mjs` is its one legitimate caller.
+   */
+  const HUMAN_WRITERS = ['recordLoopStep', 'syncLoopStepClassification', 'recordHumanTouch', 'recordHumanWorkBaseline', 'recordCostRates'];
+  const WRITERS = [...STAGE_WRITERS, ...HUMAN_WRITERS];
+  const READERS = ['stageTimings', 'discoveryTimingReport', 'campaignCycleTiming', 'genesisSpeedup', 'getCompetitorBaseline', 'listCompetitorBaselines', 'campaignsOfScope',
+    'loopStepClassification', 'effectiveLoopStepClassification', 'automationCoverage', 'humanTouches', 'campaignHumanTouches',
+    'getHumanWorkBaseline', 'listHumanWorkBaselines', 'listCostRates', 'humanWorkReport', 'campaignHumanWorkReport', 'taskScopeHash'];
 
   it('stage timing is written from inside the canonical loop and nowhere else', () => {
     // The timing is part of the loop's own write transaction, not a parallel clock: if a tool-layer
@@ -473,9 +482,20 @@ describe('INVARIANT: one stage-timing authority', () => {
     // with the hash-chained research state, and the 2x number would stop meaning the loop's own time.
     const allowed = ['packages/backend/src/researchRun.mjs', 'packages/backend/src/researchRunExecution.mjs'];
     const writers = new Set();
-    for (const w of WRITERS) for (const rel of importersOfSymbol(w, { except: [TIMING] })) writers.add(rel);
+    for (const w of STAGE_WRITERS) for (const rel of importersOfSymbol(w, { except: [TIMING] })) writers.add(rel);
     const actual = [...writers].sort();
     assert.deepEqual(actual, allowed, report(actual, allowed, 'A new module writes stage timing. Second clock?'));
+  });
+
+  it('human-work records are written from the loop and from the one boot-time classification sync', () => {
+    // The step classification is a declaration in code, projected into the database so a deployed
+    // instance can be audited against the running build; server.mjs performs that sync at boot. Every
+    // other human-work write belongs to the loop, for the same reason the stage clock does.
+    const allowed = ['packages/backend/src/researchRun.mjs', 'packages/backend/src/researchRunExecution.mjs', 'packages/backend/src/server.mjs'];
+    const writers = new Set();
+    for (const w of HUMAN_WRITERS) for (const rel of importersOfSymbol(w, { except: [TIMING] })) writers.add(rel);
+    const actual = [...writers].sort();
+    assert.ok(actual.every((rel) => allowed.includes(rel)), report(actual, allowed, 'A new module writes human-work records. Second measurement system?'));
   });
 
   it('the HTTP surface may only READ timing, never write it', () => {
@@ -502,8 +522,30 @@ describe('INVARIANT: one stage-timing authority', () => {
     // would let a slow run be made fast retroactively.
     const timing = SOURCE.get(TIMING);
     assert.ok(timing, `${TIMING} must exist`);
-    for (const verb of ['UPDATE ', 'DELETE FROM']) {
-      assert.ok(!timing.includes(verb), `${TIMING} contains ${verb.trim()}: the timing tables must stay append-only.`);
+    // Named by table rather than by scanning the whole file, which is the stronger form: it says
+    // WHICH tables may never be rewritten, so a new table cannot slip in under a file-wide pattern,
+    // and a mention of the word UPDATE inside a comment or an event name is not a finding.
+    //
+    // `discovery_loop_steps` is deliberately NOT in this list and is the only exception: it is a
+    // projection of the frozen LOOP_STEPS constant, re-synced from code at boot, so an upsert on it
+    // rewrites nothing that was ever measured. Every table that holds a measurement — a stage mark,
+    // a recorded fact, a human touch, a declared baseline, a cost rate — is append-only, because
+    // that is the whole reason a stage boundary or a saved-hours claim can be trusted after the fact.
+    const APPEND_ONLY = [
+      'discovery_stage_marks', 'discovery_stage_facts', 'discovery_timing_campaign_links',
+      'discovery_competitor_baselines', 'discovery_human_touches', 'discovery_human_work_baselines',
+      'discovery_cost_rates',
+    ];
+    for (const table of APPEND_ONLY) {
+      for (const re of [new RegExp(`UPDATE\\s+${table}\\b`, 'i'), new RegExp(`DELETE\\s+FROM\\s+${table}\\b`, 'i')]) {
+        assert.ok(!re.test(timing), `${TIMING} rewrites ${table}: the measurement tables must stay append-only.`);
+      }
+    }
+    const upserts = [...timing.matchAll(/ON CONFLICT\([^)]*\)\s*DO UPDATE/gi)];
+    for (const m of upserts) {
+      const before = timing.slice(Math.max(0, m.index - 600), m.index);
+      const table = before.match(/INSERT\s+INTO\s+([A-Za-z0-9_]+)/g)?.pop()?.split(/\s+/).pop();
+      assert.equal(table, 'discovery_loop_steps', `an upsert targets ${table}: only the classification projection may be rewritten.`);
     }
   });
 

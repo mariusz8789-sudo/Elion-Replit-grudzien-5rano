@@ -258,4 +258,7 @@ answer, and it is a measured absence, not a placeholder.
 - `packages/backend/src/api.mjs` — the two read-only routes.
 - `packages/backend/src/discoveryTiming.test.mjs` — the tests, including the no-competitor-data
   invariant.
-- `docs/DECISIONS.md` — D-163.
+- `docs/benchmark/HUMAN-WORK.md` — the step classification and the human-work metrics built on this
+  substrate at schema v18 (`LAB_INSTRUMENT` is a fourth span kind added there), with the same rule:
+  a quantity that needs a baseline nobody measured reads `UNKNOWN`.
+- `docs/DECISIONS.md` — D-163, D-172.

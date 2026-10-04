@@ -18,8 +18,9 @@
  *   - Every `hash` here is a route that really resolves in `App.tsx`'s
  *     `parseHash`. A menu entry that navigates nowhere is a lie about the
  *     product, so there are none. Places the brief suggested that have no
- *     screen yet (a separate Replay page, Reports, Lab Handoff) are NOT
- *     invented: Replay lives in Evidence & Replay, exports in Evidence packs.
+ *     screen yet (a separate Replay page) are NOT invented: Replay lives in
+ *     Evidence & Replay. Lab handoff and Reports are real screens over the
+ *     ResearchRun lab loop and the deliverable routes the backend issues.
  *   - `status: 'planned'` marks a capability whose CORE EXISTS AND RUNS but
  *     whose workspace is not built yet. It renders visibly disabled with the
  *     reason, rather than being hidden (which would understate the system) or
@@ -123,6 +124,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       { id: 'dossier', label: 'Kandydaci', icon: '🗂', hash: '#/dossier', description: 'Zapisani kandydaci z dowodami; pobierz dossier' },
       { id: 'pilot', label: 'Pakiety dowodów i eksport', icon: '🧪', hash: '#/pilot', description: 'Plan → wynik → pakiet dowodów do pobrania i powtórzenia' },
+      { id: 'lab-handoff', label: 'Przekazanie do laboratorium', icon: '⚗', hash: '#/lab-handoff', description: 'Prośba o pomiar, paczka dla laboratorium, wynik, sprawdzenie przez drugą osobę i porównanie z obliczeniem' },
+      { id: 'reports', label: 'Raporty', icon: '📄', hash: '#/reports', description: 'Pakiety dowodów, zapisy wyników, raporty Verify, paczki laboratoryjne i eksport dla klienta do pobrania' },
     ],
   },
 ];

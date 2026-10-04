@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
-import { replayDiscoveryCase } from '../core/discovery/discoveryReplay';
+import { runDemoReplay } from '../core/discovery/demoReplay';
 import type { DiscoveryCase, DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
-import { EVIDENCE_STORE_SCHEMA_VERSION, InMemoryEvidenceStore } from '../core/discovery/evidenceStore';
-import { computeEvidencePackSha256 } from '../core/discovery/evidenceCrypto';
+import { LOCAL_SIMULATION_SNAPSHOT_KIND, LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, InMemoryLocalSimulationSnapshotStore } from '../core/discovery/localSimulationSnapshotStore';
+import { computeLocalSimulationSnapshotFingerprint } from '../core/discovery/evidenceCrypto';
 import { codeCommitHash } from '../core/build/commitHash';
 
 /**
@@ -53,33 +53,35 @@ describe('Evidence & Replay integration — one real experiment through the full
     }
 
     // EVIDENCE PACK — complete (no missing fields) for a real, executable case.
-    expect(record.evidence).not.toBeNull();
-    expect(record.evidence!.missingFields).toEqual([]);
+    expect(record.snapshotPack).not.toBeNull();
+    expect(record.snapshotPack!.missingFields).toEqual([]);
   });
 
   it('MATCH: saving evidence and replaying the unmodified record reproduces it bit-for-bit', async () => {
     const record = runDiscoveryCase(spec());
-    const store = new InMemoryEvidenceStore();
-    const sha256 = await computeEvidencePackSha256(record.evidence!);
-    await store.save({ schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record, sha256, codeCommitHash: codeCommitHash(), savedAt: Date.now() });
+    const store = new InMemoryLocalSimulationSnapshotStore();
+    const snapshotFingerprint = await computeLocalSimulationSnapshotFingerprint(record.snapshotPack!);
+    await store.save({ kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record, snapshotFingerprint, codeCommitHash: codeCommitHash(), savedAt: Date.now() });
 
     const stored = await store.load(record.caseId);
     expect(stored).not.toBeNull();
 
-    const replay = replayDiscoveryCase(stored!.record);
+    const replay = runDemoReplay(stored!.record);
     expect(replay.status).toBe('MATCH');
     expect(replay.arms.every((a) => a.expectedRunFingerprint === a.actualRunFingerprint)).toBe(true);
 
     // The SHA-256 over the stored evidence pack is itself reproducible from the same content.
-    const recomputed = await computeEvidencePackSha256(stored!.record.evidence!);
-    expect(recomputed).toBe(sha256);
+    const recomputed = await computeLocalSimulationSnapshotFingerprint(stored!.record.snapshotPack!);
+    expect(recomputed).toBe(snapshotFingerprint);
   });
 
   it('DRIFT: a controlled change to the stored record is caught by replay, with the exact differing field named', async () => {
     const record = runDiscoveryCase(spec());
-    const store = new InMemoryEvidenceStore();
-    const sha256 = await computeEvidencePackSha256(record.evidence!);
-    await store.save({ schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record, sha256, codeCommitHash: codeCommitHash(), savedAt: Date.now() });
+    const store = new InMemoryLocalSimulationSnapshotStore();
+    const snapshotFingerprint = await computeLocalSimulationSnapshotFingerprint(record.snapshotPack!);
+    await store.save({ kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record, snapshotFingerprint, codeCommitHash: codeCommitHash(), savedAt: Date.now() });
     const stored = await store.load(record.caseId);
 
     // The controlled change: the stored record now claims a different peak
@@ -99,14 +101,14 @@ describe('Evidence & Replay integration — one real experiment through the full
       ],
     };
 
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
     expect(replay.status).toBe('DRIFT');
     const fields = replay.arms.flatMap((a) => a.differences.map((d) => d.field));
     expect(fields).toContain('summary.peakInfectious');
 
     // The untampered original, from the same store, still replays as MATCH —
     // proving DRIFT came from the controlled change, not from flaky replay.
-    const untamperedReplay = replayDiscoveryCase(stored!.record);
+    const untamperedReplay = runDemoReplay(stored!.record);
     expect(untamperedReplay.status).toBe('MATCH');
   });
 
@@ -115,9 +117,9 @@ describe('Evidence & Replay integration — one real experiment through the full
     const sameAgain = runDiscoveryCase(spec()); // same seed/params → same everything, deterministic model
     const differentSeed = runDiscoveryCase(spec({ initialConditions: { ...conditions, seed: 1 } }));
 
-    const hashA = await computeEvidencePackSha256(baseline.evidence!);
-    const hashB = await computeEvidencePackSha256(sameAgain.evidence!);
-    const hashC = await computeEvidencePackSha256(differentSeed.evidence!);
+    const hashA = await computeLocalSimulationSnapshotFingerprint(baseline.snapshotPack!);
+    const hashB = await computeLocalSimulationSnapshotFingerprint(sameAgain.snapshotPack!);
+    const hashC = await computeLocalSimulationSnapshotFingerprint(differentSeed.snapshotPack!);
 
     expect(hashA).toBe(hashB);
     expect(hashA).not.toBe(hashC);
@@ -125,9 +127,10 @@ describe('Evidence & Replay integration — one real experiment through the full
 
   it('records the real build commit hash alongside the run, not a fabricated placeholder', async () => {
     const record = runDiscoveryCase(spec());
-    const store = new InMemoryEvidenceStore();
+    const store = new InMemoryLocalSimulationSnapshotStore();
     const hash = codeCommitHash();
-    await store.save({ schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record, sha256: null, codeCommitHash: hash, savedAt: Date.now() });
+    await store.save({ kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record, snapshotFingerprint: null, codeCommitHash: hash, savedAt: Date.now() });
     const stored = await store.load(record.caseId);
     expect(stored!.codeCommitHash).toBe(hash);
     expect(stored!.codeCommitHash === 'NOT_AVAILABLE' || /^[0-9a-f]{40}$/.test(stored!.codeCommitHash) || stored!.codeCommitHash.startsWith('NOT_AVAILABLE:')).toBe(true);

@@ -279,8 +279,8 @@ describe('Contact network — the four questions this layer was built to answer'
 
   it('A. school closure removes school transmission but displaces it elsewhere', () => {
     const c = caseOf('SCHOOL_CLOSURE');
-    expect(c.status).toBe('EVIDENCE_VERIFIED');
-    expect(c.replay!.status).toBe('MATCH');
+    expect(c.status).toBe('SNAPSHOT_PACK_COMPLETE');
+    expect(c.demoReplay!.status).toBe('MATCH');
     // Dźwignia działa dokładnie tam, gdzie powinna.
     expect(metric(c, 'transmissions_SCHOOL').variant).toBe(0);
     expect(metric(c, 'transmissions_SCHOOL').baseline).toBeGreaterThan(0);
@@ -294,7 +294,7 @@ describe('Contact network — the four questions this layer was built to answer'
   it('B. household transmission defeats senior shielding once people stay home', () => {
     const mobile = caseOf('PROTECT_SENIORS');
     const homebound = caseOf('PROTECT_SENIORS', 0.4);
-    for (const c of [mobile, homebound]) expect(c.replay!.status).toBe('MATCH');
+    for (const c of [mobile, homebound]) expect(c.demoReplay!.status).toBe('MATCH');
 
     const householdShare = (c: ReturnType<typeof runDiscoveryCase>, arm: 0 | 1) => {
       const analysis = analyseTransmissionClusters(c.arms[arm].run.transmissionGraph);

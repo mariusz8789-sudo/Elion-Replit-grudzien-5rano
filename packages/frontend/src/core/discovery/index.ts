@@ -15,12 +15,12 @@ export {
   type DiscoveryCaseStatus,
   type DiscoveryComparison,
   type DiscoveryConclusion,
-  type DiscoveryEvidencePack,
+  type LocalSimulationSnapshotPack,
   type DiscoveryFollowUp,
   type DiscoveryFollowUpPlan,
   type DiscoveryHypothesis,
   type DiscoveryInitialConditions,
-  type DiscoveryReplay,
+  type DemoReplay,
   type DiscoveryVerdict,
   type MultiRunSpec,
   type SweepSpec,
@@ -29,13 +29,13 @@ export {
 
 export { runDiscoveryCase, runFollowUp, runFollowUpPlan, type DiscoveryFollowUpRun } from './discoveryEngine';
 export { executeDiscoveryCase, compareDiscoveryArms, discoveryModelIdentity, leverOf, DISCOVERY_LIMITATIONS, DISCOVERY_METRIC_KEYS } from './discoveryExecution';
-export { replayDiscoveryCase, replayDiscoveryCaseWithTolerance } from './discoveryReplay';
+export { runDemoReplay, runDemoReplayWithTolerance } from './demoReplay';
 export { deriveDiscoveryConclusion } from './discoveryConclusion';
-export { createDiscoveryEvidencePack, serializeDiscoveryEvidencePack, DISCOVERY_EVIDENCE_PACK_VERSION } from './discoveryEvidence';
+export { createLocalSimulationSnapshotPack, serializeLocalSimulationSnapshotPack, LOCAL_SIMULATION_SNAPSHOT_PACK_VERSION } from './localSimulationSnapshotPack';
 export { generateFollowUps, isRunnable } from './discoveryFollowUp';
 export { runParameterSweep, runInterventionTimingSweep, SWEEPABLE_PARAMETERS, NON_SWEEPABLE_PARAMETERS, type SweepResult } from './discoverySweep';
 export { runMultiSeed, median, STATISTICAL_NOTE, type MultiRunResult } from './discoveryMultiRun';
-export { validateStoredEvidence, type StoredEvidence, type StoredEvidenceValidation, type EvidenceStore } from './evidenceStore';
+export { validateLocalSimulationSnapshot, type LocalSimulationSnapshot, type LocalSimulationSnapshotValidation, type LocalSimulationSnapshotStore } from './localSimulationSnapshotStore';
 export {
   runProtectionPriorityStudy,
   PROTECTION_OBJECTIVES,

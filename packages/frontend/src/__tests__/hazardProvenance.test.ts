@@ -512,8 +512,8 @@ describe('Test 8 — isolation from epidemic Scientific Core and WorldEngineCont
     'scenarioEngine',
     'discoveryCase',
     'discoveryEngine',
-    'discoveryEvidence',
-    'discoveryReplay',
+    'localSimulationSnapshotPack',
+    'demoReplay',
     'discoveryExecution',
   ];
 
@@ -536,6 +536,6 @@ describe('Test 8 — isolation from epidemic Scientific Core and WorldEngineCont
     const source = readFileSync(join(HAZARD_DIR, 'fingerprint.ts'), 'utf8');
     expect(source).toContain("from '../events/hash'");
     expect(source).toContain("from '../discovery/evidenceCrypto'");
-    // evidenceCrypto.ts itself wraps Web Crypto only — verified separately in evidenceCrypto.test.ts — it does not import Scientific Core.
+    // evidenceCrypto.ts itself wraps Web Crypto only — verified separately in localSnapshotFingerprint.test.ts — it does not import Scientific Core.
   });
 });

@@ -161,7 +161,7 @@ export function fingerprintDiscoverySpec(spec: DiscoveryCaseSpec): string {
       baseParams: spec.baseParams ?? null,
       hospitalCapacity: spec.hospitalCapacity ?? null,
       cohort: spec.cohort ?? null,
-      replayTolerance: spec.replayTolerance ?? 0,
+      demoReplayTolerance: spec.demoReplayTolerance ?? 0,
     }),
   );
 }
@@ -338,10 +338,10 @@ export function executeDiscoveryCase(spec: DiscoveryCaseSpec): DiscoveryCase {
     initialConditions: spec.initialConditions,
     scenarios: { baseline: spec.baselineScenario, variant: spec.variantScenario },
     inputFingerprint,
-    replayTolerance: Math.max(0, spec.replayTolerance ?? 0),
+    demoReplayTolerance: Math.max(0, spec.demoReplayTolerance ?? 0),
     comparison: null,
-    replay: null,
-    evidence: null,
+    demoReplay: null,
+    snapshotPack: null,
     conclusion: null,
     followUp: [],
     limitations: DISCOVERY_LIMITATIONS,

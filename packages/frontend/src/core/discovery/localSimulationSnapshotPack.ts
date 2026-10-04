@@ -5,12 +5,12 @@ import {
   type DiscoveryCase,
   type DiscoveryComparison,
   type DiscoveryConclusion,
-  type DiscoveryEvidencePack,
-  type DiscoveryReplay,
+  type LocalSimulationSnapshotPack,
+  type DemoReplay,
 } from './discoveryCase';
 
 /**
- * DISCOVERY EVIDENCE PACK — automatyczny, przenośny zapis dowodu jednej sprawy.
+ * LOCAL_SIMULATION_SNAPSHOT PACK — automatyczny, przenośny zapis JEDNEJ sprawy DEMO.
  *
  * RELACJA DO ISTNIEJĄCEGO PAKIETU
  * `experimentFabric/evidencePack.ts` pakuje `ScientificEvidenceChain`, czyli
@@ -25,19 +25,29 @@ import {
  *
  * KOMPLETNOŚĆ
  * Pakiet sam wylicza `missingFields`. Dopóki lista nie jest pusta, bramka
- * jakości nie przepuści sprawy do EVIDENCE_VERIFIED. Brak dowodu jest widoczny,
+ * jakości nie przepuści sprawy do SNAPSHOT_PACK_COMPLETE. Brak jest widoczny,
  * a nie zamaskowany.
+ *
+ * NOT GENESIS EVIDENCE, NOT GENESIS REPLAY. This module belongs to the browser-local
+ * epidemic-city DEMO found by the 2026-10-04 architecture audit. Canonical Genesis
+ * Evidence is the backend ResearchRun loop's single ledger; canonical Replay is
+ * `packages/backend/src/campaign/verify.mjs`. The owner's 2026-10-04 resolution was to
+ * rename this cluster rather than delete it, so the stored state is a
+ * LOCAL_SIMULATION_SNAPSHOT and the re-run is a DEMO_REPLAY (D-175).
+ *
+ * DO NOT BUILD THE RESEARCHRUN MIGRATION NOW. The full redirect of this surface into
+ * the canonical loop happens ONLY once the epidemic scenario is a real ResearchRun.
  */
 
-export const DISCOVERY_EVIDENCE_PACK_VERSION = '1.0.0';
+export const LOCAL_SIMULATION_SNAPSHOT_PACK_VERSION = '1.0.0';
 
 const DISCLAIMER =
-  'Pakiet dowodowy rejestruje faktyczne przebiegi modelu, ich parametry, ziarno i odciski. Wniosek obowiązuje wyłącznie w granicach prerejestrowanego kryterium i użytego modelu; nie jest odkryciem ani twierdzeniem o świecie rzeczywistym.';
+  'LOCAL_SIMULATION_SNAPSHOT: lokalna migawka symulacji DEMO, trzymana w tej przeglądarce. To NIE jest Genesis Evidence ani Genesis Replay i nie można jej opublikować jako paczki dowodowej ani wstawić do raportu. Migawka rejestruje faktyczne przebiegi modelu, ich parametry, ziarno i odciski. Wniosek obowiazuje wylacznie w granicach prerejestrowanego kryterium i uzytego modelu; nie jest odkryciem ani twierdzeniem o swiecie rzeczywistym.';
 
 function collectMissing(
   record: DiscoveryCase,
   comparison: DiscoveryComparison,
-  replay: DiscoveryReplay,
+  replay: DemoReplay,
   conclusion: DiscoveryConclusion | null,
 ): string[] {
   const missing: string[] = [];
@@ -53,7 +63,7 @@ function collectMissing(
     if (arm.summary === null) missing.push(`arm ${arm.armId}: result summary`);
   }
   if (comparison.status !== 'COMPLETED') missing.push(`comparison (${comparison.blockedReason ?? comparison.status})`);
-  if (replay.status !== 'MATCH' && replay.status !== 'WITHIN_TOLERANCE') missing.push(`replay verification (${replay.status})`);
+  if (replay.status !== 'MATCH' && replay.status !== 'WITHIN_TOLERANCE') missing.push(`DEMO_REPLAY verification (${replay.status})`);
   if (record.limitations.length === 0) missing.push('limitations');
   if (conclusion === null) missing.push('conclusion');
   return missing;
@@ -63,12 +73,12 @@ function collectMissing(
  * Buduje pakiet dowodowy ze sprawy. Nic tu nie jest przeliczane od nowa —
  * pakiet jest projekcją tego, co sprawa już zawiera.
  */
-export function createDiscoveryEvidencePack(
+export function createLocalSimulationSnapshotPack(
   record: DiscoveryCase,
   comparison: DiscoveryComparison,
-  replay: DiscoveryReplay,
+  replay: DemoReplay,
   conclusion: DiscoveryConclusion,
-): DiscoveryEvidencePack {
+): LocalSimulationSnapshotPack {
   const inputFingerprints: Record<string, string> = { case: record.inputFingerprint };
   const runFingerprints: Record<string, string | null> = {};
   const result: Record<string, ScenarioSummary | null> = {};
@@ -80,19 +90,19 @@ export function createDiscoveryEvidencePack(
 
   const missingFields = collectMissing(record, comparison, replay, conclusion);
   const packSeed = {
-    contractVersion: DISCOVERY_EVIDENCE_PACK_VERSION,
+    contractVersion: LOCAL_SIMULATION_SNAPSHOT_PACK_VERSION,
     caseId: record.caseId,
     model: record.model,
     inputFingerprints,
     runFingerprints,
     comparison: comparison.status,
-    replay: replay.status,
+    demoReplay: replay.status,
     verdict: conclusion.verdict,
   };
 
   return {
-    contractVersion: DISCOVERY_EVIDENCE_PACK_VERSION,
-    evidencePackId: `dpack_${fnv1a(canonicalJson(packSeed))}`,
+    contractVersion: LOCAL_SIMULATION_SNAPSHOT_PACK_VERSION,
+    localSnapshotId: `localsnap_${fnv1a(canonicalJson(packSeed))}`,
     caseId: record.caseId,
     model: record.model,
     parameters: record.parameters,
@@ -103,7 +113,7 @@ export function createDiscoveryEvidencePack(
     runFingerprints,
     result,
     comparison,
-    replay,
+    demoReplay: replay,
     limitations: record.limitations,
     conclusion,
     missingFields,
@@ -111,7 +121,7 @@ export function createDiscoveryEvidencePack(
   };
 }
 
-/** Serializacja do przenoszenia dowodu poza aplikację. */
-export function serializeDiscoveryEvidencePack(pack: DiscoveryEvidencePack): string {
+/** Serializacja migawki do pobrania przez widza — lokalny plik, nie publikacja dowodu. */
+export function serializeLocalSimulationSnapshotPack(pack: LocalSimulationSnapshotPack): string {
   return canonicalJson({ ...pack, engineVersion: DISCOVERY_ENGINE_VERSION });
 }

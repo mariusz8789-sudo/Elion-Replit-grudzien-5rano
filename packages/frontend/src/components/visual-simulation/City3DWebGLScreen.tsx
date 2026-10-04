@@ -26,7 +26,7 @@ import { projectWorldState } from '../../core/simulation/worldEngineContract';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import { consumePendingEarthquakeOverlay } from '../../core/simulationRenderer/earthquakeChatBridge';
 import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
-import { EvidenceReplayPanel } from './EvidenceReplayPanel';
+import { LocalSimulationSnapshotPanel } from './LocalSimulationSnapshotPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 import { TemporalWorldHud } from './TemporalWorldHud';
 import { TemporalMultiversePanel } from './TemporalMultiversePanel';
@@ -819,7 +819,7 @@ export function City3DWebGLScreen() {
                   <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
                   <ScenarioCommandCenterPanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
                   <TemporalMultiversePanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
-                  <EvidenceReplayPanel />
+                  <LocalSimulationSnapshotPanel />
                 </>
               )}
 

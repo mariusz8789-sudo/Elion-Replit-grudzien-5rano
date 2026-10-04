@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveDiscoveryConclusion } from '../core/discovery/discoveryConclusion';
-import type { DiscoveryCase, DiscoveryComparison, DiscoveryReplay } from '../core/discovery/discoveryCase';
+import type { DiscoveryCase, DiscoveryComparison, DemoReplay } from '../core/discovery/discoveryCase';
 import type { FalsificationCriterion } from '../core/experimentFabric/scientificDiscovery';
 import type { ObservableDerivation } from '../core/agent/tautologyGate';
 
@@ -62,7 +62,7 @@ const COMPARISON = (metrics: { key: string; baseline: number; variant: number }[
   blockedReason: null,
 } as unknown as DiscoveryComparison);
 
-const REPLAY: DiscoveryReplay = { status: 'MATCH', message: 'ok' } as unknown as DiscoveryReplay;
+const REPLAY: DemoReplay = { status: 'MATCH', message: 'ok' } as unknown as DemoReplay;
 
 const MODEL_INVARIANT: ObservableDerivation = { source: 'model-invariant', modelId: 'solver', rationale: 'analytic ceiling of the solver\'s own formalism' };
 const HYPOTHESIS_PARAM: ObservableDerivation = { source: 'hypothesis-parameter', modelId: 'solver', rationale: 'genuinely varies with which hypothesis is true' };

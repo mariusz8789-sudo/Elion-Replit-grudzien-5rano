@@ -1,8 +1,8 @@
 import { deriveDiscoveryConclusion } from './discoveryConclusion';
 import { generateFollowUps } from './discoveryFollowUp';
-import { createDiscoveryEvidencePack } from './discoveryEvidence';
+import { createLocalSimulationSnapshotPack } from './localSimulationSnapshotPack';
 import { executeDiscoveryCase } from './discoveryExecution';
-import { replayDiscoveryCase } from './discoveryReplay';
+import { runDemoReplay } from './demoReplay';
 import { runParameterSweep, runInterventionTimingSweep, type SweepResult } from './discoverySweep';
 import { runMultiSeed, type MultiRunResult } from './discoveryMultiRun';
 import { highestEarnedStatus, type DiscoveryCase, type DiscoveryCaseSpec, type DiscoveryFollowUp, type DiscoveryFollowUpPlan } from './discoveryCase';
@@ -34,16 +34,16 @@ export function runDiscoveryCase(spec: DiscoveryCaseSpec): DiscoveryCase {
       }
     : executed;
 
-  const replay = replayDiscoveryCase(withCase);
+  const replay = runDemoReplay(withCase);
   const conclusion = deriveDiscoveryConclusion(withCase, withCase.comparison, replay);
   const withEvidence: DiscoveryCase = {
     ...withCase,
-    replay,
+    demoReplay: replay,
     conclusion,
-    evidence:
+    snapshotPack:
       withCase.comparison === null
         ? null
-        : createDiscoveryEvidencePack(withCase, withCase.comparison, replay, conclusion),
+        : createLocalSimulationSnapshotPack(withCase, withCase.comparison, replay, conclusion),
   };
   const withFollowUp: DiscoveryCase = { ...withEvidence, followUp: generateFollowUps(withEvidence) };
   return { ...withFollowUp, status: highestEarnedStatus(withFollowUp) };

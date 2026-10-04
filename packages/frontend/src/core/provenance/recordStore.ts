@@ -1,8 +1,8 @@
 /**
  * PHASE 0.1 — SHARED KEYED RECORD STORE.
  *
- * The one mechanism Genesis's epidemic `EvidenceStore`
- * (core/discovery/evidenceStore.ts) and hazard `HazardProvenanceStore`
+ * The one mechanism Genesis's epidemic `LocalSimulationSnapshotStore`
+ * (core/discovery/localSimulationSnapshotStore.ts) and hazard `HazardProvenanceStore`
  * (core/hazard/hazardProvenanceStore.ts) both need: save-by-id, load-by-id,
  * list, canonical-content equality, and — for stores that want it — a
  * duplicate-id-with-different-content rejection. Extracted here because
@@ -124,7 +124,7 @@ export class InMemoryRecordStore<T> implements KeyedRecordStore<T> {
  * localStorage-backed implementation via the same `core/storage.ts` every
  * other locally-persisted Genesis feature uses. One `storageKey` holds a
  * flat `Record<string, T>` — the exact shape the pre-existing
- * `LocalEvidenceStore` already persisted under `'evidence-store/v1'`, so
+ * `BrowserLocalSimulationSnapshotStore` already persisted under `'evidence-store/v1'`, so
  * records saved before this extraction remain readable without migration.
  */
 export class LocalRecordStore<T> implements KeyedRecordStore<T> {

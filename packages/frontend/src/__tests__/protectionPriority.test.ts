@@ -27,8 +27,8 @@ describe('Who to protect first — every candidate is a fully evidenced case', (
       expect(c.case.arms[0].scenario).toBe('BASELINE');
       expect(c.case.arms[1].scenario).toBe(c.scenario);
       expect(c.case.comparison!.controlledDifference).toBe('priority-protection');
-      expect(c.case.replay!.status).toBe('MATCH');
-      expect(c.case.evidence!.missingFields).toEqual([]);
+      expect(c.case.demoReplay!.status).toBe('MATCH');
+      expect(c.case.snapshotPack!.missingFields).toEqual([]);
     }
   });
 

@@ -7,7 +7,7 @@ import {
   MalformedRecordCollectionError,
   UnsafeRecordIdError,
 } from '../core/provenance/recordStore';
-import { InMemoryEvidenceStore, type StoredEvidence } from '../core/discovery/evidenceStore';
+import { InMemoryLocalSimulationSnapshotStore, type LocalSimulationSnapshot } from '../core/discovery/localSimulationSnapshotStore';
 import { InMemoryHazardProvenanceStore, ImmutableConflictError } from '../core/hazard/hazardProvenanceStore';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
 import type { DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
@@ -19,7 +19,7 @@ import { computeSourceArtifactContentHash } from '../core/hazard/fingerprint';
  *
  * Proves the shared `core/provenance/recordStore.ts` primitive genuinely
  * replaced two independent implementations rather than adding a third: the
- * epidemic EvidenceStore's existing permissive (`'overwrite'`) policy and
+ * epidemic LocalSimulationSnapshotStore's existing permissive (`'overwrite'`) policy and
  * the hazard store's immutable (`'reject-if-different'`) policy are both
  * exercised through the SAME class, and the two domains' persisted data
  * never leak into each other despite sharing the storage mechanism.
@@ -82,12 +82,13 @@ const spec = (over: Partial<DiscoveryCaseSpec> = {}): DiscoveryCaseSpec => ({
   ...over,
 });
 
-function makeEpidemicEntry(): StoredEvidence {
+function makeEpidemicEntry(): LocalSimulationSnapshot {
   const record = runDiscoveryCase(spec());
   return {
-    schemaVersion: '1.0.0',
+    kind: 'LOCAL_SIMULATION_SNAPSHOT',
+    schemaVersion: '2.0.0',
     record,
-    sha256: null,
+    snapshotFingerprint: null,
     codeCommitHash: 'test-commit-hash',
     savedAt: Date.now(),
   };
@@ -112,7 +113,7 @@ async function makeArtifact(rawContent = 'convergence-fixture'): Promise<SourceA
 }
 
 describe('Duplication check — both domain stores now share one primitive', () => {
-  it('EvidenceStore.save/load/list/delete and HazardProvenanceStore.put*/get*/list* are both backed by core/provenance/recordStore.ts', () => {
+  it('LocalSimulationSnapshotStore.save/load/list/delete and HazardProvenanceStore.put*/get*/list* are both backed by core/provenance/recordStore.ts', () => {
     // Structural proof, not a guess: both concrete classes are constructed from the same imported primitive.
     const backing = new InMemoryRecordStore<{ x: number }>('overwrite');
     expect(backing).toBeInstanceOf(InMemoryRecordStore);
@@ -126,8 +127,8 @@ describe('Duplication check — both domain stores now share one primitive', () 
 });
 
 describe('Test 3 — duplicate id + bit-identical content', () => {
-  it('epidemic EvidenceStore (overwrite policy): re-saving the identical entry under its own id is a harmless no-op, per its existing policy', async () => {
-    const store = new InMemoryEvidenceStore();
+  it('epidemic LocalSimulationSnapshotStore (overwrite policy): re-saving the identical entry under its own id is a harmless no-op, per its existing policy', async () => {
+    const store = new InMemoryLocalSimulationSnapshotStore();
     const entry = makeEpidemicEntry();
     await store.save(entry);
     await expect(store.save({ ...entry })).resolves.toBeUndefined();
@@ -178,21 +179,21 @@ describe('Test 5 — namespace isolation between epidemic and hazard records', (
 
     const sharedId = 'shared-id-collision-probe';
     const baseEntry = makeEpidemicEntry();
-    const epidemicEntry: StoredEvidence = { ...baseEntry, record: { ...baseEntry.record, caseId: sharedId } };
+    const epidemicEntry: LocalSimulationSnapshot = { ...baseEntry, record: { ...baseEntry.record, caseId: sharedId } };
     const artifact = await makeArtifact('namespace-isolation-fixture');
     const hazardRecord: SourceArtifact = { ...artifact, artifactId: sharedId };
 
-    const { LocalEvidenceStore: FreshEvidenceStore } = await import('../core/discovery/evidenceStore');
+    const { BrowserLocalSimulationSnapshotStore: FreshEvidenceStore } = await import('../core/discovery/localSimulationSnapshotStore');
     const { LocalHazardProvenanceStore: FreshHazardStore } =
       await import('../core/hazard/hazardProvenanceStore');
 
-    const evidenceStore = new FreshEvidenceStore();
+    const snapshotStore = new FreshEvidenceStore();
     const hazardStore = new FreshHazardStore();
 
-    await evidenceStore.save(epidemicEntry);
+    await snapshotStore.save(epidemicEntry);
     await hazardStore.putArtifact(hazardRecord);
 
-    const loadedEpidemic = await evidenceStore.load(sharedId);
+    const loadedEpidemic = await snapshotStore.load(sharedId);
     const loadedHazard = await hazardStore.getArtifact(sharedId);
 
     expect(loadedEpidemic?.record.caseId).toBe(sharedId);
@@ -205,7 +206,7 @@ describe('Test 5 — namespace isolation between epidemic and hazard records', (
   it('epidemic and hazard local stores write to different storage keys', async () => {
     const fake = makeFakeStorage();
     vi.stubGlobal('window', { localStorage: fake });
-    const { LocalEvidenceStore: FreshEvidenceStore } = await import('../core/discovery/evidenceStore');
+    const { BrowserLocalSimulationSnapshotStore: FreshEvidenceStore } = await import('../core/discovery/localSimulationSnapshotStore');
     const { LocalHazardProvenanceStore: FreshHazardStore } =
       await import('../core/hazard/hazardProvenanceStore');
 
@@ -214,11 +215,11 @@ describe('Test 5 — namespace isolation between epidemic and hazard records', (
 
     const keys: string[] = [];
     for (let i = 0; i < fake.length; i++) keys.push(fake.key(i)!);
-    const evidenceKeys = keys.filter((k) => k.includes('evidence-store'));
+    const snapshotKeys = keys.filter((k) => k.includes('local-simulation-snapshot'));
     const hazardKeys = keys.filter((k) => k.includes('hazard-provenance-store'));
-    expect(evidenceKeys.length).toBeGreaterThan(0);
+    expect(snapshotKeys.length).toBeGreaterThan(0);
     expect(hazardKeys.length).toBeGreaterThan(0);
-    expect(evidenceKeys).not.toEqual(expect.arrayContaining(hazardKeys));
+    expect(snapshotKeys).not.toEqual(expect.arrayContaining(hazardKeys));
   });
 });
 
@@ -228,16 +229,17 @@ describe('Test 6 — existing persisted epidemic records remain readable after t
     vi.resetModules();
   });
 
-  it('a record written to evidence-store/v1 in the pre-refactor flat-object shape is still loadable by the refactored LocalEvidenceStore', async () => {
+  it('a record written to local-simulation-snapshot/v1 in the flat-object shape is still loadable by BrowserLocalSimulationSnapshotStore', async () => {
     const fake = makeFakeStorage();
     const entry = makeEpidemicEntry();
-    // Simulate data persisted by a Genesis build from before this convergence pass: write the flat
-    // Record<string, StoredEvidence> object directly, exactly as the pre-refactor LocalEvidenceStore did,
-    // without going through any new code.
-    fake.setItem('genesis-os:evidence-store/v1', JSON.stringify({ [entry.record.caseId]: entry }));
+    // Simulate data persisted by an earlier Genesis build: write the flat
+    // Record<string, LocalSimulationSnapshot> object directly, exactly as the store does,
+    // without going through any new code. The key is the post-D-175 one; records written under
+    // the old `evidence-store/v1` key are deliberately NOT carried forward (see the store header).
+    fake.setItem('genesis-os:local-simulation-snapshot/v1', JSON.stringify({ [entry.record.caseId]: entry }));
 
     vi.stubGlobal('window', { localStorage: fake });
-    const { LocalEvidenceStore: FreshStore } = await import('../core/discovery/evidenceStore');
+    const { BrowserLocalSimulationSnapshotStore: FreshStore } = await import('../core/discovery/localSimulationSnapshotStore');
     const store = new FreshStore();
 
     const loaded = await store.load(entry.record.caseId);

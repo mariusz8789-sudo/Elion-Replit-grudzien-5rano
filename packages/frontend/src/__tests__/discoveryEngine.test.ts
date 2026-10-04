@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
 import { executeDiscoveryCase, discoveryModelIdentity, DISCOVERY_LIMITATIONS } from '../core/discovery/discoveryExecution';
-import { replayDiscoveryCase, replayDiscoveryCaseWithTolerance } from '../core/discovery/discoveryReplay';
+import { runDemoReplay, runDemoReplayWithTolerance } from '../core/discovery/demoReplay';
 import { deriveDiscoveryConclusion } from '../core/discovery/discoveryConclusion';
-import { createDiscoveryEvidencePack, serializeDiscoveryEvidencePack } from '../core/discovery/discoveryEvidence';
+import { createLocalSimulationSnapshotPack, serializeLocalSimulationSnapshotPack } from '../core/discovery/localSimulationSnapshotPack';
 import { evaluateGate, promoteCase, highestEarnedStatus, type DiscoveryCase, type DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
 
 const conditions = { nAgents: 160, initialInfected: 5, seed: 777, days: 40, stepsPerDay: 4 };
@@ -28,16 +28,16 @@ describe('Discovery Engine — the full path runs on the real model', () => {
     expect(c.question).toBeTruthy();
     expect(c.arms).toHaveLength(2);
     expect(c.comparison!.status).toBe('COMPLETED');
-    expect(c.replay!.status).toBe('MATCH');
+    expect(c.demoReplay!.status).toBe('MATCH');
     expect(c.conclusion!.verdict).toBe('SUPPORTED');
-    expect(c.evidence!.missingFields).toEqual([]);
+    expect(c.snapshotPack!.missingFields).toEqual([]);
     expect(c.followUp).toBeDefined();
   });
 
   it('carries every field the Discovery Case schema requires', () => {
     const c = runDiscoveryCase(spec());
     for (const key of ['caseId', 'question', 'hypothesis', 'model', 'parameters', 'seed', 'initialConditions',
-      'scenarios', 'inputFingerprint', 'runFingerprint', 'comparison', 'evidence', 'replay', 'limitations',
+      'scenarios', 'inputFingerprint', 'runFingerprint', 'comparison', 'snapshotPack', 'demoReplay', 'limitations',
       'conclusion', 'followUp'] as const) {
       expect(c[key]).not.toBeUndefined();
     }
@@ -77,7 +77,7 @@ describe('Discovery Engine — determinism and fingerprint integrity', () => {
     expect(b.caseId).toBe(a.caseId);
     expect(b.inputFingerprint).toBe(a.inputFingerprint);
     expect(b.runFingerprint).toBe(a.runFingerprint);
-    expect(b.evidence!.evidencePackId).toBe(a.evidence!.evidencePackId);
+    expect(b.snapshotPack!.localSnapshotId).toBe(a.snapshotPack!.localSnapshotId);
   });
 
   it('a different seed is a different case and a different run', () => {
@@ -103,12 +103,12 @@ describe('Discovery Engine — determinism and fingerprint integrity', () => {
       hypothesis: { ...spec().hypothesis, falsification: { metric: 'peakInfectious', relation: 'greater-than', rationale: 'odwrotny kierunek' } },
     }));
     expect(notSupported.conclusion!.verdict).toBe('NOT_SUPPORTED');
-    expect(notSupported.evidence!.evidencePackId).not.toBe(supported.evidence!.evidencePackId);
+    expect(notSupported.snapshotPack!.localSnapshotId).not.toBe(supported.snapshotPack!.localSnapshotId);
   });
 
   it('the serialized pack is stable across identical runs', () => {
-    const a = serializeDiscoveryEvidencePack(runDiscoveryCase(spec()).evidence!);
-    const b = serializeDiscoveryEvidencePack(runDiscoveryCase(spec()).evidence!);
+    const a = serializeLocalSimulationSnapshotPack(runDiscoveryCase(spec()).snapshotPack!);
+    const b = serializeLocalSimulationSnapshotPack(runDiscoveryCase(spec()).snapshotPack!);
     expect(b).toBe(a);
   });
 });
@@ -158,14 +158,14 @@ describe('Discovery Engine — comparison blocking', () => {
     const c = runDiscoveryCase(spec({ baselineScenario: 'ISOLATION', variantScenario: 'CONTACT_REDUCTION' }));
     expect(c.conclusion!.verdict).toBe('INSUFFICIENT_EVIDENCE');
     expect(evaluateGate(c, 'SUPPORTED').allowed).toBe(false);
-    expect(evaluateGate(c, 'EVIDENCE_VERIFIED').allowed).toBe(false);
+    expect(evaluateGate(c, 'SNAPSHOT_PACK_COMPLETE').allowed).toBe(false);
   });
 });
 
 describe('Discovery Engine — replay and drift detection', () => {
   it('replay recomputes the model and matches', () => {
     const c = runDiscoveryCase(spec());
-    const replay = replayDiscoveryCase(c);
+    const replay = runDemoReplay(c);
     expect(replay.status).toBe('MATCH');
     expect(replay.arms).toHaveLength(2);
     for (const arm of replay.arms) expect(arm.actualRunFingerprint).toBe(arm.expectedRunFingerprint);
@@ -178,7 +178,7 @@ describe('Discovery Engine — replay and drift detection', () => {
       run: { ...c.arms[0].run, summary: { ...c.arms[0].run.summary!, peakInfectious: 999 }, resultFingerprint: 'deadbeef' },
     };
     const tampered: DiscoveryCase = { ...c, arms: [tamperedArm, c.arms[1]] };
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
     expect(replay.status).toBe('DRIFT');
     const fields = replay.arms.flatMap((a) => a.differences.map((d) => d.field));
     expect(fields).toContain('summary.peakInfectious');
@@ -196,7 +196,7 @@ describe('Discovery Engine — replay and drift detection', () => {
       ...c,
       arms: [{ ...c.arms[0], run: { ...c.arms[0].run, series } }, c.arms[1]],
     };
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
     expect(replay.status).toBe('DRIFT');
     expect(replay.arms[0].differences.map((d) => d.field)).toContain('firstDifferingDay');
   });
@@ -207,7 +207,7 @@ describe('Discovery Engine — replay and drift detection', () => {
       ...c,
       arms: [{ ...c.arms[0], run: { ...c.arms[0].run, resultFingerprint: 'deadbeef' } }, c.arms[1]],
     };
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
     expect(replay.status).toBe('WITHIN_TOLERANCE');
     expect(replay.arms[0].differences.map((d) => d.field)).toEqual(['resultFingerprint']);
   });
@@ -218,18 +218,18 @@ describe('Discovery Engine — replay and drift detection', () => {
       ...c,
       arms: [{ ...c.arms[0], run: { ...c.arms[0].run, summary: { ...c.arms[0].run.summary!, totalDeaths: c.arms[0].summary!.totalDeaths + by }, resultFingerprint: 'x' } }, c.arms[1]],
     });
-    expect(replayDiscoveryCaseWithTolerance(shift(1), 2).status).toBe('WITHIN_TOLERANCE');
-    expect(replayDiscoveryCaseWithTolerance(shift(5), 2).status).toBe('DRIFT');
+    expect(runDemoReplayWithTolerance(shift(1), 2).status).toBe('WITHIN_TOLERANCE');
+    expect(runDemoReplayWithTolerance(shift(5), 2).status).toBe('DRIFT');
   });
 
   it('reports NOT_REPRODUCIBLE when the case carries no recorded run', () => {
     const c = runDiscoveryCase(spec());
-    expect(replayDiscoveryCase({ ...c, arms: [] }).status).toBe('NOT_REPRODUCIBLE');
+    expect(runDemoReplay({ ...c, arms: [] }).status).toBe('NOT_REPRODUCIBLE');
   });
 
   it('an unverified replay blocks the conclusion', () => {
     const c = runDiscoveryCase(spec());
-    const drifted = replayDiscoveryCaseWithTolerance({
+    const drifted = runDemoReplayWithTolerance({
       ...c,
       arms: [{ ...c.arms[0], run: { ...c.arms[0].run, summary: { ...c.arms[0].run.summary!, totalDeaths: 99 } } }, c.arms[1]],
     }, 0);
@@ -249,7 +249,7 @@ describe('Discovery Engine — missing model capability', () => {
 
   it('a NOT_MODELED case is never replayed or concluded into a result', () => {
     const c = runDiscoveryCase(spec({ variantScenario: 'TRANSPORT_REDUCTION' }));
-    expect(replayDiscoveryCase(c).status).toBe('BLOCKED');
+    expect(runDemoReplay(c).status).toBe('BLOCKED');
     expect(deriveDiscoveryConclusion(c, null, null).verdict).toBe('INSUFFICIENT_EVIDENCE');
   });
 
@@ -270,7 +270,7 @@ describe('Discovery Engine — conclusion is derived, not written', () => {
       hypothesis: { ...spec().hypothesis, falsification: { metric: 'peakInfectious', relation: 'greater-than', rationale: 'odwrotny kierunek' } },
     }));
     expect(c.conclusion!.verdict).toBe('NOT_SUPPORTED');
-    expect(c.status).toBe('EVIDENCE_VERIFIED');
+    expect(c.status).toBe('SNAPSHOT_PACK_COMPLETE');
   });
 
   it('returns PARTIALLY_SUPPORTED when a supporting criterion fails', () => {
@@ -346,8 +346,8 @@ describe('Discovery Engine — conclusion is derived, not written', () => {
 describe('Discovery Engine — quality gates refuse unearned status', () => {
   it('a freshly executed case has no verdict to claim yet', () => {
     const executed = executeDiscoveryCase(spec());
-    expect(evaluateGate(executed, 'REPLAY_VERIFIED').allowed).toBe(false);
-    expect(evaluateGate(executed, 'EVIDENCE_VERIFIED').missing).toContain('complete evidence pack');
+    expect(evaluateGate(executed, 'DEMO_REPLAY_VERIFIED').allowed).toBe(false);
+    expect(evaluateGate(executed, 'SNAPSHOT_PACK_COMPLETE').missing).toContain('complete local simulation snapshot pack');
     expect(evaluateGate(executed, 'SUPPORTED').allowed).toBe(false);
     expect(highestEarnedStatus(executed)).toBe('COMPLETED');
   });
@@ -360,13 +360,13 @@ describe('Discovery Engine — quality gates refuse unearned status', () => {
     expect(unchanged.status).toBe(executed.status);
   });
 
-  it('a case stripped of its evidence pack loses EVIDENCE_VERIFIED and everything above it', () => {
+  it('a case stripped of its evidence pack loses SNAPSHOT_PACK_COMPLETE and everything above it', () => {
     const c = runDiscoveryCase(spec());
-    const stripped: DiscoveryCase = { ...c, evidence: null };
-    expect(evaluateGate(stripped, 'REPLAY_VERIFIED').allowed).toBe(true);
-    expect(evaluateGate(stripped, 'EVIDENCE_VERIFIED').allowed).toBe(false);
+    const stripped: DiscoveryCase = { ...c, snapshotPack: null };
+    expect(evaluateGate(stripped, 'DEMO_REPLAY_VERIFIED').allowed).toBe(true);
+    expect(evaluateGate(stripped, 'SNAPSHOT_PACK_COMPLETE').allowed).toBe(false);
     expect(evaluateGate(stripped, 'SUPPORTED').allowed).toBe(false);
-    expect(highestEarnedStatus(stripped)).toBe('REPLAY_VERIFIED');
+    expect(highestEarnedStatus(stripped)).toBe('DEMO_REPLAY_VERIFIED');
   });
 
   it('a SUPPORTED label cannot be attached to a NOT_SUPPORTED conclusion', () => {
@@ -394,14 +394,14 @@ describe('Discovery Engine — quality gates refuse unearned status', () => {
 
 describe('Discovery Engine — evidence completeness', () => {
   it('a complete pack lists every element the brief requires', () => {
-    const pack = runDiscoveryCase(spec()).evidence!;
+    const pack = runDiscoveryCase(spec()).snapshotPack!;
     expect(pack.model.modelVersion).toBe('1.0.0');
     expect(Object.keys(pack.parameters).length).toBeGreaterThan(0);
     expect(pack.seed).toBe(777);
     expect(Object.keys(pack.inputFingerprints)).toContain('case');
     expect(Object.values(pack.runFingerprints).every((f) => typeof f === 'string')).toBe(true);
     expect(pack.comparison.status).toBe('COMPLETED');
-    expect(pack.replay.status).toBe('MATCH');
+    expect(pack.demoReplay.status).toBe('MATCH');
     expect(pack.limitations.length).toBeGreaterThan(0);
     expect(pack.conclusion.verdict).toBe('SUPPORTED');
     expect(pack.missingFields).toEqual([]);
@@ -410,20 +410,20 @@ describe('Discovery Engine — evidence completeness', () => {
 
   it('names what is missing instead of quietly passing', () => {
     const c = runDiscoveryCase(spec());
-    const brokenReplay = { ...c.replay!, status: 'DRIFT' as const };
-    const pack = createDiscoveryEvidencePack(c, c.comparison!, brokenReplay, c.conclusion!);
-    expect(pack.missingFields.join(' ')).toContain('replay verification');
+    const brokenReplay = { ...c.demoReplay!, status: 'DRIFT' as const };
+    const pack = createLocalSimulationSnapshotPack(c, c.comparison!, brokenReplay, c.conclusion!);
+    expect(pack.missingFields.join(' ')).toContain('DEMO_REPLAY verification');
     expect(pack.missingFields.length).toBeGreaterThan(0);
   });
 
   it('a pack over a blocked comparison is explicitly incomplete', () => {
     const c = runDiscoveryCase(spec({ baselineScenario: 'ISOLATION', variantScenario: 'CONTACT_REDUCTION' }));
-    const pack = createDiscoveryEvidencePack(c, c.comparison!, c.replay!, c.conclusion!);
+    const pack = createLocalSimulationSnapshotPack(c, c.comparison!, c.demoReplay!, c.conclusion!);
     expect(pack.missingFields.join(' ')).toContain('comparison');
   });
 
   it('the pack records one input fingerprint per arm plus the case itself', () => {
-    const pack = runDiscoveryCase(spec()).evidence!;
+    const pack = runDiscoveryCase(spec()).snapshotPack!;
     expect(Object.keys(pack.inputFingerprints).sort()).toEqual(['baseline:BASELINE', 'case', 'variant:ISOLATION']);
   });
 });

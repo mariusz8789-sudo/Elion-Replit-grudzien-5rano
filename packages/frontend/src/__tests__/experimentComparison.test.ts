@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
 import type { DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
-import { EVIDENCE_STORE_SCHEMA_VERSION, type StoredEvidence } from '../core/discovery/evidenceStore';
+import { LOCAL_SIMULATION_SNAPSHOT_KIND, LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, type LocalSimulationSnapshot } from '../core/discovery/localSimulationSnapshotStore';
 import { compareStoredExperiments } from '../core/discovery/experimentComparison';
 
 const conditions = { nAgents: 200, initialInfected: 8, seed: 4242, days: 30, stepsPerDay: 4 };
@@ -18,9 +18,10 @@ const spec = (over: Partial<DiscoveryCaseSpec> = {}): DiscoveryCaseSpec => ({
   ...over,
 });
 
-function entry(over: Partial<DiscoveryCaseSpec> = {}, commit = 'commit-a'): StoredEvidence {
+function entry(over: Partial<DiscoveryCaseSpec> = {}, commit = 'commit-a'): LocalSimulationSnapshot {
   const record = runDiscoveryCase(spec(over));
-  return { schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record, sha256: null, codeCommitHash: commit, savedAt: Date.now() };
+  return { kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record, snapshotFingerprint: null, codeCommitHash: commit, savedAt: Date.now() };
 }
 
 describe('compareStoredExperiments — Run Comparison between two independently saved experiments', () => {
@@ -77,7 +78,7 @@ describe('compareStoredExperiments — Run Comparison between two independently 
   it('surfaces a real DRIFT only via a tampered record, never by inventing a mismatch', () => {
     const a = entry();
     const tamperedRecord = { ...a.record, runFingerprint: 'not-the-real-fingerprint' };
-    const b: StoredEvidence = { ...a, record: tamperedRecord };
+    const b: LocalSimulationSnapshot = { ...a, record: tamperedRecord };
     const cmp = compareStoredExperiments(a, b);
     expect(cmp.sameInputFingerprint).toBe(true);
     expect(cmp.sameResultFingerprint).toBe(false);

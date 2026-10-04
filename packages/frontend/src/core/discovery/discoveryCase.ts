@@ -39,8 +39,8 @@ export type DiscoveryCaseStatus =
   | 'DRAFT'
   | 'RUNNING'
   | 'COMPLETED'
-  | 'REPLAY_VERIFIED'
-  | 'EVIDENCE_VERIFIED'
+  | 'DEMO_REPLAY_VERIFIED'
+  | 'SNAPSHOT_PACK_COMPLETE'
   | 'SUPPORTED'
   | 'PARTIALLY_SUPPORTED'
   | 'BLOCKED'
@@ -98,7 +98,7 @@ export interface DiscoveryCaseSpec {
    * Dopuszczalna rozbieżność metryki przy odtworzeniu. Model jest
    * deterministyczny, więc domyślnie 0 — każda różnica to DRIFT.
    */
-  replayTolerance?: number;
+  demoReplayTolerance?: number;
 }
 
 export type DiscoveryComparisonStatus = 'COMPLETED' | 'COMPARISON_BLOCKED';
@@ -130,23 +130,23 @@ export interface DiscoveryComparison {
   message: string;
 }
 
-export type DiscoveryReplayStatus = 'MATCH' | 'WITHIN_TOLERANCE' | 'DRIFT' | 'BLOCKED' | 'NOT_REPRODUCIBLE';
+export type DemoReplayStatus = 'MATCH' | 'WITHIN_TOLERANCE' | 'DRIFT' | 'BLOCKED' | 'NOT_REPRODUCIBLE';
 
 /** Konkretna rozbieżność przy odtworzeniu — DRIFT musi pokazać, co się różni. */
-export interface DiscoveryReplayDifference {
+export interface DemoReplayDifference {
   field: string;
   expected: number | string | null;
   actual: number | string | null;
 }
 
-export interface DiscoveryReplay {
-  status: DiscoveryReplayStatus;
+export interface DemoReplay {
+  status: DemoReplayStatus;
   tolerance: number;
   arms: readonly {
     armId: string;
     expectedRunFingerprint: string | null;
     actualRunFingerprint: string | null;
-    differences: readonly DiscoveryReplayDifference[];
+    differences: readonly DemoReplayDifference[];
   }[];
   message: string;
 }
@@ -275,9 +275,9 @@ export interface DiscoveryFollowUp {
   notModeledReason?: string;
 }
 
-export interface DiscoveryEvidencePack {
+export interface LocalSimulationSnapshotPack {
   contractVersion: string;
-  evidencePackId: string;
+  localSnapshotId: string;
   caseId: string;
   model: DiscoveryModelIdentity;
   parameters: Readonly<Record<string, number | boolean>>;
@@ -288,7 +288,7 @@ export interface DiscoveryEvidencePack {
   runFingerprints: Readonly<Record<string, string | null>>;
   result: Readonly<Record<string, ScenarioSummary | null>>;
   comparison: DiscoveryComparison;
-  replay: DiscoveryReplay;
+  demoReplay: DemoReplay;
   limitations: readonly string[];
   conclusion: DiscoveryConclusion;
   /** Puste dopiero czyni pakiet kompletnym; każdy brak jest wymieniony. */
@@ -310,11 +310,11 @@ export interface DiscoveryCase {
   inputFingerprint: string;
   runFingerprint: string | null;
   /** Dopuszczalna rozbieżność metryki przy odtworzeniu; 0 = wymagana zgodność. */
-  replayTolerance: number;
+  demoReplayTolerance: number;
   arms: readonly DiscoveryArm[];
   comparison: DiscoveryComparison | null;
-  replay: DiscoveryReplay | null;
-  evidence: DiscoveryEvidencePack | null;
+  demoReplay: DemoReplay | null;
+  snapshotPack: LocalSimulationSnapshotPack | null;
   conclusion: DiscoveryConclusion | null;
   followUp: readonly DiscoveryFollowUp[];
   limitations: readonly string[];
@@ -336,12 +336,12 @@ function armsExecuted(record: DiscoveryCase): boolean {
   );
 }
 
-function replayVerified(record: DiscoveryCase): boolean {
-  return record.replay !== null && (record.replay.status === 'MATCH' || record.replay.status === 'WITHIN_TOLERANCE');
+function demoReplayVerified(record: DiscoveryCase): boolean {
+  return record.demoReplay !== null && (record.demoReplay.status === 'MATCH' || record.demoReplay.status === 'WITHIN_TOLERANCE');
 }
 
-function evidenceComplete(record: DiscoveryCase): boolean {
-  return record.evidence !== null && record.evidence.missingFields.length === 0;
+function snapshotPackComplete(record: DiscoveryCase): boolean {
+  return record.snapshotPack !== null && record.snapshotPack.missingFields.length === 0;
 }
 
 /**
@@ -349,15 +349,15 @@ function evidenceComplete(record: DiscoveryCase): boolean {
  *
  * To jest miejsce, w którym UI i API tracą możliwość ogłoszenia wyniku za
  * wcześnie: bez przebiegów nie ma COMPLETED, bez odtworzenia nie ma
- * REPLAY_VERIFIED, bez kompletnego pakietu dowodowego nie ma EVIDENCE_VERIFIED,
+ * DEMO_REPLAY_VERIFIED, bez kompletnego pakietu dowodowego nie ma SNAPSHOT_PACK_COMPLETE,
  * a bez tego wszystkiego nie ma SUPPORTED.
  */
 export function evaluateGate(record: DiscoveryCase, target: DiscoveryCaseStatus): DiscoveryGateResult {
   const missing: string[] = [];
   const needExecuted = () => { if (!armsExecuted(record)) missing.push('two completed scenario runs with result fingerprints'); };
   const needComparison = () => { if (record.comparison === null) missing.push('comparison'); };
-  const needReplay = () => { if (!replayVerified(record)) missing.push('replay verdict MATCH or WITHIN_TOLERANCE'); };
-  const needEvidence = () => { if (!evidenceComplete(record)) missing.push('complete evidence pack'); };
+  const needDemoReplay = () => { if (!demoReplayVerified(record)) missing.push('DEMO_REPLAY verdict MATCH or WITHIN_TOLERANCE'); };
+  const needSnapshotPack = () => { if (!snapshotPackComplete(record)) missing.push('complete local simulation snapshot pack'); };
   const needConclusion = (verdict: DiscoveryVerdict) => {
     if (record.conclusion === null) missing.push('conclusion');
     else if (record.conclusion.verdict !== verdict) missing.push(`conclusion verdict ${verdict} (actual: ${record.conclusion.verdict})`);
@@ -375,29 +375,29 @@ export function evaluateGate(record: DiscoveryCase, target: DiscoveryCaseStatus)
       needExecuted();
       needComparison();
       break;
-    case 'REPLAY_VERIFIED':
+    case 'DEMO_REPLAY_VERIFIED':
       needExecuted();
       needComparison();
-      needReplay();
+      needDemoReplay();
       break;
-    case 'EVIDENCE_VERIFIED':
+    case 'SNAPSHOT_PACK_COMPLETE':
       needExecuted();
       needComparison();
-      needReplay();
-      needEvidence();
+      needDemoReplay();
+      needSnapshotPack();
       break;
     case 'SUPPORTED':
       needExecuted();
       needComparison();
-      needReplay();
-      needEvidence();
+      needDemoReplay();
+      needSnapshotPack();
       needConclusion('SUPPORTED');
       break;
     case 'PARTIALLY_SUPPORTED':
       needExecuted();
       needComparison();
-      needReplay();
-      needEvidence();
+      needDemoReplay();
+      needSnapshotPack();
       needConclusion('PARTIALLY_SUPPORTED');
       break;
     case 'BLOCKED':
@@ -427,7 +427,7 @@ export function promoteCase(
 export function highestEarnedStatus(record: DiscoveryCase): DiscoveryCaseStatus {
   if (record.notModeledReason) return 'NOT_MODELED';
   if (record.blockedReason) return 'BLOCKED';
-  for (const target of ['SUPPORTED', 'PARTIALLY_SUPPORTED', 'EVIDENCE_VERIFIED', 'REPLAY_VERIFIED', 'COMPLETED', 'RUNNING'] as const) {
+  for (const target of ['SUPPORTED', 'PARTIALLY_SUPPORTED', 'SNAPSHOT_PACK_COMPLETE', 'DEMO_REPLAY_VERIFIED', 'COMPLETED', 'RUNNING'] as const) {
     if (evaluateGate(record, target).allowed) return target;
   }
   return 'DRAFT';

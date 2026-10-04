@@ -37,6 +37,7 @@ import { REASONING_ADAPTER_VERSION, ReasoningProviderError } from './reasoningPr
 import { executorPromptLines, MAX_PREDICTIONS, PREDICTION_OPERATORS } from './researchRunEngines.mjs';
 import { researchRunProvenance } from './provenanceClass.mjs';
 import { hypothesisLiteratureOf, literatureCatalogOf } from './literature/runCitations.mjs';
+import { closeStage, FULL_CYCLE_STAGE, linkScopeToCampaign, openStage, recordCount, recordMember } from './discoveryTiming.mjs';
 import { datasetsOf, resolveDatasetCell } from './datasets/runDatasets.mjs';
 
 export const RESEARCH_RUN_DOMAIN = 'genesis.research-run';
@@ -322,6 +323,14 @@ export function startResearchRun(db, projectId, input, { userId = null } = {}) {
       origin: { kind: 'USER_QUESTION', userId },
     });
     if (!appended.ok) return { ok: false, error: appended.error };
+    // TIME-TO-DISCOVERY: the clock starts on the same write that formalises the problem, inside the
+    // same transaction, so a refused run leaves no timing behind either. Two stages open here: the
+    // question -> hypotheses stage, and the full question -> verified research outcome stage the 2x
+    // KPI is measured on.
+    const campaignId = STR(input?.campaignId, 200);
+    openStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: run.id, stage: 'QUESTION_TO_HYPOTHESES', campaignId, detail: { problemId: dedupeKey } });
+    openStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: run.id, stage: FULL_CYCLE_STAGE, campaignId, detail: { problemId: dedupeKey } });
+    if (campaignId) linkScopeToCampaign(db, { scopeKind: 'RESEARCH_RUN', scopeId: run.id, campaignId });
     return { ok: true, deduped: false, researchRun: view(db, getAgentRun(db, run.id)) };
   });
 }
@@ -495,6 +504,16 @@ export async function proposeResearchPlan(db, projectId, runId, { provider, self
       const stored = recordClaimProposal(db, projectId, h, userId);
       if (!stored.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: 'knowledge_registry' };
     }
+    // TIME-TO-DISCOVERY: question -> hypotheses is finished; hypotheses -> frozen protocols begins.
+    // The reasoning model is the agent that did this stage's work, so it is named as such. Rejected
+    // candidates here are the proposals ENTITY-3's rules threw out: a run that produced one usable
+    // hypothesis out of six is not the same work as one that produced one out of one.
+    closeStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'QUESTION_TO_HYPOTHESES', detail: { hypotheses: hypotheses.length } });
+    recordMember(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'QUESTION_TO_HYPOTHESES', kind: 'AGENT', member: `${generatedBy.providerId}:${generatedBy.model ?? 'unknown'}` });
+    if (plan.rejected.length) {
+      recordCount(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'QUESTION_TO_HYPOTHESES', kind: 'REJECTED_CANDIDATES', delta: plan.rejected.length });
+    }
+    openStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'HYPOTHESES_TO_FROZEN_PROTOCOLS' });
     return { ok: true, status: 'PROPOSED', deduped: false, researchRun: getResearchRun(db, projectId, runId) };
   });
 }

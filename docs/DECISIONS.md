@@ -10479,3 +10479,31 @@ The two remaining items are named rather than estimated: **NP-1**, the commits p
 **Not written here.** The candidate pipeline and the scientist challenge pack are owned by the agent holding D-164 through D-168; both new documents carry a marked placeholder where their sealed result belongs, with the limits their result must respect stated in advance.
 
 **Evidence.** `docs/monetization/MONETIZATION-READINESS.md` §9, `docs/grant/GRANT-READINESS.md`, `docs/public/PUBLIC-PROOF-PACK.md`. Documentation only: no product code changed, and no test covers these files.
+## D-168 — the public-demo security gate: what a visitor can see is decided once, then enforced by a test
+
+**Date:** 2026-10-04. **Scope:** a read-and-harden pass before Genesis is shown publicly (grant application, public demo, forum post). Not a redesign.
+
+**Numbering.** D-162 to D-167 are taken or reserved by other threads; this is the next free number.
+
+**What was wrong.** `GET /api/compute/environment` is unauthenticated, and it returned `compute/env_probe.py`'s output verbatim. That probe reports, for every binary engine it finds, the absolute path `shutil.which()` resolved — so any visitor could read the deployment's filesystem layout and the names of its environments. Its failure branch returned the raw `execFileSync` message, which is literally `Command failed: <interpreter path> <probe script path>`. The remote-worker API returned the server's own error text on a 500. Nine committed evidence artefacts carried a developer's Windows machine and account name, as the absolute path of their checkout, and six scripts plus five documents carried absolute paths of machines that are not this one.
+
+**What is decided.** What crosses the HTTP boundary from the environment probe is an **allowlist projection** (`publicEnvironment` in `api.mjs`), not the probe. `path` is dropped — an engine's presence is the answer, its location is not — and every free-text field is path-redacted. The stored env audit keeps the full probe, because the operator needs it. This is the pattern `publicLocalVideoRuntime` already used, which is why `ffmpeg.executable` never leaked from that route. `scienceEnv.mjs` and `remoteWorkerApi.mjs` now use the repository's single `redact()`.
+
+**Why it is a standing gate and not an audit.** The same class of leak had already been fixed twice by hand (`campaign/toolchain.mjs`, `publicLocalVideoRuntime`) and reappeared on a third route. `packages/backend/src/publicDemoSecurityGate.test.mjs` therefore drives **every** family `api.mjs` routes before its single `getUserByToken` gate, unauthenticated, through the real router, and scans the body; a second test reads `api.mjs` itself and fails if a new public family appears that the probe list does not cover. It also scans every tracked file that ships publicly and every asset of the production build. It is red on the unmodified handler (`engine vina still exposes its filesystem location`) and green after the fix.
+
+**No finding ever echoes the matched value.** A finding carries the pattern id, the line and the matched length. A gate that prints the secret it found puts the secret in the CI log.
+
+**Exceptions are decisions.** `packages/backend/src/security/public-surface-exceptions.json`; each entry names one surface, the specific pattern ids (`"*"` is refused), a reason and a `D-` id. The gate validates the file before it scans, so an undocumented exception fails the suite rather than widening the gate. Four are recorded under this decision, all of them "this is not a leak": a document whose subject is the defect, two committed vitest reports whose frames are now `<repo>`-relative, a Railway internal hostname in operator instructions, and the RO-Crate JSON-LD vocabulary namespace of the Evidence Pack, which uses a `.local` label.
+
+**No secret was found, so nothing is rotated and no history is rewritten.** Had one been found in a past commit, the rule would still have been to rotate the credential and leave the history alone.
+
+**What this does NOT close.** `GET /api/knowledge/proposals` publishes every pending Evidence Ledger proposal — claim text and source URL — to anyone, while `publish`/`reject` on the same family require a session; and `POST`/`PUT /api/worlds` write with no authentication and no ownership, so any visitor can overwrite any saved world snapshot by naming its id. Both are product decisions with a schema or a UI consequence, not redactions, so they are reported with a proposed patch in `docs/genesis1/PUBLIC-DEMO-SECURITY.md` and left for a decision of their own. Until the first is closed, the deployment used for a public demo must hold no real unpublished claim.
+
+**Evidence.** `docs/genesis1/PUBLIC-DEMO-SECURITY.md` (what was checked, found, fixed, still open, and the exact list of things that must never appear in a screenshot, a report or a public Evidence Pack); `packages/backend/src/security/publicSurface.mjs`; tests `packages/backend/src/publicDemoSecurityGate.test.mjs` (12).
+
+**Amendment, same day, on integration.** The build-asset exception for the RO-Crate JSON-LD
+vocabulary namespace was replaced by an exact-literal allowlist in the scanner
+(`VOCABULARY_NAMESPACES` in `security/publicSurface.mjs`). The reason is unchanged — a namespace
+IRI is an identifier that is never resolved and names no host — but which built asset it lands in
+depends on bundling, so a per-file exception cannot hold across a rebuild, while excusing the
+literal can. Any other `.local`, `.internal` or `.lan` address still fails the gate, proven by test.

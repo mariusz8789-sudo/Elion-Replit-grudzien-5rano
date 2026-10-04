@@ -3,8 +3,12 @@ from rdkit import Chem
 from rdkit import RDLogger; RDLogger.DisableLog('rdApp.*')
 from meeko import MoleculePreparation, PDBQTWriterLegacy
 from vina import Vina
+import os as _os
+# Repository root, derived from this file: a hard-coded absolute path named the machine
+# the script happened to run on and broke every other checkout (D-168).
+REPO=_os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
 M=json.load(open("combined.json"))
-R5={c['pdbId']:c for c in json.load(open("/home/claude/Elion-Replit-grudzien-5rano/docs/evidence/astex-vinardo-rescore.json"))['cases']}
+R5={c['pdbId']:c for c in json.load(open(REPO+"/docs/evidence/astex-vinardo-rescore.json"))['cases']}
 TOPN="/tmp/genesis-astex-topn-9wvus3jl"
 B=[p for p in M if M[p]["classification"]=="B_SAMPLING_FAILURE"]
 for p in sorted(M):

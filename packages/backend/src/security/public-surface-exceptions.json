@@ -1,0 +1,49 @@
+{
+  "$comment": [
+    "Recorded exceptions to the public-demo security gate (publicDemoSecurityGate.test.mjs, D-168).",
+    "An entry here is a DECISION, not a silencer. To add one:",
+    "  1. Establish that the match is genuinely not a leak — the value is public, or it is a",
+    "     placeholder, or the surface is not reachable by a visitor. If you cannot say that in",
+    "     one checkable sentence, the answer is to fix the leak, not to add an entry.",
+    "  2. Record the decision in docs/DECISIONS.md with the next free D-number, saying what is",
+    "     excused and why.",
+    "  3. Add the entry below with `surface` (exactly one route, file path or build path),",
+    "     `patterns` (the specific pattern ids — never \"*\"), `reason` and `decision`.",
+    "The gate validates this file's shape first, so an entry missing a reason or a decision id",
+    "fails the suite rather than widening the gate."
+  ],
+  "exceptions": [
+    {
+      "surface": "docs/BRAKUJACA_WIEDZA.md",
+      "patterns": [
+        "UNIX_HOME_PATH"
+      ],
+      "reason": "The document's subject IS this defect: the row quotes `/home/ubuntu/genesis_delivery/...` as an example of the foreign-machine paths earlier deliveries carried. Removing the example would remove the record of the problem.",
+      "decision": "D-168"
+    },
+    {
+      "surface": "artifacts/human-twin-review/full-vitest.json",
+      "patterns": [
+        "V8_STACK_FRAME"
+      ],
+      "reason": "A committed vitest run report, whose whole content is failure messages. Its host paths were redacted to <repo> in D-168, so the remaining frames name module-relative files and node: internals only, and no host.",
+      "decision": "D-168"
+    },
+    {
+      "surface": "artifacts/human-twin-review/full-vitest-verified.json",
+      "patterns": [
+        "V8_STACK_FRAME"
+      ],
+      "reason": "Same committed vitest run report, same redaction: the remaining frames are <repo>-relative and node: internal, naming no host and no user. A test log without its frames would not be a test log.",
+      "decision": "D-168"
+    },
+    {
+      "surface": "docs/RAILWAY_SCIENTIFIC_WORKERS.md",
+      "patterns": [
+        "RAILWAY_INTERNAL_HOST"
+      ],
+      "reason": "Operator deployment instructions must name the private worker URL shape, and a Railway internal hostname is derived mechanically from the service name, so it is a convention rather than a disclosure. It is only ever a private-network address with no public route.",
+      "decision": "D-168"
+    }
+  ]
+}

@@ -7,7 +7,7 @@
     "status": "AVAILABLE",
     "format": "MP4",
     "codec": "H264",
-    "binary": "C:\\Users\\Admin\\Documents\\GitHub\\Elion-Replit-grudzien-5rano\\node_modules\\ffmpeg-static\\ffmpeg.exe",
+    "binary": "<path-redacted>",
     "source": "NPM_FFMPEG_STATIC"
   },
   "frameCount": 24,

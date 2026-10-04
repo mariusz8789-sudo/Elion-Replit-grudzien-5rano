@@ -1,5 +1,8 @@
 import json,statistics
-REPO="/home/claude/Elion-Replit-grudzien-5rano"
+import os as _os
+# Repository root, derived from this file: a hard-coded absolute path named the machine
+# the script happened to run on and broke every other checkout (D-168).
+REPO=_os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
 M=json.load(open("/tmp/claude-0/phase2b/measure.json"))
 X=json.load(open("/tmp/claude-0/phase2b/xtalscore.json"))
 diag=json.load(open(REPO+"/docs/evidence/astex-redock-run4-diagnostic.json"))

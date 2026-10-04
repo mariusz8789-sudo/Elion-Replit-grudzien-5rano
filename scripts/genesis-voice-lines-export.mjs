@@ -26,9 +26,11 @@ const ART = path.join(REPO, 'artifacts/lower-harm');
 const work = mkdtempSync(path.join(tmpdir(), 'genesis-voice-lines-'));
 const entry = path.join(work, 'entry.ts');
 writeFileSync(entry, [
-  "export * from '/home/user/Elion-Replit-grudzien-5rano/packages/frontend/src/core/guide/narrationModel';".replace('/home/user/Elion-Replit-grudzien-5rano', REPO),
-  "export { followEvidenceSteps } from '/home/user/Elion-Replit-grudzien-5rano/packages/frontend/src/core/guide/followEvidence';".replace('/home/user/Elion-Replit-grudzien-5rano', REPO),
-  "export { buildDiscoveryHallSequence } from '/home/user/Elion-Replit-grudzien-5rano/packages/frontend/src/core/three/discoveryHallSequence';".replace('/home/user/Elion-Replit-grudzien-5rano', REPO),
+  // Written as `${REPO}` directly. The previous form embedded a literal `/home/<user>/…` path as
+  // a substitution sentinel, which read as a developer's machine in a committed file (D-168).
+  `export * from '${REPO}/packages/frontend/src/core/guide/narrationModel';`,
+  `export { followEvidenceSteps } from '${REPO}/packages/frontend/src/core/guide/followEvidence';`,
+  `export { buildDiscoveryHallSequence } from '${REPO}/packages/frontend/src/core/three/discoveryHallSequence';`,
 ].join('\n'));
 const bundle = path.join(work, 'guide.mjs');
 execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [entry, '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error', `--outfile=${bundle}`], { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'] });

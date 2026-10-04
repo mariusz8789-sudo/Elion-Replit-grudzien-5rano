@@ -6,7 +6,10 @@ RDLogger.DisableLog('rdApp.*')
 
 TOPN="/tmp/genesis-astex-topn-9wvus3jl"
 SRC="/tmp/claude-0/p2r/joined/astex"
-REPO="/home/claude/Elion-Replit-grudzien-5rano"
+import os as _os
+# Repository root, derived from this file: a hard-coded absolute path named the machine
+# the script happened to run on and broke every other checkout (D-168).
+REPO=_os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".."))
 
 run3=json.load(open(REPO+"/docs/evidence/astex-redock-benchmark-2026-09-27-run3.json"))
 diag=json.load(open(REPO+"/docs/evidence/astex-redock-run4-diagnostic.json"))

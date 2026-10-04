@@ -1,0 +1,142 @@
+{
+  "decisionId": "D-164",
+  "preregFingerprint": "17bb67bfbe1e3406",
+  "preregFrozenAtCommit": "a3d01932",
+  "isGateVerdict": false,
+  "notAGateVerdictBecause": "No model is fitted here and no accuracy is measured. The frozen validation gate is not read. This run measures only how far the generable product space sits from the training arm, on the boundary D-162 froze.",
+  "baseCommit": "22d3061f",
+  "computedAt": "2026-10-04T01:34:02.802Z",
+  "engine": {
+    "rdkitVersion": "2026.03.6",
+    "generator": "compute/rdkitAdapter.mjs::bricsRecombine (RDKit BRICSBuild, scrambleReagents=false)",
+    "similarity": "campaign/glp1rQsar.mjs::tanimotoIndices over 512-bit Morgan r=2"
+  },
+  "rolesFrom": {
+    "decisionId": "D-152",
+    "note": "roles READ from the sealed D-152 artefact, never recomputed here"
+  },
+  "frozenCriteria": {
+    "DOMAIN_FLOOR": 0.6,
+    "DOMAIN_FLOOR_source": "D-162 DISTANCE_CEILING, by reference",
+    "MIN_IN_DOMAIN_FRACTION": 0.5,
+    "MIN_NOVEL_PRODUCTS": 100,
+    "MIN_SMALL_MOLECULE_PARENTS": 5,
+    "SMALL_MOLECULE_MAX_MOLWT": 900,
+    "SMALL_MOLECULE_MAX_AMIDE_BONDS": 5,
+    "GENERATION_GROUP_SIZE": 8,
+    "GENERATION_MAX_PRODUCTS_PER_GROUP": 64,
+    "GENERATION_MAX_DEPTH": 2
+  },
+  "dataset": {
+    "combinedSetRows": 638,
+    "functionalRows": 320,
+    "functionalCompounds": 206,
+    "describedCompounds": 206,
+    "undescribableCompounds": 0,
+    "armFingerprinted": 206,
+    "datasetHash": "fc56bda4f5f36ce1"
+  },
+  "smallMoleculeSubset": {
+    "count": 89,
+    "fractionOfArm": 0.432,
+    "meetsMinParents": true,
+    "molWtQuantilesOfArm": {
+      "min": 292.15,
+      "median": 1465.63,
+      "max": 6204.18
+    }
+  },
+  "generation": {
+    "groups": 12,
+    "groupsAttempted": 12,
+    "groupsFailed": 0,
+    "novelProducts": 714,
+    "unfingerprintableProducts": 0,
+    "productsMeasured": 714,
+    "meetsMinProducts": true
+  },
+  "controls": {
+    "noParentCountedAsAProduct": {
+      "regeneratedParents": 0,
+      "required": 0,
+      "ok": true
+    },
+    "fingerprintAlignment": {
+      "ok": true
+    },
+    "determinism": {
+      "ok": true,
+      "note": "the generation step reproduced its product list exactly"
+    }
+  },
+  "measurement": {
+    "inDomainCount": 43,
+    "inDomainFraction": 0.0602,
+    "nearestNeighbourTanimotoToArm": {
+      "n": 714,
+      "min": 0.0824,
+      "q25": 0.2308,
+      "median": 0.2927,
+      "q75": 0.3947,
+      "max": 0.8148
+    }
+  },
+  "negativeControl": {
+    "kind": "ARM_AGAINST_ITSELF_LEAVE_ONE_OUT",
+    "note": "Each arm compound's maximum Tanimoto to any OTHER arm compound. It says how tight the arm itself is, so a low product fraction can be read against it.",
+    "n": 206,
+    "min": 0.4082,
+    "q25": 0.8353,
+    "median": 0.9333,
+    "q75": 0.9898,
+    "max": 1,
+    "fractionAtOrAboveFloor": 0.966
+  },
+  "outcome": "DOMAIN_COVERAGE_INSUFFICIENT",
+  "frozenPrediction": {
+    "author": "Claude Opus 5, session 01SdX7fcgVg9gVqH8emoF5qw, before the first number of this run was computed and before any molecular weight or amide count of this arm was read",
+    "primary": "NO_GENERABLE_CANDIDATE_SPACE",
+    "reasoning": "D-153 and D-162 both describe the functional-agonism arm as peptide-heavy, and the one row of it printed during this audit is a 30-plus-residue peptide. If the small-molecule subset is a few dozen compounds, BRICS over groups of eight with a 64-product cap may well not reach a hundred distinct novel products, and the run would stop at the candidate-pool gate rather than reaching a coverage number.",
+    "secondary": "DOMAIN_COVERAGE_INSUFFICIENT",
+    "secondaryReasoning": "If enough products are built, BRICS recombination mixes fragments across parents and the products are by construction chimeras rather than close analogues of any single parent, so most of them should land below 0.60 to the arm.",
+    "intervals": {
+      "ifProductsAreGenerated_inDomainFraction": [
+        0,
+        0.25
+      ],
+      "smallMoleculeParentCount": [
+        10,
+        70
+      ],
+      "novelProductCount": [
+        0,
+        400
+      ]
+    },
+    "whatWouldSurpriseTheAuthor": "An in-domain fraction at or above 0.50 over more than a hundred novel products, which would mean BRICS recombination of this arm stays inside its own chemical neighbourhood.",
+    "recordedWrongRatherThanDropped": "This prediction is copied into the sealed artefact verbatim whatever the outcome, exactly as D-153's and D-162's wrong predictions were."
+  },
+  "predictionCorrect": false,
+  "predictionAssessment": {
+    "primaryOutcomePredicted": "NO_GENERABLE_CANDIDATE_SPACE",
+    "primaryOutcomeCorrect": false,
+    "secondaryOutcomePredicted": "DOMAIN_COVERAGE_INSUFFICIENT",
+    "secondaryOutcomeCorrect": true,
+    "smallMoleculeParentCountInsidePredictedInterval": false,
+    "novelProductCountInsidePredictedInterval": false,
+    "inDomainFractionInsidePredictedInterval": true
+  },
+  "disclosedAfterTheFreeze": [
+    "While auditing the pipeline, and AFTER this preregistration was committed, the author counted the small molecules of the 287-row PINNED activity table (a different set from this arm) and saw 56. No threshold and no prediction moved as a result: both were already frozen in a3d01932. It is recorded here because a number seen between a freeze and a run has to be visible.",
+    "The amide cut is applied with a regular expression over the canonical SMILES rather than an RDKit substructure match, because the RDKit adapter exposes no batch substructure command and adding one would have been a code change made after the freeze. The pattern counts N-C(=O) and C(=O)-N units, which is how every peptide backbone in this arm is written. It is a coarser instrument than a SMARTS match and is reported as such."
+  ],
+  "limitations": [
+    "This run says nothing about the model's accuracy. It says where the generable product space sits relative to the training arm, and leans on D-162 for what the model does out there.",
+    "IN_DOMAIN here means only \"not shown by D-162 to be outside the model's reach\". It never means the model predicts that molecule well.",
+    "BRICS recombination is one generator. A different generator — a different fragment library, a different transformation set, an analogue enumerator around a single parent — would produce a different distance distribution, and this run does not speak for it.",
+    "No product has measured activity, a prior-art check, or any evidence of any kind. None is a candidate or a lead.",
+    "The 16 assays with no description at D-152 time are absent from this arm, as they are from D-153 and D-162."
+  ],
+  "boundary": "No gate was edited, no sealed artefact was modified, no role was reclassified, no candidate was nominated or ranked, and no docking target was changed.",
+  "artifactHash": "6f33c54b98f7078f"
+}

@@ -258,4 +258,4 @@ answer, and it is a measured absence, not a placeholder.
 - `packages/backend/src/api.mjs` — the two read-only routes.
 - `packages/backend/src/discoveryTiming.test.mjs` — the tests, including the no-competitor-data
   invariant.
-- `docs/DECISIONS.md` — D-162.
+- `docs/DECISIONS.md` — D-163.

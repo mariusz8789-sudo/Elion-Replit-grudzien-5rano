@@ -10425,11 +10425,11 @@ Note the shape of the evidence here, because it is the honest summary of all six
 
 **Evidence.** `packages/frontend/src/__tests__/replayDriftCoverage.test.ts` (5 tests; 3 of the 4 ported ones failed on the unmodified code).
 
-## D-162 — time-to-discovery is instrumented inside the canonical loop, and the 2x indicator reports TARGET_2X_NOT_YET_BENCHMARKED
+## D-163 — time-to-discovery is instrumented inside the canonical loop, and the 2x indicator reports TARGET_2X_NOT_YET_BENCHMARKED
 
 **Date:** 2026-10-04. **Source:** the owner's KPI "2x faster than a comparable competitor workflow", defined as: Genesis needs at most 50% of the competitor benchmark time for the same task scope under a comparable evidence standard.
 
-**Numbering.** D-161 is taken; this is the next free number.
+**Numbering.** Renumbered from D-162 to D-163 on integration. D-162 was claimed concurrently by the sealed GLP-1R applicability-domain probe (`packages/backend/src/campaign/glp1r-d162-applicability-domain-prereg.json`); a frozen preregistration is never edited, so this entry moved instead. No artefact of this change carries the number.
 
 **Problem.** The KPI was a sentence, not a measurement. Nothing in the repository recorded how long a discovery took, so the claim could neither be supported nor refuted — and a speedup assembled afterwards from memory is indistinguishable from one assembled from a shorter task.
 

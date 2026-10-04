@@ -190,4 +190,3 @@ export function spawnWorker({ url, id, extraEnv = {}, cwd }) {
   });
   return { proc, pid: proc.pid, kill, output: () => out };
 }
-

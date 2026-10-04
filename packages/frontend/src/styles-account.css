@@ -49,9 +49,12 @@
 
 /* Hasło + przełącznik „oko". */
 .password-wrap { position: relative; display: flex; align-items: stretch; min-width: 0; }
-.password-wrap input { padding-right: 3.2rem !important; }
+/* Logical properties, not `padding-right`: the account forms are reachable in the
+   RTL deployment (i18n.ts, LOCALE_DIRECTION.ar === 'rtl'), where the eye has to
+   sit at the end of the field, not on top of the first typed character. */
+.password-wrap input { padding-inline-end: 3.2rem !important; }
 .password-toggle {
-  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  position: absolute; inset-inline-end: 2px; top: 50%; transform: translateY(-50%);
   width: 44px; height: 40px; display: grid; place-items: center;
   border: none !important; background: transparent !important; border-radius: 6px;
   color: var(--text-dim); font-size: 1.05rem; cursor: pointer; padding: 0;
@@ -59,6 +62,25 @@
 .password-toggle:hover, .password-toggle[aria-pressed="true"] { color: var(--cyan); }
 .password-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 .account-field input[aria-invalid="true"] { border-color: rgba(244, 124, 124, 0.7); }
+
+/* D-166 — zapomniane hasło i zmiana hasła. */
+.account-forgot { margin: 0.1rem 0 0; text-align: center; font-size: 0.82rem; }
+.account-forgot a { color: var(--cyan); text-decoration: underline; min-height: 44px; display: inline-flex; align-items: center; }
+.account-note { margin: 0 0 0.6rem; font-size: 0.86rem; color: var(--text-dim); line-height: 1.5; }
+.account-delivery {
+  margin: 0 0 0.7rem; padding: 0.7rem 0.8rem; border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong); background: rgba(9, 14, 29, 0.55);
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.account-delivery strong { font-size: 0.86rem; color: var(--text); }
+.account-delivery p { margin: 0; font-size: 0.8rem; color: var(--text-dim); line-height: 1.45; }
+.account-change-password { margin: 0.4rem 0 0; }
+.account-change-password summary {
+  cursor: pointer; min-height: 44px; display: flex; align-items: center;
+  font-size: 0.88rem; font-weight: 600; color: var(--text);
+}
+.account-change-password summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.account-change-password .account-form { margin-top: 0.5rem; }
 
 /* Wybór profilu: duże karty do stuknięcia (natywne radio — dostępne z klawiatury i czytnika). */
 .profile-picker { border: none; margin: 0.2rem 0 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }

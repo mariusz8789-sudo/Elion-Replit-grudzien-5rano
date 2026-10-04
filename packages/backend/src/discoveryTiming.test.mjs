@@ -508,7 +508,9 @@ describe('TIME-TO-DISCOVERY schema migration', () => {
 
     const migrated = openDatabase(file);
     assert.equal(migrated.prepare('PRAGMA user_version').get().user_version, CURRENT_SCHEMA_VERSION);
-    assert.equal(CURRENT_SCHEMA_VERSION, 17);
+    // The timing tables arrived at v17; later additive migrations push the current version higher,
+    // and this case is about the v17 upgrade still happening, not about 17 being the newest.
+    assert.ok(CURRENT_SCHEMA_VERSION >= 17, `expected at least v17, got ${CURRENT_SCHEMA_VERSION}`);
     assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM users').get().n, usersBefore, 'migration must not touch existing rows');
     assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM projects').get().n, projectsBefore);
     assert.equal(migrated.prepare('SELECT id FROM projects WHERE id = ?').get(project.id).id, project.id);

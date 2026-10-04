@@ -148,6 +148,50 @@ export function logout(token: string): Promise<ApiResult<{ ok: true }>> {
   return request('POST', '/auth/logout', { token });
 }
 
+/* ---------------- Reset zapomnianego hasła (D-166) ---------------- */
+
+/**
+ * Stan dostarczenia wiadomości z linkiem — KOD od serwera, nie zdanie.
+ * `EXTERNAL_BLOCKED`: ta instancja nie ma dostawcy poczty, więc nic nie
+ * wyszło i nie wyjdzie. UI mówi to wprost; nie udajemy wysyłki.
+ */
+export interface ResetDelivery {
+  status: string;
+  reason: string;
+}
+
+export interface PasswordResetRequested {
+  accepted: boolean;
+  delivery: ResetDelivery;
+  message: string;
+}
+
+export interface PasswordChanged {
+  ok: boolean;
+  /** Ile sesji serwer przerwał — polityka sesji po zmianie hasła jest „wyloguj wszystko". */
+  sessionsRevoked: number;
+  message: string;
+}
+
+/**
+ * Żądanie resetu. Odpowiedź serwera jest IDENTYCZNA niezależnie od tego, czy
+ * konto istnieje, więc ten klient nie ma czego rozróżniać — i nie próbuje.
+ * Hasła tu nie ma: endpoint go nie przyjmuje.
+ */
+export function requestPasswordReset(email: string): Promise<ApiResult<PasswordResetRequested>> {
+  return request<PasswordResetRequested>('POST', '/auth/password-reset/request', { body: { email } });
+}
+
+/** Ustawienie nowego hasła jednorazowym tokenem z linku. */
+export function confirmPasswordReset(token: string, password: string): Promise<ApiResult<PasswordChanged>> {
+  return request<PasswordChanged>('POST', '/auth/password-reset/confirm', { body: { token, password } });
+}
+
+/** Zmiana hasła przez zalogowanego użytkownika — wymaga obecnego hasła. */
+export function changePassword(token: string, currentPassword: string, newPassword: string): Promise<ApiResult<PasswordChanged>> {
+  return request<PasswordChanged>('POST', '/auth/password', { token, body: { currentPassword, newPassword } });
+}
+
 export async function me(token: string): Promise<ApiResult<User>> {
   const r = await request<{ user: User }>('GET', '/auth/me', { token });
   return r.ok ? { ok: true, data: r.data.user } : r;

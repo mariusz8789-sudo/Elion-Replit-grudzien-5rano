@@ -61,8 +61,8 @@ describe('capability gate (shared table, imported from the backend file)', () =>
 
 describe('password show/hide toggle', () => {
   it('maps state to input type, aria-pressed and label', () => {
-    expect(passwordToggleState(false)).toMatchObject({ inputType: 'password', pressed: false, label: 'Pokaż hasło' });
-    expect(passwordToggleState(true)).toMatchObject({ inputType: 'text', pressed: true, label: 'Ukryj hasło' });
+    expect(passwordToggleState(false, 'pl')).toMatchObject({ inputType: 'password', pressed: false, label: 'Pokaż hasło' });
+    expect(passwordToggleState(true, 'pl')).toMatchObject({ inputType: 'text', pressed: true, label: 'Ukryj hasło' });
   });
 
   it('renders hidden by default with an accessible, non-submitting toggle', () => {

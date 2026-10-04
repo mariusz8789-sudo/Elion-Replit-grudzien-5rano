@@ -56,8 +56,19 @@ import {
   createCandidate,
   getCandidate,
   listCandidates,
+  createPasswordReset,
+  getPasswordResetByTokenHash,
+  consumePasswordReset,
+  changeUserPassword,
+  recordAuthAuditEvent,
+  AUTH_AUDIT_KINDS,
 } from './store.mjs';
-import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
+import { hashPassword, verifyPassword, generateToken, validateRegistration, validatePassword, normalizeEmail, isEmailShaped } from './auth.mjs';
+import {
+  RESET_DELIVERY_STATUS, RESET_REFUSAL_MESSAGE, RESET_TOKEN_STATE,
+  classifyPasswordReset, deliveryStatus, newPasswordResetToken, parsePasswordResetToken,
+} from './passwordReset.mjs';
+import { createRateLimiter } from './lib.mjs';
 import { createHash } from 'node:crypto';
 import { sha256Hex } from './determinism.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
@@ -355,6 +366,11 @@ export function handleApi(db, ctx) {
   if (seg[0] === 'auth') {
     if (seg[1] === 'register' && method === 'POST') return register(db, body);
     if (seg[1] === 'login' && method === 'POST') return login(db, body);
+    // Reset zapomnianego hasła (D-166). Obie trasy są bez tokenu sesji — z
+    // natury: użytkownik, który zapomniał hasła, nie ma czym się uwierzytelnić.
+    if (seg[1] === 'password-reset' && seg[2] === 'request' && method === 'POST') return requestPasswordReset(db, ctx, body);
+    if (seg[1] === 'password-reset' && seg[2] === 'confirm' && method === 'POST') return confirmPasswordReset(db, body);
+    if (seg[1] === 'password' && method === 'POST') return changePassword(db, ctx, body);
     if (seg[1] === 'logout' && method === 'POST') {
       if (ctx.token) deleteSession(db, ctx.token);
       return ok({ ok: true });
@@ -1691,7 +1707,7 @@ function register(db, body) {
 }
 
 function login(db, body) {
-  const email = String(body.email ?? '').trim().toLowerCase();
+  const email = normalizeEmail(body.email);
   const password = String(body.password ?? '');
   const user = getUserByEmail(db, email);
   // Ten sam komunikat dla „brak konta" i „złe hasło" — brak wycieku, kto ma konto.
@@ -1699,6 +1715,146 @@ function login(db, body) {
     return err(401, 'invalid_credentials', 'Nieprawidłowy e-mail lub hasło.');
   }
   return issueSession(db, user);
+}
+
+/* ---------------- Reset zapomnianego hasła (D-166) ---------------- */
+
+/**
+ * Limit żądań resetu na adres sieciowy. Używa `createRateLimiter` z lib.mjs —
+ * tego samego mechanizmu, którym repo ogranicza /api/ask, uploady i propozycje
+ * modelu. Drugiego mechanizmu nie wprowadzamy. Limiter jest wstrzykiwalny przez
+ * `ctx.passwordResetLimiter` (jak `ctx.computeAdmission`), żeby test mógł go
+ * wyczerpać bez czekania minuty.
+ */
+const passwordResetLimiter = createRateLimiter({ limit: 5, windowMs: 60 * 60 * 1000 });
+
+/**
+ * Odpowiedź na żądanie resetu — IDENTYCZNA niezależnie od tego, czy konto
+ * istnieje. Jedna stała, nie dwa miejsca, które mogłyby się rozjechać.
+ */
+function passwordResetAcceptedBody() {
+  return {
+    accepted: true,
+    delivery: deliveryStatus(),
+    message: 'Jeśli istnieje konto na podany adres, link do zmiany hasła został przygotowany.',
+  };
+}
+
+/**
+ * POST /api/auth/password-reset/request — przyjmuje adres, zwraca zawsze to
+ * samo. Konto bez wpisu nie różni się NICZYM w odpowiedzi: ten sam status, to
+ * samo ciało, a praca po stronie serwera to w obu gałęziach jedno zapytanie o
+ * użytkownika (losowanie tokenu to mikrosekundy i nie zależy od adresu).
+ * Hasła tu nie ma w ogóle — endpoint go nie przyjmuje.
+ */
+function requestPasswordReset(db, ctx, body) {
+  const limiter = ctx.passwordResetLimiter ?? passwordResetLimiter;
+  const address = String(ctx.clientAddress ?? 'unknown');
+  if (!limiter.allow(address)) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_REQUESTED, outcome: 'RATE_LIMITED' });
+    return err(429, 'rate_limited', 'Za dużo żądań zmiany hasła z tego adresu — odczekaj chwilę.');
+  }
+  const email = normalizeEmail(body?.email);
+  // Nawet dla adresu bez właściwego kształtu odpowiedź jest TA SAMA — inaczej
+  // „podaj poprawny adres" vs „przyjęto" byłoby oraculum o kształcie, a dla
+  // części adresów także o istnieniu konta.
+  if (!isEmailShaped(email)) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_REQUESTED, outcome: 'IGNORED', detail: { reason: 'EMAIL_NOT_ADDRESS_SHAPED' } });
+    return ok(passwordResetAcceptedBody());
+  }
+  const user = getUserByEmail(db, email);
+  if (!user) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_REQUESTED, outcome: 'NO_ACCOUNT' });
+    return ok(passwordResetAcceptedBody());
+  }
+  const issued = newPasswordResetToken();
+  createPasswordReset(db, { userId: user.id, tokenHash: issued.tokenHash, createdAt: issued.createdAt, expiresAt: issued.expiresAt });
+  recordAuthAuditEvent(db, {
+    kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_REQUESTED,
+    userId: user.id,
+    outcome: 'ISSUED',
+    detail: { delivery: RESET_DELIVERY_STATUS.EXTERNAL_BLOCKED, expiresAt: issued.expiresAt },
+  });
+  // Wartość jawna tokenu NIE wchodzi do odpowiedzi. Bez dostawcy poczty jedyną
+  // drogą jest ślad serwera — i tylko gdy operator jawnie o to poprosi zmienną
+  // środowiskową, której produkcja nie ustawia (patrz .env.example).
+  if (process.env.GENESIS_PASSWORD_RESET_DEV_ECHO === '1') {
+    console.log(JSON.stringify({
+      t: new Date().toISOString(), level: 'warn', msg: 'password_reset_token_echo_dev_only',
+      userId: user.id, token: issued.token, expiresAt: issued.expiresAt,
+    }));
+  }
+  return ok(passwordResetAcceptedBody());
+}
+
+/**
+ * POST /api/auth/password-reset/confirm — ustawia nowe hasło.
+ *
+ * Każda odmowa tokenu oddaje TEN SAM kod i komunikat (RESET_REFUSAL_MESSAGE);
+ * uszkodzony token nigdy nie dotyka bazy, więc nie ma ścieżki, która mogłaby
+ * rzucić i oddać klientowi ślad stosu albo nazwę tabeli.
+ */
+function confirmPasswordReset(db, body) {
+  const tokenHash = parsePasswordResetToken(body?.token);
+  if (tokenHash === null) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_COMPLETED, outcome: 'REFUSED', detail: { state: RESET_TOKEN_STATE.MALFORMED } });
+    return err(400, 'invalid_reset_token', RESET_REFUSAL_MESSAGE);
+  }
+  const record = getPasswordResetByTokenHash(db, tokenHash);
+  const state = classifyPasswordReset(record);
+  if (state !== RESET_TOKEN_STATE.VALID) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_COMPLETED, userId: record?.userId ?? null, outcome: 'REFUSED', detail: { state } });
+    return err(400, 'invalid_reset_token', RESET_REFUSAL_MESSAGE);
+  }
+  // Polityka haseł jest ta sama, co przy rejestracji — jedna funkcja, auth.mjs.
+  const policy = validatePassword(body?.password);
+  if (!policy.ok) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_COMPLETED, userId: record.userId, outcome: 'REFUSED', detail: { state: 'WEAK_PASSWORD' } });
+    return err(400, 'invalid_password', policy.error);
+  }
+  const consumed = consumePasswordReset(db, { resetId: record.id, userId: record.userId, passwordHash: hashPassword(policy.value) });
+  if (!consumed.ok) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_COMPLETED, userId: record.userId, outcome: 'REFUSED', detail: { state: RESET_TOKEN_STATE.USED } });
+    return err(400, 'invalid_reset_token', RESET_REFUSAL_MESSAGE);
+  }
+  recordAuthAuditEvent(db, {
+    kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_COMPLETED,
+    userId: record.userId,
+    outcome: 'COMPLETED',
+    detail: { sessionsRevoked: consumed.sessionsRevoked },
+  });
+  // Bez automatycznego zalogowania: po zmianie hasła każda sesja jest skasowana,
+  // a użytkownik loguje się nowym hasłem — to dowód, że hasło faktycznie działa.
+  return ok({
+    ok: true,
+    sessionsRevoked: consumed.sessionsRevoked,
+    message: 'Hasło zostało zmienione. Wszystkie urządzenia zostały wylogowane — zaloguj się nowym hasłem.',
+  });
+}
+
+/**
+ * POST /api/auth/password — zmiana hasła przez zalogowanego użytkownika.
+ * Wymaga obecnego hasła (sam token sesji nie wystarcza: przejęta sesja nie ma
+ * dawać prawa do podmiany hasła), a nowe hasło przechodzi tę samą politykę.
+ */
+function changePassword(db, ctx, body) {
+  const user = getUserByToken(db, ctx.token);
+  if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby zmienić hasło.');
+  const current = String(body?.currentPassword ?? '');
+  if (!verifyPassword(current, getPasswordHash(db, user.id))) {
+    recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_CHANGED, userId: user.id, outcome: 'REFUSED', detail: { state: 'CURRENT_PASSWORD_WRONG' } });
+    return err(401, 'invalid_credentials', 'Obecne hasło jest nieprawidłowe.');
+  }
+  const policy = validatePassword(body?.newPassword);
+  if (!policy.ok) return err(400, 'invalid_password', policy.error);
+  if (policy.value === current) return err(400, 'invalid_password', 'Nowe hasło musi być inne niż obecne.');
+  const result = changeUserPassword(db, { userId: user.id, passwordHash: hashPassword(policy.value) });
+  recordAuthAuditEvent(db, { kind: AUTH_AUDIT_KINDS.PASSWORD_CHANGED, userId: user.id, outcome: 'COMPLETED', detail: { sessionsRevoked: result.sessionsRevoked } });
+  return ok({
+    ok: true,
+    sessionsRevoked: result.sessionsRevoked,
+    message: 'Hasło zostało zmienione. Wszystkie urządzenia zostały wylogowane — zaloguj się nowym hasłem.',
+  });
 }
 
 /* ---------------- Handlery projektów / RBAC ---------------- */

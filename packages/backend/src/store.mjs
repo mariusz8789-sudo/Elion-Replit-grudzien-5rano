@@ -545,6 +545,47 @@ CREATE TRIGGER IF NOT EXISTS evidence_ledger_base_append_only_delete BEFORE DELE
 BEGIN SELECT RAISE(ABORT, 'evidence_ledger_base is append-only'); END;
 `;
 
+/**
+ * V18 (D-166) — reset zapomnianego hasła i ślad audytowy zdarzeń
+ * uwierzytelniania. Dodatek czysto ADDYTYWNY: dwie nowe tabele, zero zmian w
+ * `users` i `sessions`, więc starsza baza otwiera się, zachowuje wiersze i
+ * pozostaje zapisywalna (test: storeMigration.test.mjs).
+ *
+ * `password_resets.token_hash` trzyma WYŁĄCZNIE SHA-256 tokenu (secrets.mjs,
+ * ta sama droga co `sessions.token`) — wartości jawnej nie da się odtworzyć z
+ * kopii pliku bazy. `used_at` jest nośnikiem jednorazowości: ustawiane w tej
+ * samej transakcji, w której zmienia się hasło.
+ *
+ * `auth_audit_events` jest append-only (trigger, jak rejestr dowodowy V16):
+ * ślad żądania i zakończenia resetu nie daje się po cichu przepisać. Zdarzenie
+ * NIGDY nie nosi hasła ani jawnego tokenu — kolumna `detail_json` przyjmuje
+ * tylko kody stanu, a `user_id` jest NULL dla adresu bez konta.
+ */
+const SCHEMA_V18 = `
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash  TEXT NOT NULL UNIQUE,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  used_at     INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+CREATE TABLE IF NOT EXISTS auth_audit_events (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  outcome     TEXT NOT NULL,
+  detail_json TEXT NOT NULL DEFAULT '{}',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_audit_events_kind ON auth_audit_events(kind, created_at);
+CREATE TRIGGER IF NOT EXISTS auth_audit_events_append_only_update BEFORE UPDATE ON auth_audit_events
+BEGIN SELECT RAISE(ABORT, 'auth_audit_events is append-only: an event cannot be updated'); END;
+CREATE TRIGGER IF NOT EXISTS auth_audit_events_append_only_delete BEFORE DELETE ON auth_audit_events
+BEGIN SELECT RAISE(ABORT, 'auth_audit_events is append-only: an event cannot be deleted'); END;
+`;
+
 // V15 extends the existing `jobs` table for lease-based scientific workers. Legacy in-process jobs
 // keep all new columns NULL and retain their old lifecycle; only rows carrying idempotency_key are
 // claimed by the scientific queue backend.
@@ -670,7 +711,7 @@ CREATE TABLE IF NOT EXISTS discovery_timing_campaign_links (
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -778,6 +819,12 @@ function migrate(db) {
   if (version < 17) {
     db.exec(SCHEMA_V17);
     db.exec('PRAGMA user_version = 17');
+  }
+  // v18: password reset tokens and the append-only authentication audit trail. Also additive, and
+  // it rewrites nothing in `users` or `sessions`.
+  if (version < 18) {
+    db.exec(SCHEMA_V18);
+    db.exec('PRAGMA user_version = 18');
   }
 }
 
@@ -976,6 +1023,130 @@ export function deleteSession(db, token) {
 /** Sprząta wygasłe sesje (wołane okresowo przez serwer). Zwraca liczbę usuniętych. */
 export function purgeExpiredSessions(db, now = Date.now()) {
   return db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now).changes;
+}
+
+/**
+ * Kasuje WSZYSTKIE sesje użytkownika. Polityka sesji po zmianie hasła (D-166):
+ * zmiana hasła wylogowuje każde urządzenie, bo jeśli hasło zmienia ktoś, kto
+ * odzyskuje przejęte konto, to właśnie cudza sesja jest tym, co trzeba przerwać.
+ * Zwraca liczbę usuniętych sesji.
+ */
+export function deleteSessionsForUser(db, userId) {
+  return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes;
+}
+
+/* ---------------- Reset hasła (D-166) ---------------- */
+
+function toPasswordReset(row) {
+  if (!row) return null;
+  return { id: row.id, userId: row.user_id, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at ?? null };
+}
+
+/**
+ * Zapisuje żądanie resetu. Przyjmuje WYŁĄCZNIE hash tokenu — wartość jawna
+ * nigdy nie przechodzi przez tę warstwę, więc nie ma miejsca, w którym mogłaby
+ * trafić do bazy (passwordReset.mjs `newPasswordResetToken` oddaje ją tylko
+ * wołającemu, raz).
+ */
+export function createPasswordReset(db, { userId, tokenHash, createdAt, expiresAt }) {
+  if (typeof tokenHash !== 'string' || !looksHashed(tokenHash)) throw new Error('password_reset_token_must_be_hashed');
+  const id = newId();
+  db.prepare('INSERT INTO password_resets (id, user_id, token_hash, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)')
+    .run(id, userId, tokenHash, createdAt, expiresAt);
+  return { id, userId, createdAt, expiresAt, usedAt: null };
+}
+
+/** Rekord resetu po HASHU tokenu (jedyna droga wyszukania). */
+export function getPasswordResetByTokenHash(db, tokenHash) {
+  if (typeof tokenHash !== 'string' || !looksHashed(tokenHash)) return null;
+  return toPasswordReset(db.prepare('SELECT * FROM password_resets WHERE token_hash = ?').get(tokenHash));
+}
+
+/**
+ * Zmienia hasło i zużywa token W JEDNEJ TRANSAKCJI, a na końcu kasuje sesje
+ * użytkownika. Jednorazowość tokenu nie zależy od kolejności wywołań w
+ * handlerze: `used_at IS NULL` jest warunkiem UPDATE, więc dwa równoległe
+ * żądania z tym samym tokenem dadzą co najwyżej jedną zmianę hasła.
+ * Zwraca `{ ok, sessionsRevoked }`; `ok:false` znaczy, że token był już zużyty.
+ */
+export function consumePasswordReset(db, { resetId, userId, passwordHash, now = Date.now() }) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const consumed = db.prepare('UPDATE password_resets SET used_at = ? WHERE id = ? AND used_at IS NULL').run(now, resetId);
+    if (consumed.changes !== 1) {
+      db.exec('ROLLBACK');
+      return { ok: false, sessionsRevoked: 0 };
+    }
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+    // Każdy inny niezużyty link dla tego konta przestaje działać razem z tym.
+    db.prepare('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, userId);
+    const revoked = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes;
+    db.exec('COMMIT');
+    return { ok: true, sessionsRevoked: revoked };
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+/**
+ * Zmiana hasła przez zalogowanego użytkownika. Wszystkie sesje (również ta,
+ * z której przyszło żądanie) są kasowane — ta sama polityka co po resecie.
+ */
+export function changeUserPassword(db, { userId, passwordHash, now = Date.now() }) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+    db.prepare('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, userId);
+    const revoked = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes;
+    db.exec('COMMIT');
+    return { sessionsRevoked: revoked };
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+/* ---------------- Ślad audytowy uwierzytelniania (D-166) ---------------- */
+
+/** Rodzaje zdarzeń — zamknięta lista, żeby ślad dał się czytać zapytaniem. */
+export const AUTH_AUDIT_KINDS = Object.freeze({
+  PASSWORD_RESET_REQUESTED: 'PASSWORD_RESET_REQUESTED',
+  PASSWORD_RESET_COMPLETED: 'PASSWORD_RESET_COMPLETED',
+  PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+});
+
+/**
+ * Dopisuje zdarzenie audytowe. `detail` przechodzi przez filtr, który
+ * przyjmuje wyłącznie krótkie wartości skalarne — hasło ani jawny token nie
+ * mają tą drogą jak trafić do bazy nawet przez pomyłkę wołającego.
+ */
+export function recordAuthAuditEvent(db, { kind, userId = null, outcome, detail = {} }) {
+  const id = newId();
+  const now = Date.now();
+  const safeDetail = {};
+  for (const [key, value] of Object.entries(detail ?? {})) {
+    if (typeof value === 'number' || typeof value === 'boolean') safeDetail[key] = value;
+    else if (typeof value === 'string') safeDetail[key] = value.slice(0, 64);
+  }
+  db.prepare('INSERT INTO auth_audit_events (id, kind, user_id, outcome, detail_json, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, String(kind), userId, String(outcome), JSON.stringify(safeDetail), now);
+  return { id, kind, userId, outcome, detail: safeDetail, createdAt: now };
+}
+
+/** Ślad audytowy, najnowsze pierwsze. `kind` zawęża do jednego rodzaju. */
+export function listAuthAuditEvents(db, { kind = null, limit = 100 } = {}) {
+  const rows = kind
+    ? db.prepare('SELECT * FROM auth_audit_events WHERE kind = ? ORDER BY created_at DESC, id DESC LIMIT ?').all(String(kind), limit)
+    : db.prepare('SELECT * FROM auth_audit_events ORDER BY created_at DESC, id DESC LIMIT ?').all(limit);
+  return rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    userId: row.user_id ?? null,
+    outcome: row.outcome,
+    detail: JSON.parse(row.detail_json),
+    createdAt: row.created_at,
+  }));
 }
 
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */

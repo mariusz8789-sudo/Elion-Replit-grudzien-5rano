@@ -3,6 +3,9 @@ import { register, login, logout, me } from '../core/backend/client';
 import { useSession, setSession, clearSession, getToken, updateUser } from '../core/backend/session';
 import { ACCOUNT_PROFILES, PROFILE_TABLE, capabilityOverview, profileOfUser, type AccountProfile } from '../core/accountProfiles';
 import { PasswordField } from './PasswordField';
+import { ChangePasswordForm } from './auth/ChangePasswordForm';
+import { pwText } from './auth/passwordAuthText';
+import { useLocale } from '../core/i18n';
 
 /**
  * Panel konta — jedyna implementacja logowania i rejestracji w aplikacji
@@ -17,6 +20,10 @@ import { PasswordField } from './PasswordField';
 
 export type AccountMode = 'login' | 'register';
 
+/** Adresy obu kroków resetu hasła (D-166) — jedno miejsce prawdy dla linków. */
+export const ACCOUNT_RESET_REQUEST_HASH = '#/konto?tryb=reset-haslo';
+export const ACCOUNT_RESET_CONFIRM_HASH = '#/konto?tryb=nowe-haslo';
+
 /** Walidacja formularza rejestracji po stronie klienta — ten sam próg co backend, komunikaty po polsku. */
 export function validateRegisterForm(input: { email: string; password: string; repeat: string; profile: AccountProfile | null }): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) return 'Podaj poprawny adres e-mail.';
@@ -28,6 +35,7 @@ export function validateRegisterForm(input: { email: string; password: string; r
 
 export function AccountPanel({ initialMode = 'login', onModeChange }: { initialMode?: AccountMode; onModeChange?: (mode: AccountMode) => void } = {}) {
   const session = useSession();
+  const locale = useLocale();
   const [mode, setModeState] = useState<AccountMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -111,6 +119,7 @@ export function AccountPanel({ initialMode = 'login', onModeChange }: { initialM
             </li>
           ))}
         </ul>
+        <ChangePasswordForm />
         <button className="chip-btn" onClick={handleLogout}>Wyloguj się</button>
       </div>
     );
@@ -174,6 +183,11 @@ export function AccountPanel({ initialMode = 'login', onModeChange }: { initialM
         <button className="chip-btn primary account-submit" type="submit" disabled={busy}>
           {busy ? 'Chwila…' : mode === 'register' ? 'Utwórz konto' : 'Zaloguj się'}
         </button>
+        {mode === 'login' && (
+          <p className="account-forgot">
+            <a href={ACCOUNT_RESET_REQUEST_HASH} data-testid="account-forgot-password">{pwText('forgotLink', locale)}</a>
+          </p>
+        )}
       </form>
       <p className="settings-hint">
         Konto jest opcjonalne — bez logowania Genesis działa lokalnie. Hasło jest haszowane (scrypt) po stronie

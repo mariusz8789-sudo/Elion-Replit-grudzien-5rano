@@ -219,7 +219,14 @@ export function buildScientistChallengePack(input) {
 
     minimumNextExperiment: laboratoryPlan.length > 0 ? laboratoryPlan[0] : UNKNOWN('no next experiment was proposed', 'the cheapest experiment that can falsify the key hypothesis'),
     laboratoryPlan: laboratoryPlan.length > 0 ? laboratoryPlan : UNKNOWN('no laboratory plan was supplied', 'at least one preregistered measurement with a frozen model value'),
-    laboratoryWorkRequiredNow: laboratoryPlan.some((s) => s.status === 'READY_FOR_EXTERNAL_REVIEW' && s.labValueOfInformation?.proposable === true),
+    // Laboratory work is required NOW only if there is a subject to measure. A prepared
+    // plan with no subject is a plan, not a reason to send anyone to a bench — and saying
+    // otherwise would be the low-cost-first rule broken by its own report.
+    laboratoryWorkRequiredNow: hasSubject
+      && laboratoryPlan.some((s) => s.status === 'READY_FOR_EXTERNAL_REVIEW' && s.labValueOfInformation?.proposable === true),
+    laboratoryPlanIsPreparedNotRequired: !hasSubject,
+    laboratoryPlanIsPreparedNotRequiredReason: hasSubject ? null
+      : `the gate returned ${gateResult.verdict}, so there is no subject to measure; the plan below is ready for the first subject that reaches the gate and is not a request for bench work now`,
 
     whatAPositiveResultMeans: campaign.whatAPositiveResultMeans ?? UNKNOWN('not stated', 'the campaign\'s own reading of its primary endpoint'),
     whatAPositiveResultDoesNotMean: [

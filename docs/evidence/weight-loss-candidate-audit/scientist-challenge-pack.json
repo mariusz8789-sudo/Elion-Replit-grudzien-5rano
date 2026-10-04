@@ -6345,7 +6345,9 @@
       "missingFields": []
     }
   ],
-  "laboratoryWorkRequiredNow": true,
+  "laboratoryWorkRequiredNow": false,
+  "laboratoryPlanIsPreparedNotRequired": true,
+  "laboratoryPlanIsPreparedNotRequiredReason": "the gate returned NO_CANDIDATE, so there is no subject to measure; the plan below is ready for the first subject that reaches the gate and is not a request for bench work now",
   "whatAPositiveResultMeans": "For LAB-0, that the substance is the named structure. For LAB-1, that the named molecule is a functional GLP-1R agonist in a heterologous cell line at a measured potency.",
   "whatAPositiveResultDoesNotMean": [
     "Not that the substance is a medicine. A measurement on a substance is not a therapeutic effect.",
@@ -6693,11 +6695,11 @@
     "stages": [
       {
         "stage": "CANDIDATE_POOL_TO_RANKED_CANDIDATE",
-        "openedAtMs": 1791078118768,
-        "closedAtMs": 1791078118780,
+        "openedAtMs": 1791078555962,
+        "closedAtMs": 1791078556000,
         "complete": true,
-        "wallClockMs": 12,
-        "computeMs": 11,
+        "wallClockMs": 38,
+        "computeMs": 30,
         "queueMs": 0,
         "humanWaitMs": 0,
         "experiments": 2,
@@ -6712,11 +6714,11 @@
       },
       {
         "stage": "RANKED_CANDIDATE_TO_COMPUTATIONAL_WINNER",
-        "openedAtMs": 1791078118780,
-        "closedAtMs": 1791078118791,
+        "openedAtMs": 1791078556001,
+        "closedAtMs": 1791078556022,
         "complete": true,
-        "wallClockMs": 11,
-        "computeMs": 9,
+        "wallClockMs": 21,
+        "computeMs": 16,
         "queueMs": 0,
         "humanWaitMs": 0,
         "experiments": 0,
@@ -6731,7 +6733,7 @@
       },
       {
         "stage": "WINNER_TO_LABORATORY_HANDOFF",
-        "openedAtMs": 1791078118791,
+        "openedAtMs": 1791078556024,
         "closedAtMs": null,
         "complete": false,
         "wallClockMs": null,
@@ -6749,7 +6751,7 @@
         "replayStatuses": []
       }
     ],
-    "wallClockMsForThisAudit": 1793,
+    "wallClockMsForThisAudit": 2251,
     "note": "This is the cost of reaching THIS decision — a NO — from an already-populated repository. It is not a discovery benchmark and it is not a speedup claim: discoveryTiming.mjs can report no speedup without a recorded competitor baseline at the same task scope, and none was recorded here. WINNER_TO_LABORATORY_HANDOFF reads as still open in this copy of the report, because the report is taken while that stage is running in order to be carried inside the pack; the audit record carries the closed report as costToDecisionFinal.",
     "speedupClaimed": false,
     "speedupClaimedReason": "No competitor baseline exists for this task scope. Declaring an advantage without a benchmark is forbidden."
@@ -6766,5 +6768,5 @@
     "Check that no two numbers in the baseline matrix come from different populations, doses or trials without the limitation beside them.",
     "Try to find a cheaper way to get the information the minimum next experiment claims to buy. If you find one, the experiment should not be run."
   ],
-  "packFingerprint": "061e6b56e8bd15be"
+  "packFingerprint": "17639017cf9fa37b"
 }

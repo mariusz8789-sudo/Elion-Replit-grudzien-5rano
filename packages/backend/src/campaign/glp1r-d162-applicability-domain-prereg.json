@@ -1,0 +1,107 @@
+{
+  "decisionId": "D-162",
+  "title": "GLP-1R functional-agonism model: preregistered chemical-series extrapolation probe (applicability domain)",
+  "frozenBeforeAnyMetricWasComputed": true,
+  "baseCommit": "e0e13ce2",
+  "whyThisExperiment": "D-153 sealed MODEL_GATE_PASS on the FUNCTIONAL_AGONISM arm (MAE 0.6557, R2 0.7827, n=53) and, in a clearly labelled POST_HOC_DIAGNOSTIC, measured nearest-neighbour Tanimoto from each test row to the training set at median 0.8415 with 22 of 53 test rows at or above 0.90. D-153 therefore states that the model INTERPOLATES WITHIN ONE CHEMICAL SERIES, nominates no candidate and may not rank candidates. That caveat is the single thing standing between an EVALUABLE efficacy axis and an axis a candidate pipeline could use, and it is currently a post-hoc observation rather than a preregistered test. This decision converts it into one: it asks, with the rule written down first, whether the same algorithm on the same rows still reaches the frozen gate's own accuracy thresholds when the held-out set is chemically DISTANT from the training set by construction.",
+  "whatThisIsNot": [
+    "NOT a gate verdict. The frozen gate glp1r-validation-gate.json names splitMethod 'scaffold-hash-mod10'. This probe deliberately uses a DIFFERENT split, so its outcome is never called MODEL_GATE_PASS or MODEL_GATE_FAILED and can never be quoted as one. Only the four numeric thresholds (MIN_TRAIN, MIN_TEST, MAX_MAE, MIN_R2) and the algorithm/lambda/conformalAlpha are read from the gate file, unchanged.",
+    "NOT a re-run or a reinterpretation of D-153. D-153's sealed artefact is not read for its metrics, not edited, and stands exactly as sealed whatever this probe returns.",
+    "NOT a licence to rank candidates. Under D-069 Option A (packages/backend/src/campaign/predictionHardFilters.mjs) a MODEL_ESTIMATE may rule a candidate OUT and may never rank candidates IN. A PASS here would not change that rule; it would only remove the 'interpolates within one series' objection to using this axis as a filter.",
+    "NOT evidence about any molecule, any organism, or any clinical effect.",
+    "NOT a docking decision. D-159 stands: 6X18 is a reference structure, not a docking target, and the docking registry holds only ABL1_1IEP."
+  ],
+  "hypothesis": {
+    "id": "H1",
+    "statement": "A ridge model over 512-bit Morgan r=2 fingerprints, fitted to the D-152 FUNCTIONAL_AGONISM rows, retains the frozen gate's accuracy (MAE <= MAX_MAE and R2 >= MIN_R2) on a held-out set whose every row is chemically DISTANT from every training row (nearest-neighbour Tanimoto strictly below DISTANCE_CEILING)."
+  },
+  "whatWouldFalsifyH1": "On a split that is demonstrably distant (every test row's maximum Tanimoto to any training row strictly below DISTANCE_CEILING) and large enough (nTrain >= MIN_TRAIN, nTest >= MIN_TEST), a test MAE above MAX_MAE or a test R2 below MIN_R2 falsifies H1. Either one alone is sufficient.",
+  "frozenCriteria": {
+    "gateFile": "packages/backend/src/campaign/glp1r-validation-gate.json",
+    "expectedGateRuleFingerprint": "d2f77a7e6042f0fc",
+    "gateFieldsRead": ["algorithm", "lambda", "conformalAlpha", "MIN_TRAIN", "MIN_TEST", "MAX_MAE", "MIN_R2"],
+    "gateIsNotEdited": true,
+    "DISTANCE_CEILING": 0.6,
+    "DISTANCE_CEILING_rationale": "0.60 Tanimoto on 512-bit folded Morgan r=2 fingerprints is the conventional dividing line between 'same series / close analogue' and 'different chemistry' for this fingerprint size. It is chosen because it sits well below D-153's measured post-hoc median of 0.8415 and well below its q75 of 0.9113, so a split that satisfies it is not the split D-153 already ran. It is fixed here and must not be lowered or raised after any number below is read.",
+    "CLUSTER_CUTOFF": 0.6,
+    "CLUSTER_CUTOFF_rationale": "Equal to DISTANCE_CEILING by construction, so the clustering and the distance control speak about the same notion of 'same series'. Using two different numbers would make the pruning step arbitrary."
+  },
+  "dataset": {
+    "source": "Rebuilt by D-153's own path: the D-144 combined set (287-row pin + 351 A1xA2 rows admitted under D-144's rules) filtered to the assays D-152 filed as FUNCTIONAL_AGONISM.",
+    "rolesReadFrom": "packages/backend/src/campaign/glp1r-assay-roles-d152.json",
+    "rolesAreNeverRecomputed": true,
+    "EXPECTED_ROWS": 320,
+    "EXPECTED_COMPOUNDS": 206,
+    "driftRule": "Any count other than 320 rows / 206 compounds aborts the run with DATASET_DRIFT. No row is dropped, added, averaged or reweighted.",
+    "featurization": "packages/backend/src/compute/rdkitAdapter.mjs::fingerprintBatch, the production path, with real RDKit. A misaligned batch aborts with FEATURIZATION_MISALIGNED."
+  },
+  "splitRule": {
+    "ordering": "All derived orderings are by ascending canonical SMILES string, then by assayId, then by standardType. No randomness, no seed, no shuffling anywhere.",
+    "step1_cluster": "Leader clustering over the distinct compounds of the arm, on the same 512-bit set-bit index arrays the model is fitted on, using campaign/glp1rQsar.mjs::tanimotoIndices. Compounds are visited in ascending canonical-SMILES order. A compound joins the FIRST existing leader (in leader-creation order) whose Tanimoto to it is >= CLUSTER_CUTOFF; otherwise it becomes a new leader.",
+    "step2_choose_test_clusters": "Clusters are ordered by descending row count, ties broken by ascending leader canonical SMILES. Clusters are assigned to TEST one at a time in that order, stopping immediately once the accumulated TEST row count reaches MIN_TEST.",
+    "step3_prune_for_distance": "Every row NOT in a test cluster whose maximum Tanimoto to ANY test row is >= DISTANCE_CEILING is DROPPED. A dropped row is never reassigned to test. The dropped count is reported.",
+    "step4_calibration": "Of the surviving non-test rows, those whose production scaffold bucket (campaign/glp1rQsar.mjs::scaffoldBucket) is 2 or 3 become CALIBRATION; the rest become TRAIN. This reuses the production bucket rule, so calibration stays scaffold-disjoint from train exactly as it is in the production split.",
+    "step5_fit": "campaign/glp1rQsar.mjs::trainRidge at gate.lambda on TRAIN; prediction is the same bias-plus-set-bits dot product trainAndValidate uses; conformal half-width is the standard split-conformal order statistic ceil((n+1)(1-alpha)) of the sorted absolute calibration residuals at gate.conformalAlpha."
+  },
+  "controlsCheckedBeforeAnyMetricIsRead": {
+    "compoundDisjointness": { "sharedCompoundsBetweenTrainAndTest": 0, "required": 0 },
+    "scaffoldDisjointness": { "sharedScaffoldsBetweenTrainAndTest": 0, "required": 0 },
+    "distance": { "maxNearestNeighbourTanimotoTestToTrain": "strictly < DISTANCE_CEILING", "note": "This is the control the whole probe rests on. If it does not hold the probe is inconclusive, not a pass and not a failure." },
+    "testAssayCoverage": { "distinctTestAssays": ">= 3", "note": "Transcribed unchanged from D-153's MIN_TEST_ASSAY_COUNT so this probe does not invent a looser independence standard." },
+    "assayConcentration": { "largestTestAssayShare": "<= 0.50", "note": "Transcribed unchanged from D-153's MAX_TEST_ASSAY_SHARE." },
+    "effect": "A control that does not hold can only make the outcome worse. It can never turn a failing metric into a pass."
+  },
+  "prespecifiedOutcomes": [
+    {
+      "outcome": "EXTRAPOLATION_SUPPORTED",
+      "when": "All controls hold, nTrain >= MIN_TRAIN, nTest >= MIN_TEST, MAE <= MAX_MAE and R2 >= MIN_R2.",
+      "means": "H1 survives this probe. The efficacy axis is then shown to hold up on chemistry outside its own series, and D-153's 'interpolates within one chemical series' caveat is no longer the binding objection to using this axis as a D-069 Option A FILTER. It still does not rank candidates and still nominates none.",
+      "doesNotMean": "That the model is validated, that any molecule is active, or that a candidate may be promoted."
+    },
+    {
+      "outcome": "EXTRAPOLATION_NOT_SUPPORTED",
+      "when": "All controls hold, nTrain >= MIN_TRAIN, nTest >= MIN_TEST, and MAE > MAX_MAE or R2 < MIN_R2.",
+      "means": "H1 is falsified on this data. D-153's post-hoc caveat becomes a preregistered finding: this efficacy axis is confined to its training series and cannot be used to judge chemistry outside it, as a filter or otherwise. The named blocker for a weight-loss computational candidate then includes MODEL APPLICABILITY DOMAIN, and it is BLOCKED_SCIENCE on this representation plus BLOCKED_DATA on the number of distant functional-agonism rows."
+    },
+    {
+      "outcome": "INSUFFICIENT_DATA_FOR_DISTANT_SPLIT",
+      "when": "After step 3, nTrain < MIN_TRAIN or nTest < MIN_TEST.",
+      "means": "This dataset contains no training core of the required size that is chemically distant from a held-out set of the required size. H1 is UNTESTED, neither supported nor falsified. This is itself a finding about the data: it says the functional-agonism arm is one chemical neighbourhood and cannot be cut into a near set and a far set at this size. The blocker is then BLOCKED_DATA, and the quantity that is binding is the number of CHEMICALLY DISTINCT functional-agonism compounds, not the row count."
+    },
+    {
+      "outcome": "PROBE_INCONCLUSIVE_SPLIT_NOT_DISTANT",
+      "when": "Sizes are met but the distance control does not hold (some test row is >= DISTANCE_CEILING to some training row).",
+      "means": "The split rule failed to produce a distant split. H1 is UNTESTED. No metric from this run is reported as a verdict about extrapolation, and the measured maximum is recorded so the next decision can be written against it."
+    },
+    {
+      "outcome": "PROBE_ABORTED",
+      "when": "Gate fingerprint mismatch, dataset drift, RDKit absent, or misaligned featurization.",
+      "means": "Nothing was measured. The abort code is the result."
+    }
+  ],
+  "frozenPrediction": {
+    "author": "Claude Opus 5, session 01SdX7fcgVg9gVqH8emoF5qw, before the first number of this probe was computed",
+    "primary": "INSUFFICIENT_DATA_FOR_DISTANT_SPLIT",
+    "reasoning": "The arm is peptide-heavy and peptides share large amide-rich fingerprint regions, so pruning everything within 0.60 Tanimoto of a 40-row holdout is expected to remove a large fraction of the remaining rows; 206 compounds is a thin budget for a 150-row distant training core.",
+    "secondary": "EXTRAPOLATION_NOT_SUPPORTED",
+    "intervals": {
+      "ifSizesAreMet_MAE": [1.0, 1.9],
+      "ifSizesAreMet_R2": [-0.8, 0.25]
+    },
+    "whatWouldSurpriseTheAuthor": "MAE at or below 1.0 together with R2 at or above 0.25 on a split whose maximum test-to-train Tanimoto is strictly below 0.60.",
+    "recordedWrongRatherThanDropped": "This prediction is copied into the sealed artefact verbatim whatever the outcome, exactly as D-153's wrong prediction was."
+  },
+  "negativeControlReportedAlways": "A train-mean baseline on the same held-out rows (MAE and R2). It can only weaken a claim, never strengthen one, and it is reported whatever the outcome.",
+  "forbidden": [
+    "editing packages/backend/src/campaign/glp1r-validation-gate.json or any of its thresholds",
+    "editing or re-running any sealed artefact of D-143, D-144, D-151, D-152, D-153, D-154, D-156, D-157",
+    "moving an assay between roles",
+    "registering any GLP-1R docking target, including 6X18 (D-159)",
+    "changing DISTANCE_CEILING, CLUSTER_CUTOFF or any gate threshold after a number is read",
+    "reporting this probe's outcome as a gate verdict",
+    "nominating, ranking or promoting any molecule on the strength of this probe",
+    "touching docs/evidence/run8-status.json or the Run 8 / Run 9 preregistrations"
+  ],
+  "runner": "scripts/glp1r-d162-applicability-domain.mjs",
+  "sealedOutput": "packages/backend/src/campaign/glp1r-d162-applicability-domain.sealed.json"
+}

@@ -43,6 +43,7 @@ import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { createFanOutAwareWorker } from './researchRunFanOut.mjs';
+import { handleRemoteWorkerApi, REMOTE_BODY_LIMIT_BYTES, WORKER_API_PREFIX } from './remoteWorkerApi.mjs';
 import { createLocalContentAddressedArtifactStorage } from './compute/localArtifactStorageBackend.mjs';
 import { createReasoningProvider } from './reasoningProvider.mjs';
 import { createDockerScientificSandboxBackend } from './compute/dockerScientificSandboxBackend.mjs';
@@ -325,6 +326,40 @@ function isPersistApiPath(url) {
   return PERSIST_API_SEGMENTS.includes(first);
 }
 
+/**
+ * Remote ResearchRun workers (remoteWorkerApi.mjs). A separate surface from the user API: its own bearer token
+ * (GENESIS_WORKER_TOKEN; unset = 503), no user session, a larger body limit for the outcome artifact.
+ */
+function handleRemoteWorker(req, res, url) {
+  const declaredLength = Number(req.headers['content-length'] ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > REMOTE_BODY_LIMIT_BYTES) return json(res, 413, { error: 'payload_too_large' });
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+  const chunks = [];
+  let size = 0;
+  let overflow = false;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > REMOTE_BODY_LIMIT_BYTES) { overflow = true; req.destroy(); return; }
+    chunks.push(chunk);
+  });
+  req.on('end', async () => {
+    if (overflow) return;
+    let body = {};
+    const raw = Buffer.concat(chunks).toString('utf8');
+    if (raw) {
+      try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
+    }
+    try {
+      const result = await handleRemoteWorkerApi(db, { method: req.method, pathname: url.pathname, token, body, artifactStorage, expectedToken: process.env.GENESIS_WORKER_TOKEN });
+      return json(res, result.status, result.body);
+    } catch (err) {
+      log('error', 'remote_worker_api_failed', { path: url.pathname, message: String(err?.message) });
+      return json(res, 500, { error: 'internal' });
+    }
+  });
+}
+
 const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
 // Uploady źródłowe mogą zawierać duże, poprawne artefakty; nie dzielą jednak
 // budżetu, aby spam GIS nie blokował Knowledge Ingestion.
@@ -497,6 +532,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
+  if (requestUrl?.pathname.startsWith(`${WORKER_API_PREFIX}/`)) return handleRemoteWorker(req, res, requestUrl);
   if (isPersistApiPath(req.url)) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }

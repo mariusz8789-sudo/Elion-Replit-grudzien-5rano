@@ -19,6 +19,10 @@ import { knowledgeLedgerPersistenceStatus } from './knowledgeApi.mjs';
  */
 export const RESEARCH_EXPERIMENT_CAPABILITY = 'research-run-experiment';
 export const RESEARCH_ADVANCE_CAPABILITY = 'research-run-advance';
+/** The same experiment, but run by a separate worker process that speaks only HTTP (remoteWorkerApi.mjs). */
+export const RESEARCH_REMOTE_CAPABILITY = 'research-run-experiment-remote';
+/** A remote worker may die; the lease expiry hands the job to another one. A retry resumes the SAME frozen experiment. */
+export const REMOTE_MAX_ATTEMPTS = 3;
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
 export const queueFor = (db) => createScientificJobQueuePort({ backend: createSqliteScientificJobQueueBackend({ db }) });
@@ -30,7 +34,7 @@ export function researchJobIdentity(runId, ordinal, hypothesisId, generation = 0
   return { jobId: `job-rr-${digest}`, idempotencyKey: `idem-rr-${digest}`, experimentId: `queued-${digest}` };
 }
 
-async function enqueueResearchJob(db, projectId, runId, { capabilityId, label, userId, timeoutMs, extra = {} }) {
+async function enqueueResearchJob(db, projectId, runId, { capabilityId, label, userId, timeoutMs, extra = {}, maxAttempts = 1 }) {
   const view = getResearchRun(db, projectId, runId);
   if (!view) return { ok: false, status: 'NOT_FOUND' };
   // A paused or cancelled run accepts no new work; the worker would only dead-letter it.
@@ -50,7 +54,7 @@ async function enqueueResearchJob(db, projectId, runId, { capabilityId, label, u
     researchRunId: runId,
     capabilityId,
     priority: 5,
-    maxAttempts: 1,
+    maxAttempts,
     timeoutMs,
     payload: { projectId, userId, ...extra },
   });
@@ -58,9 +62,13 @@ async function enqueueResearchJob(db, projectId, runId, { capabilityId, label, u
   return { ok: true, deduped: Boolean(queued.deduped), job: queued.job };
 }
 
-export function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000, lineage = null } = {}) {
+export function enqueueResearchExperiment(db, projectId, runId, { hypothesisId = null, userId = null, timeoutMs = 120_000, lineage = null, remote = false } = {}) {
   return enqueueResearchJob(db, projectId, runId, {
-    capabilityId: RESEARCH_EXPERIMENT_CAPABILITY, label: hypothesisId, userId, timeoutMs, extra: { hypothesisId, ...(lineage ? { lineage } : {}) },
+    capabilityId: remote ? RESEARCH_REMOTE_CAPABILITY : RESEARCH_EXPERIMENT_CAPABILITY,
+    // A remote job has its own identity so it never collides with (or dedupes into) a local job for the same hypothesis.
+    label: remote ? `remote:${hypothesisId ?? 'next'}` : hypothesisId,
+    userId, timeoutMs, maxAttempts: remote ? REMOTE_MAX_ATTEMPTS : 1,
+    extra: { hypothesisId, ...(remote ? { remote: true } : {}), ...(lineage ? { lineage } : {}) },
   });
 }
 
@@ -119,7 +127,7 @@ export async function controlResearchRunExecution(db, projectId, runId, action, 
     for (const job of withdrawn) {
       const hypothesisId = job.payload?.hypothesisId ?? null;
       if (stillOpen(hypothesisId)) continue;
-      const requeued = await enqueueResearchExperiment(db, projectId, runId, { hypothesisId, userId: job.payload?.userId ?? userId, timeoutMs: job.timeoutMs ?? undefined });
+      const requeued = await enqueueResearchExperiment(db, projectId, runId, { hypothesisId, userId: job.payload?.userId ?? userId, timeoutMs: job.timeoutMs ?? undefined, remote: job.payload?.remote === true });
       (requeued.ok ? queue.requeued : queue.refused).push(requeued.ok ? requeued.job.jobId : job.jobId);
     }
   }
@@ -205,6 +213,8 @@ export function createResearchRunExecutionPort(db, { tools, proposeEvidence, now
 export function createResearchRunWorker(db, { workerId = 'worker-research-run-local', leaseMs = 30_000, ...options } = {}) {
   return createScientificWorkerRuntime({
     queue: queueFor(db),
+    // Remote jobs belong to remote workers; the in-process worker never takes them (the HTTP API does, for them).
+    claimFilter: { excludeCapabilities: [RESEARCH_REMOTE_CAPABILITY] },
     executionPort: createResearchRunExecutionPort(db, options),
     workerId,
     leaseMs,

@@ -1066,7 +1066,8 @@ export function handleApi(db, ctx) {
         if (body?.async === true) {
           // Same execution path as below, started by a queue worker instead of this request.
           return (async () => {
-            const queued = await enqueueResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id });
+            // remote:true hands the experiment to a separate worker process over HTTP (remoteWorkerApi.mjs) instead of the in-process worker.
+            const queued = await enqueueResearchExperiment(db, projectId, current.researchRunId, { hypothesisId, userId: user.id, remote: body?.remote === true });
             if (!queued.ok) return { status: { NOT_FOUND: 404, RUN_NOT_EXECUTABLE: 409 }[queued.status] ?? 422, body: { error: queued.status, reason: queued.reason ?? null } };
             return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
           })();

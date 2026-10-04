@@ -30,6 +30,7 @@ export function createScientificWorkerRuntime({
   workerId,
   leaseMs = 30_000,
   heartbeatMs = Math.max(1_000, Math.floor(leaseMs / 3)),
+  claimFilter,
 } = {}) {
   if (!queue || typeof queue.claim !== 'function' || typeof queue.heartbeat !== 'function'
     || typeof queue.complete !== 'function' || typeof queue.fail !== 'function') throw new Error('queue: invalid');
@@ -39,7 +40,7 @@ export function createScientificWorkerRuntime({
   if (!Number.isInteger(heartbeatMs) || heartbeatMs < 100 || heartbeatMs >= leaseMs) throw new Error('heartbeatMs: invalid');
 
   async function runOnce() {
-    const claimed = await queue.claim(workerId, leaseMs);
+    const claimed = await queue.claim(workerId, leaseMs, claimFilter);
     if (!claimed?.ok || !claimed.job) return claimed?.ok ? { ok: true, state: 'IDLE' } : claimed;
     const job = claimed.job;
     const controller = new globalThis.AbortController();

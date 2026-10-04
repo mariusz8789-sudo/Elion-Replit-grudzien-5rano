@@ -89,9 +89,26 @@ const IDENTIFIER_KEYS = Object.freeze(new Set([
   'recordedHash', 'recomputedHash', 'datasetHash', 'modelFingerprint', 'trainingDataHash',
 ]));
 
+/**
+ * Subtrees that are VERBATIM THIRD-PARTY RECORDS, carried unchanged: trial-registry arm
+ * labels, endpoint titles and deposited units. A registry arm titled with a clinical dose
+ * is not a synthesis instruction, and rewriting it to satisfy a synthesis guard would
+ * falsify an external record. They are skipped BY KEY, and the guard's subject stays what
+ * it is — synthesis content written by Genesis.
+ *
+ * This is the only exemption, it is a whole-subtree one, and a pack that wants to hide
+ * synthesis text inside one of these keys would have to be constructed deliberately: a
+ * test asserts the exempt keys are exactly this set.
+ */
+export const EXTERNAL_RECORD_KEYS = Object.freeze(new Set([
+  'baselineMatrix', 'referenceHeadToHead', 'bodyWeightEndpoints', 'adverseEventEndpoints',
+  'directRandomisedWeightComparisons', 'trials', 'arms', 'armTitle', 'armA', 'armB',
+  'briefTitle', 'outcomeTitle', 'unitOfMeasure', 'endpointDefinition',
+]));
+
 /** Collects the PROSE of a package: every string value that is not a machine identifier. */
 function prosePartsOf(value, key = null, out = []) {
-  if (key !== null && IDENTIFIER_KEYS.has(key)) return out;
+  if (key !== null && (IDENTIFIER_KEYS.has(key) || EXTERNAL_RECORD_KEYS.has(key))) return out;
   if (typeof value === 'string') { out.push(value); return out; }
   if (value === null || typeof value !== 'object') return out;
   if (Array.isArray(value)) { for (const v of value) prosePartsOf(v, key, out); return out; }

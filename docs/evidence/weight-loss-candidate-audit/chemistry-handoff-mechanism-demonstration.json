@@ -1,0 +1,308 @@
+{
+  "kind": "GENESIS_CHEMISTRY_HANDOFF_PACKAGE",
+  "contractVersion": 1,
+  "packVisibility": "PRIVATE_FULL",
+  "purpose": "MECHANISM_DEMONSTRATION",
+  "purposeNote": "MECHANISM DEMONSTRATION ONLY. This molecule is not a candidate, is not proposed for any indication, and was chosen because it exercises every branch of the generator. Nothing in this package says it does anything.",
+  "candidateId": "MECHANISM-DEMO-001",
+  "status": "INCOMPLETE",
+  "missingItems": [
+    "referenceCompoundSuppliers",
+    "publishedRoutesOrAnalogousClasses",
+    "syntheticAccessibility",
+    "predictedSolubilityProblems",
+    "predictedStabilityProblems",
+    "predictedAggregationProblems",
+    "predictedMetabolismProblems",
+    "evidencePack",
+    "replay",
+    "allEngineResultsIncludingNegative",
+    "rankingAgainstCompetitors",
+    "whyItWon",
+    "firstLaboratoryMeasurements",
+    "laboratoryResultsThatWouldFalsifyIt",
+    "literatureWithIdentifiers",
+    "conceptualRetrosyntheticDisconnections",
+    "commerciallyAvailableBuildingBlockClasses",
+    "roughStepCount",
+    "riskiestTransformations",
+    "expectedSelectivityProblems"
+  ],
+  "missingItemsNote": "An item listed here is genuinely absent from this runtime and this repository. It is not an estimate withheld for caution; there is no value. The winner gate's CHEMISTRY_HANDOFF_COMPLETE criterion fails while this list is non-empty.",
+  "structureHash": "9806b766dde1196aa6cfa397255bf727c9f1c5cce2f7fa782a149e7a804f035a",
+  "ipReview": "PASS",
+  "noveltyStatus": "KNOWN_COMPOUND",
+  "engine": {
+    "rdkit": "RDKit 2026.03.6",
+    "routeSearch": "UNAVAILABLE: AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'"
+  },
+  "enginesAreNotOpenSourceClaim": "This package makes no licensing claim about any engine. Each engine's own licence governs its use.",
+  "items": {
+    "candidateId": "MECHANISM-DEMO-001",
+    "canonicalSmiles": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+    "isomericSmiles": {
+      "status": "COMPUTED",
+      "value": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+      "note": "RDKit MolToSmiles is called at its default isomericSmiles=true, so the canonical SMILES above IS the canonical isomeric SMILES; they are one string, reported twice rather than invented twice."
+    },
+    "inchi": "InChI=1S/C9H7Cl2N3O2S/c1-17(15,16)9-8(12)13-6-2-4(10)5(11)3-7(6)14-9/h2-3H,1H3,(H2,12,13)",
+    "inchiKey": "OIBUBJHZBKQANO-UHFFFAOYSA-N",
+    "molecularFormula": "C9H7Cl2N3O2S",
+    "molecularWeight": {
+      "status": "COMPUTED",
+      "averageMolWt": 292.147,
+      "exactMolWt": 290.9636,
+      "unit": "Da",
+      "engine": "RDKit 2026.03.6"
+    },
+    "chargeAndProtonationState": {
+      "status": "COMPUTED",
+      "formalCharge": 0,
+      "protonationStateUsedInComputation": "As written in the input SMILES. No protonation-state prediction engine is installed in this runtime, so no pH-dependent microspecies was computed and none is assumed.",
+      "pHAssumed": null,
+      "pKaPrediction": {
+        "status": "UNKNOWN",
+        "value": null,
+        "reason": "no pKa predictor is installed in this runtime",
+        "whatWouldCloseIt": "a pKa engine, or a measured pKa from the literature"
+      }
+    },
+    "stereochemistry": {
+      "status": "COMPUTED",
+      "ok": true,
+      "canonicalSmiles": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+      "stereoElements": [],
+      "assignedAtomStereocentres": 0,
+      "unassignedAtomStereocentres": 0,
+      "namesOneMolecule": true,
+      "tautomers": {
+        "canonicalTautomerSmiles": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+        "enumeratedCount": 2,
+        "inputIsCanonicalTautomer": true
+      },
+      "engine": "RDKit 2026.03.6"
+    },
+    "tautomersAndProtomers": {
+      "status": "COMPUTED",
+      "canonicalTautomerSmiles": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+      "enumeratedCount": 2,
+      "inputIsCanonicalTautomer": true,
+      "note": "RDKit MolStandardize tautomer enumeration. The canonical tautomer is RDKit's scoring choice, not a statement about which tautomer predominates in any solvent. Protomers were not enumerated: no protonation engine is installed."
+    },
+    "structure2D": {
+      "status": "COMPUTED",
+      "representation": "canonical isomeric SMILES",
+      "value": "CS(=O)(=O)c1nc2cc(Cl)c(Cl)cc2nc1N",
+      "note": "The SMILES IS the 2D structure Genesis used. No depiction image is generated, because an image adds nothing a chemist cannot regenerate from this string and could drift from it."
+    },
+    "structure3D": {
+      "status": "COMPUTED",
+      "method": "RDKit ETKDG embedding then MMFF minimisation, seed 42",
+      "nAtoms": 24,
+      "nBonds": 25,
+      "formalCharge": 0,
+      "coordinatesSha256": "b792e31921f9843c7a451be6f68f840e9de257a6731c00c65cbad7d6bea8d73c",
+      "note": "One minimised conformer, deterministic for this seed. It is NOT a bound pose, NOT a solution structure and NOT a crystal structure, and no conformational ensemble was generated."
+    },
+    "provenanceAndLicencePerDataItem": [
+      {
+        "id": "structure",
+        "source": "packages/backend/src/campaign/glp1rActivity.json (pinned, hash-verified)",
+        "licence": "ChEMBL CC BY-SA 3.0",
+        "retrievedOrComputed": "pinned in-repo"
+      }
+    ],
+    "compoundClass": "KNOWN_COMPOUND",
+    "referenceCompoundSuppliers": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no supplier catalogue is reachable from this runtime and none is pinned in this repository",
+      "whatWouldCloseIt": "a hash-recorded fetch of a supplier catalogue, or a licensed catalogue shipped with the backend"
+    },
+    "publishedRoutesOrAnalogousClasses": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no literature or patent index is reachable from this runtime and none is pinned in this repository",
+      "whatWouldCloseIt": "a hash-recorded literature or patent search"
+    },
+    "syntheticAccessibility": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "the route-search engine is unavailable: AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'",
+      "whatWouldCloseIt": "an installed route-search engine plus its model files"
+    },
+    "knownChemicalAndStabilityRisks": {
+      "status": "PARTIAL_COMPUTED",
+      "structuralAlerts": [],
+      "structuralAlertCount": 0,
+      "catalogs": [
+        "PAINS",
+        "BRENK",
+        "NIH"
+      ],
+      "qed": 0.8674,
+      "whatThisIs": "Deterministic substructure matches against published screening-deck filter catalogues, computed by RDKit. An alert is a flag for assay interference or a known reactive motif, read from a published rule set.",
+      "whatThisIsNot": "Not a toxicity prediction, not a stability measurement, not target-specific, and not a statement that the molecule is safe when the list is empty.",
+      "measuredStabilityData": {
+        "status": "UNKNOWN",
+        "value": null,
+        "reason": "no measured stability data for this molecule is in this repository",
+        "whatWouldCloseIt": "a literature value with its citation, or a measurement"
+      }
+    },
+    "predictedSolubilityProblems": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no solubility model is installed in this runtime",
+      "whatWouldCloseIt": "an ADMET engine within its licence gate, or a measured solubility with its citation"
+    },
+    "predictedStabilityProblems": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no stability model is installed in this runtime",
+      "whatWouldCloseIt": "a stability-prediction engine, or measured data with its citation"
+    },
+    "predictedAggregationProblems": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no aggregation model is installed in this runtime",
+      "whatWouldCloseIt": "an aggregation predictor, or a measured dynamic-light-scattering or nephelometry result"
+    },
+    "predictedStereochemistryProblems": {
+      "status": "PARTIAL_COMPUTED",
+      "unassignedStereocentres": 0,
+      "note": "An unassigned stereocentre is a real identity problem: it means the structure above does not name one molecule. Whether a given centre is configurationally labile, or epimerises, is not computed here.",
+      "configurationalStabilityPrediction": {
+        "status": "UNKNOWN",
+        "value": null,
+        "reason": "no configurational-stability model is installed in this runtime",
+        "whatWouldCloseIt": "literature on the nearest analogues, or a measurement"
+      }
+    },
+    "predictedMetabolismProblems": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no metabolism or cytochrome-P450 model is installed in this runtime",
+      "whatWouldCloseIt": "an ADMET engine within its licence gate"
+    },
+    "predictedReactivityProblems": {
+      "status": "PARTIAL_COMPUTED",
+      "reactiveMotifAlerts": [],
+      "note": "Reactive-motif alerts come from the same published filter catalogues as the risk item above. No quantum-chemical reactivity calculation was run for this molecule.",
+      "quantumReactivity": {
+        "status": "UNKNOWN",
+        "value": null,
+        "reason": "no quantum calculation was run for this molecule",
+        "whatWouldCloseIt": "one quantum Science Run, recorded with its Replay"
+      }
+    },
+    "evidencePack": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no Evidence Pack projection was supplied",
+      "whatWouldCloseIt": "an Evidence Pack covering every science run this candidate relies on, including the negative ones"
+    },
+    "replay": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no Replay projection was supplied",
+      "whatWouldCloseIt": "a canonical Replay verification with verdict MATCH for every science run relied on"
+    },
+    "allEngineResultsIncludingNegative": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no engine results were supplied, negative or otherwise",
+      "whatWouldCloseIt": "the campaign's science-run list, with the failures kept in it"
+    },
+    "rankingAgainstCompetitors": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no ranking against competitors was supplied",
+      "whatWouldCloseIt": "a gate result per competitor and an ordering that does not collapse the axes into one number"
+    },
+    "whyItWon": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "nothing won: no candidate reached the gate",
+      "whatWouldCloseIt": "a candidate that reaches COMPUTATIONAL_CANDIDATE under the frozen winner gate"
+    },
+    "stillUnknown": [
+      "every property of this molecule beyond its computed identity"
+    ],
+    "firstLaboratoryMeasurements": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no laboratory measurement plan was supplied",
+      "whatWouldCloseIt": "a preregistered measurement plan with a frozen model value and a falsification criterion"
+    },
+    "laboratoryResultsThatWouldFalsifyIt": {
+      "status": "UNKNOWN",
+      "value": null,
+      "reason": "no falsification criterion for a laboratory result was supplied",
+      "whatWouldCloseIt": "a preregistered criterion, frozen before the measurement"
+    },
+    "literatureWithIdentifiers": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no literature index with DOIs or patent identifiers is reachable from this runtime and none is pinned in this repository",
+      "whatWouldCloseIt": "a hash-recorded literature and patent search for this molecule and its nearest analogues"
+    },
+    "conceptualRetrosyntheticDisconnections": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "the route-search engine is unavailable: AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'",
+      "whatWouldCloseIt": "an installed route-search engine plus its model files"
+    },
+    "commerciallyAvailableBuildingBlockClasses": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "no building-block catalogue is reachable from this runtime and none is pinned in this repository",
+      "whatWouldCloseIt": "a hash-recorded fetch of a building-block catalogue"
+    },
+    "roughStepCount": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "the route-search engine is unavailable: AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'",
+      "whatWouldCloseIt": "an installed route-search engine plus its model files"
+    },
+    "riskiestTransformations": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "without a route search there is no transformation list to rank for risk",
+      "whatWouldCloseIt": "a route search, then a chemist's own reading of its disconnections"
+    },
+    "expectedSelectivityProblems": {
+      "status": "BLOCKED",
+      "value": null,
+      "reason": "without a route search there is no transformation list to assess for selectivity",
+      "whatWouldCloseIt": "a route search, then a chemist's own reading of its disconnections"
+    },
+    "identityAndPurityConfirmationMethods": {
+      "status": "DERIVED_FROM_STRUCTURE",
+      "methods": [
+        {
+          "method": "HIGH_RESOLUTION_MASS_SPECTROMETRY",
+          "confirms": "the molecular formula C9H7Cl2N3O2S and the exact mass 290.9636 Da",
+          "whyThisOne": "the formula and exact mass are the two identity values this package computed, so they are the two a mass measurement can contradict"
+        },
+        {
+          "method": "NUCLEAR_MAGNETIC_RESONANCE",
+          "confirms": "the connectivity the canonical SMILES asserts",
+          "whyThisOne": "the structure is an assertion about connectivity and nothing in this package has tested it"
+        },
+        {
+          "method": "CHROMATOGRAPHIC_PURITY_DETERMINATION",
+          "confirms": "that the sample is one substance",
+          "whyThisOne": "every predicted property in this package is about one structure, so a mixture invalidates all of them"
+        }
+      ],
+      "boundary": "Method NAMES and what each would confirm. No instrument configuration, no sample preparation and no operating condition is given: the chemist and the analyst choose those under their own procedures."
+    }
+  },
+  "operationalSynthesisProcedure": "NEVER_INCLUDED",
+  "operationalSynthesisProcedureReason": "The owner's constraint: this package carries identity and evidence so that a professional chemist designs execution under their own procedures, safety rules and regulations. It contains no quantity, temperature, duration, concentration or step-by-step operation, and the generator refuses to emit a package that does.",
+  "unsigned": true,
+  "unsignedReason": "There is no signing key in this system. This package is UNSIGNED and its integrity rests on the hashes it carries.",
+  "claimBoundary": "A structure, its computed identity, and the state of the evidence around it. Not a measurement of any molecule in any organism, not a medicine, and never a claim that adverse effects are absent.",
+  "packFingerprint": "b085a9231bcd5789"
+}

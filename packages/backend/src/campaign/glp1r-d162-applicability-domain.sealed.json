@@ -1,0 +1,166 @@
+{
+  "decisionId": "D-162",
+  "preregFingerprint": "bd0b4a99387913a6",
+  "preregFrozenAtCommit": "9e5ce31c",
+  "gateRuleFingerprint": "d2f77a7e6042f0fc",
+  "gateUnchanged": true,
+  "gateVerdict": null,
+  "isGateVerdict": false,
+  "notAGateVerdictBecause": "The frozen gate names splitMethod 'scaffold-hash-mod10'. This probe uses the preregistered distant-cluster split instead, so its outcome is NOT a gate verdict and must never be quoted as MODEL_GATE_PASS or MODEL_GATE_FAILED. D-153 stands exactly as sealed.",
+  "baseCommit": "e0e13ce2",
+  "computedAt": "2026-10-04T00:56:45.161Z",
+  "engine": {
+    "rdkitVersion": "2026.03.6",
+    "algorithm": "ridge-ecfp4-morgan-r2-512bit",
+    "lambda": 1,
+    "conformalAlpha": 0.1,
+    "splitMethod": "D-162 distant leader-cluster holdout (preregistered)"
+  },
+  "rolesFrom": {
+    "decisionId": "D-152",
+    "note": "roles READ from the sealed D-152 artefact, never recomputed here"
+  },
+  "dataset": {
+    "combinedSetRows": 638,
+    "functionalRows": 320,
+    "functionalCompounds": 206,
+    "featurizedRows": 320,
+    "unfingerprintable": 0,
+    "datasetHash": "c7afb32398abade9",
+    "distinctScaffolds": 89,
+    "distinctAssays": 39
+  },
+  "clustering": {
+    "cutoff": 0.6,
+    "clusters": 31,
+    "compounds": 206,
+    "largestClusterRows": 88,
+    "clusterRowSizes": [
+      88,
+      83,
+      39,
+      34,
+      16,
+      14,
+      5,
+      3,
+      3,
+      3,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "split": {
+    "testClusters": 1,
+    "nTrain": 164,
+    "nCalib": 36,
+    "nTest": 88,
+    "trainMeetsMin": true,
+    "testMeetsMin": true,
+    "droppedForDistance": 32,
+    "nonTestRowsBeforePruning": 232
+  },
+  "controls": {
+    "compoundDisjointness": {
+      "sharedCompounds": 0,
+      "required": 0,
+      "ok": true
+    },
+    "scaffoldDisjointness": {
+      "sharedScaffolds": 0,
+      "required": 0,
+      "ok": true
+    },
+    "distance": {
+      "maxNearestNeighbourTanimotoTestToTrain": 0.5991,
+      "medianNearestNeighbourTanimotoTestToTrain": 0.493,
+      "ceiling": 0.6,
+      "ok": true
+    },
+    "testAssayCoverage": {
+      "distinctTestAssays": 28,
+      "minimum": 3,
+      "ok": true
+    },
+    "assayConcentration": {
+      "largestTestAssayShare": 0.3182,
+      "threshold": 0.5,
+      "ok": true
+    }
+  },
+  "controlsOk": true,
+  "measurement": {
+    "mae": 3.4847,
+    "rmse": 3.6454,
+    "r2": -13.0013,
+    "n": 88,
+    "conformalHalfWidth": 3.4084,
+    "thresholdsNotMet": [
+      "MAE=3.4847 > MAX_MAE=1",
+      "R2=-13.0013 < MIN_R2=0.25"
+    ]
+  },
+  "negativeControl": {
+    "kind": "TRAIN_MEAN_BASELINE",
+    "mae": 2.2171,
+    "r2": -4.9723,
+    "n": 88
+  },
+  "outcome": "EXTRAPOLATION_NOT_SUPPORTED",
+  "frozenPrediction": {
+    "author": "Claude Opus 5, session 01SdX7fcgVg9gVqH8emoF5qw, before the first number of this probe was computed",
+    "primary": "INSUFFICIENT_DATA_FOR_DISTANT_SPLIT",
+    "reasoning": "The arm is peptide-heavy and peptides share large amide-rich fingerprint regions, so pruning everything within 0.60 Tanimoto of a 40-row holdout is expected to remove a large fraction of the remaining rows; 206 compounds is a thin budget for a 150-row distant training core.",
+    "secondary": "EXTRAPOLATION_NOT_SUPPORTED",
+    "intervals": {
+      "ifSizesAreMet_MAE": [
+        1,
+        1.9
+      ],
+      "ifSizesAreMet_R2": [
+        -0.8,
+        0.25
+      ]
+    },
+    "whatWouldSurpriseTheAuthor": "MAE at or below 1.0 together with R2 at or above 0.25 on a split whose maximum test-to-train Tanimoto is strictly below 0.60.",
+    "recordedWrongRatherThanDropped": "This prediction is copied into the sealed artefact verbatim whatever the outcome, exactly as D-153's wrong prediction was."
+  },
+  "predictionCorrect": false,
+  "predictionAssessment": {
+    "primaryOutcomePredicted": "INSUFFICIENT_DATA_FOR_DISTANT_SPLIT",
+    "primaryOutcomeCorrect": false,
+    "secondaryOutcomePredicted": "EXTRAPOLATION_NOT_SUPPORTED",
+    "secondaryOutcomeCorrect": true,
+    "maeInsidePredictedInterval": false,
+    "r2InsidePredictedInterval": false,
+    "surpriseConditionMet": false
+  },
+  "limitations": [
+    "This probe speaks about ONE representation — the ridge over 512-bit Morgan r=2 fingerprints the frozen gate names. D-144 already refuted that representation on this target's small molecules, so a failure here is a joint statement about the representation and the data, not about the endpoint or the receptor.",
+    "It is not a measurement of any molecule and not a claim that any molecule works.",
+    "Replicate rows are present and are NOT averaged, exactly as in D-153.",
+    "Sixteen assays in the combined set had no description at D-152 time; D-157 classified them as a separate audit layer and did NOT adopt the enlarged arm, so those rows are absent here too.",
+    "A distant split produced by pruning has a smaller, differently composed training set than the production split. That is the point of the probe and also a limit on it: a drop in accuracy mixes the distance effect with the smaller-training-set effect, and this run does not separate them."
+  ],
+  "boundary": "No gate was edited, no sealed artefact was modified, no role was reclassified, no candidate was nominated or ranked, and no docking target was changed.",
+  "artifactHash": "14e75067a3b7d120"
+}

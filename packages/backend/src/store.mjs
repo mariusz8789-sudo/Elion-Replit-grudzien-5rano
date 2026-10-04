@@ -555,6 +555,111 @@ const JOB_LEASE_COLUMNS_V15 = Object.freeze([
   ['lease_id', 'TEXT'], ['lease_expires_at', 'INTEGER'], ['failure_json', 'TEXT'], ['cancel_reason', 'TEXT'],
 ]);
 
+// V17: TIME-TO-DISCOVERY instrumentation (src/discoveryTiming.mjs). Four append-only tables, no second
+// state system: the timings are written from inside the canonical ResearchRun loop's own write
+// transactions, so a rolled-back step leaves no timing behind either.
+//
+//  - `discovery_stage_marks` holds ONLY stage boundaries. The unique index makes "each boundary is
+//    recorded once" a database guarantee, not a convention: a second OPEN or a second CLOSE for the
+//    same (scope, stage) is refused by SQLite, so a re-entered loop step cannot inflate or reset a
+//    measured stage.
+//  - `discovery_stage_facts` holds everything that ACCUMULATES inside a stage: time spans
+//    (COMPUTE / QUEUE / HUMAN_WAIT), counters (experiments, rejected candidates, retries),
+//    distinct members (agents, workers) and Evidence/Replay statuses.
+//    QUEUE and HUMAN_WAIT are deliberately different kinds: QUEUE is time a unit of work waited for
+//    a MACHINE (a free worker, a lease, a scheduler), HUMAN_WAIT is time blocked on a PERSON (a
+//    review, a decision, a laboratory). Collapsing them would let a slow human look like a slow
+//    computer, which is exactly the number the 2x claim must not blur.
+//  - `discovery_competitor_baselines` holds EXTERNALLY measured baselines. Every provenance column is
+//    NOT NULL and CHECKed non-empty, so a baseline without a traceable measurer, method and source
+//    cannot be inserted at all; the speedup indicator reads nothing else.
+//  - `discovery_timing_campaign_links` attaches a run (or any scope) to a campaign, so a campaign's
+//    full cycle is retrievable even when its runs were created before the link existed.
+const SCHEMA_V17 = `
+CREATE TABLE IF NOT EXISTS discovery_stage_marks (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  scope_kind  TEXT NOT NULL CHECK (scope_kind IN ('RESEARCH_RUN','EXPERIMENT','CAMPAIGN')),
+  scope_id    TEXT NOT NULL,
+  stage       TEXT NOT NULL,
+  mark        TEXT NOT NULL CHECK (mark IN ('OPEN','CLOSE')),
+  at_ms       INTEGER NOT NULL CHECK (at_ms >= 0),
+  campaign_id TEXT,
+  detail_json TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_discovery_stage_marks_once
+  ON discovery_stage_marks(scope_kind, scope_id, stage, mark);
+CREATE INDEX IF NOT EXISTS idx_discovery_stage_marks_campaign
+  ON discovery_stage_marks(campaign_id) WHERE campaign_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS discovery_stage_marks_append_only_update BEFORE UPDATE ON discovery_stage_marks
+BEGIN SELECT RAISE(ABORT, 'discovery_stage_marks is append-only: a measured stage boundary cannot be moved'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_stage_marks_append_only_delete BEFORE DELETE ON discovery_stage_marks
+BEGIN SELECT RAISE(ABORT, 'discovery_stage_marks is append-only: a measured stage boundary cannot be deleted'); END;
+
+CREATE TABLE IF NOT EXISTS discovery_stage_facts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  scope_kind  TEXT NOT NULL CHECK (scope_kind IN ('RESEARCH_RUN','EXPERIMENT','CAMPAIGN')),
+  scope_id    TEXT NOT NULL,
+  stage       TEXT NOT NULL,
+  fact        TEXT NOT NULL CHECK (fact IN ('SPAN','COUNT','MEMBER','STATUS')),
+  kind        TEXT NOT NULL,
+  value_ms    INTEGER CHECK (value_ms IS NULL OR value_ms >= 0),
+  delta       INTEGER,
+  member      TEXT,
+  status      TEXT,
+  ref         TEXT,
+  campaign_id TEXT,
+  detail_json TEXT,
+  at_ms       INTEGER NOT NULL CHECK (at_ms >= 0),
+  created_at  INTEGER NOT NULL,
+  CHECK (fact <> 'SPAN'   OR value_ms IS NOT NULL),
+  CHECK (fact <> 'COUNT'  OR delta    IS NOT NULL),
+  CHECK (fact <> 'MEMBER' OR (member IS NOT NULL AND member <> '')),
+  CHECK (fact <> 'STATUS' OR (status IS NOT NULL AND status <> ''))
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_stage_facts_scope
+  ON discovery_stage_facts(scope_kind, scope_id, stage);
+CREATE INDEX IF NOT EXISTS idx_discovery_stage_facts_campaign
+  ON discovery_stage_facts(campaign_id) WHERE campaign_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS discovery_stage_facts_append_only_update BEFORE UPDATE ON discovery_stage_facts
+BEGIN SELECT RAISE(ABORT, 'discovery_stage_facts is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_stage_facts_append_only_delete BEFORE DELETE ON discovery_stage_facts
+BEGIN SELECT RAISE(ABORT, 'discovery_stage_facts is append-only'); END;
+
+CREATE TABLE IF NOT EXISTS discovery_competitor_baselines (
+  id                   TEXT PRIMARY KEY,
+  task_scope_id        TEXT NOT NULL CHECK (task_scope_id <> ''),
+  task_scope_hash      TEXT NOT NULL CHECK (task_scope_hash <> ''),
+  stage                TEXT NOT NULL,
+  evidence_standard    TEXT NOT NULL CHECK (evidence_standard <> ''),
+  wall_clock_ms        INTEGER NOT NULL CHECK (wall_clock_ms > 0),
+  active_human_ms      INTEGER NOT NULL CHECK (active_human_ms >= 0),
+  compute_ms           INTEGER NOT NULL CHECK (compute_ms >= 0),
+  measured_by          TEXT NOT NULL CHECK (measured_by <> ''),
+  measured_at          TEXT NOT NULL CHECK (measured_at <> ''),
+  measurement_method   TEXT NOT NULL CHECK (measurement_method <> ''),
+  source_uri           TEXT NOT NULL CHECK (source_uri <> ''),
+  source_sha256        TEXT NOT NULL CHECK (length(source_sha256) = 64),
+  provenance_json      TEXT NOT NULL CHECK (provenance_json <> ''),
+  provenance_hash      TEXT NOT NULL CHECK (length(provenance_hash) = 64),
+  created_at           INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_competitor_baselines_scope
+  ON discovery_competitor_baselines(task_scope_id, stage);
+CREATE TRIGGER IF NOT EXISTS discovery_competitor_baselines_append_only_update BEFORE UPDATE ON discovery_competitor_baselines
+BEGIN SELECT RAISE(ABORT, 'discovery_competitor_baselines is append-only: a recorded baseline cannot be edited'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_competitor_baselines_append_only_delete BEFORE DELETE ON discovery_competitor_baselines
+BEGIN SELECT RAISE(ABORT, 'discovery_competitor_baselines is append-only: a recorded baseline cannot be deleted'); END;
+
+CREATE TABLE IF NOT EXISTS discovery_timing_campaign_links (
+  scope_kind  TEXT NOT NULL CHECK (scope_kind IN ('RESEARCH_RUN','EXPERIMENT','CAMPAIGN')),
+  scope_id    TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (scope_kind, scope_id, campaign_id)
+);
+`;
+
 /**
  * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
  * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
@@ -565,7 +670,7 @@ const JOB_LEASE_COLUMNS_V15 = Object.freeze([
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 16;
+export const CURRENT_SCHEMA_VERSION = 17;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -665,6 +770,14 @@ function migrate(db) {
   if (version < 16) {
     db.exec(SCHEMA_V16);
     db.exec('PRAGMA user_version = 16');
+  }
+  // v17: TIME-TO-DISCOVERY tables. Purely additive (`CREATE TABLE IF NOT EXISTS` + indexes), so a
+  // database from any earlier version keeps every row it had and simply gains four empty tables; a
+  // run that happened before this migration has no stage timings, which is the correct state
+  // (nothing was measured then), never a gap to be backfilled with guesses.
+  if (version < 17) {
+    db.exec(SCHEMA_V17);
+    db.exec('PRAGMA user_version = 17');
   }
 }
 

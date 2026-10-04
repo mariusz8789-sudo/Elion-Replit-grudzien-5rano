@@ -6,7 +6,7 @@ import type {
   DiscoveryComparison,
   DiscoveryConclusion,
   DiscoveryCriterionCheck,
-  DiscoveryReplay,
+  DemoReplay,
   DiscoveryVerdict,
 } from './discoveryCase';
 
@@ -97,7 +97,7 @@ function assessDeclaredDerivations(record: DiscoveryCase): TautologyAssessment |
 export function deriveDiscoveryConclusion(
   record: DiscoveryCase,
   comparison: DiscoveryComparison | null,
-  replay: DiscoveryReplay | null,
+  replay: DemoReplay | null,
 ): DiscoveryConclusion {
   const limitations = record.limitations;
   if (record.notModeledReason) return insufficient(`model nie wyraża tego eksperymentu (${record.notModeledReason}).`, limitations);

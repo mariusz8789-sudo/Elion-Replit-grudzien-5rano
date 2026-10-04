@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
-import { replayDiscoveryCase } from '../core/discovery/discoveryReplay';
+import { runDemoReplay } from '../core/discovery/demoReplay';
 import type { DiscoveryCase, DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
 
 /**
@@ -53,7 +53,7 @@ describe('Discovery replay — pokrycie rozjazdu', () => {
       hospital: { ...sample.hospital, occupiedBeds: sample.hospital.occupiedBeds + 3 },
     }));
 
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
 
     expect(replay.status).toBe('DRIFT');
     expect(replay.message).not.toContain('mieści się w tolerancji');
@@ -68,7 +68,7 @@ describe('Discovery replay — pokrycie rozjazdu', () => {
       hospital: { ...sample.hospital, bedOccupancy: sample.hospital.bedOccupancy + 0.25 },
     }));
 
-    expect(replayDiscoveryCase(tampered).status).toBe('DRIFT');
+    expect(runDemoReplay(tampered).status).toBe('DRIFT');
   });
 
   it('różnica dnia niesie nazwę pola i OBIE wartości, a nie ten sam dzień dwa razy', () => {
@@ -77,7 +77,7 @@ describe('Discovery replay — pokrycie rozjazdu', () => {
     const day = record.arms[0].run.series[10].day;
     const tampered = tamperDay(record, 10, (sample) => ({ ...sample, infectious: sample.infectious + 7 }));
 
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
     const valued = replay.arms[0].differences.find((d) => d.field === `series.day${day}.infectious`);
 
     expect(valued).toBeDefined();
@@ -92,7 +92,7 @@ describe('Discovery replay — pokrycie rozjazdu', () => {
     const day = record.arms[0].run.series[10].day;
     const tampered = tamperDay(record, 10, (sample) => ({ ...sample, infectious: sample.infectious + 7 }));
 
-    const replay = replayDiscoveryCase(tampered);
+    const replay = runDemoReplay(tampered);
 
     expect(replay.status).toBe('DRIFT');
     expect(replay.message).not.toContain(`firstDifferingDay (${day} → ${day})`);
@@ -105,6 +105,6 @@ describe('Discovery replay — pokrycie rozjazdu', () => {
 
   it('nietknięta sprawa dalej odtwarza się jako MATCH — szersze porównanie nie produkuje fałszywego DRIFT', () => {
     const record = runDiscoveryCase(spec());
-    expect(replayDiscoveryCase(record).status).toBe('MATCH');
+    expect(runDemoReplay(record).status).toBe('MATCH');
   });
 });

@@ -3,24 +3,34 @@ import { DISCOVERY_METRIC_KEYS } from './discoveryExecution';
 import type {
   DiscoveryArm,
   DiscoveryCase,
-  DiscoveryReplay,
-  DiscoveryReplayDifference,
-  DiscoveryReplayStatus,
+  DemoReplay,
+  DemoReplayDifference,
+  DemoReplayStatus,
 } from './discoveryCase';
 
 /**
- * DISCOVERY REPLAY — dowód odtwarzalności przez PONOWNE PRZELICZENIE modelu.
+ * DEMO_REPLAY — powtarzalność DEMO przez PONOWNE PRZELICZENIE modelu w przeglądarce.
  *
- * Replay nie odczytuje zapisanej odpowiedzi. Uruchamia Scenario Engine jeszcze
- * raz z wejść zapisanych w sprawie i porównuje odciski oraz metryki. Rozjazd
- * musi pokazać, CO się różni — inaczej „DRIFT" byłby tylko etykietą.
+ * DEMO_REPLAY nie odczytuje zapisanej odpowiedzi. Uruchamia przeglądarkowy Scenario
+ * Engine jeszcze raz z wejść zapisanych w migawce i porównuje odciski oraz metryki.
+ * Rozjazd musi pokazać, CO się różni — inaczej „DRIFT" byłby tylko etykietą.
+ *
+ * NOT GENESIS EVIDENCE, NOT GENESIS REPLAY. This module belongs to the browser-local
+ * epidemic-city DEMO found by the 2026-10-04 architecture audit. Canonical Genesis
+ * Evidence is the backend ResearchRun loop's single ledger; canonical Replay is
+ * `packages/backend/src/campaign/verify.mjs`. The owner's 2026-10-04 resolution was to
+ * rename this cluster rather than delete it, so the stored state is a
+ * LOCAL_SIMULATION_SNAPSHOT and the re-run is a DEMO_REPLAY (D-172).
+ *
+ * DO NOT BUILD THE RESEARCHRUN MIGRATION NOW. The full redirect of this surface into
+ * the canonical loop happens ONLY once the epidemic scenario is a real ResearchRun.
  */
 
 const COMPARTMENTS = ['susceptible', 'exposed', 'infectious', 'recovered', 'deceased'] as const;
 
 /**
  * Warstwa szpitalna wchodzi do `resultFingerprint` przebiegu (scenarioEngine),
- * więc replay musi ją porównywać tak samo. Bez tego rozjazd wyłącznie
+ * więc DEMO_REPLAY musi ją porównywać tak samo. Bez tego rozjazd wyłącznie
  * szpitalny dawał WITHIN_TOLERANCE z komunikatem „każda metryka mieści się w
  * tolerancji", mimo że przebieg realnie się różnił — odcisk był jedyną
  * różnicą, a ta jest z werdyktu wyłączona. Lista pokrywa dokładnie pola
@@ -65,13 +75,13 @@ function firstDaySampleDifference(
 }
 
 /** Różnica z równymi wartościami (np. numer dnia) to fakt, nie rozjazd „a → a". */
-function describeDifference(d: DiscoveryReplayDifference): string {
+function describeDifference(d: DemoReplayDifference): string {
   if (d.expected === d.actual) return `${d.field} = ${String(d.expected)}`;
   return `${d.field} (${String(d.expected)} → ${String(d.actual)})`;
 }
 
-function armDifferences(expected: ScenarioRun, actual: ScenarioRun, tolerance: number): DiscoveryReplayDifference[] {
-  const differences: DiscoveryReplayDifference[] = [];
+function armDifferences(expected: ScenarioRun, actual: ScenarioRun, tolerance: number): DemoReplayDifference[] {
+  const differences: DemoReplayDifference[] = [];
   if (expected.resultFingerprint !== actual.resultFingerprint) {
     differences.push({ field: 'resultFingerprint', expected: expected.resultFingerprint, actual: actual.resultFingerprint });
   }
@@ -122,11 +132,11 @@ function rerunArm(arm: DiscoveryArm, record: DiscoveryCase): ScenarioRun {
  *  BLOCKED           — sprawy nie da się wykonać (scenariusz NOT_MODELED).
  *  NOT_REPRODUCIBLE  — sprawa nie niesie kompletnego zapisu przebiegu.
  */
-export function replayDiscoveryCase(record: DiscoveryCase): DiscoveryReplay {
-  return replayDiscoveryCaseWithTolerance(record, Math.max(0, record.replayTolerance));
+export function runDemoReplay(record: DiscoveryCase): DemoReplay {
+  return runDemoReplayWithTolerance(record, Math.max(0, record.demoReplayTolerance));
 }
 
-export function replayDiscoveryCaseWithTolerance(record: DiscoveryCase, tolerance: number): DiscoveryReplay {
+export function runDemoReplayWithTolerance(record: DiscoveryCase, tolerance: number): DemoReplay {
   if (record.status === 'NOT_MODELED' || record.notModeledReason) {
     return {
       status: 'BLOCKED',
@@ -155,7 +165,7 @@ export function replayDiscoveryCaseWithTolerance(record: DiscoveryCase, toleranc
       armId: arm.armId,
       expectedRunFingerprint: arm.run.resultFingerprint,
       actualRunFingerprint: actual.resultFingerprint,
-      differences: armDifferences(arm.run, actual, tolerance) as readonly DiscoveryReplayDifference[],
+      differences: armDifferences(arm.run, actual, tolerance) as readonly DemoReplayDifference[],
     };
   });
 
@@ -163,7 +173,7 @@ export function replayDiscoveryCaseWithTolerance(record: DiscoveryCase, toleranc
   // Różnice poza samym odciskiem: to one decydują o DRIFT.
   const substantive = arms.flatMap((a) => a.differences).filter((d) => d.field !== 'resultFingerprint');
 
-  let status: DiscoveryReplayStatus;
+  let status: DemoReplayStatus;
   let message: string;
   if (fingerprintsMatch && substantive.length === 0) {
     status = 'MATCH';

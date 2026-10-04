@@ -2,18 +2,18 @@
  * PHASE 0 — HAZARD PROVENANCE STORE.
  *
  * Domain-neutral generalization the audit doc asked for ("Generalize the
- * existing EvidenceStore/evidenceCrypto pattern behind a domain-neutral
+ * existing discovery snapshot-store/evidenceCrypto pattern behind a domain-neutral
  * interface before adding hazard evidence... Do not create a third parallel
  * evidence system.")
  *
  * PHASE 0.1 UPDATE: the immutable get/put/list mechanics below are no longer
  * implemented twice. Both this store and the epidemic
- * `core/discovery/evidenceStore.ts` now delegate to the same
+ * `core/discovery/localSimulationSnapshotStore.ts` now delegate to the same
  * `core/provenance/recordStore.ts` primitive — this file only supplies the
  * hazard-specific policy choice (`'reject-if-different'`, i.e. immutable)
  * and the three hazard collections (artifacts/inputs/runs). See
  * docs/PHASE0_EVIDENCE_STORE_CONVERGENCE.md for what was deduplicated and
- * why the domain interfaces (`EvidenceStore` vs `HazardProvenanceStore`)
+ * why the domain interfaces (`LocalSimulationSnapshotStore` vs `HazardProvenanceStore`)
  * stay separate.
  *
  * `ImmutableConflictError` and `ImmutableRecordStore` are re-exported under
@@ -175,7 +175,7 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
 
 /**
  * Persists Phase 0 provenance records in localStorage — survives a refresh,
- * same device only, mirrors LocalEvidenceStore. Uses three separate storage
+ * same device only, mirrors BrowserLocalSimulationSnapshotStore. Uses three separate storage
  * keys (not `evidence-store/v1`) so a hazard record can never collide with,
  * or be misread as, an epidemic evidence record even if the same id string
  * were reused across domains.

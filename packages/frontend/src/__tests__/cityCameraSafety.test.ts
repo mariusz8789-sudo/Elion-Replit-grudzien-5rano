@@ -126,7 +126,7 @@ describe('camera focus safety — isolation', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(join(here, '..', 'core', 'three', 'cityCameraSafety.ts'), 'utf8');
     expect(source.match(/^import .*$/gm) ?? []).toHaveLength(0);
-    for (const forbidden of ['epidemicCity', 'hazardReplay', 'earthquake', 'evidenceStore', 'recordStore', 'worldEngineContract', 'roadNetwork', 'three']) {
+    for (const forbidden of ['epidemicCity', 'hazardReplay', 'earthquake', 'localSimulationSnapshotStore', 'recordStore', 'worldEngineContract', 'roadNetwork', 'three']) {
       expect(source.toLowerCase()).not.toContain(`from '${forbidden}'`);
       expect(source.toLowerCase()).not.toContain(`/${forbidden}'`);
     }

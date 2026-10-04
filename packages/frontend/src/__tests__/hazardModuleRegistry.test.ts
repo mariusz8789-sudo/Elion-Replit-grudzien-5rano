@@ -178,8 +178,8 @@ describe('requiredEvidenceFields matches what the real evidence gate enforces', 
 describe('Hazard Module Registry isolation — no epidemic/routing/City3D/GIS/UI imports', () => {
   const forbiddenModules = [
     'epidemicCity', 'cityAgent', 'roadNetwork', 'worldEngineContract', 'worldEngineInterface',
-    'hospitalResource', 'scenarioEngine', 'discoveryCase', 'discoveryEngine', 'discoveryEvidence',
-    'discoveryReplay', 'discoveryExecution', 'city3d', 'three/', "from 'three'", 'react', 'gis', 'spatialoverlay',
+    'hospitalResource', 'scenarioEngine', 'discoveryCase', 'discoveryEngine', 'localSimulationSnapshotPack',
+    'demoReplay', 'discoveryExecution', 'city3d', 'three/', "from 'three'", 'react', 'gis', 'spatialoverlay',
   ];
 
   it('hazardModuleRegistry.ts imports only registered hazard modules\' own version constants and contract types', () => {

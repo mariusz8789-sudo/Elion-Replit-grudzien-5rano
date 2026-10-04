@@ -147,11 +147,11 @@ function admissionOf(record: DiscoveryCase): { admitted: boolean; rejectionReaso
   if (record.comparison?.status !== 'COMPLETED') {
     return { admitted: false, rejectionReason: `porównanie zablokowane: ${record.comparison?.blockedReason ?? 'brak porównania'}` };
   }
-  if (record.replay?.status !== 'MATCH' && record.replay?.status !== 'WITHIN_TOLERANCE') {
-    return { admitted: false, rejectionReason: `odtworzenie nie potwierdzone: ${record.replay?.status ?? 'brak odtworzenia'}` };
+  if (record.demoReplay?.status !== 'MATCH' && record.demoReplay?.status !== 'WITHIN_TOLERANCE') {
+    return { admitted: false, rejectionReason: `odtworzenie nie potwierdzone: ${record.demoReplay?.status ?? 'brak odtworzenia'}` };
   }
-  if (record.evidence === null || record.evidence.missingFields.length > 0) {
-    return { admitted: false, rejectionReason: `pakiet dowodowy niekompletny: ${record.evidence?.missingFields.join(', ') ?? 'brak pakietu'}` };
+  if (record.snapshotPack === null || record.snapshotPack.missingFields.length > 0) {
+    return { admitted: false, rejectionReason: `pakiet dowodowy niekompletny: ${record.snapshotPack?.missingFields.join(', ') ?? 'brak pakietu'}` };
   }
   return { admitted: true };
 }

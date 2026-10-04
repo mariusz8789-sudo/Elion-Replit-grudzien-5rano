@@ -1,5 +1,5 @@
-import { serializeDiscoveryEvidencePack } from './discoveryEvidence';
-import type { DiscoveryEvidencePack } from './discoveryCase';
+import { serializeLocalSimulationSnapshotPack } from './localSimulationSnapshotPack';
+import type { LocalSimulationSnapshotPack } from './discoveryCase';
 import { sha256Hex as canonicalSha256Hex } from '@genesis/core/determinism.js';
 
 /**
@@ -19,7 +19,7 @@ import { sha256Hex as canonicalSha256Hex } from '@genesis/core/determinism.js';
  * for a COMPLETED evidence pack. That is a different job from internal
  * replay bookkeeping, so it gets a different, real hash: the browser's own
  * SHA-256 (Web Crypto), computed over the pack's existing canonical
- * serialization (`serializeDiscoveryEvidencePack`, unchanged).
+ * serialization (`serializeLocalSimulationSnapshotPack`, unchanged).
  */
 export async function sha256Hex(input: string): Promise<string> {
   // The ONE SHA-256 (isomorphic, bit-identical to WebCrypto); async signature kept for existing callers.
@@ -27,6 +27,6 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 /** SHA-256 of a completed evidence pack's canonical content. */
-export async function computeEvidencePackSha256(pack: DiscoveryEvidencePack): Promise<string> {
-  return sha256Hex(serializeDiscoveryEvidencePack(pack));
+export async function computeLocalSimulationSnapshotFingerprint(pack: LocalSimulationSnapshotPack): Promise<string> {
+  return sha256Hex(serializeLocalSimulationSnapshotPack(pack));
 }

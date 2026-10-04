@@ -83,8 +83,8 @@ export async function buildHazardEvidencePack(result: EarthquakeScenarioResult):
   ];
 
   // generatedAt is metadata about WHEN the pack was built, not part of what it
-  // attests to — it must stay outside the hash, exactly like StoredEvidence's
-  // savedAt sits outside computeEvidencePackSha256's input. Hashing it would
+  // attests to — it must stay outside the hash, exactly like LocalSimulationSnapshot's
+  // savedAt sits outside computeLocalSimulationSnapshotFingerprint's input. Hashing it would
   // make two packs built from the IDENTICAL result at two different moments
   // report different digests, which defeats using the digest as tamper
   // evidence for the content (confirmed via scripts/earthquake-e2e.mjs,

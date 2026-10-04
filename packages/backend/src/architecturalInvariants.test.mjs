@@ -417,3 +417,197 @@ describe('INVARIANT: one ResearchRun scientific loop', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// INVARIANT 8 — THE BROWSER-LOCAL DEMO IS NOT EVIDENCE AND NOT REPLAY
+// ---------------------------------------------------------------------------
+
+/**
+ * The 2026-10-04 audit found a complete second Evidence-and-Replay implementation living in
+ * the browser under `packages/frontend/src/core/discovery/*` — its own store, its own
+ * MATCH/DRIFT verdict, its own SHA-256 pack — reaching exactly one product surface, a
+ * synthetic Worlds demo. It was not a second brain because of what it computed; it was a
+ * second brain because of what it was CALLED.
+ *
+ * The owner's resolution (D-172) was to rename, not delete, and to fix the vocabulary at the
+ * root: the stored state is a **LOCAL_SIMULATION_SNAPSHOT**, the re-run is a **DEMO_REPLAY**,
+ * and the words "Evidence" and "Replay" no longer name anything that cluster owns. The full
+ * redirect into the canonical ResearchRun loop happens ONLY once the epidemic scenario is a
+ * real ResearchRun; nothing here asks for that migration now.
+ *
+ * This invariant reads ACROSS the package boundary on purpose. The claim being defended is not
+ * about backend code: it is that a browser-local demo artefact can neither be published nor
+ * read as canonical Genesis Evidence. That claim spans both packages, so the check does too,
+ * and it lives beside the other seven rather than in a second invariant file.
+ */
+describe('INVARIANT: the browser-local demo is not Evidence and not Replay', () => {
+  const FRONTEND = path.join(REPO, 'packages/frontend/src');
+
+  /** Every .ts/.tsx under packages/frontend/src, as a repo-relative POSIX path. */
+  function frontendModules(dir = FRONTEND, out = []) {
+    for (const name of readdirSync(dir).sort()) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) {
+        if (name !== 'node_modules') frontendModules(full, out);
+        continue;
+      }
+      if (!/\.tsx?$/.test(name)) continue;
+      out.push(path.relative(REPO, full).split(path.sep).join('/'));
+    }
+    return out;
+  }
+
+  const FE = frontendModules();
+  const FE_SOURCE = new Map(FE.map((rel) => [rel, readFileSync(path.join(REPO, rel), 'utf8')]));
+
+  /** The demo cluster itself: the modules the audit named, under their post-D-172 names. */
+  const DEMO_CLUSTER = [
+    'packages/frontend/src/core/discovery/localSimulationSnapshotStore.ts',
+    'packages/frontend/src/core/discovery/localSimulationSnapshotPack.ts',
+    'packages/frontend/src/core/discovery/demoReplay.ts',
+  ];
+  const DEMO_PANEL = 'packages/frontend/src/components/visual-simulation/LocalSimulationSnapshotPanel.tsx';
+
+  it('the renamed demo modules exist and the old Evidence/Replay-named ones are gone', () => {
+    for (const rel of [...DEMO_CLUSTER, DEMO_PANEL]) {
+      assert.ok(FE_SOURCE.has(rel), `${rel} must exist: the demo cluster's post-D-172 name.`);
+    }
+    const revived = [
+      'packages/frontend/src/core/discovery/evidenceStore.ts',
+      'packages/frontend/src/core/discovery/discoveryReplay.ts',
+      'packages/frontend/src/core/discovery/discoveryEvidence.ts',
+      'packages/frontend/src/components/visual-simulation/EvidenceReplayPanel.tsx',
+    ].filter((rel) => FE_SOURCE.has(rel));
+    assert.deepEqual(
+      revived,
+      [],
+      report(revived, [], 'An Evidence/Replay-named module of the browser-local demo came back. The demo is LOCAL_SIMULATION_SNAPSHOT + DEMO_REPLAY.'),
+    );
+  });
+
+  it('the demo cluster names its own artefacts LOCAL_SIMULATION_SNAPSHOT / DEMO_REPLAY and nothing else', () => {
+    // The vocabulary check. A symbol the demo cluster EXPORTS may not be named with a bare
+    // Evidence or Replay word: that is exactly how this became readable as a second brain.
+    // `Demo*` is allowed because DEMO_REPLAY is the owner's chosen term.
+    const offenders = [];
+    for (const rel of [...DEMO_CLUSTER, DEMO_PANEL]) {
+      const src = FE_SOURCE.get(rel);
+      for (const match of src.matchAll(/^export (?:async function|function|const|class|interface|type|enum)\s+(\w+)/gm)) {
+        const name = match[1];
+        if (/^(Demo|DEMO_|runDemo|LocalSimulationSnapshot|LOCAL_SIMULATION_SNAPSHOT)/.test(name)) continue;
+        if (/evidence/i.test(name) || /replay/i.test(name)) offenders.push(`${rel}::${name}`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      report(offenders, [], 'A browser-local demo export is named Evidence or Replay. Use LOCAL_SIMULATION_SNAPSHOT / DEMO_REPLAY.'),
+    );
+
+    // Both terms must actually be present, or the rename was only a deletion of words.
+    const store = FE_SOURCE.get('packages/frontend/src/core/discovery/localSimulationSnapshotStore.ts');
+    assert.match(store, /LOCAL_SIMULATION_SNAPSHOT_KIND = 'LOCAL_SIMULATION_SNAPSHOT'/,
+      'The store must declare the LOCAL_SIMULATION_SNAPSHOT discriminant.');
+    assert.match(FE_SOURCE.get('packages/frontend/src/core/discovery/demoReplay.ts'), /export function runDemoReplay\b/,
+      'The demo re-run must be runDemoReplay.');
+  });
+
+  it('a demo snapshot carries a discriminant that is not, and cannot be read as, an Evidence Pack', () => {
+    const store = FE_SOURCE.get('packages/frontend/src/core/discovery/localSimulationSnapshotStore.ts');
+    // Every stored record is tagged, and a record without the tag is refused by the validator.
+    assert.match(store, /kind: typeof LOCAL_SIMULATION_SNAPSHOT_KIND/, 'The stored shape must carry `kind`.');
+    assert.match(
+      store,
+      /if \(value\.kind !== LOCAL_SIMULATION_SNAPSHOT_KIND\) issues\.push/,
+      'validateLocalSimulationSnapshot must reject a record that is not tagged LOCAL_SIMULATION_SNAPSHOT.',
+    );
+    // And it is written under its own storage key, not the old Evidence-named one.
+    assert.match(store, /const STORAGE_KEY = 'local-simulation-snapshot\/v1'/, 'The demo must own its storage key.');
+    assert.ok(
+      !/const STORAGE_KEY = 'evidence-store\/v1'/.test(store),
+      'The demo store must not write under the old Evidence-named localStorage key.',
+    );
+  });
+
+  it('the demo snapshot is not publishable: no Evidence Pack, report or RO-Crate path reads it', () => {
+    // THE PUBLISHABILITY ASSERTION. A demo snapshot must not be exportable through any
+    // canonical Evidence Pack or report path. The way that would happen is an export/report
+    // module importing the demo cluster, so that is what is checked — in both directions.
+    const DEMO_BASENAMES = ['localSimulationSnapshotStore', 'localSimulationSnapshotPack', 'demoReplay', 'LocalSimulationSnapshotPanel'];
+    const EXPORT_SURFACE = /(evidencePack|roCrate|report|export|publish|ledger|researchRun)/i;
+
+    const importers = FE.filter((rel) => {
+      if ([...DEMO_CLUSTER, DEMO_PANEL].includes(rel)) return false;
+      if (rel.includes('/__tests__/')) return false;
+      const src = FE_SOURCE.get(rel);
+      return DEMO_BASENAMES.some((base) => new RegExp(`from\\s+'[^']*/${base}'`).test(src));
+    });
+    const publishers = importers.filter((rel) => EXPORT_SURFACE.test(path.basename(rel)));
+    assert.deepEqual(
+      publishers,
+      [],
+      report(publishers, [], 'An Evidence Pack / report / ledger / ResearchRun module imports the browser-local demo. A demo snapshot must not be publishable as canonical Evidence.'),
+    );
+
+    // The demo cluster must not reach the other way either: into the canonical loop's own names.
+    const CANONICAL = ['proposeStructuredEvidence', 'openKnowledgeLedgerPersistence', 'replayCapabilityInputs', 'buildDecisionTrace', 'appendServerResearchStateEvent'];
+    const leaks = [];
+    for (const rel of [...DEMO_CLUSTER, DEMO_PANEL]) {
+      for (const needle of CANONICAL) {
+        if (FE_SOURCE.get(rel).includes(needle)) leaks.push(`${rel}::${needle}`);
+      }
+    }
+    assert.deepEqual(
+      leaks,
+      [],
+      report(leaks, [], 'The browser-local demo names a canonical ledger/replay/DecisionTrace primitive. It must never reach the canonical ledger.'),
+    );
+  });
+
+  it('the UI says plainly that this is a local demo snapshot in the browser, not Genesis Evidence', () => {
+    const panel = FE_SOURCE.get(DEMO_PANEL);
+    // The user-facing disclosure. A viewer looking at this panel must be told, on the screen,
+    // what they are looking at — not only in a source comment.
+    const banner = panel.match(/local-snapshot-not-evidence[\s\S]{0,1200}?<\/p>/);
+    assert.ok(banner, `${DEMO_PANEL} must render the local-snapshot-not-evidence disclosure.`);
+    const text = banner[0];
+    for (const required of ['DEMO', 'LOCAL_SIMULATION_SNAPSHOT', 'przegl', 'Genesis Evidence', 'Genesis Replay', 'DEMO_REPLAY']) {
+      assert.ok(text.includes(required), `The UI disclosure must say "${required}". It currently reads: ${text}`);
+    }
+    // The panel's own heading must not advertise itself as Evidence & Replay any more.
+    assert.ok(
+      !/EVIDENCE\s*&(amp;)?\s*REPLAY/i.test(panel),
+      'The demo panel still shows an "EVIDENCE & REPLAY" heading to the user.',
+    );
+    assert.match(panel, /LOCAL_SIMULATION_SNAPSHOT \(DEMO\)/, 'The demo panel heading must name itself a DEMO snapshot.');
+    // There is no signing key: the fingerprint must never be shown as a signature.
+    const withoutDisclaimers = panel.replace(/bez podpisu|NIEPODPISANE|klucza podpisuj\w*/gi, '');
+    assert.ok(
+      !/podpisan|\bsigned\b/i.test(withoutDisclaimers),
+      'The demo panel must not describe its SHA-256 as a signature. Canonical evidence packages are UNSIGNED.',
+    );
+  });
+
+  it('nothing has started the ResearchRun migration this decision deferred', () => {
+    // D-172 defers the redirect until the epidemic scenario is a real ResearchRun. If a later
+    // session starts it here, this fails and sends them back to the decision record.
+    // An import or a backend-client call is the migration starting; a comment that NAMES
+    // ResearchRun is the deferral being documented, which is what we asked for.
+    const offenders = [...DEMO_CLUSTER, DEMO_PANEL].filter((rel) => {
+      const src = FE_SOURCE.get(rel);
+      return /from\s+'[^']*researchRun/i.test(src) || /\b(start|advance|steer|execute)ResearchRun\w*\s*\(/.test(src);
+    });
+    assert.deepEqual(
+      offenders,
+      [],
+      report(offenders, [], 'The browser-local demo calls into ResearchRun. D-172 defers that redirect until the epidemic scenario IS a ResearchRun.'),
+    );
+    for (const rel of ['packages/frontend/src/core/discovery/localSimulationSnapshotStore.ts', DEMO_PANEL]) {
+      assert.match(
+        FE_SOURCE.get(rel),
+        /DO NOT BUILD THE RESEARCHRUN MIGRATION NOW/,
+        `${rel} must carry the deferral note at the top, so the next session does not start the migration.`,
+      );
+    }
+  });
+});

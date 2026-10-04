@@ -14,13 +14,13 @@ import {
 /**
  * EVIDENCE CONNECTOR STORE — append-only ingest history per source, backed
  * by the existing `KeyedRecordStore` primitive (`core/provenance/recordStore.ts`,
- * the same one `core/discovery/evidenceStore.ts` and hazard provenance
+ * the same one `core/discovery/localSimulationSnapshotStore.ts` and hazard provenance
  * already share) rather than a new storage mechanism. Each key holds the
  * FULL, ever-growing list of `IngestRecord`s for that source; `ingest()`
  * only ever reads the existing list and writes a strictly longer one —
  * nothing already in the list is edited or dropped.
  *
- * NAMED DELIBERATELY NOT `EvidenceStore`: `core/discovery/evidenceStore.ts`
+ * NAMED DELIBERATELY NOT `LocalSimulationSnapshotStore`: `core/discovery/localSimulationSnapshotStore.ts`
  * already owns that name for a different job (persisting `DiscoveryCase`
  * results). Two classes named the same thing in the same codebase is a
  * readability defect even when they live in different files.

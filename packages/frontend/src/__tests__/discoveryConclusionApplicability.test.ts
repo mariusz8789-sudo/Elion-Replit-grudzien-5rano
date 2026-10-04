@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveDiscoveryConclusion } from '../core/discovery/discoveryConclusion';
-import type { DiscoveryCase, DiscoveryComparison, DiscoveryReplay } from '../core/discovery/discoveryCase';
+import type { DiscoveryCase, DiscoveryComparison, DemoReplay } from '../core/discovery/discoveryCase';
 import type { FalsificationCriterion } from '../core/experimentFabric/scientificDiscovery';
 
 /**
@@ -53,7 +53,7 @@ const COMPARISON = (metrics: { key: string; baseline: number; variant: number }[
   blockedReason: null,
 } as unknown as DiscoveryComparison);
 
-const REPLAY: DiscoveryReplay = { status: 'MATCH', message: 'ok' } as unknown as DiscoveryReplay;
+const REPLAY: DemoReplay = { status: 'MATCH', message: 'ok' } as unknown as DemoReplay;
 
 describe('a criterion the comparison cannot settle is INSUFFICIENT_EVIDENCE, never NOT_SUPPORTED', () => {
   /**

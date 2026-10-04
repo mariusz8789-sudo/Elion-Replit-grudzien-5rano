@@ -2,7 +2,7 @@
  * PHASE 0 — EVIDENCE COMPLETENESS GATE.
  *
  * Mirrors the Discovery Engine's own `missingFields` gating on
- * `DiscoveryEvidencePack` (core/discovery/discoveryEvidence.ts) rather than
+ * `LocalSimulationSnapshotPack` (core/discovery/localSimulationSnapshotPack.ts) rather than
  * inventing a new admission concept: a record missing a mandatory
  * provenance/version field is rejected before it ever reaches the
  * provenance store, so an incomplete record can never later masquerade as a

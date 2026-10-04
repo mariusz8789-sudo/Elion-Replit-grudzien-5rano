@@ -1,6 +1,6 @@
 import { DISCOVERY_METRIC_KEYS } from './discoveryExecution';
 import type { DiscoveryCase, DiscoveryMetricDelta } from './discoveryCase';
-import type { StoredEvidence } from './evidenceStore';
+import type { LocalSimulationSnapshot } from './localSimulationSnapshotStore';
 
 /**
  * RUN COMPARISON — between two independently SAVED experiments, not between
@@ -45,7 +45,7 @@ function armDeltas(a: DiscoveryCase['arms'][number], b: DiscoveryCase['arms'][nu
   return DISCOVERY_METRIC_KEYS.map((key) => delta(key, a.summary![key], b.summary![key]));
 }
 
-export function compareStoredExperiments(a: StoredEvidence, b: StoredEvidence): ExperimentComparison {
+export function compareStoredExperiments(a: LocalSimulationSnapshot, b: LocalSimulationSnapshot): ExperimentComparison {
   const rA = a.record;
   const rB = b.record;
   const inputDifferences: string[] = [];

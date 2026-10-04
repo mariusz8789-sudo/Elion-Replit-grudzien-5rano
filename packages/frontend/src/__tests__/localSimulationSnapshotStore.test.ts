@@ -2,15 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runDiscoveryCase } from '../core/discovery/discoveryEngine';
 import type { DiscoveryCaseSpec } from '../core/discovery/discoveryCase';
 import {
-  EVIDENCE_STORE_SCHEMA_VERSION,
-  InMemoryEvidenceStore,
-  listExperimentRegistry,
-  summarizeStoredEvidence,
-  validateStoredEvidence,
-  type EvidenceStore,
-  type StoredEvidence,
-} from '../core/discovery/evidenceStore';
-import { computeEvidencePackSha256 } from '../core/discovery/evidenceCrypto';
+  LOCAL_SIMULATION_SNAPSHOT_KIND,
+  LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION,
+  InMemoryLocalSimulationSnapshotStore,
+  listLocalSimulationSnapshots,
+  summarizeLocalSimulationSnapshot,
+  validateLocalSimulationSnapshot,
+  type LocalSimulationSnapshotStore,
+  type LocalSimulationSnapshot,
+} from '../core/discovery/localSimulationSnapshotStore';
+import { computeLocalSimulationSnapshotFingerprint } from '../core/discovery/evidenceCrypto';
 
 const conditions = { nAgents: 160, initialInfected: 5, seed: 777, days: 40, stepsPerDay: 4 };
 const spec = (over: Partial<DiscoveryCaseSpec> = {}): DiscoveryCaseSpec => ({
@@ -37,20 +38,21 @@ function makeFakeStorage() {
   };
 }
 
-async function makeEntry(overSeed = 777): Promise<StoredEvidence> {
+async function makeEntry(overSeed = 777): Promise<LocalSimulationSnapshot> {
   const c = runDiscoveryCase(spec({ initialConditions: { ...conditions, seed: overSeed } }));
-  const sha256 = await computeEvidencePackSha256(c.evidence!);
-  return { schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record: c, sha256, codeCommitHash: 'test-commit-hash', savedAt: Date.now() };
+  const snapshotFingerprint = await computeLocalSimulationSnapshotFingerprint(c.snapshotPack!);
+  return { kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record: c, snapshotFingerprint, codeCommitHash: 'test-commit-hash', savedAt: Date.now() };
 }
 
-async function runsExercise(store: EvidenceStore) {
+async function runsExercise(store: LocalSimulationSnapshotStore) {
   const entry = await makeEntry();
   await store.save(entry);
   const loaded = await store.load(entry.record.caseId);
   expect(loaded).not.toBeNull();
   expect(loaded!.record).toEqual(entry.record);
-  expect(loaded!.sha256).toBe(entry.sha256);
-  expect(loaded!.schemaVersion).toBe(EVIDENCE_STORE_SCHEMA_VERSION);
+  expect(loaded!.snapshotFingerprint).toBe(entry.snapshotFingerprint);
+  expect(loaded!.schemaVersion).toBe(LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION);
   expect(loaded!.codeCommitHash).toBe('test-commit-hash');
   // Replay capability actually needs the per-arm run series, not just the summary pack.
   expect(loaded!.record.arms[0].run.series.length).toBeGreaterThan(0);
@@ -64,13 +66,13 @@ async function runsExercise(store: EvidenceStore) {
   expect(await store.list()).not.toContain(entry.record.caseId);
 }
 
-describe('InMemoryEvidenceStore', () => {
+describe('InMemoryLocalSimulationSnapshotStore', () => {
   it('saves, loads, lists, and deletes a real discovery case with its evidence', async () => {
-    await runsExercise(new InMemoryEvidenceStore());
+    await runsExercise(new InMemoryLocalSimulationSnapshotStore());
   });
 });
 
-describe('LocalEvidenceStore — genuinely persistent, unlike the InMemory-only store from the uploaded ZIP', () => {
+describe('BrowserLocalSimulationSnapshotStore — genuinely persistent, unlike the InMemory-only store from the uploaded ZIP', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();
@@ -78,56 +80,57 @@ describe('LocalEvidenceStore — genuinely persistent, unlike the InMemory-only 
 
   it('saves, loads, lists, and deletes a real discovery case via localStorage', async () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
-    const { LocalEvidenceStore } = await import('../core/discovery/evidenceStore');
-    await runsExercise(new LocalEvidenceStore());
+    const { BrowserLocalSimulationSnapshotStore } = await import('../core/discovery/localSimulationSnapshotStore');
+    await runsExercise(new BrowserLocalSimulationSnapshotStore());
   });
 
   it('survives being reconstructed — the whole point of swapping InMemory for a persistent store', async () => {
     const fake = makeFakeStorage();
     vi.stubGlobal('window', { localStorage: fake });
     const entry = await makeEntry();
-    const { LocalEvidenceStore } = await import('../core/discovery/evidenceStore');
-    const first = new LocalEvidenceStore();
+    const { BrowserLocalSimulationSnapshotStore } = await import('../core/discovery/localSimulationSnapshotStore');
+    const first = new BrowserLocalSimulationSnapshotStore();
     await first.save(entry);
 
     vi.resetModules();
     vi.stubGlobal('window', { localStorage: fake });
-    const { LocalEvidenceStore: FreshStore } = await import('../core/discovery/evidenceStore');
+    const { BrowserLocalSimulationSnapshotStore: FreshStore } = await import('../core/discovery/localSimulationSnapshotStore');
     const freshInstance = new FreshStore();
     const loaded = await freshInstance.load(entry.record.caseId);
-    expect(loaded?.sha256).toBe(entry.sha256);
+    expect(loaded?.snapshotFingerprint).toBe(entry.snapshotFingerprint);
     expect(loaded?.record.arms[0].run.series.length).toBe(entry.record.arms[0].run.series.length);
   });
 });
 
-describe('validateStoredEvidence — persisted integrity boundary', () => {
+describe('validateLocalSimulationSnapshot — persisted integrity boundary', () => {
   it('accepts a real completed entry whose SHA-256 matches the canonical evidence pack', async () => {
     const entry = await makeEntry();
-    await expect(validateStoredEvidence(entry)).resolves.toEqual({ valid: true, issues: [] });
+    await expect(validateLocalSimulationSnapshot(entry)).resolves.toEqual({ valid: true, issues: [] });
   });
 
   it('rejects a persisted evidence pack when the wrapper digest no longer matches', async () => {
     const entry = await makeEntry();
-    const validation = await validateStoredEvidence({ ...entry, sha256: 'tampered-sha256' });
+    const validation = await validateLocalSimulationSnapshot({ ...entry, snapshotFingerprint: 'tampered-snapshotFingerprint' });
     expect(validation.valid).toBe(false);
-    expect(validation.issues).toContain('sha256 mismatch');
+    expect(validation.issues).toContain('snapshotFingerprint mismatch');
 
-    const store = new InMemoryEvidenceStore();
-    await store.save({ ...entry, sha256: 'tampered-sha256' });
-    expect(await listExperimentRegistry(store)).toEqual([]);
+    const store = new InMemoryLocalSimulationSnapshotStore();
+    await store.save({ ...entry, snapshotFingerprint: 'tampered-snapshotFingerprint' });
+    expect(await listLocalSimulationSnapshots(store)).toEqual([]);
   });
 
   it('rejects malformed persisted wrappers before they can be treated as a replayable record', async () => {
-    const validation = await validateStoredEvidence({ schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record: null, sha256: null, codeCommitHash: 'test', savedAt: Date.now() });
+    const validation = await validateLocalSimulationSnapshot({ kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION, record: null, snapshotFingerprint: null, codeCommitHash: 'test', savedAt: Date.now() });
     expect(validation.valid).toBe(false);
     expect(validation.issues).toContain('missing record');
   });
 });
 
-describe('summarizeStoredEvidence — Experiment Registry projection', () => {
+describe('summarizeLocalSimulationSnapshot — Experiment Registry projection', () => {
   it('carries every field the registry needs, all read from real data', async () => {
     const entry = await makeEntry();
-    const summary = summarizeStoredEvidence(entry);
+    const summary = summarizeLocalSimulationSnapshot(entry);
     expect(summary.experimentId).toBe(entry.record.caseId);
     expect(summary.scenarioId).toBe('BASELINE→ISOLATION');
     expect(summary.seed).toBe(777);
@@ -141,21 +144,21 @@ describe('summarizeStoredEvidence — Experiment Registry projection', () => {
   });
 });
 
-describe('listExperimentRegistry — every saved experiment, newest first', () => {
+describe('listLocalSimulationSnapshots — every saved experiment, newest first', () => {
   it('lists real saved entries sorted by save time, not fabricated ones', async () => {
-    const store = new InMemoryEvidenceStore();
+    const store = new InMemoryLocalSimulationSnapshotStore();
     const first = await makeEntry(1);
     await store.save({ ...first, savedAt: 1000 });
     const second = await makeEntry(2);
     await store.save({ ...second, savedAt: 2000 });
 
-    const registry = await listExperimentRegistry(store);
+    const registry = await listLocalSimulationSnapshots(store);
     expect(registry).toHaveLength(2);
     expect(registry[0].experimentId).toBe(second.record.caseId);
     expect(registry[1].experimentId).toBe(first.record.caseId);
   });
 
   it('returns an empty list, not a crash, when the store is empty', async () => {
-    expect(await listExperimentRegistry(new InMemoryEvidenceStore())).toEqual([]);
+    expect(await listLocalSimulationSnapshots(new InMemoryLocalSimulationSnapshotStore())).toEqual([]);
   });
 });

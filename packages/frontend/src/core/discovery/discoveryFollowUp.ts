@@ -34,7 +34,7 @@ function unconfoundedPair(record: DiscoveryCase, variant: DiscoveryCase['scenari
     baselineScenario: 'BASELINE',
     variantScenario: variant,
     initialConditions: record.initialConditions,
-    ...(record.replayTolerance > 0 ? { replayTolerance: record.replayTolerance } : {}),
+    ...(record.demoReplayTolerance > 0 ? { demoReplayTolerance: record.demoReplayTolerance } : {}),
   };
 }
 

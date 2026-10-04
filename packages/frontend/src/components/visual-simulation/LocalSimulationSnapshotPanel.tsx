@@ -1,35 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
 import { runDiscoveryCase } from '../../core/discovery/discoveryEngine';
-import { replayDiscoveryCase } from '../../core/discovery/discoveryReplay';
+import { runDemoReplay } from '../../core/discovery/demoReplay';
 import { SCENARIOS, SCENARIOS_NOT_MODELED, type ScenarioId } from '../../core/simulation/scenarioEngine';
-import type { DiscoveryCase, DiscoveryCaseSpec, DiscoveryReplay } from '../../core/discovery/discoveryCase';
+import type { DiscoveryCase, DiscoveryCaseSpec, DemoReplay } from '../../core/discovery/discoveryCase';
 import {
-  EVIDENCE_STORE_SCHEMA_VERSION,
-  LocalEvidenceStore,
-  listExperimentRegistry,
-  summarizeStoredEvidence,
-  validateStoredEvidence,
-  type EvidenceStore,
-  type ExperimentRegistryEntry,
-  type StoredEvidence,
-} from '../../core/discovery/evidenceStore';
-import { computeEvidencePackSha256 } from '../../core/discovery/evidenceCrypto';
+  LOCAL_SIMULATION_SNAPSHOT_KIND,
+  LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION,
+  BrowserLocalSimulationSnapshotStore,
+  listLocalSimulationSnapshots,
+  summarizeLocalSimulationSnapshot,
+  validateLocalSimulationSnapshot,
+  type LocalSimulationSnapshotStore,
+  type LocalSimulationSnapshotSummary,
+  type LocalSimulationSnapshot,
+} from '../../core/discovery/localSimulationSnapshotStore';
+import { computeLocalSimulationSnapshotFingerprint } from '../../core/discovery/evidenceCrypto';
 import { compareStoredExperiments, type ExperimentComparison } from '../../core/discovery/experimentComparison';
 import { codeCommitHash } from '../../core/build/commitHash';
 import { storageAvailable } from '../../core/storage';
 
 /**
- * EVIDENCE & REPLAY — the UI consumer of Genesis's existing Discovery Engine
- * (runDiscoveryCase/replayDiscoveryCase/createDiscoveryEvidencePack). This
- * panel does not run a second simulation or invent a second provenance
- * system: it lets the user run a REAL scenario pair through the real
- * pipeline, persists the result (LocalEvidenceStore — new, Genesis had no
- * persistence for this before), and re-verifies it with the real
- * replayDiscoveryCase(). Scenario choices come from the real SCENARIOS
- * registry; nothing here is a fixed demo pair anymore.
+ * LOCAL_SIMULATION_SNAPSHOT + DEMO_REPLAY — a browser-local DEMO panel inside the
+ * synthetic City 3D / Worlds screen. NOT Genesis Evidence, NOT Genesis Replay.
  *
- * Runs a Discovery Case directly through Scenario Engine, independent of the
- * WebGL loop in the rest of this screen — not tied to its live clock.
+ * It runs a REAL scenario pair through the in-browser epidemic Scenario Engine,
+ * writes the result to the viewer's own `localStorage` as a
+ * LOCAL_SIMULATION_SNAPSHOT (`BrowserLocalSimulationSnapshotStore`), and re-runs
+ * it with `runDemoReplay()`. Everything it produces stays in this browser. It
+ * cannot reach the canonical ledger, it is not exportable through any Evidence
+ * Pack or report path, and the panel says so to the user in plain words.
+ *
+ * Canonical Genesis Evidence is the backend ResearchRun loop's single ledger, and
+ * canonical Replay is `packages/backend/src/campaign/verify.mjs`; see
+ * `packages/backend/src/architecturalInvariants.test.mjs`, which has an invariant
+ * dedicated to keeping this panel out of both.
+ *
+ * DO NOT BUILD THE RESEARCHRUN MIGRATION NOW. The full redirect of this surface
+ * into the canonical loop happens only once the epidemic scenario is a real
+ * ResearchRun (D-172 in docs/DECISIONS.md).
  */
 
 const RUNNABLE_SCENARIOS: ScenarioId[] = (Object.keys(SCENARIOS) as ScenarioId[]).filter((id) => !SCENARIOS_NOT_MODELED.includes(id));
@@ -49,7 +57,7 @@ function buildSpec(baseline: ScenarioId, variant: ScenarioId): DiscoveryCaseSpec
   };
 }
 
-/** Same tamper technique the Discovery Engine's own test suite uses to prove replay catches drift. */
+/** Same tamper technique this demo engine's own test suite uses to prove DEMO_REPLAY catches drift. */
 function tamperedCopy(record: DiscoveryCase): DiscoveryCase {
   const arm = record.arms[0];
   return {
@@ -61,7 +69,7 @@ function tamperedCopy(record: DiscoveryCase): DiscoveryCase {
   };
 }
 
-const REPLAY_LABELS: Record<DiscoveryReplay['status'], string> = {
+const DEMO_REPLAY_LABELS: Record<DemoReplay['status'], string> = {
   MATCH: 'MATCH', WITHIN_TOLERANCE: 'WITHIN_TOLERANCE', DRIFT: 'DRIFT', BLOCKED: 'BLOCKED', NOT_REPRODUCIBLE: 'NOT_REPRODUCIBLE',
 };
 
@@ -70,15 +78,15 @@ function operationError(scope: string, cause: unknown): string {
   return `${scope}: ${detail}`;
 }
 
-export function formatEvidenceStatusLine(
-  current: StoredEvidence | null,
+export function formatLocalSimulationSnapshotStatusLine(
+  current: LocalSimulationSnapshot | null,
   historyLength: number,
-  replay: DiscoveryReplay | null,
+  demoReplayResult: DemoReplay | null,
 ): string {
   if (!current) return `${historyLength} zapisanych`;
-  const verdict = replay
-    ? `replay ${REPLAY_LABELS[replay.status]}`
-    : `snapshot ${REPLAY_LABELS[current.record.replay?.status ?? 'NOT_REPRODUCIBLE']}`;
+  const verdict = demoReplayResult
+    ? `DEMO_REPLAY ${DEMO_REPLAY_LABELS[demoReplayResult.status]}`
+    : `snapshot ${DEMO_REPLAY_LABELS[current.record.demoReplay?.status ?? 'NOT_REPRODUCIBLE']}`;
   return `${current.record.scenarios.baseline}/${current.record.scenarios.variant} · ${verdict}`;
 }
 
@@ -92,12 +100,13 @@ function downloadJson(filename: string, data: unknown): void {
   URL.revokeObjectURL(url);
 }
 
-async function saveNewRun(store: EvidenceStore, record: DiscoveryCase): Promise<StoredEvidence> {
-  const sha256 = record.evidence ? await computeEvidencePackSha256(record.evidence) : null;
-  const entry: StoredEvidence = {
-    schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION,
+async function saveNewRun(store: LocalSimulationSnapshotStore, record: DiscoveryCase): Promise<LocalSimulationSnapshot> {
+  const snapshotFingerprint = record.snapshotPack ? await computeLocalSimulationSnapshotFingerprint(record.snapshotPack) : null;
+  const entry: LocalSimulationSnapshot = {
+    kind: LOCAL_SIMULATION_SNAPSHOT_KIND,
+    schemaVersion: LOCAL_SIMULATION_SNAPSHOT_SCHEMA_VERSION,
     record,
-    sha256,
+    snapshotFingerprint,
     codeCommitHash: codeCommitHash(),
     savedAt: Date.now(),
   };
@@ -105,14 +114,14 @@ async function saveNewRun(store: EvidenceStore, record: DiscoveryCase): Promise<
   return entry;
 }
 
-export function EvidenceReplayPanel() {
-  const store = useMemo(() => new LocalEvidenceStore(), []);
+export function LocalSimulationSnapshotPanel() {
+  const store = useMemo(() => new BrowserLocalSimulationSnapshotStore(), []);
   const [baseline, setBaseline] = useState<ScenarioId>('BASELINE');
   const [variant, setVariant] = useState<ScenarioId>('CONTACT_REDUCTION');
-  const [history, setHistory] = useState<ExperimentRegistryEntry[]>([]);
-  const [current, setCurrent] = useState<StoredEvidence | null>(null);
-  const [replay, setReplay] = useState<DiscoveryReplay | null>(null);
-  const [driftDemo, setDriftDemo] = useState<DiscoveryReplay | null>(null);
+  const [history, setHistory] = useState<LocalSimulationSnapshotSummary[]>([]);
+  const [current, setCurrent] = useState<LocalSimulationSnapshot | null>(null);
+  const [demoReplayResult, setDemoReplay] = useState<DemoReplay | null>(null);
+  const [driftDemo, setDriftDemo] = useState<DemoReplay | null>(null);
   const [compareWithId, setCompareWithId] = useState<string>('');
   const [comparison, setComparison] = useState<ExperimentComparison | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,7 +134,7 @@ export function EvidenceReplayPanel() {
 
   const refreshHistory = async () => {
     try {
-      setHistory(await listExperimentRegistry(store));
+      setHistory(await listLocalSimulationSnapshots(store));
     } catch (cause) {
       setError(operationError('HISTORIA', cause));
     }
@@ -141,7 +150,7 @@ export function EvidenceReplayPanel() {
       const fresh = runDiscoveryCase(buildSpec(baseline, variant));
       const entry = await saveNewRun(store, fresh);
       setCurrent(entry);
-      setReplay(fresh.replay);
+      setDemoReplay(fresh.demoReplay);
       await refreshHistory();
     } catch (cause) {
       setError(operationError('EKSPERYMENT', cause));
@@ -155,10 +164,10 @@ export function EvidenceReplayPanel() {
     try {
       const entry = await store.load(experimentId);
       if (!entry) return;
-      const validation = await validateStoredEvidence(entry);
+      const validation = await validateLocalSimulationSnapshot(entry);
       if (!validation.valid) {
         setCurrent(null);
-        setReplay(null);
+        setDemoReplay(null);
         setDriftDemo(null);
         setComparison(null);
         setIntegrityNotice(`Zapis odrzucony: ${validation.issues.join('; ')}.`);
@@ -166,7 +175,7 @@ export function EvidenceReplayPanel() {
       }
       setIntegrityNotice(null);
       setCurrent(entry);
-      setReplay(null);
+      setDemoReplay(null);
       setDriftDemo(null);
       setComparison(null);
     } catch (cause) {
@@ -174,26 +183,26 @@ export function EvidenceReplayPanel() {
     }
   };
 
-  const replayCurrent = async () => {
+  const runDemoReplayOnCurrent = async () => {
     if (!current) return;
     setBusy(true);
     setError(null);
     try {
       const stored = await store.load(current.record.caseId);
       if (!stored) {
-        setIntegrityNotice('REPLAY: zapis nie istnieje już w lokalnej historii.');
+        setIntegrityNotice('DEMO_REPLAY: zapis nie istnieje już w lokalnej historii.');
         return;
       }
-      const validation = await validateStoredEvidence(stored);
+      const validation = await validateLocalSimulationSnapshot(stored);
       if (!validation.valid) {
-        setIntegrityNotice(`REPLAY BLOCKED: ${validation.issues.join('; ')}.`);
-        setReplay({ status: 'BLOCKED', tolerance: current.record.replayTolerance, arms: [], message: 'Persisted evidence failed integrity validation.' });
+        setIntegrityNotice(`DEMO_REPLAY BLOCKED: ${validation.issues.join('; ')}.`);
+        setDemoReplay({ status: 'BLOCKED', tolerance: current.record.demoReplayTolerance, arms: [], message: 'Zapisana migawka nie przeszła walidacji spójności.' });
         return;
       }
       setIntegrityNotice(null);
-      setReplay(replayDiscoveryCase(stored.record));
+      setDemoReplay(runDemoReplay(stored.record));
     } catch (cause) {
-      setError(operationError('REPLAY', cause));
+      setError(operationError('DEMO_REPLAY', cause));
     } finally {
       setBusy(false);
     }
@@ -201,14 +210,14 @@ export function EvidenceReplayPanel() {
 
   const simulateDrift = () => {
     if (!current) return;
-    setDriftDemo(replayDiscoveryCase(tamperedCopy(current.record)));
+    setDriftDemo(runDemoReplay(tamperedCopy(current.record)));
   };
 
   const deleteEntry = async (experimentId: string) => {
     setError(null);
     try {
       await store.delete(experimentId);
-      if (current?.record.caseId === experimentId) { setCurrent(null); setReplay(null); setDriftDemo(null); }
+      if (current?.record.caseId === experimentId) { setCurrent(null); setDemoReplay(null); setDriftDemo(null); }
       await refreshHistory();
     } catch (cause) {
       setError(operationError('USUWANIE', cause));
@@ -225,8 +234,8 @@ export function EvidenceReplayPanel() {
         return;
       }
       const [currentValidation, otherValidation] = await Promise.all([
-        validateStoredEvidence(current),
-        validateStoredEvidence(other),
+        validateLocalSimulationSnapshot(current),
+        validateLocalSimulationSnapshot(other),
       ]);
       if (!currentValidation.valid || !otherValidation.valid) {
         const issues = [...currentValidation.issues, ...otherValidation.issues];
@@ -241,36 +250,49 @@ export function EvidenceReplayPanel() {
     }
   };
 
-  const exportEvidence = () => {
+  /**
+   * Hands the viewer their OWN browser-local snapshot back as a file. This is not an
+   * Evidence Pack export and not a report path: it is a local download, the payload is
+   * labelled LOCAL_SIMULATION_SNAPSHOT, and nothing about it reaches a Genesis ledger.
+   */
+  const downloadLocalSnapshotJson = () => {
     if (!current) return;
-    const summary = summarizeStoredEvidence(current);
-    downloadJson(`${current.record.caseId}.evidence.json`, {
+    const summary = summarizeLocalSimulationSnapshot(current);
+    downloadJson(`${current.record.caseId}.local-simulation-snapshot.json`, {
+      kind: current.kind,
+      notGenesisEvidence: 'Lokalna migawka symulacji DEMO z tej przeglądarki. To nie jest Genesis Evidence ani Genesis Replay.',
       experiment: summary,
       configuration: { seed: current.record.seed, initialConditions: current.record.initialConditions, scenarios: current.record.scenarios, parameters: current.record.parameters },
       provenance: summary.provenance,
-      fingerprints: { input: current.record.inputFingerprint, result: current.record.runFingerprint, sha256: current.sha256 },
+      fingerprints: { input: current.record.inputFingerprint, result: current.record.runFingerprint, snapshotFingerprint: current.snapshotFingerprint },
       result: current.record.arms.map((arm) => ({ armId: arm.armId, role: arm.role, resultFingerprint: arm.run.resultFingerprint, summary: arm.summary })),
-      replayStatus: current.record.replay?.status ?? null,
-      evidencePack: current.record.evidence,
+      demoReplayStatus: current.record.demoReplay?.status ?? null,
+      snapshotPack: current.record.snapshotPack,
     });
   };
 
-  const statusLine = formatEvidenceStatusLine(current, history.length, replay);
+  const statusLine = formatLocalSimulationSnapshotStatusLine(current, history.length, demoReplayResult);
 
   return (
-    <div className="world-panel evidence-panel">
+    <div className="world-panel local-snapshot-panel">
       <button
         type="button"
-        className="world-panel-heading evidence-panel-toggle"
+        className="world-panel-heading local-snapshot-panel-toggle"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
       >
-        <span>EVIDENCE &amp; REPLAY {expanded ? '▾' : '▸'}</span>
+        <span>LOCAL_SIMULATION_SNAPSHOT (DEMO) {expanded ? '▾' : '▸'}</span>
         <small>{statusLine}</small>
       </button>
 
       {!expanded ? null : (<>
-      <div className="evidence-scenario-picker">
+      <p className="hospital-panel-note local-snapshot-not-evidence" role="note">
+        <strong>DEMO:</strong> to lokalna migawka symulacji (LOCAL_SIMULATION_SNAPSHOT) przechowywana
+        w tej przeglądarce, na tym urządzeniu. <strong>To nie jest Genesis Evidence ani Genesis Replay.</strong>{' '}
+        Nic z tego panelu nie trafia do kanonicznego rejestru Genesis, nie da się tego wyeksportować
+        jako Evidence Pack ani wstawić do raportu. Ponowne przeliczenie poniżej to DEMO_REPLAY.
+      </p>
+      <div className="local-snapshot-scenario-picker">
         <label>baseline
           <select value={baseline} onChange={(e) => setBaseline(e.target.value as ScenarioId)}>
             {RUNNABLE_SCENARIOS.map((id) => <option key={id} value={id}>{SCENARIOS[id].label}</option>)}
@@ -282,18 +304,18 @@ export function EvidenceReplayPanel() {
           </select>
         </label>
       </div>
-      <div className="evidence-actions">
+      <div className="local-snapshot-actions">
         <button className="world-action accent" disabled={busy} onClick={runExperiment}>{busy ? '…' : '▶ Uruchom eksperyment'}</button>
         {current && (
           <>
-            <button className="world-action" disabled={busy} onClick={replayCurrent}>↻ Replay</button>
+            <button className="world-action" disabled={busy} onClick={runDemoReplayOnCurrent}>↻ DEMO_REPLAY</button>
             <button className="world-action ghost" disabled={busy} onClick={simulateDrift}>⚠ Symuluj rozjazd</button>
-            <button className="world-action ghost" disabled={busy} onClick={exportEvidence}>⬇ Eksportuj JSON</button>
+            <button className="world-action ghost" disabled={busy} onClick={downloadLocalSnapshotJson}>⬇ Pobierz migawkę (JSON)</button>
           </>
         )}
       </div>
-      {error && <p className="evidence-error" role="alert">{error}</p>}
-      {integrityNotice && <p className="hospital-panel-note evidence-integrity-notice" role="alert">{integrityNotice}</p>}
+      {error && <p className="local-snapshot-error" role="alert">{error}</p>}
+      {integrityNotice && <p className="hospital-panel-note local-snapshot-integrity-notice" role="alert">{integrityNotice}</p>}
 
       {current ? (
         <>
@@ -301,19 +323,19 @@ export function EvidenceReplayPanel() {
             <div className="epidemic-summary-row"><span>model</span><strong>{current.record.model.modelId}@{current.record.model.modelVersion}</strong></div>
             <div className="epidemic-summary-row"><span>seed</span><strong>{current.record.seed}</strong></div>
             <div className="epidemic-summary-row"><span>scenariusze</span><strong>{current.record.scenarios.baseline} / {current.record.scenarios.variant}</strong></div>
-            <div className="epidemic-summary-row"><span>code commit</span><strong className="evidence-hash" title={current.codeCommitHash}>{current.codeCommitHash.startsWith('NOT_AVAILABLE') ? current.codeCommitHash : `${current.codeCommitHash.slice(0, 12)}…`}</strong></div>
+            <div className="epidemic-summary-row"><span>code commit</span><strong className="local-snapshot-hash" title={current.codeCommitHash}>{current.codeCommitHash.startsWith('NOT_AVAILABLE') ? current.codeCommitHash : `${current.codeCommitHash.slice(0, 12)}…`}</strong></div>
             <div className="epidemic-summary-row"><span>input fingerprint</span><strong title={current.record.inputFingerprint}>{current.record.inputFingerprint}</strong></div>
             <div className="epidemic-summary-row"><span>result fingerprint</span><strong title={current.record.runFingerprint ?? undefined}>{current.record.runFingerprint ?? '—'}</strong></div>
-            <div className="epidemic-summary-row"><span>evidence pack</span><strong>{current.record.evidence && current.record.evidence.missingFields.length === 0 ? 'KOMPLETNY' : `BRAKUJE: ${current.record.evidence?.missingFields.join(', ') ?? 'brak pakietu'}`}</strong></div>
-            <div className="epidemic-summary-row"><span>SHA-256</span><strong className="evidence-hash" title={current.sha256 ?? undefined}>{current.sha256 ? `${current.sha256.slice(0, 16)}…` : '—'}</strong></div>
-            {replay && (
-              <div className={`epidemic-summary-row ${replay.status === 'DRIFT' ? 'accent-row' : ''}`} role="status" aria-live="polite" aria-atomic="true"><span>replay</span><strong>{REPLAY_LABELS[replay.status]}</strong></div>
+            <div className="epidemic-summary-row"><span>snapshot</span><strong>{current.record.snapshotPack && current.record.snapshotPack.missingFields.length === 0 ? 'KOMPLETNA' : `BRAKUJE: ${current.record.snapshotPack?.missingFields.join(', ') ?? 'brak migawki'}`}</strong></div>
+            <div className="epidemic-summary-row"><span>snapshot fingerprint (SHA-256, bez podpisu)</span><strong className="local-snapshot-hash" title={current.snapshotFingerprint ?? undefined}>{current.snapshotFingerprint ? `${current.snapshotFingerprint.slice(0, 16)}…` : '—'}</strong></div>
+            {demoReplayResult && (
+              <div className={`epidemic-summary-row ${demoReplayResult.status === 'DRIFT' ? 'accent-row' : ''}`} role="status" aria-live="polite" aria-atomic="true"><span>DEMO_REPLAY</span><strong>{DEMO_REPLAY_LABELS[demoReplayResult.status]}</strong></div>
             )}
           </div>
           {driftDemo && (
-            <p className="hospital-panel-note evidence-drift-demo" role="status" aria-live="polite" aria-atomic="true">
-              Symulacja rozjazdu (kontrolowana zmiana w zapisanym rekordzie, nie w modelu): replay zwrócił{' '}
-              <strong>{REPLAY_LABELS[driftDemo.status]}</strong>
+            <p className="hospital-panel-note local-snapshot-drift-demo" role="status" aria-live="polite" aria-atomic="true">
+              Symulacja rozjazdu (kontrolowana zmiana w zapisanej migawce, nie w modelu): DEMO_REPLAY zwrócił{' '}
+              <strong>{DEMO_REPLAY_LABELS[driftDemo.status]}</strong>
               {driftDemo.status === 'DRIFT' && driftDemo.arms[0]?.differences.length > 0 && (
                 <> — różnica: <code>{driftDemo.arms[0].differences[0].field}</code> (oczekiwano {String(driftDemo.arms[0].differences[0].expected)}, otrzymano {String(driftDemo.arms[0].differences[0].actual)}).</>
               )}
@@ -321,33 +343,33 @@ export function EvidenceReplayPanel() {
           )}
         </>
       ) : (
-        <p className="world-panel-empty">Brak zapisanego dowodu. Uruchom eksperyment, aby zobaczyć realne odciski, pakiet dowodowy i werdykt replay.</p>
+        <p className="world-panel-empty">Brak zapisanej migawki. Uruchom eksperyment DEMO, aby zobaczyć realne odciski, migawkę i werdykt DEMO_REPLAY.</p>
       )}
 
-      <div className="world-panel-heading evidence-subheading"><span>HISTORIA EKSPERYMENTÓW</span><small>{history.length} zapisanych</small></div>
+      <div className="world-panel-heading local-snapshot-subheading"><span>HISTORIA MIGAWEK (LOKALNIE)</span><small>{history.length} zapisanych</small></div>
       {localPersistenceAvailable === false && (
-        <p className="hospital-panel-note evidence-history-unavailable" role="status" aria-live="polite" aria-atomic="true">
-          <strong>LOCAL_PERSISTENCE_UNAVAILABLE:</strong> Przeglądarka nie udostępnia trwałego local storage. Ten widok nie może potwierdzić zapisanej historii eksperymentów.
+        <p className="hospital-panel-note local-snapshot-history-unavailable" role="status" aria-live="polite" aria-atomic="true">
+          <strong>LOCAL_PERSISTENCE_UNAVAILABLE:</strong> Przeglądarka nie udostępnia trwałego local storage. Ten widok nie może potwierdzić zapisanej historii migawek.
         </p>
       )}
       {history.length === 0 && localPersistenceAvailable !== false ? (
-        <p className="world-panel-empty">Brak zapisanych eksperymentów.</p>
+        <p className="world-panel-empty">Brak zapisanych migawek.</p>
       ) : history.length > 0 ? (
-        <ul className="hotspot-list evidence-history">
+        <ul className="hotspot-list local-snapshot-history">
           {history.map((entry) => (
-            <li key={entry.experimentId} className={current?.record.caseId === entry.experimentId ? 'evidence-history-active' : ''}>
-              <button className="evidence-history-row" onClick={() => void loadEntry(entry.experimentId)}>
+            <li key={entry.experimentId} className={current?.record.caseId === entry.experimentId ? 'local-snapshot-history-active' : ''}>
+              <button className="local-snapshot-history-row" onClick={() => void loadEntry(entry.experimentId)}>
                 <span>{entry.scenarioId} · seed {entry.seed} · {new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
                 <strong>{entry.status}</strong>
               </button>
-              <button className="evidence-history-delete" aria-label={`Usuń ${entry.experimentId}`} onClick={() => void deleteEntry(entry.experimentId)}>×</button>
+              <button className="local-snapshot-history-delete" aria-label={`Usuń ${entry.experimentId}`} onClick={() => void deleteEntry(entry.experimentId)}>×</button>
             </li>
           ))}
         </ul>
       ) : null}
 
       {current && history.length > 1 && (
-        <div className="evidence-compare">
+        <div className="local-snapshot-compare">
           <label>porównaj z
             <select value={compareWithId} onChange={(e) => setCompareWithId(e.target.value)}>
               <option value="">— wybierz eksperyment —</option>
@@ -360,7 +382,7 @@ export function EvidenceReplayPanel() {
         </div>
       )}
       {comparison && (
-        <div className="evidence-comparison-result">
+        <div className="local-snapshot-comparison-result">
           <div className="epidemic-summary-row"><span>status</span><strong>{comparison.status === 'BLOCKED' ? comparison.blockedReason : comparison.matchStatus}</strong></div>
           {comparison.inputDifferences.length > 0 && (
             <p className="hospital-panel-note">Różnice wejść: {comparison.inputDifferences.join('; ')}</p>
@@ -381,9 +403,13 @@ export function EvidenceReplayPanel() {
       )}
 
       <p className="hospital-panel-note">
-        Odcisk wewnętrzny (<code>fnv1a</code>) i replay przez rzeczywiste przeliczenie modelu pochodzą z
-        istniejącego Discovery Engine — nie są tu liczone drugi raz. SHA-256 i <code>codeCommitHash</code> to
-        nowe warstwy nad tym samym pakietem dowodowym, zapisywane trwale przez <code>LocalEvidenceStore</code>.
+        Odcisk wewnętrzny (<code>fnv1a</code>) i DEMO_REPLAY przez rzeczywiste przeliczenie modelu
+        pochodzą z przeglądarkowego silnika scenariuszy. SHA-256 i <code>codeCommitHash</code> opisują
+        tę jedną migawkę i są zapisywane lokalnie przez{' '}
+        <code>BrowserLocalSimulationSnapshotStore</code> w <code>localStorage</code> tej przeglądarki.
+        SHA-256 to odcisk, nie podpis — Genesis nie ma klucza podpisującego, a kanoniczne paczki
+        dowodowe są NIEPODPISANE i opisywane jako odciski i replay. Kanoniczne Genesis Evidence i
+        Genesis Replay powstają w pętli ResearchRun na backendzie, nie tutaj.
       </p>
       </>)}
     </div>

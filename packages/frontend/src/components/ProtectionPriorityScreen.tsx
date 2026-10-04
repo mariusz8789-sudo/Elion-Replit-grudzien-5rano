@@ -181,7 +181,7 @@ export function ProtectionPriorityScreen() {
                 <li key={c.scenario} data-testid={`protection-candidate-${c.scenario}`}>
                   <strong>{c.label}</strong>{' '}
                   {c.admitted
-                    ? <span className="mono">DOPUSZCZONY — porównanie {c.case.comparison?.status ?? '—'}, odtworzenie {c.case.replay?.status ?? '—'}</span>
+                    ? <span className="mono">DOPUSZCZONY — porównanie {c.case.comparison?.status ?? '—'}, odtworzenie {c.case.demoReplay?.status ?? '—'}</span>
                     : <span className="mono">ODRZUCONY — {c.rejectionReason}</span>}
                 </li>
               ))}

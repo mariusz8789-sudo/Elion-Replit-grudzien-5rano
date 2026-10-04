@@ -46,6 +46,36 @@ function productionModules(dir = SRC, out = []) {
 const MODULES = productionModules();
 const SOURCE = new Map(MODULES.map((rel) => [rel, readFileSync(path.join(REPO, rel), 'utf8')]));
 
+/**
+ * The frontend's production .ts/.tsx, as repo-relative POSIX paths. Invariants 10 reaches across the
+ * package boundary on purpose: the second Evidence/Replay path Genesis actually has is in the
+ * browser (packages/frontend/src/core/discovery), and an invariant that could not see it would be
+ * green while the duplicate it is meant to pin moved.
+ */
+function frontendModules(dir = path.join(REPO, 'packages/frontend/src'), out = []) {
+  for (const name of readdirSync(dir).sort()) {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) {
+      if (name !== 'node_modules' && name !== '__tests__') frontendModules(full, out);
+      continue;
+    }
+    if (!/\.tsx?$/.test(name) || name.includes('.test.')) continue;
+    out.push(path.relative(REPO, full).split(path.sep).join('/'));
+  }
+  return out;
+}
+
+const FRONTEND = frontendModules();
+const FRONTEND_SOURCE = new Map(FRONTEND.map((rel) => [rel, readFileSync(path.join(REPO, rel), 'utf8')]));
+
+/** Frontend modules under one of `roots` whose source mentions `needle`. */
+function frontendMentions(needle, roots) {
+  return FRONTEND
+    .filter((rel) => roots.some((root) => rel.startsWith(`packages/frontend/src/${root}`)))
+    .filter((rel) => FRONTEND_SOURCE.get(rel).includes(needle))
+    .sort();
+}
+
 /** Modules whose source mentions `needle`, excluding the module that defines it. */
 function mentions(needle, { except = [] } = {}) {
   const skip = new Set(except);
@@ -415,5 +445,165 @@ describe('INVARIANT: one ResearchRun scientific loop', () => {
       [],
       report(offenders, [], 'A campaign module drives a ResearchRun. The loop calls its tools; a tool never calls the loop.'),
     );
+  });
+
+  it('a ResearchRun is started from the HTTP seam only', () => {
+    // One way in. A module that could start a run of its own would be a second entry to the loop,
+    // outside the intake that records who asked and why.
+    const allowed = ['packages/backend/src/api.mjs'];
+    const actual = importersOfSymbol('startResearchRun', { except: ['packages/backend/src/researchRun.mjs'] });
+    assert.deepEqual(actual, allowed, report(actual, allowed, 'A new module starts a ResearchRun. Second entry into the loop?'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 8 — ONE STAGE-TIMING AUTHORITY (schema v17, discoveryTiming.mjs)
+// ---------------------------------------------------------------------------
+
+describe('INVARIANT: one stage-timing authority', () => {
+  const TIMING = 'packages/backend/src/discoveryTiming.mjs';
+
+  /** Every function in discoveryTiming.mjs that WRITES a row. Readers are listed separately. */
+  const WRITERS = ['openStage', 'closeStage', 'recordSpan', 'recordCount', 'recordMember', 'recordStageStatus', 'linkScopeToCampaign', 'recordCompetitorBaseline'];
+  const READERS = ['stageTimings', 'discoveryTimingReport', 'campaignCycleTiming', 'genesisSpeedup', 'getCompetitorBaseline', 'listCompetitorBaselines', 'campaignsOfScope'];
+
+  it('stage timing is written from inside the canonical loop and nowhere else', () => {
+    // The timing is part of the loop's own write transaction, not a parallel clock: if a tool-layer
+    // or HTTP module could open or close a stage, Genesis would have a second timeline to reconcile
+    // with the hash-chained research state, and the 2x number would stop meaning the loop's own time.
+    const allowed = ['packages/backend/src/researchRun.mjs', 'packages/backend/src/researchRunExecution.mjs'];
+    const writers = new Set();
+    for (const w of WRITERS) for (const rel of importersOfSymbol(w, { except: [TIMING] })) writers.add(rel);
+    const actual = [...writers].sort();
+    assert.deepEqual(actual, allowed, report(actual, allowed, 'A new module writes stage timing. Second clock?'));
+  });
+
+  it('the HTTP surface may only READ timing, never write it', () => {
+    const api = SOURCE.get('packages/backend/src/api.mjs');
+    const imported = api.match(/import\s*\{([^}]*)\}\s*from\s*'\.\/discoveryTiming\.mjs'/);
+    assert.ok(imported, 'api.mjs must import from discoveryTiming.mjs (the read-only timing routes)');
+    const names = imported[1].split(',').map((s) => s.trim()).filter(Boolean);
+    const writers = names.filter((n) => WRITERS.includes(n));
+    assert.deepEqual(writers, [], `api.mjs imported timing WRITERS: ${writers.join(', ')}. Routes report time; the loop records it.`);
+    assert.ok(names.every((n) => READERS.includes(n)), `api.mjs imported a non-reader from discoveryTiming.mjs: ${names.join(', ')}`);
+  });
+
+  it('the four timing tables are created in one place and queried from one module', () => {
+    const TABLES = ['discovery_stage_marks', 'discovery_stage_facts', 'discovery_timing_campaign_links', 'discovery_competitor_baselines'];
+    const allowed = ['packages/backend/src/discoveryTiming.mjs', 'packages/backend/src/store.mjs'];
+    for (const table of TABLES) {
+      const named = mentions(table);
+      assert.deepEqual(named, allowed, report(named, allowed, `${table} is named outside its one module and its one schema.`));
+    }
+  });
+
+  it('the timing tables are append-only: the timing module issues no UPDATE or DELETE', () => {
+    // "Append-only" is the whole reason a stage boundary can be trusted after the fact. A rewrite
+    // would let a slow run be made fast retroactively.
+    const timing = SOURCE.get(TIMING);
+    assert.ok(timing, `${TIMING} must exist`);
+    for (const verb of ['UPDATE ', 'DELETE FROM']) {
+      assert.ok(!timing.includes(verb), `${TIMING} contains ${verb.trim()}: the timing tables must stay append-only.`);
+    }
+  });
+
+  it('a competitor time can only come from the provenance-gated table, never from a constant', () => {
+    // The 2x claim needs a competitor number. There is none in this repository, and the ONLY way one
+    // can enter is a row in discovery_competitor_baselines with every provenance column filled.
+    const timing = SOURCE.get(TIMING);
+    assert.ok(timing.includes('TARGET_2X_NOT_YET_BENCHMARKED'), 'genesisSpeedup must be able to report that nothing has been benchmarked.');
+    const speedup = timing.slice(timing.indexOf('export function genesisSpeedup'));
+    assert.ok(
+      /discovery_competitor_baselines|getCompetitorBaseline|listCompetitorBaselines/.test(speedup),
+      'genesisSpeedup must read its competitor time from the baselines table.',
+    );
+    // A module may NAME the vocabulary in a comment (api.mjs:902 documents what the route reports);
+    // what it may not do is DECLARE its own copy, which would be a second definition of the claim.
+    const redeclared = MODULES
+      .filter((rel) => rel !== TIMING)
+      .filter((rel) => /(?:const|let|var)\s+(?:TARGET_2X_NOT_YET_BENCHMARKED|SPEEDUP_GREEN_THRESHOLD)\s*=/.test(SOURCE.get(rel)))
+      .sort();
+    assert.deepEqual(redeclared, [], report(redeclared, [], 'A second module declares its own speedup vocabulary instead of importing it.'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 9 — ONE SCHEMA / MIGRATION AUTHORITY
+// ---------------------------------------------------------------------------
+
+describe('INVARIANT: one schema authority', () => {
+  it('store.mjs is the only module that moves the schema version', () => {
+    // Two migrators on one database is the fastest way to two states of the same science.
+    const actual = mentions('user_version');
+    assert.deepEqual(actual, ['packages/backend/src/store.mjs'], report(actual, ['store.mjs'], 'A second module writes PRAGMA user_version.'));
+    const named = mentions('CURRENT_SCHEMA_VERSION', { except: ['packages/backend/src/store.mjs'] })
+      .filter((rel) => !/from\s+'[^']*store\.mjs'/.test(SOURCE.get(rel)));
+    assert.deepEqual(named, [], report(named, [], 'A module names CURRENT_SCHEMA_VERSION without importing store.mjs.'));
+  });
+
+  it('the schema the code knows is v17, declared once', () => {
+    const store = SOURCE.get('packages/backend/src/store.mjs');
+    assert.match(store, /export const CURRENT_SCHEMA_VERSION = 17;/, 'store.mjs must declare CURRENT_SCHEMA_VERSION = 17 (the discoveryTiming schema).');
+    assert.equal((store.match(/export const CURRENT_SCHEMA_VERSION/g) ?? []).length, 1, 'CURRENT_SCHEMA_VERSION must be declared exactly once.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 10 — THE BROWSER-LOCAL DISCOVERY ENGINE IS CONTAINED
+// ---------------------------------------------------------------------------
+
+describe('INVARIANT: the browser-local Discovery Engine stays a demo tool', () => {
+  // packages/frontend/src/core/discovery is a genuine SECOND evidence+replay implementation: it runs
+  // the in-browser scenario engine, hashes its own evidence pack and produces its own replay verdict,
+  // persisted in the viewer's localStorage. It is not the canonical path and must never become one.
+  // Removing it is not a small change (docs/genesis1/ONE-BRAIN.md, RED-3), so these tests pin the
+  // containment instead: one surface, and no route from it into the canonical Evidence ledger.
+  const PRIMITIVES = ['runDiscoveryCase', 'replayDiscoveryCase', 'LocalEvidenceStore', 'computeEvidencePackSha256'];
+  const SURFACE = 'packages/frontend/src/components/visual-simulation/EvidenceReplayPanel.tsx';
+
+  for (const primitive of PRIMITIVES) {
+    it(`${primitive} has exactly one product surface`, () => {
+      const actual = frontendMentions(primitive, ['components/', 'App.tsx']);
+      assert.deepEqual(actual, [SURFACE], report(actual, [SURFACE], `${primitive} reached a second screen. The browser-local engine is spreading.`));
+    });
+  }
+
+  it('the browser-local engine has no route into the canonical Evidence ledger', () => {
+    // The one ledger is reached over HTTP through core/backend/client.ts. If that module (or the
+    // ResearchRun screens) ever imported the browser-local discovery pack, a localStorage artefact
+    // could be proposed as Evidence and Genesis would have two things called an evidence pack in one
+    // ledger.
+    const canonical = ['core/backend/client.ts', 'core/verifyTarget.ts', 'core/scienceChat/', 'components/verify/', 'components/labHandoff/', 'components/reports/'];
+    const offenders = FRONTEND
+      .filter((rel) => canonical.some((root) => rel.startsWith(`packages/frontend/src/${root}`)))
+      .filter((rel) => PRIMITIVES.some((p) => FRONTEND_SOURCE.get(rel).includes(p)))
+      .sort();
+    assert.deepEqual(offenders, [], report(offenders, [], 'A ResearchRun-facing frontend module touches the browser-local Discovery Engine.'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// INVARIANT 11 — THE TWO WORKER SYSTEMS DO NOT MERGE
+// ---------------------------------------------------------------------------
+
+describe('INVARIANT: the capability worker and the ResearchRun worker stay separate systems', () => {
+  // Invariant 4 forbids a researchRun* module from calling routeCapability. This is the other
+  // direction: the private capability-worker system (compute/workerServer.mjs +
+  // compute/remoteScientificWorkerClient.mjs, push-RPC, GENESIS_SCIENTIFIC_WORKER_TOKEN) must not
+  // learn about ResearchRun either, or the two job models grow into one half-merged third.
+  it('the capability-worker system never references a ResearchRun', () => {
+    const offenders = ['packages/backend/src/compute/workerServer.mjs', 'packages/backend/src/compute/remoteScientificWorkerClient.mjs']
+      .filter((rel) => {
+        const src = SOURCE.get(rel);
+        assert.ok(src, `${rel} must exist`);
+        return /[Rr]esearchRun/.test(src);
+      });
+    assert.deepEqual(offenders, [], report(offenders, [], 'The capability-worker system now knows about ResearchRun. Two job models merging.'));
+  });
+
+  it('only Virtual Lab and Replay route a capability, and the caller list is closed', () => {
+    const allowed = ['packages/backend/src/campaign/verify.mjs', 'packages/backend/src/campaign/virtualLabClosedLoop.mjs'];
+    const actual = importersOfSymbol('routeCapability', { except: ['packages/backend/src/compute/remoteScientificWorkerClient.mjs'] });
+    assert.deepEqual(actual, allowed, report(actual, allowed, 'A new module routes a capability. Virtual Lab and Replay are the only two.'));
   });
 });

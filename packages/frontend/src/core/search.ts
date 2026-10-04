@@ -35,6 +35,8 @@ const GOALS: readonly { hash: string; icon: string; name: string; tagline: strin
   { hash: '#/reviewer', icon: '🧐', name: 'Check whether a result is real', tagline: 'Try to break it in the Reviewer Room', extra: 'goal sprawdz wynik prawdziwy weryfikacja tamper' },
   { hash: '#/verify', icon: '✓', name: 'Verify a Genesis result record', tagline: 'Genesis Verify: fingerprints, ledger and replay, HTML report', extra: 'goal zweryfikuj sprawdz zapis plik raport verify record sha256 hash odcisk' },
   { hash: '#/evidence', icon: '🔁', name: 'Reproduce a result', tagline: 'Replay a run and compare hashes', extra: 'goal powtorz odtworz replay reproduce' },
+  { hash: '#/lab-handoff', icon: '⚗', name: 'Send a candidate to a laboratory', tagline: 'Request, package, measurement, review, comparison', extra: 'goal laboratorium wyslij zmierz pomiar lab measure send candidate kandydat' },
+  { hash: '#/reports', icon: '📄', name: 'Download a project report', tagline: 'Evidence packs, records, Verify reports and exports', extra: 'goal pobierz raport download report eksport export' },
   { hash: '#/human-biology-lab', icon: '🫀', name: 'Explore the human body', tagline: 'Body → organ → tissue → cell', extra: 'goal cialo anatomia organ narzad komorka' },
   { hash: '#/physics/cms-z', icon: '📈', name: 'Look at real particle-physics data', tagline: 'CMS Open Data, Z boson peak', extra: 'goal dane fizyka czastki cern' },
   { hash: '#/research-console?panel=gov', icon: '📑', name: 'Check a claim against a clinical trial', tagline: 'D-063 claim audit on SURPASS-2', extra: 'goal twierdzenie badanie kliniczne claim audit d-063 surpass rzad government' },
@@ -83,6 +85,8 @@ const DESTINATION_WORDS: Readonly<Record<string, string>> = {
   'flight-control': 'science flight control kolejka queue worker lease dzierzawa przebieg research run wstrzymaj wznow anuluj pause resume cancel lot',
   dossier: 'candidate dossier kandydat pobierz download',
   pilot: 'eksport export pakiet pack ro-crate pobierz download',
+  'lab-handoff': 'laboratorium laboratory lab handoff przekazanie pomiar measurement prosba request paczka package tolerancja tolerance recenzja review porownanie compare wet lab cro',
+  reports: 'raport raporty report reports pobierz download pakiet dowodow evidence pack zapis record verify html eksport export klient customer delivery',
   'cern-complex': 'cern lhc fizyka czastki detektor',
   reality: 'reality navigator rzeczywistosc orbita kepler gwiazda planeta galaz wariant scena zapis sceny replay odtworz czas swiata',
 };

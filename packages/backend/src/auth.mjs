@@ -59,6 +59,33 @@ export function newId() {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Normalizacja adresu e-mail — jedno miejsce prawdy (rejestracja, logowanie, reset hasła). */
+export function normalizeEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
+}
+
+export function isEmailShaped(email) {
+  const e = normalizeEmail(email);
+  return EMAIL_RE.test(e) && e.length <= 254;
+}
+
+/** Polityka haseł — JEDNO miejsce prawdy. */
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 200;
+
+/**
+ * Jedyna polityka haseł w systemie. Rejestracja, zmiana hasła i ustawienie
+ * nowego hasła po resecie wołają DOKŁADNIE tę funkcję, więc nie da się
+ * obejść progu żadną z trzech dróg. Komunikaty po polsku — API oddaje je
+ * klientowi bez ujawniania szczegółów implementacji.
+ */
+export function validatePassword(password) {
+  const p = String(password ?? '');
+  if (p.length < PASSWORD_MIN_LENGTH) return { ok: false, error: `Hasło musi mieć co najmniej ${PASSWORD_MIN_LENGTH} znaków.` };
+  if (p.length > PASSWORD_MAX_LENGTH) return { ok: false, error: `Hasło jest zbyt długie (max ${PASSWORD_MAX_LENGTH} znaków).` };
+  return { ok: true, value: p };
+}
+
 /**
  * Walidacja poświadczeń rejestracji. Zwraca { ok, error?, value? } — jawne
  * komunikaty (po polsku), które API może oddać klientowi bez ujawniania
@@ -68,13 +95,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * klientami API), nieznana wartość → błąd.
  */
 export function validateRegistration({ email, password, displayName, accountProfile } = {}) {
-  const e = String(email ?? '').trim().toLowerCase();
-  if (!EMAIL_RE.test(e) || e.length > 254) {
+  const e = normalizeEmail(email);
+  if (!isEmailShaped(e)) {
     return { ok: false, error: 'Podaj poprawny adres e-mail.' };
   }
-  const p = String(password ?? '');
-  if (p.length < 8) return { ok: false, error: 'Hasło musi mieć co najmniej 8 znaków.' };
-  if (p.length > 200) return { ok: false, error: 'Hasło jest zbyt długie (max 200 znaków).' };
+  const policy = validatePassword(password);
+  if (!policy.ok) return { ok: false, error: policy.error };
+  const p = policy.value;
   const name = String(displayName ?? '').trim().slice(0, 80) || e.split('@')[0];
   const profile = accountProfile === undefined || accountProfile === null || accountProfile === ''
     ? DEFAULT_ACCOUNT_PROFILE

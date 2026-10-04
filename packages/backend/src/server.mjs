@@ -433,6 +433,9 @@ function handlePersistApi(req, res, url) {
         token,
         body,
         query,
+        // D-166: the per-address reset limit lives in the API router (it is the
+        // layer that knows which route it is), so the address has to reach it.
+        clientAddress: ip,
         reasoningProvider,
         artifactStorage,
         scientificSandboxPort,

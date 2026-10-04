@@ -4,7 +4,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { openDatabase, CURRENT_SCHEMA_VERSION } from './store.mjs';
+import { openDatabase, CURRENT_SCHEMA_VERSION, createPasswordReset, recordAuthAuditEvent, AUTH_AUDIT_KINDS } from './store.mjs';
+import { newPasswordResetToken } from './passwordReset.mjs';
 
 /**
  * P1.3 — Granice migracji schematu: pusta baza, baza z realnymi danymi,
@@ -99,6 +100,8 @@ describe('P1.3 — pusta baza: schemat powstaje w całości', () => {
       'knowledge_materials', 'knowledge_material_versions', 'project_spatial_datasets',
       'worlds', 'agent_runs', 'agent_run_steps',
       'project_access', 'access_audit',
+      // D-166 (SCHEMA_V18)
+      'password_resets', 'auth_audit_events',
     ]) {
       assert.ok(tables.includes(expected), `brakuje tabeli ${expected} na pustej, świeżo utworzonej bazie`);
     }
@@ -178,6 +181,46 @@ describe('P1.3 — baza z realnymi danymi: migracja nie gubi ani jednego wiersza
     migrated.close();
     rmSync(path.dirname(legacyPath), { recursive: true, force: true });
     rmSync(path.dirname(migratedPath), { recursive: true, force: true });
+  });
+});
+
+describe('D-166 — SCHEMA_V18 (reset hasła) jest dodatkiem ADDYTYWNYM', () => {
+  test('baza sprzed V18 otwiera się, zachowuje swoje wiersze, zostaje zapisywalna i ląduje na wersji bieżącej', () => {
+    const dbPath = tmpDbPath('genesis-pre-v18-');
+
+    // Zbuduj realną bazę, wstaw realne wiersze, a potem cofnij ją do stanu
+    // SPRZED V18: skasuj dwie nowe tabele i obniż user_version. To dokładnie
+    // ten kształt, w jakim baza wyprodukowana starszym backendem leży na dysku.
+    const seeded = openDatabase(dbPath);
+    const now = Date.now();
+    seeded.prepare("INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES ('u-pre', 'pre@example.com', 'Pre', 'scrypt$aa$bb', ?)").run(now);
+    seeded.prepare("INSERT INTO projects (id, name, description, owner_id, visibility, created_at) VALUES ('p-pre', 'Pre Project', '', 'u-pre', 'private', ?)").run(now);
+    seeded.prepare("INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ('deadbeef', 'u-pre', ?, ?)").run(now, now + 60_000);
+    seeded.exec('DROP TABLE IF EXISTS password_resets');
+    seeded.exec('DROP TABLE IF EXISTS auth_audit_events');
+    seeded.exec('PRAGMA user_version = 16');
+    const countsBefore = rowCounts(seeded, ['users', 'projects', 'sessions']);
+    seeded.close();
+
+    const migrated = openDatabase(dbPath);
+    assert.equal(migrated.prepare('PRAGMA user_version').get().user_version, CURRENT_SCHEMA_VERSION);
+    assert.deepEqual(rowCounts(migrated, ['users', 'projects', 'sessions']), countsBefore, 'migracja do V18 zmieniła liczbę istniejących wierszy');
+    const user = migrated.prepare('SELECT * FROM users WHERE id=?').get('u-pre');
+    assert.equal(user.email, 'pre@example.com');
+    assert.equal(user.password_hash, 'scrypt$aa$bb', 'migracja nie ma prawa ruszyć istniejącego hasła');
+    assert.ok(migrated.prepare('SELECT 1 FROM sessions WHERE token=?').get('deadbeef'), 'istniejąca sesja przeżyła migrację');
+
+    // Nowe tabele istnieją i baza jest ZAPISYWALNA — i w starych, i w nowych tabelach.
+    const resets = recordAuthAuditEvent(migrated, { kind: AUTH_AUDIT_KINDS.PASSWORD_RESET_REQUESTED, userId: 'u-pre', outcome: 'ISSUED' });
+    assert.ok(resets.id);
+    const issued = newPasswordResetToken();
+    createPasswordReset(migrated, { userId: 'u-pre', tokenHash: issued.tokenHash, createdAt: issued.createdAt, expiresAt: issued.expiresAt });
+    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM password_resets').get().n, 1);
+    migrated.prepare("INSERT INTO projects (id, name, description, owner_id, visibility, created_at) VALUES ('p-after', 'After', '', 'u-pre', 'private', ?)").run(Date.now());
+    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM projects').get().n, countsBefore.projects + 1, 'stara tabela musi zostać zapisywalna po migracji');
+
+    migrated.close();
+    rmSync(path.dirname(dbPath), { recursive: true, force: true });
   });
 });
 

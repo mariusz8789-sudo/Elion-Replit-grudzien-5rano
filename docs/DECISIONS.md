@@ -10639,3 +10639,5 @@ No gate was edited, no sealed artefact was modified, no role was reclassified, n
 **Limits.** One shared token authenticates all workers, so worker-reported engine status and environment are only as trustworthy as that token and host. The server needs the engine to plan and replay. Artifact storage is the single-node server directory and the queue is one SQLite file, so this is not proof of a multi-replica deployment. Idle workers are listed from memory since the last server start. Not deployed.
 
 **Evidence.** `packages/backend/src/remoteFanOutAdvance.e2e.test.mjs` (fan-out of 3 children on 2 workers with a kill, advance killed in step 2, cancel of the parent), `remoteWorkerApi.test.mjs`, `remoteWorker.e2e.test.mjs`; Flight Control section in `FlightControlView.tsx` over `GET /api/projects/:id/remote-workers`.
+
+**Merged.** PR #84 head `a3befec0` passed all 42 CI checks and was merged into `main` as `8ab0ec9d` on 4 Oct 2026 02:30Z, under the owner's decision of 01:41Z (wait for full green CI, merge, run the full main CI, record a decision id, **no deploy**). Production remains `37197555`; nothing was deployed by this merge.

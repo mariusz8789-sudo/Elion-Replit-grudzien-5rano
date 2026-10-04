@@ -59,7 +59,7 @@ export function createScientificJobQueuePort({ backend } = {}) {
       if (!validated.ok) return validated;
       return backend.enqueue(validated.value);
     },
-    claim: (workerId, leaseMs) => backend.claim(workerId, leaseMs),
+    claim: (workerId, leaseMs, filter) => backend.claim(workerId, leaseMs, filter),
     heartbeat: (jobId, leaseId, leaseMs) => backend.heartbeat(jobId, leaseId, leaseMs),
     complete: (jobId, leaseId, result) => backend.complete(jobId, leaseId, result),
     fail: (jobId, leaseId, failure) => backend.fail(jobId, leaseId, failure),
@@ -109,9 +109,17 @@ export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now
         return { ok: true, deduped: false, job: read(job.jobId) };
       });
     },
-    async claim(workerId, leaseMs) {
+    // `filter` narrows which capabilities this worker may take: `capabilities` (only these) and/or `excludeCapabilities`
+    // (never these). It is how a remote worker and the in-process worker share one queue without taking each other's jobs.
+    async claim(workerId, leaseMs, filter = {}) {
       requireId(workerId, 'workerId');
       if (!Number.isInteger(leaseMs) || leaseMs < 1_000 || leaseMs > 3_600_000) return { ok: false, error: 'leaseMs: invalid' };
+      const only = Array.isArray(filter?.capabilities) ? filter.capabilities.map(String) : null;
+      const except = Array.isArray(filter?.excludeCapabilities) ? filter.excludeCapabilities.map(String) : [];
+      if (only && only.length === 0) return { ok: true, job: null };
+      const marks = (list) => list.map(() => '?').join(',');
+      const capabilitySql = `${only ? ` AND capability_id IN (${marks(only)})` : ''}${except.length ? ` AND capability_id NOT IN (${marks(except)})` : ''}`;
+      const capabilityArgs = [...(only ?? []), ...except];
       return transaction(() => {
         const timestamp = now();
         // A worker that disappeared on the final allowed attempt must not leave a permanently
@@ -122,7 +130,7 @@ export function createSqliteScientificJobQueueBackend({ db, now = () => Date.now
           .run(JSON.stringify({ code: 'LEASE_EXPIRED_AFTER_MAX_ATTEMPTS' }), timestamp, timestamp);
         const row = db.prepare(`SELECT * FROM jobs WHERE idempotency_key IS NOT NULL
           AND attempts < max_attempts AND (status = 'QUEUED' OR (status = 'CLAIMED' AND lease_expires_at <= ?))
-          ORDER BY priority DESC, created_at ASC LIMIT 1`).get(timestamp);
+          ${capabilitySql} ORDER BY priority DESC, created_at ASC LIMIT 1`).get(timestamp, ...capabilityArgs);
         if (!row) return { ok: true, job: null };
         const leaseId = newLeaseId();
         db.prepare(`UPDATE jobs SET status = 'CLAIMED', worker_id = ?, lease_id = ?, lease_expires_at = ?,

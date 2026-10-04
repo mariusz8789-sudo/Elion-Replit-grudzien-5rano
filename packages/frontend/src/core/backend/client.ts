@@ -722,6 +722,214 @@ export function replayResearchExperiment(
   return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/experiments/${encodeURIComponent(experimentId)}/replays`, { token });
 }
 
+/* ---------------- Candidate → laboratory loop on a ResearchRun (backend researchRunLab.mjs) ---------------- */
+
+/** Codes the server sends; every one of them is the server's, the client only says them in words. */
+export type LabReviewVerdict = 'ACCEPTED_AS_OBSERVATION' | 'NEEDS_CLARIFICATION' | 'REJECTED_INTEGRITY';
+export type LabQualityStatus = 'QC_PASSED' | 'QC_FAILED' | 'QC_UNKNOWN';
+export type LabProviderType = 'CRO' | 'ACADEMIC_LAB' | 'INTERNAL_LAB' | 'OTHER_EXTERNAL';
+
+export interface LabTolerance { absolute: number | null; relative: number | null }
+
+export interface LabEndpointInput {
+  endpointId: string;
+  assay: string;
+  outputKey: string;
+  expectedUnit: string;
+  tolerance: { absolute?: number; relative?: number };
+}
+
+export interface LabRequest {
+  requestId: string;
+  requestFingerprint: string;
+  researchRunId: string;
+  experimentId: string;
+  candidateRef: string;
+  candidateInput: Record<string, unknown> | null;
+  objective: string;
+  endpoint: { endpointId: string; assay: string; expectedUnit: string; tolerance: LabTolerance; comparisonOutputKey: string };
+  modelBinding: { outputKey: string; modelValue: number; unit: string; outputHash: string; inputHash: string; scienceRunId: string | null; predictionFingerprint: string; preregistrationFingerprint: string };
+  computationalEvidence: { evidenceProposalId: string; evidenceStatus: string; replayVerdict: string; protocolVerdict: string };
+  externalProvider: { providerId: string | null; providerType: LabProviderType } | null;
+  requestedBy: string | null;
+  status: string;
+  requiresHumanApproval: boolean;
+  executionAuthority: string;
+  labels: { modelValue: string; labResult: string };
+  claimBoundary: string;
+}
+
+export interface LabReview {
+  observationId: string;
+  requestId: string;
+  verdict: LabReviewVerdict;
+  reviewerId: string;
+  note: string | null;
+  reviewFingerprint: string;
+}
+
+export interface LabObservation {
+  observationId: string;
+  observationFingerprint: string;
+  requestId: string;
+  endpointId: string;
+  value: number | string | boolean;
+  unit: string;
+  observedAt: string;
+  methodReference: string;
+  rawArtifactSha256: string;
+  rawArtifactIntegrity: { level: 'VERIFIED_BY_GENESIS' | 'DECLARED_BY_CLIENT'; byteLength: number | null; limitation: string };
+  source: { labId: string; providerType: LabProviderType; externalObservationId: string; sourceUri: string };
+  quality: { status: LabQualityStatus; confidence: number; notes: string | null };
+  ingestedBy: string;
+  status: string;
+  evidenceClass: string;
+  clinicalEfficacy: string;
+  /** The latest review, attached by GET /lab; absent on the POST answer. */
+  review?: LabReview | null;
+}
+
+export interface LabComparison {
+  comparisonId: string;
+  requestId: string;
+  observationId: string;
+  experimentId: string;
+  endpointId: string;
+  outputKey: string;
+  model: { label: string; value: number; outputHash: string };
+  measurement: { label: string; value: number; observationId: string };
+  unit: string;
+  delta: number;
+  deltaAbs: number;
+  deltaRel: number;
+  toleranceChecks: Array<{ kind: 'absolute' | 'relative'; threshold: number; actual: number; pass: boolean }>;
+  verdict: 'AGREES_WITHIN_TOLERANCE' | 'DISAGREES_OUTSIDE_TOLERANCE';
+  clinicalEfficacy: string;
+  claimBoundary: string;
+}
+
+export interface LabEvidenceLink {
+  observationId: string;
+  requestId: string;
+  proposalId: string;
+  evidenceContentHash: string | null;
+  mode: string;
+  status: string;
+  evidenceClass: string;
+}
+
+export interface LabLoopState {
+  researchRunId: string;
+  requests: LabRequest[];
+  observations: LabObservation[];
+  comparisons: LabComparison[];
+  evidenceLinks: LabEvidenceLink[];
+  nextResearchAction: { action: string; reason?: string };
+  clinicalEfficacy: string;
+  claimBoundary: string;
+  labFingerprint: string;
+}
+
+/** The package for an external laboratory, exactly as the server builds it. UNSIGNED by construction. */
+export interface LabPackage {
+  kind: string;
+  packageVersion: string;
+  requestId: string;
+  requestFingerprint: string;
+  forLaboratory: {
+    candidate: { identity: string | null; reference: string };
+    objective: string;
+    endpoint: { endpointId: string; assay: string; expectedUnit: string };
+    pleaseReturn: string[];
+    status: string;
+    labels: { genesisSide: string; yourResult: string };
+  };
+  integrity: { signature: { status: string; statement: string }; method: string };
+  humanApproval: { required: boolean; state: string; note: string };
+  claimBoundary: string;
+  technicalDetails: Record<string, unknown>;
+  packageHash: string;
+}
+
+export interface LabPackageVerification { ok: boolean; status: 'VALID_INTEGRITY_ONLY' | 'REJECTED'; signature: string; failures: string[] }
+
+export interface LabObservationInput {
+  endpointId: string;
+  value: number;
+  unit: string;
+  observedAt: string;
+  methodReference: string;
+  source: { labId: string; providerType: LabProviderType; externalObservationId: string; sourceUri: string };
+  quality: { status: LabQualityStatus; notes?: string };
+  /** The raw file's bytes; Genesis computes their sha256 itself. */
+  rawArtifactBase64: string;
+}
+
+const labPath = (projectId: string, researchRunId: string) => `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/lab`;
+
+export function getLabLoop(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ lab: LabLoopState }>> {
+  return request('GET', labPath(projectId, researchRunId), { token });
+}
+
+export function prepareLabRequest(
+  token: string, projectId: string, researchRunId: string,
+  input: { experimentId: string; endpoint: LabEndpointInput; objective?: string; externalProvider?: { providerId: string; providerType: LabProviderType } },
+): Promise<ApiResult<{ deduped: boolean; request: LabRequest }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/requests`, { token, body: input });
+}
+
+export function getLabPackage(token: string, projectId: string, researchRunId: string, requestId: string): Promise<ApiResult<{ package: LabPackage }>> {
+  return request('GET', `${labPath(projectId, researchRunId)}/requests/${encodeURIComponent(requestId)}/package`, { token });
+}
+
+export function verifyLabPackage(token: string, projectId: string, researchRunId: string, pkg: unknown): Promise<ApiResult<{ verification: LabPackageVerification }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/package`, { token, body: { package: pkg } });
+}
+
+export function ingestLabObservation(
+  token: string, projectId: string, researchRunId: string, requestId: string, observation: LabObservationInput,
+): Promise<ApiResult<{ deduped: boolean; observation: LabObservation }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/observations`, { token, body: { requestId, observation } });
+}
+
+/** The reviewer is the signed-in person; the server never takes a reviewer name from the body. */
+export function reviewLabObservation(
+  token: string, projectId: string, researchRunId: string, observationId: string, verdict: LabReviewVerdict, note?: string,
+): Promise<ApiResult<{ deduped: boolean; review: LabReview }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/observations/${encodeURIComponent(observationId)}`, { token, body: note ? { verdict, note } : { verdict } });
+}
+
+export function compareLabObservation(token: string, projectId: string, researchRunId: string, observationId: string): Promise<ApiResult<{ deduped: boolean; comparison: LabComparison }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/observations/${encodeURIComponent(observationId)}/compare`, { token });
+}
+
+export function proposeLabEvidence(token: string, projectId: string, researchRunId: string, observationId: string): Promise<ApiResult<{ deduped: boolean; link: LabEvidenceLink }>> {
+  return request('POST', `${labPath(projectId, researchRunId)}/observations/${encodeURIComponent(observationId)}/evidence`, { token });
+}
+
+/* ---------------- Deliverables of a ResearchRun: Evidence Pack and customer delivery ---------------- */
+
+/** The canonical Evidence Pack (backend researchRunEvidencePack.mjs); opaque apart from what the screen names. */
+export interface ResearchRunEvidencePack {
+  researchRunId: string;
+  experiments: unknown[];
+  [key: string]: unknown;
+}
+
+export function getResearchRunEvidencePack(token: string, projectId: string, researchRunId: string): Promise<ApiResult<{ pack: ResearchRunEvidencePack }>> {
+  return request('GET', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/evidence-pack`, { token });
+}
+
+export interface CustomerDeliveryResult {
+  delivery: { status: string; exportAllowed: boolean; scientificBlockers: unknown[]; deliveryFingerprint: string; delivered: boolean; approvalBoundary: string; [key: string]: unknown };
+  exportArtifact?: { ok: boolean; status: string; artifact?: { fileName: string; mediaType: string; byteLength: number; sha256: string; content: string } };
+}
+
+/** A read-only projection of the run through the commercial release gate; it never delivers, signs or bills. */
+export function getCustomerDelivery(token: string, projectId: string, researchRunId: string): Promise<ApiResult<CustomerDeliveryResult>> {
+  return request('POST', `/projects/${projectId}/research-runs/${encodeURIComponent(researchRunId)}/customer-delivery`, { token, body: { includeExportArtifact: true } });
+}
+
 export interface GeneratedScientificAnalysis {
   analysisId: string;
   proposal: {

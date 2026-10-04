@@ -21,6 +21,7 @@
     "smoke:mobile": "node scripts/smoke-e2e.mjs mobile",
     "proof:full-app": "node scripts/full-app-route-proof.mjs",
     "proof:research-run-ui": "node scripts/research-run-ui-proof.mjs",
+    "proof:lab-handoff-ui": "node scripts/lab-handoff-ui-proof.mjs",
     "proof:literature-live": "node --use-system-ca scripts/research-run-literature-live-proof.mjs",
     "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",
     "compute:bundle:speculative": "esbuild packages/core/src/solvers/speculative/index.ts --bundle --format=esm --platform=node --target=node22 --banner:js=\"/* eslint-disable @typescript-eslint/no-unused-vars -- esbuild bundle of packages/core/src/solvers/speculative; regenerate with npm run compute:bundle:speculative, do not edit */\" --outfile=packages/backend/src/compute/speculative-core.mjs",

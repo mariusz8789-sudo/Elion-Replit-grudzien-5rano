@@ -41,6 +41,7 @@ import { DEFAULT_RESEARCH_TOOLS, MAX_PREDICTIONS, PREDICTION_OPERATORS } from '.
 import { getScienceRun, listScienceRunVerifications, saveScienceRun } from './store.mjs';
 import { sha256Hex16 } from './provenance.mjs';
 import { VERDICT as REPLAY_VERDICT, verifyScienceRun } from './campaign/verify.mjs';
+import { closeStage, FULL_CYCLE_STAGE, openStage, recordCount, recordMember, recordSpan, recordStageStatus } from './discoveryTiming.mjs';
 
 export const EXECUTION_RECORD_VERSION = 'research-run-execution@1';
 export const VERDICT_SCOPE = 'Applies only to this frozen hypothesis under this protocol (engine, input, criteria). It is not a statement of scientific truth.';
@@ -255,6 +256,13 @@ function freeze(db, projectId, runId, hypothesis, x, userId) {
       datasetBinding: hypothesis.experimentProposal?.datasetBinding ?? null,
     });
     if (!appended.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: appended.error };
+    // TIME-TO-DISCOVERY: the protocol is frozen, so hypotheses -> frozen protocols is finished and
+    // protocols -> completed experiments begins. The run-scope boundary is recorded once (the first
+    // protocol); every individual experiment also gets its own EXPERIMENT scope, which is where
+    // per-experiment durations live.
+    closeStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'HYPOTHESES_TO_FROZEN_PROTOCOLS', detail: { firstProtocolId: preregistrationKey } });
+    openStage(db, { scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS' });
+    openStage(db, { scopeKind: 'EXPERIMENT', scopeId: experimentId, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', detail: { researchRunId: runId, protocolId: preregistrationKey } });
     return { ok: true, deduped: false, experimentId };
   });
 }
@@ -388,6 +396,30 @@ function executeAndFalsify(db, projectId, runId, frozen, tools, now) {
         scope: 'Deterministic computational anomaly under the frozen expectation and tolerance. It is not scientific evidence or a statement of truth.',
       });
       if (!surprised.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: surprised.error };
+    }
+    // TIME-TO-DISCOVERY. The engine has run and the result has been sealed against the
+    // preregistration in this same transaction, so both boundaries land here:
+    //   protocols -> completed experiments closes, and
+    //   experiment -> falsification opens and closes (the seal IS the falsification step; it is not
+    //   a separate wait, which is why its two marks share this instant).
+    // durationMs is the engine's own measured runtime, so it is COMPUTE, never wall clock.
+    const stageAt = Date.now();
+    for (const scope of [{ scopeKind: 'RESEARCH_RUN', scopeId: runId }, { scopeKind: 'EXPERIMENT', scopeId: frozen.experimentId }]) {
+      closeStage(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', atMs: stageAt });
+      recordCount(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', kind: 'EXPERIMENTS', delta: 1, ref: frozen.experimentId, atMs: stageAt });
+      recordSpan(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', kind: 'COMPUTE', ms: execution.durationMs, source: frozen.engineId, atMs: stageAt });
+      // A queued experiment waited for a free worker before it could run: machine wait, not human wait.
+      if (Number.isFinite(tools.executionContext?.queueMs)) {
+        recordSpan(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', kind: 'QUEUE', ms: tools.executionContext.queueMs, source: 'EXPERIMENT_JOB_QUEUE', atMs: stageAt });
+      }
+      // Attempts beyond the first are retries. An engine that refused its input counts as one failed
+      // attempt in this stage even when the caller reported no attempt number.
+      const attempts = Number.isFinite(tools.executionContext?.attempts) ? tools.executionContext.attempts : null;
+      const retries = attempts !== null ? Math.max(0, attempts - 1) : (execution.status === 'EXECUTED' ? 0 : 1);
+      if (retries > 0) recordCount(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', kind: 'RETRIES', delta: retries, ref: frozen.experimentId, atMs: stageAt });
+      recordMember(db, { ...scope, stage: 'PROTOCOLS_TO_COMPLETED_EXPERIMENTS', kind: 'WORKER', member: execution.executedOn?.workerId ?? execution.executedOn?.host ?? 'in-process', atMs: stageAt });
+      openStage(db, { ...scope, stage: 'EXPERIMENT_TO_FALSIFICATION', atMs: stageAt });
+      closeStage(db, { ...scope, stage: 'EXPERIMENT_TO_FALSIFICATION', atMs: stageAt, detail: { sealRecordId: sealed.record.id, verdict: PROTOCOL_VERDICT[body.serverVerdict] } });
     }
     return { ok: true, deduped: false };
   });
@@ -547,6 +579,32 @@ function proposeEvidenceAndNext(db, projectId, runId, experimentId, tools, propo
         status: 'PROPOSED',
       });
       if (!next.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE', reason: next.error };
+      // TIME-TO-DISCOVERY: result -> Replay. The replay ran through the existing verifier before this
+      // transaction; its verdict is recorded next to the timing so a fast stage can never be read
+      // apart from whether the result actually reproduced.
+      const replayAt = Date.now();
+      for (const scope of [{ scopeKind: 'RESEARCH_RUN', scopeId: runId }, { scopeKind: 'EXPERIMENT', scopeId: experimentId }]) {
+        openStage(db, { ...scope, stage: 'RESULT_TO_REPLAY', atMs: replayAt });
+        closeStage(db, { ...scope, stage: 'RESULT_TO_REPLAY', atMs: replayAt });
+        recordStageStatus(db, { ...scope, stage: 'RESULT_TO_REPLAY', kind: 'REPLAY', status: replay?.verdict ?? 'UNAVAILABLE', ref: experimentId, atMs: replayAt });
+      }
+      // The full question -> research outcome stage closes when the run's fixed rule has no further
+      // executable experiment: that is the end of what Genesis produces without a person. Anything
+      // after it (review, decision, laboratory) is HUMAN_WAIT on the later stages, never counted here.
+      if (proposal.action !== 'EXECUTE_NEXT_HYPOTHESIS') {
+        closeStage(db, {
+          scopeKind: 'RESEARCH_RUN', scopeId: runId, stage: FULL_CYCLE_STAGE, atMs: replayAt,
+          detail: { endedBecause: proposal.action, reason: proposal.reason ?? null, experiments: current.experiments.length },
+        });
+      }
+    }
+    // TIME-TO-DISCOVERY: result -> Evidence Pack. The Evidence Pack is a PROPOSAL that still requires
+    // a human decision; the recorded status says exactly that and is never upgraded here.
+    const evidenceAt = Date.now();
+    for (const scope of [{ scopeKind: 'RESEARCH_RUN', scopeId: runId }, { scopeKind: 'EXPERIMENT', scopeId: experimentId }]) {
+      openStage(db, { ...scope, stage: 'RESULT_TO_EVIDENCE_PACK', atMs: evidenceAt });
+      closeStage(db, { ...scope, stage: 'RESULT_TO_EVIDENCE_PACK', atMs: evidenceAt });
+      recordStageStatus(db, { ...scope, stage: 'RESULT_TO_EVIDENCE_PACK', kind: 'EVIDENCE', status: 'PROPOSED_REQUIRES_HUMAN_APPROVAL', ref: proposed.proposalId, atMs: evidenceAt });
     }
     return { ok: true, deduped: false };
   });
@@ -644,7 +702,19 @@ export function replayResearchExperiment(db, projectId, runId, experimentId) {
   if (!scienceRunId || !getScienceRun(db, scienceRunId)) return { ok: false, status: 'NOTHING_TO_REPLAY', reason: `engine status ${x.execution.status}` };
   const v = verifyScienceRun(db, scienceRunId);
   if (!v.ok) return { ok: false, status: 'REPLAY_FAILED', reason: v.error };
-  return { ok: true, experimentId, verification: replaySummary(v.verification), replays: listResearchExperimentReplays(db, scienceRunId) };
+  const summary = replaySummary(v.verification);
+  // TIME-TO-DISCOVERY: an on-demand replay adds its verdict to the result -> Replay stage. The stage's
+  // boundaries were recorded once by the loop; statuses accumulate, so every replay stays visible.
+  const at = Date.now();
+  for (const scope of [{ scopeKind: 'RESEARCH_RUN', scopeId: runId }, { scopeKind: 'EXPERIMENT', scopeId: experimentId }]) {
+    openStage(db, { ...scope, stage: 'RESULT_TO_REPLAY', atMs: at });
+    closeStage(db, { ...scope, stage: 'RESULT_TO_REPLAY', atMs: at });
+    recordStageStatus(db, { ...scope, stage: 'RESULT_TO_REPLAY', kind: 'REPLAY', status: summary.verdict ?? 'UNAVAILABLE', ref: experimentId, atMs: at });
+    if (Number.isFinite(v.verification?.durationMs)) {
+      recordSpan(db, { ...scope, stage: 'RESULT_TO_REPLAY', kind: 'COMPUTE', ms: v.verification.durationMs, source: 'REPLAY_VERIFIER', atMs: at });
+    }
+  }
+  return { ok: true, experimentId, verification: summary, replays: listResearchExperimentReplays(db, scienceRunId) };
 }
 
 /** Every replay of one experiment, oldest first. */

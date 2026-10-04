@@ -1,7 +1,7 @@
 import {
-  getCognitiveState, listResearchRuns,
+  getCognitiveState, getRemoteWorkers, listResearchRuns,
   type ApiResult, type CognitiveResearchRunJob, type GenesisCognitiveState, type ResearchRunControlAction,
-  type ResearchRunControlResult, type ResearchRunQueueJob, type ResearchRunSummary, type ScienceFlight,
+  type RemoteWorkersView, type ResearchRunControlResult, type ResearchRunQueueJob, type ResearchRunSummary, type ScienceFlight,
 } from '../../core/backend/client';
 import type { Locale } from '../../core/i18n';
 import { fcCode, fcText, type Tone } from './flightControlText';
@@ -19,12 +19,15 @@ export interface FlightControlSnapshot {
   /** null when the run list request failed; the failure is kept beside it, the rest of the screen still renders. */
   runs: ResearchRunSummary[] | null;
   runsFailure: ApiFailure | null;
+  /** Workers that live outside the server and take jobs over HTTP. null when the request failed; the rest of the screen still renders. */
+  remoteWorkers: RemoteWorkersView | null;
+  remoteWorkersFailure: ApiFailure | null;
   loadedAt: number;
 }
 
-/** Cognitive state is the backbone; the run list is a second request whose failure is shown, not hidden. */
+/** Cognitive state is the backbone; the run list and the remote workers are further requests whose failure is shown, not hidden. */
 export async function loadFlightControl(token: string, projectId: string, now: () => number = Date.now): Promise<{ ok: true; snapshot: FlightControlSnapshot } | ApiFailure> {
-  const [state, runs] = await Promise.all([getCognitiveState(token, projectId), listResearchRuns(token, projectId)]);
+  const [state, runs, workers] = await Promise.all([getCognitiveState(token, projectId), listResearchRuns(token, projectId), getRemoteWorkers(token, projectId)]);
   if (!state.ok) return state;
   return {
     ok: true,
@@ -32,6 +35,8 @@ export async function loadFlightControl(token: string, projectId: string, now: (
       state: state.data,
       runs: runs.ok ? runs.data.researchRuns : null,
       runsFailure: runs.ok ? null : runs,
+      remoteWorkers: workers.ok ? workers.data : null,
+      remoteWorkersFailure: workers.ok ? null : workers,
       loadedAt: now(),
     },
   };

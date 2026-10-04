@@ -4,7 +4,7 @@ import { ENGINE_EXECUTION_STATUS } from './compute/engineExecutionContract.mjs';
 import { createScientificWorkerRuntime } from './compute/scientificWorkerRuntime.mjs';
 import { CHILD_RESULT_MARKER, runIsolatedProcess } from './compute/isolatedProcess.mjs';
 import { RESEARCH_RUN_EXECUTORS, researchEngineStatus } from './researchRunEngines.mjs';
-import { REMOTE_OUTCOME_KIND, WORKER_API_PREFIX } from './remoteWorkerApi.mjs';
+import { REMOTE_OUTCOME_KIND, RESEARCH_ADVANCE_REMOTE_CAPABILITY, WORKER_API_PREFIX } from './remoteWorkerProtocol.mjs';
 
 /**
  * A ResearchRun worker that lives OUTSIDE the server: it has no database handle and no shared file. Everything it
@@ -87,38 +87,62 @@ async function runEngineInChild(workOrder, { signal, processTimeoutMs }) {
   try { return { ok: true, outcome: JSON.parse(line.slice(CHILD_RESULT_MARKER.length)) }; } catch { return { ok: false, failureCode: 'CHILD_BAD_RESULT' }; }
 }
 
-/** EngineExecutionPort for the worker runtime: run the engine, upload the outcome artifact, return its digest. */
-export function createRemoteExecutionPort({ client, workerId, processTimeoutMs } = {}) {
+const MAX_STEPS_PER_JOB = 50;
+
+/**
+ * EngineExecutionPort for the worker runtime. A single-experiment job: run the engine, upload the outcome, return
+ * its digest (the runtime then completes the job). An advance job: the same, repeated under ONE lease; after each
+ * upload the server applies the step and answers with the next frozen experiment or with the end of the advance.
+ */
+export function createRemoteExecutionPort({ client, workerId, processTimeoutMs, engines = availableEngines() } = {}) {
+  async function runOne(request, workOrder, signal) {
+    const leaseId = client.leaseOf(request.executionId);
+    const ran = await runEngineInChild(workOrder, { signal, processTimeoutMs });
+    if (!ran.ok) return { record: { status: ran.failureCode === 'CHILD_TIMEOUT' ? ENGINE_EXECUTION_STATUS.TIMEOUT : ENGINE_EXECUTION_STATUS.FAILED, failureCode: ran.failureCode } };
+    const { outcome } = ran;
+    // An engine that is not available HERE is not a scientific result: the job goes back to the queue.
+    if (!outcome.engineResult.ok && outcome.engineResult.status === 'BLOCKED') {
+      return { record: { status: ENGINE_EXECUTION_STATUS.BLOCKED_BY_RUNTIME, failureCode: outcome.engineResult.reason ?? 'ENGINE_BLOCKED' } };
+    }
+    const artifact = {
+      kind: REMOTE_OUTCOME_KIND,
+      jobId: request.executionId,
+      workerId,
+      researchRunId: workOrder.researchRunId,
+      experimentId: workOrder.experimentId,
+      engineId: workOrder.engineId,
+      inputHash: workOrder.inputHash,
+      ...outcome,
+    };
+    const bytes = Buffer.from(JSON.stringify(artifact), 'utf8');
+    const sha = sha256(bytes);
+    const uploaded = await client.call(`jobs/${request.executionId}/artifact`, {
+      leaseId, experimentId: workOrder.experimentId, sha256: sha, contentBase64: bytes.toString('base64'),
+    });
+    if (uploaded.status !== 201) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: `ARTIFACT_UPLOAD_${uploaded.body?.error ?? uploaded.status}` } };
+    return { ok: true, sha, ref: uploaded.body.artifactRef, leaseId };
+  }
+
   return Object.freeze({
     async execute(request, { signal } = {}) {
-      const workOrder = request.input;
-      const leaseId = client.leaseOf(request.executionId);
-      const ran = await runEngineInChild(workOrder, { signal, processTimeoutMs });
-      if (!ran.ok) return { record: { status: ran.failureCode === 'CHILD_TIMEOUT' ? ENGINE_EXECUTION_STATUS.TIMEOUT : ENGINE_EXECUTION_STATUS.FAILED, failureCode: ran.failureCode } };
-      const { outcome } = ran;
-      // An engine that is not available HERE is not a scientific result: the job goes back to the queue.
-      if (!outcome.engineResult.ok && outcome.engineResult.status === 'BLOCKED') {
-        return { record: { status: ENGINE_EXECUTION_STATUS.BLOCKED_BY_RUNTIME, failureCode: outcome.engineResult.reason ?? 'ENGINE_BLOCKED' } };
+      let workOrder = request.input;
+      const first = workOrder;
+      let last = null;
+      for (let step = 1; step <= MAX_STEPS_PER_JOB; step += 1) {
+        const ran = await runOne(request, workOrder, signal);
+        if (!ran.ok) return ran;
+        last = ran;
+        if (request.capabilityId !== RESEARCH_ADVANCE_REMOTE_CAPABILITY) break;
+        const stepped = await client.call(`jobs/${request.executionId}/step`, { leaseId: ran.leaseId, artifactSha256: ran.sha, engines });
+        if (stepped.status !== 200) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: `STEP_${stepped.body?.error ?? stepped.status}` } };
+        // The server released the job (a next step it could not hand out): the runtime must not complete it.
+        if (stepped.body.released) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: `STEP_RELEASED_${stepped.body.released.code}` } };
+        if (!stepped.body.next) break;
+        workOrder = stepped.body.next.workOrder;
       }
-      const artifact = {
-        kind: REMOTE_OUTCOME_KIND,
-        jobId: request.executionId,
-        workerId,
-        researchRunId: workOrder.researchRunId,
-        experimentId: workOrder.experimentId,
-        engineId: workOrder.engineId,
-        inputHash: workOrder.inputHash,
-        ...outcome,
-      };
-      const bytes = Buffer.from(JSON.stringify(artifact), 'utf8');
-      const digest = sha256(bytes);
-      const uploaded = await client.call(`jobs/${request.executionId}/artifact`, {
-        leaseId, experimentId: workOrder.experimentId, sha256: digest, contentBase64: bytes.toString('base64'),
-      });
-      if (uploaded.status !== 201) return { record: { status: ENGINE_EXECUTION_STATUS.FAILED, failureCode: `ARTIFACT_UPLOAD_${uploaded.body?.error ?? uploaded.status}` } };
       return {
-        record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: workOrder.researchRunId, experimentId: workOrder.experimentId },
-        result: { artifactSha256: digest, artifactRef: uploaded.body.artifactRef },
+        record: { status: ENGINE_EXECUTION_STATUS.SUCCESS, researchRunId: first.researchRunId, experimentId: workOrder.experimentId },
+        result: { artifactSha256: last.sha, artifactRef: last.ref },
       };
     },
   });
@@ -128,7 +152,7 @@ export function createRemoteWorker({ serverUrl, token, workerId, leaseMs = 30_00
   const client = createHttpQueueClient({ serverUrl, token, engines, fetchImpl });
   const runtime = createScientificWorkerRuntime({
     queue: client,
-    executionPort: createRemoteExecutionPort({ client, workerId, processTimeoutMs }),
+    executionPort: createRemoteExecutionPort({ client, workerId, processTimeoutMs, engines: engines ?? availableEngines() }),
     workerId,
     leaseMs,
   });

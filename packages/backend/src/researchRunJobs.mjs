@@ -9,6 +9,7 @@ import { advanceResearchRun, MAX_ADVANCE_STEPS } from './researchRunAdvance.mjs'
 import { databaseFile } from './compute/heavyJobThread.mjs';
 import { CHILD_RESULT_MARKER, runIsolatedProcess } from './compute/isolatedProcess.mjs';
 import { knowledgeLedgerPersistenceStatus } from './knowledgeApi.mjs';
+import { REMOTE_MAX_ATTEMPTS, RESEARCH_ADVANCE_REMOTE_CAPABILITY, RESEARCH_REMOTE_CAPABILITY } from './remoteWorkerProtocol.mjs';
 
 /**
  * Asynchronous front door to the ONE ResearchRun execution path. A queued job owns no scientific state:
@@ -19,10 +20,8 @@ import { knowledgeLedgerPersistenceStatus } from './knowledgeApi.mjs';
  */
 export const RESEARCH_EXPERIMENT_CAPABILITY = 'research-run-experiment';
 export const RESEARCH_ADVANCE_CAPABILITY = 'research-run-advance';
-/** The same experiment, but run by a separate worker process that speaks only HTTP (remoteWorkerApi.mjs). */
-export const RESEARCH_REMOTE_CAPABILITY = 'research-run-experiment-remote';
-/** A remote worker may die; the lease expiry hands the job to another one. A retry resumes the SAME frozen experiment. */
-export const REMOTE_MAX_ATTEMPTS = 3;
+export { REMOTE_MAX_ATTEMPTS, RESEARCH_ADVANCE_REMOTE_CAPABILITY, RESEARCH_REMOTE_CAPABILITY };
+export const REMOTE_CAPABILITIES = Object.freeze([RESEARCH_REMOTE_CAPABILITY, RESEARCH_ADVANCE_REMOTE_CAPABILITY]);
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
 export const queueFor = (db) => createScientificJobQueuePort({ backend: createSqliteScientificJobQueueBackend({ db }) });
@@ -73,10 +72,15 @@ export function enqueueResearchExperiment(db, projectId, runId, { hypothesisId =
 }
 
 /** The queued form of advance(): the worker runs up to maxSteps justified experiments for this run. */
-export function enqueueResearchAdvance(db, projectId, runId, { maxSteps = 1, userId = null, timeoutMs = 600_000 } = {}) {
+export function enqueueResearchAdvance(db, projectId, runId, { maxSteps = 1, userId = null, timeoutMs = 600_000, remote = false } = {}) {
   const steps = Math.min(MAX_ADVANCE_STEPS, Math.max(1, Number.isInteger(maxSteps) ? maxSteps : 1));
+  // A remote advance counts completed experiments, not steps taken by one worker, so a worker that takes the job
+  // over after a kill continues toward the same target instead of starting its budget again.
+  const baseline = remote ? (getResearchRun(db, projectId, runId)?.experiments.filter((e) => e.next).length ?? 0) : null;
   return enqueueResearchJob(db, projectId, runId, {
-    capabilityId: RESEARCH_ADVANCE_CAPABILITY, label: `advance-${steps}`, userId, timeoutMs, extra: { maxSteps: steps },
+    capabilityId: remote ? RESEARCH_ADVANCE_REMOTE_CAPABILITY : RESEARCH_ADVANCE_CAPABILITY,
+    label: remote ? `remote-advance-${steps}` : `advance-${steps}`, userId, timeoutMs, maxAttempts: remote ? REMOTE_MAX_ATTEMPTS : 1,
+    extra: { maxSteps: steps, ...(remote ? { remote: true, baseline, until: baseline + steps } : {}) },
   });
 }
 
@@ -214,7 +218,7 @@ export function createResearchRunWorker(db, { workerId = 'worker-research-run-lo
   return createScientificWorkerRuntime({
     queue: queueFor(db),
     // Remote jobs belong to remote workers; the in-process worker never takes them (the HTTP API does, for them).
-    claimFilter: { excludeCapabilities: [RESEARCH_REMOTE_CAPABILITY] },
+    claimFilter: { excludeCapabilities: [...REMOTE_CAPABILITIES] },
     executionPort: createResearchRunExecutionPort(db, options),
     workerId,
     leaseMs,

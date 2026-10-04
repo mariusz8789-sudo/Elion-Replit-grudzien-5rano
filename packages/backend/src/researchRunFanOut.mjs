@@ -50,13 +50,13 @@ function createChild(db, projectId, parent, hypothesis, userId, at) {
 }
 
 /** Starts the missing jobs of a parent's children (a child that already has a job is never enqueued again here). */
-async function ensureJobs(db, projectId, parentId, children, { userId, timeoutMs }) {
+async function ensureJobs(db, projectId, parentId, children, { userId, timeoutMs, remote = false }) {
   const jobs = [];
   for (const child of children) {
     if (['CANCELLED', 'FAILED'].includes(child.status)) continue;
     if (latestJobOf(db, child.id)) continue;
     const queued = await enqueueResearchExperiment(db, projectId, child.id, {
-      hypothesisId: child.budget.lineage.hypothesisId, userId, timeoutMs,
+      hypothesisId: child.budget.lineage.hypothesisId, userId, timeoutMs, remote,
       lineage: { parentRunId: parentId, childRunId: child.id, hypothesisId: child.budget.lineage.hypothesisId },
     });
     jobs.push({ childRunId: child.id, ok: queued.ok, status: queued.status ?? null, jobId: queued.job?.jobId ?? null });
@@ -68,7 +68,7 @@ async function ensureJobs(db, projectId, parentId, children, { userId, timeoutMs
  * Spawns (or resumes) the fan-out. Idempotent: a hypothesis that already has a child never gets a second one,
  * and a second call with nothing new neither writes an event nor enqueues anything.
  */
-export async function spawnChildRuns(db, projectId, parentId, { hypothesisIds = null, userId = null, timeoutMs = FANOUT_TIMEOUT_MS.default } = {}) {
+export async function spawnChildRuns(db, projectId, parentId, { hypothesisIds = null, userId = null, timeoutMs = FANOUT_TIMEOUT_MS.default, remote = false } = {}) {
   const parent = getResearchRun(db, projectId, parentId);
   if (!parent) return { ok: false, status: 'NOT_FOUND' };
   if (!parent.researchState.chain.ok) return { ok: false, status: 'STATE_INTEGRITY_FAILURE' };
@@ -98,7 +98,7 @@ export async function spawnChildRuns(db, projectId, parentId, { hypothesisIds = 
   });
   if (!created.ok) return created;
   const children = childrenOf(db, projectId, parentId).filter((c) => wanted.includes(c.budget.lineage.hypothesisId));
-  const jobs = await ensureJobs(db, projectId, parentId, children, { userId, timeoutMs: timeout });
+  const jobs = await ensureJobs(db, projectId, parentId, children, { userId, timeoutMs: timeout, remote });
   if (jobs.some((j) => !j.ok)) return { ok: false, status: 'ENQUEUE_FAILED', jobs };
   return { ok: true, status: created.fresh ? 'SPAWNED' : 'ALREADY_SPAWNED', deduped: !created.fresh, fanOut: reconcileFanOut(db, projectId, parentId).fanOut };
 }
@@ -171,7 +171,7 @@ function readLast(db, parentId) {
 }
 
 /** Re-runs one failed or cancelled child under a new job generation, bounded by MAX_CHILD_GENERATIONS. */
-export async function retryChild(db, projectId, parentId, childRunId, { userId = null, timeoutMs = FANOUT_TIMEOUT_MS.default } = {}) {
+export async function retryChild(db, projectId, parentId, childRunId, { userId = null, timeoutMs = FANOUT_TIMEOUT_MS.default, remote } = {}) {
   const parent = getResearchRun(db, projectId, parentId);
   if (!parent) return { ok: false, status: 'NOT_FOUND' };
   if (parent.run.status !== AGENT_RUN_STATUS.RUNNING) return { ok: false, status: 'RUN_NOT_EXECUTABLE', reason: parent.run.status };
@@ -193,8 +193,10 @@ export async function retryChild(db, projectId, parentId, childRunId, { userId =
     });
     if (!reopened.ok) return reopened;
   }
+  // A retry stays where the child was running unless the caller says otherwise.
+  const wasRemote = remote ?? (latestJobOf(db, child.id)?.payload?.remote === true);
   const queued = await enqueueResearchExperiment(db, projectId, child.id, {
-    hypothesisId: child.budget.lineage.hypothesisId, userId, timeoutMs: clampTimeout(timeoutMs),
+    hypothesisId: child.budget.lineage.hypothesisId, userId, timeoutMs: clampTimeout(timeoutMs), remote: wasRemote,
     lineage: { parentRunId: parentId, childRunId: child.id, hypothesisId: child.budget.lineage.hypothesisId },
   });
   if (!queued.ok) return { ok: false, status: queued.status, reason: queued.reason ?? null };

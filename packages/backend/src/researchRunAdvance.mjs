@@ -29,6 +29,29 @@ export function justifiedNextOf(view) {
   return { ok: true, from: last, proposal, proposalFingerprint: fnv1a(canonicalJson(proposal)), decisionId: last.next.decisionTrace?.decisionId ?? null };
 }
 
+/**
+ * Links an executed experiment to the one whose recorded proposal justified it (EXPERIMENT_CONTINUED), from the chain
+ * alone. Idempotent. An experiment the proposal did not name (a plain run, steering) is left unlinked.
+ */
+export function recordContinuation(db, projectId, runId, experimentId, { userId = null } = {}) {
+  return inWriteTransaction(db, () => {
+    const view = getResearchRun(db, projectId, runId);
+    const index = view?.experiments.findIndex((e) => e.experimentId === experimentId) ?? -1;
+    if (index <= 0) return { ok: true, linked: false };
+    const current = view.experiments[index];
+    const from = view.experiments[index - 1];
+    const proposal = from.next?.proposal;
+    if (current.continuedFrom || proposal?.action !== 'EXECUTE_NEXT_HYPOTHESIS' || proposal.hypothesisId !== current.frozen.hypothesisId) return { ok: true, linked: false };
+    const appended = appendServerResearchStateEvent(db, runId, 'EXPERIMENT_CONTINUED', {
+      contractVersion: RESEARCH_RUN_CONTRACT_VERSION, researchRunId: runId, experimentId,
+      fromExperimentId: from.experimentId, hypothesisId: proposal.hypothesisId, reason: proposal.reason,
+      proposalFingerprint: fnv1a(canonicalJson(proposal)), decisionId: from.next.decisionTrace?.decisionId ?? null, decidedBy: 'GENESIS_FIXED_RULE', actor: { kind: 'USER', userId },
+    });
+    if (!appended.ok) throw new Error(`advance_state:${appended.error}`);
+    return { ok: true, linked: true };
+  });
+}
+
 /** Runs up to maxSteps justified experiments. `afterStep(runId)` lets the caller store artifacts between steps. */
 export async function advanceResearchRun(db, projectId, runId, { maxSteps = 1, userId = null, afterStep = null, execOptions = {} } = {}) {
   const budget = Math.min(MAX_ADVANCE_STEPS, Math.max(1, Number.isInteger(maxSteps) ? maxSteps : 1));
@@ -45,19 +68,7 @@ export async function advanceResearchRun(db, projectId, runId, { maxSteps = 1, u
     if (!result.ok) { stop = ADVANCE_STOP.FAILED; stopReason = result.reason ?? result.status; steps.push({ ok: false, status: result.status, reason: result.reason ?? null }); break; }
     if (afterStep) await afterStep(runId);
     const done = getResearchRun(db, projectId, runId).experiments.find((e) => e.experimentId === result.experimentId);
-    if (!next.first) {
-      inWriteTransaction(db, () => {
-        const current = getResearchRun(db, projectId, runId);
-        if (current.experiments.find((e) => e.experimentId === result.experimentId)?.continuedFrom) return { ok: true };
-        const appended = appendServerResearchStateEvent(db, runId, 'EXPERIMENT_CONTINUED', {
-          contractVersion: RESEARCH_RUN_CONTRACT_VERSION, researchRunId: runId, experimentId: result.experimentId,
-          fromExperimentId: next.from.experimentId, hypothesisId: next.proposal.hypothesisId, reason: next.proposal.reason,
-          proposalFingerprint: next.proposalFingerprint, decisionId: next.decisionId, decidedBy: 'GENESIS_FIXED_RULE', actor: { kind: 'USER', userId },
-        });
-        if (!appended.ok) throw new Error(`advance_state:${appended.error}`);
-        return { ok: true };
-      });
-    }
+    if (!next.first) recordContinuation(db, projectId, runId, result.experimentId, { userId });
     steps.push({
       ok: true, experimentId: result.experimentId, hypothesisId: done?.frozen?.hypothesisId ?? null, verdict: done?.falsification?.verdict ?? null,
       selectedBy: next.first ? 'FIRST_EXECUTABLE_HYPOTHESIS_IN_PLAN' : next.proposal.reason, justifiedBy: next.first ? null : { experimentId: next.from.experimentId, proposalFingerprint: next.proposalFingerprint },

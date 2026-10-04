@@ -122,11 +122,21 @@ engine runs, builds the record from the stored outcome artifact, and replays it
 on its own engine. A worker that dies loses its lease; the job (up to 3
 attempts) goes to another worker and the same frozen experiment is resumed.
 The surface is off (503) until `GENESIS_WORKER_TOKEN` is set on the server.
+The same lease also carries `POST .../advance` with `{"async": true, "remote":
+true, "maxSteps": n}` (several justified experiments under ONE lease: after each
+uploaded outcome the server applies the step and hands out the next frozen
+experiment through `/jobs/:id/step`) and `POST .../fanout/spawn` with `{"remote":
+true}` (each child is an ordinary remote experiment job; cancelling the parent
+withdraws the leases, the worker's next heartbeat is refused and it kills its
+engine process). `GET /api/projects/:id/remote-workers` lists who holds a lease
+with the last heartbeat; Flight Control shows one row per worker.
 Limits: one shared token authenticates workers, so the worker-reported engine
 status and environment are only as trustworthy as that token and host; the server
-needs the engine to replay; artifact storage is still the server's single-node
-content-addressed directory; advance/fan-out jobs are not remote yet. Proof:
-`remoteWorker.e2e.test.mjs`. Nothing here changes the Railway services.
+needs the engine to plan and replay; artifact storage is still the server's
+single-node content-addressed directory; the queue is still one SQLite file, so
+this is not multi-replica proof; the worker list keeps idle workers in memory only
+(since the last server start). Proof: `remoteWorker.e2e.test.mjs`,
+`remoteFanOutAdvance.e2e.test.mjs`. Nothing here changes the Railway services.
 
 ## Exact staging variables
 

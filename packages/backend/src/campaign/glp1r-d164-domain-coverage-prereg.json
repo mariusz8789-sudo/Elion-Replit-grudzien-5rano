@@ -1,0 +1,111 @@
+{
+  "decisionId": "D-164",
+  "title": "Can the model judge anything Genesis can actually generate? Applicability-domain coverage of the generable GLP-1R candidate space",
+  "frozenBeforeAnyMetricWasComputed": true,
+  "baseCommit": "22d3061f",
+  "whyThisExperiment": "D-162 measured that the GLP-1R functional-agonism model collapses on chemistry that is distant from its own training series: on a leader-cluster holdout whose maximum test-to-train Tanimoto is 0.5991, MAE 3.4847 and R2 -13.0013, worse on the same rows than a train-mean baseline (MAE 2.2171, R2 -4.9723). That is a statement about held-out ChEMBL rows. It is NOT yet a statement about the candidates Genesis itself would propose. The weight-loss candidate question needs the second statement, because the pipeline's ranking gate reads the model on GENERATED molecules, not on ChEMBL rows. This decision asks the narrow, answerable form of that question: of the novel molecules the production generator can actually build from this arm's own small-molecule chemistry, how many fall inside the region where D-162 did NOT measure the model to be worse than a baseline?",
+  "whatThisIsNot": [
+    "NOT a gate verdict. No model is fitted here and no accuracy is measured. The frozen gate glp1r-validation-gate.json is read for nothing and is not touched. The outcome is never spelled MODEL_GATE_PASS or MODEL_GATE_FAILED.",
+    "NOT a re-run, a re-interpretation or an extension of D-153 or D-162. Both sealed artefacts are read only for the two constants this decision reuses by reference (the 0.60 distance boundary and the 320-row/206-compound arm size) and are not edited.",
+    "NOT a candidate nomination. Every molecule this run builds is a BRICS recombination product with no measured activity, no assay, no provenance beyond its own parents, and no prior-art check. None of them is a candidate, a lead, or a proposal, and none may be named as one on the strength of this run.",
+    "NOT a docking decision. D-159 stands: 6X18 is a reference structure, not a docking target, and the registry holds only ABL1_1IEP.",
+    "NOT evidence about any molecule, any organism, or any clinical effect."
+  ],
+  "hypothesis": {
+    "id": "H1",
+    "statement": "The novel molecules the production BRICS generator builds from the small-molecule subset of the D-152 FUNCTIONAL_AGONISM arm fall, for the most part, inside the chemical region where the GLP-1R functional-agonism model has not been measured to fail: at least MIN_IN_DOMAIN_FRACTION of them have a nearest-neighbour Tanimoto to the arm at or above DOMAIN_FLOOR."
+  },
+  "whatWouldFalsifyH1": "A generable, novel product set of at least MIN_NOVEL_PRODUCTS molecules in which fewer than MIN_IN_DOMAIN_FRACTION have nearest-neighbour Tanimoto to the arm at or above DOMAIN_FLOOR falsifies H1. A generable set that does not reach MIN_NOVEL_PRODUCTS does not falsify H1 and does not support it: it reports a different and prior failure, at the candidate-pool gate rather than the model gate.",
+  "frozenCriteria": {
+    "DOMAIN_FLOOR": 0.6,
+    "DOMAIN_FLOOR_source": "Reused BY REFERENCE from D-162's DISTANCE_CEILING (packages/backend/src/campaign/glp1r-d162-applicability-domain-prereg.json, frozenCriteria.DISTANCE_CEILING). It is not re-chosen here and must not be re-argued here. Its meaning in this decision is exactly what D-162 measured: at or above 0.60 the model's behaviour is the behaviour D-153 sealed; strictly below 0.60 the model's behaviour is the behaviour D-162 sealed, which is worse than a train-mean baseline.",
+    "DOMAIN_FLOOR_isNotAPassMark": "A product at or above 0.60 is NOT thereby a molecule the model predicts well. It is only a molecule about which D-162's negative measurement does not directly speak. The honest reading of IN_DOMAIN is 'not yet shown to be outside the model's reach', never 'predicted reliably'.",
+    "MIN_IN_DOMAIN_FRACTION": 0.5,
+    "MIN_IN_DOMAIN_FRACTION_rationale": "A ranking gate that can judge fewer than half of the molecules the generator proposes is not a ranking gate; it is a sieve that discards most of its own input for a reason unrelated to the molecules. One half is the weakest defensible version of 'for the most part' and is chosen so that the test is easy to pass rather than easy to fail.",
+    "MIN_NOVEL_PRODUCTS": 100,
+    "MIN_NOVEL_PRODUCTS_rationale": "A fraction over fewer than a hundred molecules is not a stable fraction. Below this count the run reports NO_GENERABLE_CANDIDATE_SPACE instead of a coverage number.",
+    "MIN_SMALL_MOLECULE_PARENTS": 5,
+    "MIN_SMALL_MOLECULE_PARENTS_rationale": "BRICS recombination needs a pool of fragments from several distinct parents to produce anything that is not a parent. Fewer than five distinct small-molecule parents is not a generable space at all.",
+    "SMALL_MOLECULE_MAX_MOLWT": 900,
+    "SMALL_MOLECULE_MAX_AMIDE_BONDS": 5,
+    "SMALL_MOLECULE_DEFINITION_rationale": "The arm is known from D-153 and D-162 to be peptide-heavy, and a peptide is not a molecule this pipeline can propose, filter on Lipinski/Veber terms, or hand to a small-molecule chemist. The two cuts are set before any molecular weight or amide count in this arm is read. 900 Da is generous: the published oral non-peptidic GLP-1R agonists sit well below it, and the ceiling deliberately also admits peptidomimetics and macrocycles rather than excluding them by taste. The amide cut (at most 5 matches of the SMARTS pattern [NX3][CX3]=[OX1]) removes oligopeptide backbones without removing ordinary amide-containing small molecules. Both numbers are fixed here and must not move after any count below is read.",
+    "SMALL_MOLECULE_AMIDE_SMARTS": "[NX3][CX3]=[OX1]",
+    "GENERATION_GROUP_SIZE": 8,
+    "GENERATION_MAX_PRODUCTS_PER_GROUP": 64,
+    "GENERATION_MAX_DEPTH": 2,
+    "GENERATION_rationale": "compute/rdkitAdapter.mjs::bricsRecombine is the production generation path and runs under a 10-second per-invocation budget, so one call over all parents is not possible. Parents are therefore sorted by ascending canonical SMILES and partitioned into consecutive groups of GENERATION_GROUP_SIZE; each group is recombined once at GENERATION_MAX_DEPTH with GENERATION_MAX_PRODUCTS_PER_GROUP. RDKit's BRICSBuild is called with scrambleReagents=False by that adapter, so the products of a given group are deterministic. No randomness, no seed, no shuffling anywhere."
+  },
+  "dataset": {
+    "source": "Rebuilt by D-162's own path, which is D-153's path: the D-144 combined set (287-row pin + A1xA2 rows admitted under D-144's rules) filtered to the assays D-152 filed as FUNCTIONAL_AGONISM.",
+    "rolesReadFrom": "packages/backend/src/campaign/glp1r-assay-roles-d152.json",
+    "rolesAreNeverRecomputed": true,
+    "EXPECTED_ROWS": 320,
+    "EXPECTED_COMPOUNDS": 206,
+    "driftRule": "Any count other than 320 rows / 206 compounds aborts the run with DATASET_DRIFT. No row is dropped, added, averaged or reweighted.",
+    "featurization": "packages/backend/src/compute/rdkitAdapter.mjs::fingerprintBatch, the production path, with real RDKit; Tanimoto by campaign/glp1rQsar.mjs::tanimotoIndices, exactly as D-162 computed it. A misaligned batch aborts with FEATURIZATION_MISALIGNED."
+  },
+  "procedure": {
+    "ordering": "All derived orderings are by ascending canonical SMILES. No randomness, no seed, no shuffling anywhere.",
+    "step1_arm": "Rebuild the arm and assert 320 rows / 206 distinct compounds.",
+    "step2_smallMolecules": "Compute RDKit descriptors for every distinct compound (compute/rdkitAdapter.mjs::descriptorsBatch) and count amide matches with the frozen SMARTS. A compound is SMALL_MOLECULE when molWt <= SMALL_MOLECULE_MAX_MOLWT and amide matches <= SMALL_MOLECULE_MAX_AMIDE_BONDS. The count is reported whatever it is.",
+    "step3_generate": "Partition the SMALL_MOLECULE parents into consecutive groups of GENERATION_GROUP_SIZE in ascending canonical-SMILES order and call bricsRecombine once per group at the frozen parameters. Pool the products, drop any product whose canonical SMILES equals any of the 206 arm compounds, and deduplicate by canonical SMILES keeping first appearance in group order. The survivors are the NOVEL PRODUCT SET.",
+    "step4_distance": "Fingerprint the 206 arm compounds and the novel product set with the same production call. For each novel product compute its maximum Tanimoto to any arm compound. IN_DOMAIN means that maximum is >= DOMAIN_FLOOR.",
+    "step5_report": "Report the in-domain fraction, the full quantile summary of the nearest-neighbour distribution, and the count at every stage of the funnel. Report the result whatever it is."
+  },
+  "controlsCheckedBeforeAnyFractionIsRead": {
+    "noParentIsCountedAsAProduct": { "required": "every novel product's canonical SMILES differs from every arm compound's", "note": "A regenerated parent would be trivially in-domain at Tanimoto 1.0 and would inflate the fraction." },
+    "fingerprintAlignment": { "required": "fingerprintBatch returns one row per input, in input order, for both sets" },
+    "determinism": { "required": "the generation step is re-run once and must return the identical product list; a difference aborts with GENERATION_NOT_DETERMINISTIC" },
+    "effect": "A control that does not hold makes the run inconclusive. It can never turn a failing fraction into a passing one."
+  },
+  "prespecifiedOutcomes": [
+    {
+      "outcome": "DOMAIN_COVERAGE_SUFFICIENT",
+      "when": "All controls hold, the novel product set has at least MIN_NOVEL_PRODUCTS members, and the in-domain fraction is >= MIN_IN_DOMAIN_FRACTION.",
+      "means": "H1 survives. Most of what this generator can build from this arm lies in the region D-162 did not condemn. The model would then still not RANK candidates (D-069 Option A stands) but it could FILTER a majority of them, and the binding blocker for a weight-loss computational candidate would move off the model's applicability domain onto the next failing gate.",
+      "doesNotMean": "That the model predicts those molecules well, that any of them is active, that any of them is a candidate, or that the efficacy axis is validated."
+    },
+    {
+      "outcome": "DOMAIN_COVERAGE_INSUFFICIENT",
+      "when": "All controls hold, the novel product set has at least MIN_NOVEL_PRODUCTS members, and the in-domain fraction is < MIN_IN_DOMAIN_FRACTION.",
+      "means": "H1 is falsified. The one efficacy axis Genesis has cannot speak about most of the molecules Genesis can generate: by D-162's measurement, on that majority the model is worse than predicting the training mean. The weight-loss candidate path is then blocked at the ranking/filtering gate for a reason that is a property of the data and the representation together, and the blocker is BLOCKED_SCIENCE on this representation plus BLOCKED_DATA on the number of chemically diverse functional-agonism small molecules."
+    },
+    {
+      "outcome": "NO_GENERABLE_CANDIDATE_SPACE",
+      "when": "All controls hold but the SMALL_MOLECULE parent count is < MIN_SMALL_MOLECULE_PARENTS, or the novel product set has fewer than MIN_NOVEL_PRODUCTS members.",
+      "means": "H1 is UNTESTED, neither supported nor falsified, and the failure is PRIOR to the model: this arm does not contain enough small-molecule chemistry for the production generator to build a candidate pool from at all. The binding blocker is then BLOCKED_DATA at the CANDIDATE POOL gate, and the quantity that binds is the number of non-peptidic functional-agonism compounds."
+    },
+    {
+      "outcome": "RUN_ABORTED",
+      "when": "Dataset drift, RDKit absent, misaligned featurization, a regenerated parent among the products, or a non-deterministic generation step.",
+      "means": "Nothing was measured. The abort code is the result."
+    }
+  ],
+  "frozenPrediction": {
+    "author": "Claude Opus 5, session 01SdX7fcgVg9gVqH8emoF5qw, before the first number of this run was computed and before any molecular weight or amide count of this arm was read",
+    "primary": "NO_GENERABLE_CANDIDATE_SPACE",
+    "reasoning": "D-153 and D-162 both describe the functional-agonism arm as peptide-heavy, and the one row of it printed during this audit is a 30-plus-residue peptide. If the small-molecule subset is a few dozen compounds, BRICS over groups of eight with a 64-product cap may well not reach a hundred distinct novel products, and the run would stop at the candidate-pool gate rather than reaching a coverage number.",
+    "secondary": "DOMAIN_COVERAGE_INSUFFICIENT",
+    "secondaryReasoning": "If enough products are built, BRICS recombination mixes fragments across parents and the products are by construction chimeras rather than close analogues of any single parent, so most of them should land below 0.60 to the arm.",
+    "intervals": {
+      "ifProductsAreGenerated_inDomainFraction": [0.0, 0.25],
+      "smallMoleculeParentCount": [10, 70],
+      "novelProductCount": [0, 400]
+    },
+    "whatWouldSurpriseTheAuthor": "An in-domain fraction at or above 0.50 over more than a hundred novel products, which would mean BRICS recombination of this arm stays inside its own chemical neighbourhood.",
+    "recordedWrongRatherThanDropped": "This prediction is copied into the sealed artefact verbatim whatever the outcome, exactly as D-153's and D-162's wrong predictions were."
+  },
+  "negativeControlReportedAlways": "The same nearest-neighbour statistic computed for the 206 ARM COMPOUNDS against each other (leave-one-out: each compound's maximum Tanimoto to any OTHER arm compound). It says how tight the arm itself is and therefore how much of a low in-domain fraction is a property of the generator rather than of the arm. It can only weaken a claim, never strengthen one, and is reported whatever the outcome.",
+  "forbidden": [
+    "editing packages/backend/src/campaign/glp1r-validation-gate.json or any of its thresholds",
+    "editing or re-running any sealed artefact of D-143, D-144, D-151, D-152, D-153, D-154, D-156, D-157, D-162",
+    "moving an assay between roles",
+    "registering any GLP-1R docking target, including 6X18 (D-159)",
+    "changing DOMAIN_FLOOR, MIN_IN_DOMAIN_FRACTION, MIN_NOVEL_PRODUCTS, MIN_SMALL_MOLECULE_PARENTS, the small-molecule cuts or any generation parameter after a number is read",
+    "reporting this run's outcome as a gate verdict or as a statement about the model's accuracy",
+    "nominating, ranking, promoting or naming any molecule as a candidate or a lead on the strength of this run",
+    "touching docs/evidence/run8-status.json or the Run 8 / Run 9 preregistrations"
+  ],
+  "runner": "scripts/glp1r-d164-domain-coverage.mjs",
+  "sealedOutput": "packages/backend/src/campaign/glp1r-d164-domain-coverage.sealed.json"
+}

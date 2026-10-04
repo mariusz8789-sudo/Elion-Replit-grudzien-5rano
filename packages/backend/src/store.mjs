@@ -660,6 +660,125 @@ CREATE TABLE IF NOT EXISTS discovery_timing_campaign_links (
 );
 `;
 
+// V18: HUMAN WORK — the same instrumentation as v17, extended so the owner's principle ("Genesis takes
+// the human's work onto itself; a person doing work Genesis could do correctly, reproducibly, under
+// Evidence, safely and automatically is a PRODUCT BUG") becomes a number instead of a slogan. Still one
+// measurement system: these tables sit next to the v17 ones, are read by the same
+// `src/discoveryTiming.mjs`, and introduce no second clock and no second state machine.
+//
+//  - `discovery_loop_steps` is the step CLASSIFICATION. One class per step
+//    (AUTOMATED / HUMAN_APPROVAL_ONLY / HUMAN_REQUIRED / EXTERNAL_PHYSICAL_ACTION), enforced by a CHECK.
+//    `why_human_required` is NOT NULL and non-empty FOR EVERY `HUMAN_REQUIRED` ROW, enforced by a table
+//    CHECK, because the owner's rule is that a human step without a strong reason gets automated instead
+//    of recorded. `coverage_exclusion` names which of the four admitted reasons (physical presence, legal
+//    responsibility, a real measurement, mandatory human review) removes a step from the
+//    AUTOMATION_COVERAGE denominator; an AUTOMATED step can never be excluded, so the denominator cannot
+//    be shrunk around work Genesis already does. This table is the only table in the family that is NOT
+//    append-only: it is a projection of a frozen constant in code (`LOOP_STEPS`), re-synchronised on
+//    demand, not an observation. Observations are the other three tables.
+//  - `discovery_human_touches` is append-only and is the ONLY source of human ACTIVE time: one row per
+//    thing a person actually did, with the actor, the step, the kind of touch and the active
+//    milliseconds. Human-WAIT time stays where v17 put it (`discovery_stage_facts`, kind HUMAN_WAIT):
+//    waiting is not working, and the two are never summed.
+//  - `discovery_human_work_baselines` holds what a person WITHOUT Genesis needed for the same task
+//    scope. Nothing in this repository can produce such a row from its own data — it is a measurement of
+//    work performed outside Genesis — so every provenance column is NOT NULL and CHECKed non-empty,
+//    exactly as `discovery_competitor_baselines` is. With no matching row, hours saved, lab hours
+//    avoided, experiments avoided and cost are the literal string UNKNOWN, never 0 and never estimated.
+//  - `discovery_cost_rates` holds the prices COST_TO_DECISION needs (scientist, compute, laboratory).
+//    No rate is built into the code; without a recorded, provenanced rate row there is no cost figure.
+const SCHEMA_V18 = `
+CREATE TABLE IF NOT EXISTS discovery_loop_steps (
+  step_id            TEXT PRIMARY KEY CHECK (trim(step_id) <> ''),
+  seq                INTEGER NOT NULL CHECK (seq > 0),
+  stage              TEXT NOT NULL CHECK (trim(stage) <> ''),
+  step_class         TEXT NOT NULL CHECK (step_class IN ('AUTOMATED','HUMAN_APPROVAL_ONLY','HUMAN_REQUIRED','EXTERNAL_PHYSICAL_ACTION')),
+  why_human_required TEXT,
+  coverage_exclusion TEXT CHECK (coverage_exclusion IS NULL OR coverage_exclusion IN ('PHYSICAL_PRESENCE','LEGAL_RESPONSIBILITY','REAL_MEASUREMENT','MANDATORY_HUMAN_REVIEW')),
+  justification      TEXT NOT NULL CHECK (trim(justification) <> ''),
+  code_ref           TEXT NOT NULL CHECK (trim(code_ref) <> ''),
+  created_at         INTEGER NOT NULL,
+  CHECK (step_class <> 'HUMAN_REQUIRED' OR (why_human_required IS NOT NULL AND trim(why_human_required) <> '')),
+  CHECK (why_human_required IS NULL OR trim(why_human_required) <> ''),
+  CHECK (step_class <> 'AUTOMATED' OR coverage_exclusion IS NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_loop_steps_stage ON discovery_loop_steps(stage);
+CREATE INDEX IF NOT EXISTS idx_discovery_loop_steps_class ON discovery_loop_steps(step_class);
+
+CREATE TABLE IF NOT EXISTS discovery_human_touches (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  scope_kind  TEXT NOT NULL CHECK (scope_kind IN ('RESEARCH_RUN','EXPERIMENT','CAMPAIGN')),
+  scope_id    TEXT NOT NULL CHECK (scope_id <> ''),
+  stage       TEXT NOT NULL CHECK (stage <> ''),
+  step_id     TEXT NOT NULL CHECK (step_id <> ''),
+  touch_kind  TEXT NOT NULL CHECK (touch_kind IN ('QUESTION','APPROVAL','DECISION','REVIEW','DATA_ENTRY','PHYSICAL_ACTION','MEASUREMENT')),
+  actor       TEXT NOT NULL CHECK (actor <> ''),
+  active_ms   INTEGER NOT NULL CHECK (active_ms >= 0),
+  ref         TEXT,
+  campaign_id TEXT,
+  detail_json TEXT,
+  at_ms       INTEGER NOT NULL CHECK (at_ms >= 0),
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_human_touches_scope ON discovery_human_touches(scope_kind, scope_id);
+CREATE INDEX IF NOT EXISTS idx_discovery_human_touches_campaign ON discovery_human_touches(campaign_id) WHERE campaign_id IS NOT NULL;
+CREATE TRIGGER IF NOT EXISTS discovery_human_touches_append_only_update BEFORE UPDATE ON discovery_human_touches
+BEGIN SELECT RAISE(ABORT, 'discovery_human_touches is append-only: a recorded human touch cannot be rewritten'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_human_touches_append_only_delete BEFORE DELETE ON discovery_human_touches
+BEGIN SELECT RAISE(ABORT, 'discovery_human_touches is append-only: a recorded human touch cannot be deleted'); END;
+
+CREATE TABLE IF NOT EXISTS discovery_human_work_baselines (
+  id                 TEXT PRIMARY KEY,
+  task_scope_id      TEXT NOT NULL CHECK (task_scope_id <> ''),
+  task_scope_hash    TEXT NOT NULL CHECK (length(task_scope_hash) = 64),
+  stage              TEXT NOT NULL CHECK (stage <> ''),
+  evidence_standard  TEXT NOT NULL CHECK (evidence_standard <> ''),
+  active_human_ms    INTEGER NOT NULL CHECK (active_human_ms >= 0),
+  wall_clock_ms      INTEGER NOT NULL CHECK (wall_clock_ms > 0),
+  lab_instrument_ms  INTEGER NOT NULL CHECK (lab_instrument_ms >= 0),
+  experiments        INTEGER NOT NULL CHECK (experiments >= 0),
+  failed_experiments INTEGER NOT NULL CHECK (failed_experiments >= 0),
+  cost_minor         INTEGER NOT NULL CHECK (cost_minor >= 0),
+  currency           TEXT NOT NULL CHECK (length(currency) = 3),
+  measured_by        TEXT NOT NULL CHECK (measured_by <> ''),
+  measured_at        TEXT NOT NULL CHECK (measured_at <> ''),
+  measurement_method TEXT NOT NULL CHECK (measurement_method <> ''),
+  source_uri         TEXT NOT NULL CHECK (source_uri <> ''),
+  source_sha256      TEXT NOT NULL CHECK (length(source_sha256) = 64),
+  provenance_json    TEXT NOT NULL CHECK (provenance_json <> ''),
+  provenance_hash    TEXT NOT NULL CHECK (length(provenance_hash) = 64),
+  created_at         INTEGER NOT NULL,
+  CHECK (failed_experiments <= experiments)
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_human_work_baselines_scope
+  ON discovery_human_work_baselines(task_scope_id, stage);
+CREATE TRIGGER IF NOT EXISTS discovery_human_work_baselines_append_only_update BEFORE UPDATE ON discovery_human_work_baselines
+BEGIN SELECT RAISE(ABORT, 'discovery_human_work_baselines is append-only: a recorded baseline cannot be edited'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_human_work_baselines_append_only_delete BEFORE DELETE ON discovery_human_work_baselines
+BEGIN SELECT RAISE(ABORT, 'discovery_human_work_baselines is append-only: a recorded baseline cannot be deleted'); END;
+
+CREATE TABLE IF NOT EXISTS discovery_cost_rates (
+  id                       TEXT PRIMARY KEY,
+  currency                 TEXT NOT NULL CHECK (length(currency) = 3),
+  scientist_minor_per_hour INTEGER NOT NULL CHECK (scientist_minor_per_hour >= 0),
+  compute_minor_per_hour   INTEGER NOT NULL CHECK (compute_minor_per_hour >= 0),
+  lab_minor_per_hour       INTEGER NOT NULL CHECK (lab_minor_per_hour >= 0),
+  effective_from           TEXT NOT NULL CHECK (effective_from <> ''),
+  measured_by              TEXT NOT NULL CHECK (measured_by <> ''),
+  measured_at              TEXT NOT NULL CHECK (measured_at <> ''),
+  measurement_method       TEXT NOT NULL CHECK (measurement_method <> ''),
+  source_uri               TEXT NOT NULL CHECK (source_uri <> ''),
+  source_sha256            TEXT NOT NULL CHECK (length(source_sha256) = 64),
+  provenance_json          TEXT NOT NULL CHECK (provenance_json <> ''),
+  provenance_hash          TEXT NOT NULL CHECK (length(provenance_hash) = 64),
+  created_at               INTEGER NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS discovery_cost_rates_append_only_update BEFORE UPDATE ON discovery_cost_rates
+BEGIN SELECT RAISE(ABORT, 'discovery_cost_rates is append-only: a recorded rate cannot be edited'); END;
+CREATE TRIGGER IF NOT EXISTS discovery_cost_rates_append_only_delete BEFORE DELETE ON discovery_cost_rates
+BEGIN SELECT RAISE(ABORT, 'discovery_cost_rates is append-only: a recorded rate cannot be deleted'); END;
+`;
+
 /**
  * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
  * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
@@ -670,7 +789,7 @@ CREATE TABLE IF NOT EXISTS discovery_timing_campaign_links (
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -778,6 +897,17 @@ function migrate(db) {
   if (version < 17) {
     db.exec(SCHEMA_V17);
     db.exec('PRAGMA user_version = 17');
+  }
+  // v18: HUMAN WORK tables (step classification, human touches, human-work baselines, cost rates).
+  // Purely additive, like v17: a database from any earlier version keeps every row it had and gains
+  // four tables, three of them empty by design. The classification table stays empty until
+  // `syncLoopStepClassification()` is called, because the classification is a declaration in code and
+  // migration is not the place to assert what the loop does. A run that happened before this migration
+  // has no human touches recorded, so its human-work ratios read UNKNOWN — the correct state (nothing
+  // was measured then), never a zero that would read as "no human did anything".
+  if (version < 18) {
+    db.exec(SCHEMA_V18);
+    db.exec('PRAGMA user_version = 18');
   }
 }
 

@@ -39,6 +39,7 @@ import {
   parseWorldProposalToolResponse,
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
+import { syncLoopStepClassification } from './discoveryTiming.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
@@ -110,6 +111,15 @@ try {
 } catch (err) {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
+}
+// The HUMAN WORK step classification (discoveryTiming.mjs LOOP_STEPS) is a declaration in code; this
+// projects it into `discovery_loop_steps` once at boot so the running deployment's database can be
+// audited against what the running code claims. Idempotent, and the read-only report falls back to the
+// code declaration when it has not run, so a failure here costs auditability, not correctness.
+if (db) {
+  try { syncLoopStepClassification(db); } catch (err) {
+    console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'loop_step_classification_sync_failed', message: String(err?.message) }));
+  }
 }
 // Evidence ledger of the knowledge channel (proposals, published records): append-only rows in genesis.db (V16), shared
 // by every process on the file; the JSON file beside the DB is imported once if the table is empty, then kept as an export.

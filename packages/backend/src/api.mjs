@@ -79,7 +79,7 @@ import { buildSelfModel } from './genesisSelfModel.mjs';
 import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { proposeScientificClaim } from './claimProposal.mjs';
 import { getResearchRun, listResearchRuns, proposeResearchPlan, RESEARCH_RUN_DOMAIN, startResearchRun, steerResearchRun } from './researchRun.mjs';
-import { campaignCycleTiming, discoveryTimingReport, genesisSpeedup } from './discoveryTiming.mjs';
+import { campaignCycleTiming, campaignHumanWorkReport, discoveryTimingReport, genesisSpeedup, humanWorkReport } from './discoveryTiming.mjs';
 import { buildExecutionBundle, recoverMissingArtifacts, verifyExperimentArtifact } from './researchRunArtifacts.mjs';
 import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './researchRunEvidencePack.mjs';
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
@@ -909,6 +909,25 @@ export function handleApi(db, ctx) {
           genesisSpeedup: genesisSpeedup(db, { scopeKind: 'RESEARCH_RUN', scopeId: current.researchRunId }),
         });
       }
+      // Read-only HUMAN WORK readout for one run: the step classification with its justifications, and
+      // the owner's metrics computed from recorded data only. Every quantity that needs a baseline of
+      // what a person would have done WITHOUT Genesis reads the literal UNKNOWN, because no such
+      // baseline exists in this repository. `taskScopeId`, `taskScope` and `evidenceStandard` in the
+      // query only DECLARE which recorded baseline could be compared; they are never values.
+      if (seg.length === 5 && seg[4] === 'human-work') {
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        let declaredTaskScope = null;
+        if (typeof ctx.query?.taskScope === 'string' && ctx.query.taskScope) {
+          try { declaredTaskScope = JSON.parse(ctx.query.taskScope); } catch { return err(400, 'invalid_task_scope'); }
+        }
+        return ok({
+          humanWork: humanWorkReport(db, 'RESEARCH_RUN', current.researchRunId, {
+            taskScopeId: typeof ctx.query?.taskScopeId === 'string' && ctx.query.taskScopeId ? ctx.query.taskScopeId : null,
+            taskScope: declaredTaskScope,
+            evidenceStandard: typeof ctx.query?.evidenceStandard === 'string' && ctx.query.evidenceStandard ? ctx.query.evidenceStandard : null,
+          }),
+        });
+      }
       if (seg.length === 5 && seg[4] === 'steering') {
         if (method !== 'POST') return err(405, 'method_not_allowed');
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
@@ -1287,6 +1306,22 @@ export function handleApi(db, ctx) {
         return ok({
           timeToDiscovery: campaignCycleTiming(db, campaignId),
           genesisSpeedup: genesisSpeedup(db, { scopeKind: 'CAMPAIGN', scopeId: campaignId }),
+        });
+      }
+
+      // Read-only: this campaign's HUMAN WORK readout, aggregated over the campaign and every run
+      // linked to it. Same honesty invariant as the per-run route.
+      if (seg.length === 5 && seg[4] === 'human-work' && method === 'GET') {
+        let declaredTaskScope = null;
+        if (typeof ctx.query?.taskScope === 'string' && ctx.query.taskScope) {
+          try { declaredTaskScope = JSON.parse(ctx.query.taskScope); } catch { return err(400, 'invalid_task_scope'); }
+        }
+        return ok({
+          humanWork: campaignHumanWorkReport(db, campaignId, {
+            taskScopeId: typeof ctx.query?.taskScopeId === 'string' && ctx.query.taskScopeId ? ctx.query.taskScopeId : null,
+            taskScope: declaredTaskScope,
+            evidenceStandard: typeof ctx.query?.evidenceStandard === 'string' && ctx.query.evidenceStandard ? ctx.query.evidenceStandard : null,
+          }),
         });
       }
 

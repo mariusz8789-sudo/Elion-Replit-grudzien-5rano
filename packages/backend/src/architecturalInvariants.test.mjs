@@ -541,9 +541,15 @@ describe('INVARIANT: one schema authority', () => {
     assert.deepEqual(named, [], report(named, [], 'A module names CURRENT_SCHEMA_VERSION without importing store.mjs.'));
   });
 
-  it('the schema the code knows is v17, declared once', () => {
+  it('the schema version is declared once, and the timing migration is in it', () => {
+    // The invariant is "one declaration", not "one number": additive migrations keep arriving and
+    // pinning the newest version here would make every one of them break an architectural test.
+    // What must stay true is that store.mjs is the single declaring authority and that the v17
+    // discovery-timing upgrade is still part of the chain.
     const store = SOURCE.get('packages/backend/src/store.mjs');
-    assert.match(store, /export const CURRENT_SCHEMA_VERSION = 17;/, 'store.mjs must declare CURRENT_SCHEMA_VERSION = 17 (the discoveryTiming schema).');
+    const declared = Number(store.match(/export const CURRENT_SCHEMA_VERSION = (\d+);/)?.[1]);
+    assert.ok(declared >= 17, `store.mjs must declare CURRENT_SCHEMA_VERSION >= 17 (the discoveryTiming schema); got ${declared}.`);
+    assert.match(store, /if \(version < 17\)/, 'the v17 discoveryTiming migration gate disappeared from store.mjs.');
     assert.equal((store.match(/export const CURRENT_SCHEMA_VERSION/g) ?? []).length, 1, 'CURRENT_SCHEMA_VERSION must be declared exactly once.');
   });
 });

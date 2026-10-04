@@ -1,0 +1,147 @@
+{
+  "kind": "GENESIS_SCIENTIST_CHALLENGE_PACK",
+  "contractVersion": 1,
+  "packVisibility": "PUBLIC_NO_STRUCTURE",
+  "verdict": "NO_CANDIDATE",
+  "candidateId": "TRACK-A-CHEMBL4297839",
+  "structureHash": "9806b766dde1196aa6cfa397255bf727c9f1c5cce2f7fa782a149e7a804f035a",
+  "structureWithheld": true,
+  "structureWithheldReason": "A public pack carries no structure by default.",
+  "scientificQuestion": "Is there a molecule for which Genesis can today produce a defensible computational candidacy for body-weight reduction on the incretin axis, at a defensible trade-off across efficacy, safety, tolerability, toxicity, laboratory cost, defensibility and reproducibility?",
+  "hypothesis": "H0 (the one actually tested across D-143 to D-164): Genesis can rank or filter weight-reduction candidates on the incretin axis using the evidence and engines it has. Every preregistered test of a component of H0 has either failed or returned BLOCKED.",
+  "mechanism": [
+    {
+      "target": "GLP1R",
+      "biologicalRationale": "Receptor whose activation raises cAMP through Gs; the axis every approved incretin-based weight-reduction medicine acts on.",
+      "humanExpression": "HPA reports GLP1R RNA as tissue-enhanced, detected in some, pancreas 8.6 and heart muscle 2.6 nTPM, highest at single-cell level in tuft cells 46.1, pancreatic islet cells 23.3 and lacrimal acinar cells 19.0 nCPM — all transcript level. HPA's own antibody staining does NOT support tissue expression (protein tissue specificity not detected, one antibody, no immunohistochemistry reliability), and HPA's own evidence level for this gene is transcript level. The counterweight travels with the numbers (D-155).",
+      "pathway": "Reactome 97: R-HSA-381706 -> R-HSA-422320 -> R-HSA-381704 -> R-HSA-381607, each link verified against the downstream record's own precedingEvent field.",
+      "pathwayCaveats": [
+        "Reactome states Gs heterotrimers are not observed to significantly dissociate in living cells.",
+        "Reactome states the adenylyl-cyclase VIII evidence is by analogy with AC I and II from rat beta cells, while human beta cells carry AC V and VI."
+      ],
+      "expectedPhenotype": "UNKNOWN from these sources. A pathway record is not evidence that activating the receptor reduces body weight, and this audit does not make that leap.",
+      "knownModulators": "the pinned record holds 20 molecules across GLP1R/GIPR/GCGR with measured median potencies, from peptides to small molecules (see baselineMatrix)",
+      "humanEvidence": "the pinned ClinicalTrials.gov records in the baseline matrix, per trial and per arm",
+      "safetyLiabilities": "gastrointestinal events are common across the deposited arms of these trials; the matrix reports them per arm and computes no cross-trial comparison",
+      "crossReactivity": "UNKNOWN in this runtime — no selectivity panel, no off-target model, and GIPR/GCGR potencies are present for only some pinned molecules",
+      "knownFailedProgrammes": "UNKNOWN from the pinned record alone. The pinned table does carry molecules at max_phase 2 that are not approved, which is suggestive and not evidence; establishing why a programme stopped needs a literature search this runtime cannot perform.",
+      "uncertainty": "The biology is source-backed. The step from receptor activation to weight reduction in a human is not, in these sources, and is not asserted."
+    },
+    {
+      "target": "OTHER_MECHANISMS_FOR_APPETITE_SATIETY_AND_METABOLIC_BALANCE",
+      "biologicalRationale": "The owner asked for mechanism search rather than another GLP-1 agonist: GIP, glucagon, amylin, PYY, oxyntomodulin and further endogenous axes.",
+      "status": "BLOCKED_EXTERNAL",
+      "whatIsInTheRepositoryAlready": "the pinned table carries GIPR and GCGR median potencies for some molecules, and GLUCAGON, GLP-1, EXENATIDE, COTADUTIDE, ADOMEGLIVANT and MK-0893 as rows, so the glucagon and dual-agonist axes are partly represented",
+      "whatIsMissing": "amylin, PYY and oxyntomodulin have no pinned bioactivity or trial record here, and no source that carries them is reachable from this runtime; a mechanism survey that named them from memory would be exactly the fabrication this audit refuses",
+      "whatWouldCloseIt": "one hash-recorded fetch per axis of the target, pathway, expression and trial records, which needs network egress this container does not have"
+    }
+  ],
+  "methodology": "Preregistered decisions, each frozen in its own commit before the code that could produce a number under it existed; real engines only; sealed artefacts carrying their preregistration fingerprint; a frozen prediction recorded wrong rather than dropped.",
+  "results": {
+    "sealedDecisions": [
+      {
+        "decision": "d153FunctionalModel",
+        "artefact": "glp1r-d153-functional-model.sealed.json",
+        "bodyHash": "0480012a8e0ae716"
+      },
+      {
+        "decision": "d153PostHoc",
+        "artefact": "glp1r-d153-posthoc-similarity.json",
+        "bodyHash": "682acd15070bdc87"
+      },
+      {
+        "decision": "d154StructureSelection",
+        "artefact": "glp1r-d154-structure-selection.sealed.json",
+        "bodyHash": "75856ab883b4d2c9"
+      },
+      {
+        "decision": "d155PathwayExpression",
+        "artefact": "glp1r-d155-pathway-expression.external-evidence.json",
+        "bodyHash": "956eec789397b92d"
+      },
+      {
+        "decision": "d156WiderSet",
+        "artefact": "glp1r-d156-structure-selection-wider-set.sealed.json",
+        "bodyHash": "e1a0932db5631834"
+      },
+      {
+        "decision": "d157AssayRoleAudit",
+        "artefact": "glp1r-d157-assay-role-audit.sealed.json",
+        "bodyHash": "9c5ea0b92bf5e3e8"
+      },
+      {
+        "decision": "d162ApplicabilityDomain",
+        "artefact": "glp1r-d162-applicability-domain.sealed.json",
+        "bodyHash": "6e4b6ec3535749e3"
+      },
+      {
+        "decision": "d164DomainCoverage",
+        "artefact": "glp1r-d164-domain-coverage.sealed.json",
+        "bodyHash": "d1cb4428d927c1f4"
+      }
+    ],
+    "headlineNegatives": [
+      "D-144: the named featurization has no predictive power on this target's small molecules.",
+      "D-154 and D-156: of six authoritative structures, none is simultaneously clean, active-state and small-molecule-bound.",
+      "D-162: the efficacy model collapses outside its training series, worse than a train-mean baseline.",
+      "D-164: 94.0% of the generable novel product space lies outside that model's measured reach."
+    ]
+  },
+  "everyNegativeResult": [
+    {
+      "decision": "D-144",
+      "result": "GENESIS-MOL-01 = NO_WINNER. Morgan r=2 512-bit ECFP4 ridge has no predictive power on GLP-1R small molecules (R2 -29.29, then -0.1352); the best combined arm missed the gate at MAE 1.0118 against MAX_MAE 1.0. Never reinterpreted."
+    },
+    {
+      "decision": "D-153",
+      "result": "A pass, with the load-bearing caveat recorded in the same seal: nearest-neighbour Tanimoto from test to train had median 0.8415 and 22 of 53 test rows at or above 0.90, so the model interpolates within one chemical series. The author's frozen prediction of failure was wrong and is recorded wrong."
+    },
+    {
+      "decision": "D-154",
+      "result": "NO_STRUCTURE_SELECTED. 7C2E fails the 4.0 Angstrom resolution ceiling at 4.2; 7S15 has no G protein in the record and 8 engineered mutations inside its transmembrane region. The threshold was not relaxed after the numbers were known."
+    },
+    {
+      "decision": "D-156",
+      "result": "6X18 selected but carrying POCKET_DEFINED_FROM_PEPTIDE_CONTEXT: its orthosteric site holds a 30-residue peptide. 6B3J, 6LN2 and 5VEW each fail the same unchanged rule."
+    },
+    {
+      "decision": "D-159",
+      "result": "The owner refused to register 6X18 as a docking target. Genesis still has no GLP-1R docking target and the registry holds only ABL1_1IEP."
+    },
+    {
+      "decision": "D-162",
+      "result": "EXTRAPOLATION_NOT_SUPPORTED. MAE 3.4847, R2 -13.0013 on a holdout at maximum Tanimoto 0.5991 to train, against a train-mean baseline of MAE 2.2171 and R2 -4.9723 on the same rows. The frozen prediction was wrong twice and is recorded wrong twice."
+    },
+    {
+      "decision": "D-164",
+      "result": "DOMAIN_COVERAGE_INSUFFICIENT. 43 of 714 generable novel products (6.0%) reach the 0.60 boundary; median 0.2927. The negative control shows the arm itself at median 0.9333 with 96.6% above that boundary, so the arm is one tight neighbourhood and the generator leaves it immediately. The frozen prediction of NO_GENERABLE_CANDIDATE_SPACE was wrong and is recorded wrong."
+    },
+    {
+      "decision": "engine probes, this audit",
+      "result": "docking docking_unavailable: No module named 'vina'; ADMET admet_ai_unavailable: No module named 'admet_ai'; route search AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'. RDKit 2026.03.6 is the only installed chemistry engine."
+    },
+    {
+      "decision": "egress probes, this audit",
+      "result": "www.ebi.ac.uk, pubchem.ncbi.nlm.nih.gov, clinicaltrials.gov, files.rcsb.org and api.crossref.org all refused at the proxy, so no literature, patent, supplier or building-block search is possible from this runtime."
+    }
+  ],
+  "replayProof": {
+    "status": "NOT_APPLICABLE",
+    "reason": "no candidate science run exists to replay. The sealed runs are deterministic and re-runnable from their runners, which is reproducibility but not a Replay verification of a candidate."
+  },
+  "whatStoppedIt": "3 blocking criterion/criteria do not hold: IDENTITY (identity incomplete — missing canonicalSmiles, inchi, inchiKey, molecularFormula, molWt, formalCharge, stereochemistry); NO_IDENTITY_CONFLICT (no identity records to cross-check — a single unchecked identity is not a checked one); NO_KNOWN_FATAL_PROPERTY (5 fatal safety criterion/criteria UNKNOWN: SERIOUS_ADVERSE_EVENT_RATE_WORSE_THAN_COMPARATOR, TREATMENT_DISCONTINUATION_FOR_ADVERSE_EVENTS_WORSE_THAN_COMPARATOR, PANCREATITIS_OR_GALLBLADDER_SIGNAL, KNOWN_FATAL_STRUCTURAL_LIABILITY, PREDICTED_CARDIOTOXICITY — UNKNOWN is not safe)",
+  "whatAPositiveResultDoesNotMean": [
+    "Not that the substance is a medicine. A measurement on a substance is not a therapeutic effect.",
+    "Not that the substance is safe or tolerable. Neither follows from any in-vitro or computed value.",
+    "Not that adverse effects are absent. That is a clinical finding and nothing in this pack reaches a clinical finding.",
+    "Not that the computational model was right in general. One agreeing measurement is one agreeing measurement.",
+    "Not that the molecule reduces body weight. A receptor response in a cell line is not a phenotype in an organism.",
+    "Not that a heterologous-system response is a native-tissue response.",
+    "Not that the computational model was right: for a molecule outside the model's measured applicability domain there is no prediction to be right about."
+  ],
+  "chemistryHandoffIncluded": false,
+  "ipReview": "PASS",
+  "unsigned": true,
+  "claimBoundary": "A computational result and the state of the evidence around it. Not a measurement in any organism, not a medicine, not safety clearance, and never a claim that adverse effects are absent.",
+  "packFingerprint": "a12679f271250a04"
+}

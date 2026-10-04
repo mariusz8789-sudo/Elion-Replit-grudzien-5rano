@@ -1,0 +1,233 @@
+{
+  "ruleId": "GENESIS-CANDIDATE-WINNER-GATE-V1",
+  "frozenFor": "docs/DECISIONS.md D-164 — the preregistered winner gate for a therapeutic computational candidate. Safety, toxicity and tolerability are first-class axes, scored separately from efficacy and never summed into one number.",
+  "frozenAt": "2026-10-04",
+  "ruleFingerprint": "1c4add3fbce57010",
+  "gate": {
+    "contractVersion": 1,
+    "verdicts": [
+      "REJECTED_SAFETY_VETO",
+      "NO_CANDIDATE",
+      "LEAD_FOR_FURTHER_VALIDATION",
+      "COMPUTATIONAL_CANDIDATE"
+    ],
+    "verdictThatDoesNotExist": "FINAL_WINNER",
+    "whyFinalWinnerDoesNotExist": "A computation cannot establish that a molecule is a medicine. The strongest verdict this gate can reach is COMPUTATIONAL_CANDIDATE: an identity plus an evidence trail a professional chemist and a laboratory can attack. No input, option, flag, threshold or external record can produce a stronger verdict, because no stronger verdict is defined.",
+    "targetAgnostic": true,
+    "targetAgnosticNote": "No criterion names a receptor, a disease or a molecule. The target, the axes' values and the fatal safety criteria all arrive in the dossier from the campaign's own preregistration. Weight reduction is the first demonstration campaign, not the gate's subject.",
+    "requiredCriteria": [
+      {
+        "id": "IDENTITY",
+        "blocking": true,
+        "asks": "Does the dossier carry a resolved chemical identity: canonical SMILES, InChI, InChIKey, molecular formula, molecular weight, formal charge, and an explicit stereochemistry statement?"
+      },
+      {
+        "id": "NO_IDENTITY_CONFLICT",
+        "blocking": true,
+        "asks": "Do all identity records in the dossier agree, with no two different structures under one candidate id and no two candidate ids under one InChIKey?"
+      },
+      {
+        "id": "PROVENANCE",
+        "blocking": true,
+        "asks": "Does every data item carry a source, a retrieval or computation record, and a licence statement, with no item left unattributed?"
+      },
+      {
+        "id": "NO_TAMPER",
+        "blocking": true,
+        "asks": "Does every hashed artefact in the dossier recompute to its recorded hash, and does the gate rule itself match the fingerprint the campaign preregistered?"
+      },
+      {
+        "id": "TARGET_RELEVANCE",
+        "blocking": true,
+        "asks": "Is there source-backed evidence that the named target or pathway is relevant to the campaign's stated phenotype, and that the candidate is proposed to act on it?"
+      },
+      {
+        "id": "NO_KNOWN_FATAL_PROPERTY",
+        "blocking": true,
+        "asks": "Is the candidate free of every fatal property the campaign preregistered, as judged by the engines and data actually available?"
+      },
+      {
+        "id": "MODEL_VALIDITY",
+        "blocking": false,
+        "asks": "For every fitted model whose output is read, did it clear its own frozen validation gate AND is this candidate inside that model's measured applicability domain?"
+      },
+      {
+        "id": "FALSIFICATION",
+        "blocking": false,
+        "asks": "Was a real attempt made to overturn the candidacy, with its findings recorded whether or not they were favourable?"
+      },
+      {
+        "id": "REPLAY_MATCH",
+        "blocking": false,
+        "asks": "Did every engine result the dossier relies on reproduce under the canonical Replay engine with verdict MATCH?"
+      },
+      {
+        "id": "EVIDENCE_PACK_VALID",
+        "blocking": false,
+        "asks": "Is there an Evidence Pack covering every science run the dossier relies on, including the negative results, and does it validate?"
+      },
+      {
+        "id": "CHEMISTRY_HANDOFF_COMPLETE",
+        "blocking": false,
+        "asks": "Is the chemistry handoff package COMPLETE — no item of its required schema left INCOMPLETE, UNKNOWN or BLOCKED?"
+      },
+      {
+        "id": "LAB_VALUE_OF_INFORMATION",
+        "blocking": false,
+        "asks": "Does every proposed physical experiment carry a LAB_VALUE_OF_INFORMATION record stating what is learned, whether it can change a decision, what it eliminates, whether a cheaper route exists, and whether public data already answers it?"
+      }
+    ],
+    "blockingCriteriaMeaning": "A blocking criterion that does not hold yields NO_CANDIDATE. There is no dossier content and no caller option that converts a failed blocking criterion into any other verdict.",
+    "nonBlockingCriteriaMeaning": "A non-blocking criterion that does not hold caps the verdict at LEAD_FOR_FURTHER_VALIDATION. It never yields NO_CANDIDATE on its own and never reaches COMPUTATIONAL_CANDIDATE.",
+    "axes": [
+      {
+        "id": "TARGET_RELEVANCE",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "EXPECTED_EFFICACY",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "SAFETY",
+        "direction": "higher_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "TOXICITY_RISK",
+        "direction": "lower_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "TOLERABILITY",
+        "direction": "higher_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "SELECTIVITY",
+        "direction": "higher_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "PHARMACOKINETIC_RISK",
+        "direction": "lower_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "METABOLIC_LIABILITY",
+        "direction": "lower_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "OFF_TARGET_RISK",
+        "direction": "lower_is_better",
+        "safetyAxis": true
+      },
+      {
+        "id": "EVIDENCE_STRENGTH",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "REPLAY",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "UNCERTAINTY",
+        "direction": "lower_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "AVAILABILITY_FOR_VALIDATION",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "LAB_VALIDATION_COST",
+        "direction": "lower_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "IP_LICENCE_COMMERCIAL_STATUS",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "REFERENCE_MATERIAL_AVAILABILITY",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      },
+      {
+        "id": "EXISTING_COMPOUND_STATUS",
+        "direction": "higher_is_better",
+        "safetyAxis": false
+      }
+    ],
+    "axesAreNeverSummed": true,
+    "axesAreNeverSummedNote": "There is no weighted total. Each axis is reported with its own status (MEASURED / MODEL_ESTIMATE / EXTERNAL_PUBLISHED / UNKNOWN / BLOCKED) and its own value, and an axis whose status is UNKNOWN is never treated as neutral or favourable. Collapsing the axes into one number is exactly the move that lets a high efficacy score hide an unacceptable safety signal, so no such number is computed anywhere in this gate.",
+    "safetyVeto": {
+      "isHard": true,
+      "effect": "REJECTED_SAFETY_VETO",
+      "rule": "If any preregistered fatal safety criterion of the campaign is MET, the verdict is REJECTED_SAFETY_VETO regardless of every other axis, every efficacy value, and every criterion that did hold. The veto is evaluated FIRST and short-circuits the rest of the gate.",
+      "efficacyCannotOverrideIt": true,
+      "unknownIsNotSafe": "A fatal safety criterion whose data is missing is reported UNKNOWN. UNKNOWN does not trigger the veto, because a veto is an assertion and there is nothing to assert; it instead fails the NO_KNOWN_FATAL_PROPERTY criterion unless the campaign's preregistration states that this criterion may be left unevaluated, and that statement must itself be preregistered.",
+      "neverClaimZeroSideEffects": "No verdict, axis or statement produced under this gate may assert the absence of adverse effects. Absence of adverse effects is a clinical finding and this gate reaches no clinical findings."
+    },
+    "tracks": {
+      "A_EXISTING_OR_REPURPOSING": {
+        "order": 1,
+        "strictness": "standard",
+        "note": "A known drug, agonist, peptide or molecule that already carries experimental or clinical data. A repurposing hypothesis is labelled COMPUTATIONAL_REPURPOSING_HYPOTHESIS and never changes an indication on model output alone."
+      },
+      "B_KNOWN_FAMILY": {
+        "order": 2,
+        "strictness": "standard",
+        "note": "A known peptide or hormone family the human literature supports. Natural origin never raises a safety axis by itself."
+      },
+      "C_NOVEL_COMPUTATIONAL": {
+        "order": 3,
+        "strictness": "stricter",
+        "note": "A novel computational lead, admissible only where tracks A and B are insufficient. Because it carries less real safety data it must satisfy every non-blocking criterion as well, so for track C there are no non-blocking criteria."
+      }
+    },
+    "trackCStrictnessRule": "For a track C candidate every criterion in requiredCriteria is treated as blocking. A novel structure with thinner safety data may not reach COMPUTATIONAL_CANDIDATE on a weaker evidence trail than a known compound would need.",
+    "preferenceOrderAtComparableScience": [
+      "EXISTING_LEGAL_REFERENCE_COMPOUND",
+      "EXISTING_DESCRIBED_COMPOUND",
+      "EXISTING_PEPTIDE_OR_ANALOGUE_WITH_DATA",
+      "NEW_MOLECULE_REQUIRING_SYNTHESIS"
+    ],
+    "preferenceIsATieBreakOnly": "The preference order applies only between candidates whose scientific profile is comparable on every axis. A known compound never outranks a better-evidenced one, and the science gate has precedence over the preference order in every case.",
+    "ipGate": {
+      "rule": "A candidate whose structure is a new computational proposal, or whose novelty is unverified, is marked IP_REVIEW_REQUIRED.",
+      "effectOnPublicPack": "Under IP_REVIEW_REQUIRED the public pack carries the candidate id, a structure hash, the mechanism, the methodology, the results and the Replay proof, and carries no SMILES, no InChI, no InChIKey, no formula, no structure file and no chemistry handoff package.",
+      "forbiddenPhrasesInAnyPack": [
+        "AI cured",
+        "drug discovered",
+        "clinically proven",
+        "zero side effects",
+        "no side effects",
+        "validated",
+        "signed evidence"
+      ]
+    },
+    "lowCostFirst": {
+      "rule": "No physical experiment may be proposed as required until the cheaper routes have been exhausted or recorded as BLOCKED: public literature, existing assays, the pinned external datasets, existing reference compounds, existing clinical and safety records, the real engines, QSAR only inside a measured applicability domain, docking only against a scientifically defensible target and pocket, ADMET within its licence gate, falsification, Replay and the Evidence Pack.",
+      "everyProposedExperimentNeeds": [
+        "whatIsLearned",
+        "canChangeADecision",
+        "whichCandidateItEliminates",
+        "cheaperRouteToSameInformation",
+        "publicDataAlreadyAnswersIt"
+      ]
+    },
+    "evidenceClassesThatMayNotRank": [
+      "MODEL_ESTIMATE"
+    ],
+    "evidenceClassesThatMayNotRankNote": "Decision D-069 Option A, unchanged: a MODEL_ESTIMATE may rule a candidate OUT and may never rank candidates IN. This gate reads model estimates as filters and as uncertainty, never as a ranking term.",
+    "verdictsAreListedWeakestFirst": "The list is ordered weakest to strongest and that order IS the ranking order. REJECTED_SAFETY_VETO is weakest because it is an affirmative rejection, where NO_CANDIDATE is only an unmet requirement."
+  }
+}

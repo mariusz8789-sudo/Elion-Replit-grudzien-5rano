@@ -505,6 +505,55 @@ def main():
         print(json.dumps({"ok": True, "data": data, "engine": "RDKit " + rdkit.__version__}))
         return
 
+    # STEREOCHEMISTRY AND TAUTOMERS (D-164, chemistry handoff).
+    #
+    # A handoff package has to say whether the SMILES it carries names ONE molecule.
+    # Both answers below come straight from RDKit and from nowhere else:
+    #   FindPotentialStereo        -> every stereo element, specified or not
+    #   CalcNumUnspecifiedAtomStereoCenters -> the count that makes the identity ambiguous
+    #   MolStandardize.TautomerEnumerator   -> the canonical tautomer and how many exist
+    # No value here is estimated. A missing RDKit sub-module yields an explicit error,
+    # never a substituted number.
+    if cmd == "stereo":
+        try:
+            elements = []
+            for e in Chem.FindPotentialStereo(mol):
+                elements.append({
+                    "type": str(e.type),
+                    "centeredOn": int(e.centeredOn),
+                    "specified": str(e.specified),
+                    "descriptor": str(e.descriptor),
+                })
+            assigned = rdMolDescriptors.CalcNumAtomStereoCenters(mol)
+            unassigned = rdMolDescriptors.CalcNumUnspecifiedAtomStereoCenters(mol)
+        except Exception as e:  # noqa: BLE001 — brak modulu => blad, nie zmyslona liczba
+            print(json.dumps({"ok": False, "error": "stereo_unavailable: %s" % e}))
+            return
+        tautomers = None
+        try:
+            from rdkit.Chem.MolStandardize import rdMolStandardize
+            te = rdMolStandardize.TautomerEnumerator()
+            canon = Chem.MolToSmiles(te.Canonicalize(mol))
+            enumerated = list(te.Enumerate(mol))
+            tautomers = {
+                "canonicalTautomerSmiles": canon,
+                "enumeratedCount": len(enumerated),
+                "inputIsCanonicalTautomer": bool(canon == Chem.MolToSmiles(mol)),
+            }
+        except Exception as e:  # noqa: BLE001
+            tautomers = {"error": "tautomer_enumeration_unavailable: %s" % e}
+        print(json.dumps({
+            "ok": True,
+            "canonicalSmiles": Chem.MolToSmiles(mol),
+            "stereoElements": elements,
+            "assignedAtomStereocentres": assigned,
+            "unassignedAtomStereocentres": unassigned,
+            "namesOneMolecule": bool(unassigned == 0),
+            "tautomers": tautomers,
+            "engine": "RDKit " + rdkit.__version__,
+        }))
+        return
+
     print(json.dumps({"ok": False, "error": "unknown_cmd: %s" % cmd}))
 
 

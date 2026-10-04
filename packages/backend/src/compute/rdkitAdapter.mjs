@@ -332,6 +332,34 @@ export function embed3d(smiles, seed = 42) {
   }
 }
 
+/**
+ * Stereo elements, assigned/unassigned stereocentre counts and the canonical tautomer,
+ * computed by RDKit (D-164). Used by the chemistry handoff package to state whether the
+ * SMILES it carries names ONE molecule. No value is estimated: a missing RDKit
+ * sub-module comes back as an error, never as a substituted number.
+ */
+export function stereochemistry(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'stereo', smiles: String(smiles ?? '') });
+    return r.ok
+      ? {
+        ok: true,
+        canonicalSmiles: r.canonicalSmiles,
+        stereoElements: r.stereoElements ?? [],
+        assignedAtomStereocentres: r.assignedAtomStereocentres,
+        unassignedAtomStereocentres: r.unassignedAtomStereocentres,
+        namesOneMolecule: r.namesOneMolecule,
+        tautomers: r.tautomers ?? null,
+        engine: r.engine,
+      }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Lista dostępnych transformacji (id). */
 export function listTransformations() {
   const d = detect();

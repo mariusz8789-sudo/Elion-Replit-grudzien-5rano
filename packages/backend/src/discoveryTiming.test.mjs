@@ -7,7 +7,6 @@ import path from 'node:path';
 import { openDatabase, CURRENT_SCHEMA_VERSION } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { executeResearchExperiment } from './researchRunExecution.mjs';
-import { DEFAULT_RESEARCH_TOOLS } from './researchRunEngines.mjs';
 import {
   campaignCycleTiming, campaignsOfScope, closeStage, COMPETITOR_PROVENANCE_FIELDS, COUNT_KINDS,
   DISCOVERY_STAGES, discoveryTimingReport, FULL_CYCLE_STAGE, genesisSpeedup, getCompetitorBaseline,

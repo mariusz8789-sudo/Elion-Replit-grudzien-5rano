@@ -96,6 +96,7 @@ import { buildResearchRunEvidencePack, verifyResearchRunEvidencePack } from './r
 import { executeResearchExperiment, listResearchExperimentReplays, replayResearchExperiment } from './researchRunExecution.mjs';
 import { controlResearchRunExecution, enqueueResearchAdvance, enqueueResearchExperiment, readResearchJob, queueFor } from './researchRunJobs.mjs';
 import { advanceResearchRun } from './researchRunAdvance.mjs';
+import { listRemoteWorkers } from './remoteWorkerApi.mjs';
 import { cancelFanOut, hasFanOutChildren, readFanOut, retryChild, spawnChildRuns } from './researchRunFanOut.mjs';
 import { literatureReplaysOf, replayResearchRunLiterature, retrieveResearchRunLiterature } from './researchRunLiterature.mjs';
 import { attachResearchRunDataset, listResearchRunDatasets } from './researchRunDatasets.mjs';
@@ -801,6 +802,11 @@ export function handleApi(db, ctx) {
         return ok({ cognitiveState: buildCognitiveState(db, projectId, { selfModel }) });
       })();
     }
+    // Remote ResearchRun workers: who holds a lease on which job of this project, with the last heartbeat. Read-only.
+    if (seg[2] === 'remote-workers' && seg.length === 3) {
+      if (method !== 'GET') return err(405, 'method_not_allowed');
+      return ok(listRemoteWorkers(db, projectId));
+    }
     // Knowledge loop: recall + synthesis over canonical state. A read-only view; stores nothing, calls no model.
     if (seg[2] === 'knowledge' && seg[3] === 'synthesis' && seg.length === 4) {
       if (method !== 'GET') return err(405, 'method_not_allowed');
@@ -921,7 +927,7 @@ export function handleApi(db, ctx) {
         if (body?.async === true) {
           // The queued form: a worker runs the steps in a killable child process, this request returns at once.
           return (async () => {
-            const queued = await enqueueResearchAdvance(db, projectId, current.researchRunId, { maxSteps: body?.maxSteps, userId: user.id });
+            const queued = await enqueueResearchAdvance(db, projectId, current.researchRunId, { maxSteps: body?.maxSteps, userId: user.id, remote: body?.remote === true });
             if (!queued.ok) return { status: queued.status === 'NOT_FOUND' ? 404 : 422, body: { error: queued.status, reason: queued.reason ?? null } };
             return ok({ job: queued.job, deduped: queued.deduped, poll: `/api/projects/${projectId}/research-runs/${current.researchRunId}/experiment-jobs/${queued.job.jobId}` }, 202);
           })();
@@ -947,8 +953,8 @@ export function handleApi(db, ctx) {
         return (async () => {
           const timeoutMs = Number.isFinite(body?.timeoutMs) ? body.timeoutMs : undefined;
           const result = seg[5] === 'spawn'
-            ? await spawnChildRuns(db, projectId, current.researchRunId, { hypothesisIds: Array.isArray(body?.hypothesisIds) ? body.hypothesisIds : null, userId: user.id, timeoutMs })
-            : await retryChild(db, projectId, current.researchRunId, seg[6], { userId: user.id, timeoutMs });
+            ? await spawnChildRuns(db, projectId, current.researchRunId, { hypothesisIds: Array.isArray(body?.hypothesisIds) ? body.hypothesisIds : null, userId: user.id, timeoutMs, remote: body?.remote === true })
+            : await retryChild(db, projectId, current.researchRunId, seg[6], { userId: user.id, timeoutMs, ...(typeof body?.remote === 'boolean' ? { remote: body.remote } : {}) });
           return result.ok ? ok(result, result.deduped ? 200 : 202) : failure(result);
         })();
       }

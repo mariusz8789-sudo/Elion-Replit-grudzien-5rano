@@ -268,7 +268,12 @@ describe('INVARIANT: one engine authority', () => {
   });
 
   it('only one module may serve the remote-worker HTTP API', () => {
-    const allowed = ['packages/backend/src/remoteWorker.mjs', 'packages/backend/src/server.mjs'];
+    // remoteWorkerProtocol.mjs only DEFINES the prefix (constants shared by server and worker, no imports, no routing).
+    const allowed = [
+      'packages/backend/src/remoteWorker.mjs',
+      'packages/backend/src/remoteWorkerProtocol.mjs',
+      'packages/backend/src/server.mjs',
+    ];
     const actual = mentions('WORKER_API_PREFIX', { except: ['packages/backend/src/remoteWorkerApi.mjs'] });
     assert.deepEqual(actual, allowed, report(actual, allowed, 'A second module routes /api/worker/v1.'));
     assert.ok(
@@ -281,9 +286,13 @@ describe('INVARIANT: one engine authority', () => {
     // Without this filter two workers race for one frozen experiment and the run could be executed twice.
     const jobs = SOURCE.get('packages/backend/src/researchRunJobs.mjs');
     assert.ok(
-      /claimFilter:\s*\{\s*excludeCapabilities:\s*\[RESEARCH_REMOTE_CAPABILITY\]\s*\}/.test(jobs),
-      'createResearchRunWorker must exclude RESEARCH_REMOTE_CAPABILITY from its claim filter, '
+      /claimFilter:\s*\{\s*excludeCapabilities:\s*\[\.\.\.REMOTE_CAPABILITIES\]\s*\}/.test(jobs),
+      'createResearchRunWorker must exclude every remote capability (REMOTE_CAPABILITIES) from its claim filter, '
       + 'so a remote-only job is never also claimed in-process.',
+    );
+    assert.ok(
+      /REMOTE_CAPABILITIES\s*=\s*Object\.freeze\(\[RESEARCH_REMOTE_CAPABILITY,\s*RESEARCH_ADVANCE_REMOTE_CAPABILITY\]\)/.test(jobs),
+      'REMOTE_CAPABILITIES must list both the single-experiment and the advance remote capability.',
     );
   });
 });

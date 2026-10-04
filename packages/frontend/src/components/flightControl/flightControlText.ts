@@ -94,6 +94,26 @@ const TEXT = {
   failure: ['Powód', 'Reason'],
   cancelJob: ['Anuluj zadanie', 'Cancel job'],
 
+  workersTitle: ['Zdalni pracownicy', 'Remote workers'],
+  workersLead: [
+    'Pracownicy działający poza serwerem biorą zadania przez sieć. Widać, kto trzyma dzierżawę zadania i kiedy ostatnio dał znak życia.',
+    'Workers that run outside the server take jobs over the network. You can see who holds a job on a lease and when it last reported in.',
+  ],
+  workersEmpty: ['Żaden zdalny pracownik nie zgłosił się do serwera od jego ostatniego uruchomienia.', 'No remote worker has contacted the server since it last started.'],
+  workersUnavailable: ['Lista zdalnych pracowników nie przyszła z serwera.', 'The list of remote workers did not arrive from the server.'],
+  workersWaiting: ['zdalnych zadań czeka na pracownika', 'remote jobs waiting for a worker'],
+  workerLastSeen: ['Ostatni znak życia', 'Last seen'],
+  workerHolds: ['Trzyma zadanie', 'Holds a job'],
+  workerNoLease: ['nie trzyma żadnego zadania', 'holds no job'],
+  workerHeartbeat: ['ostatni sygnał', 'last heartbeat'],
+  workerAttempt: ['próba', 'attempt'],
+  workerOf: ['z', 'of'],
+  workerFanOutChild: ['dziecko rozgałęzienia', 'fan-out child'],
+  workerScope: [
+    'Dzierżawy pochodzą z trwałej kolejki. Pracownik bez dzierżawy jest widoczny tylko, dopóki zgłasza się do serwera (pamięć od ostatniego uruchomienia).',
+    'Leases come from the durable queue. A worker without a lease is listed only while it keeps contacting the server (memory since its last start).',
+  ],
+
   flightsTitle: ['Loty eksperymentów', 'Experiment flights'],
   flightsLead: [
     'Lot to jeden zaplanowany eksperyment Virtual Lab: kontrola przed startem, wykonanie wobec planu, dowód i powtórzenie.',
@@ -172,6 +192,12 @@ const CODES = {
     AWAITING_HUMAN_REVIEW: ['czeka na przegląd człowieka', 'awaiting human review'], STATE_INTEGRITY_FAILURE: ['nic — łańcuch zdarzeń jest uszkodzony', 'nothing — the event chain is broken'],
     NONE: ['brak — przebieg nie jest w toku', 'none — the run is not in progress'],
   },
+  workerState: {
+    BUSY: ['pracuje', 'working'], IDLE: ['czeka na zadanie', 'waiting for a job'], LEASE_EXPIRED: ['dzierżawa wygasła, brak sygnału', 'lease expired, no signal'], SILENT: ['od dawna bez sygnału', 'silent for a while'],
+  },
+  workerKind: {
+    EXPERIMENT: ['jeden eksperyment', 'one experiment'], ADVANCE: ['kilka eksperymentów po kolei', 'several experiments in a row'],
+  },
   jobState: {
     QUEUED: ['czeka', 'queued'], CLAIMED: ['wykonywane', 'claimed'], SUCCEEDED: ['zakończone sukcesem', 'succeeded'], FAILED: ['nieudane', 'failed'],
     CANCELLED: ['anulowane', 'cancelled'], DEAD_LETTER: ['porzucone po wygaśnięciu', 'dead-lettered'],
@@ -224,9 +250,9 @@ export function fcCode(group: CodeGroup, code: string | null | undefined, locale
   return pair ? pair[locale === 'pl' ? 0 : 1] : code;
 }
 
-const GOOD = new Set(['RUNNING', 'RESOLVED', 'SUCCEEDED', 'VERIFIED', 'CLEARED', 'PASS', 'MATCH', 'REPLAY_MATCH', 'WITHIN_BUDGET', 'SUPPORTED_WITHIN_PROTOCOL', 'PROPOSED_REQUIRES_HUMAN_APPROVAL']);
+const GOOD = new Set(['BUSY', 'RUNNING', 'RESOLVED', 'SUCCEEDED', 'VERIFIED', 'CLEARED', 'PASS', 'MATCH', 'REPLAY_MATCH', 'WITHIN_BUDGET', 'SUPPORTED_WITHIN_PROTOCOL', 'PROPOSED_REQUIRES_HUMAN_APPROVAL']);
 const BAD = new Set(['FAILED', 'CANCELLED', 'DEAD_LETTER', 'BLOCKED', 'FAIL', 'DRIFT', 'REPLAY_DRIFT', 'REPLAY_DRIFT_DETECTED', 'EXCEEDED', 'FALSIFIED_WITHIN_PROTOCOL', 'STATE_INTEGRITY_FAILURE', 'MISSING', 'BUDGET_EXHAUSTED']);
-const WARN = new Set(['PAUSED', 'QUEUED', 'CLAIMED', 'BLOCKED_RETRYABLE', 'AWAITING_EVIDENCE', 'AWAITING_REPLAY', 'READY_TO_EXECUTE', 'INCONCLUSIVE', 'REPLAY_BLOCKED_BY_RUNTIME', 'REPLAY_ENGINE_VERSION_CHANGED', 'AWAITING_HUMAN_REVIEW']);
+const WARN = new Set(['LEASE_EXPIRED', 'SILENT', 'PAUSED', 'QUEUED', 'CLAIMED', 'BLOCKED_RETRYABLE', 'AWAITING_EVIDENCE', 'AWAITING_REPLAY', 'READY_TO_EXECUTE', 'INCONCLUSIVE', 'REPLAY_BLOCKED_BY_RUNTIME', 'REPLAY_ENGINE_VERSION_CHANGED', 'AWAITING_HUMAN_REVIEW']);
 
 /** A colour for a server code; anything unknown stays neutral rather than looking good or bad. */
 export function toneOf(code: string | null | undefined): Tone {

@@ -417,6 +417,58 @@ function FlightsSection({ snapshot, locale }: { snapshot: FlightControlSnapshot;
   );
 }
 
+/* ---------------- remote workers ---------------- */
+
+function RemoteWorkersSection({ snapshot, locale }: { snapshot: FlightControlSnapshot; locale: Locale }) {
+  const view = snapshot.remoteWorkers;
+  return (
+    <section className="fc-section" aria-labelledby="fc-workers-h" data-testid="fc-workers">
+      <header className="fc-section-head">
+        <h2 id="fc-workers-h">{fcText('workersTitle', locale)}</h2>
+        <p>{fcText('workersLead', locale)}</p>
+      </header>
+      {!view && <Empty testId="fc-workers-unavailable">{fcText('workersUnavailable', locale)}</Empty>}
+      {view && view.workers.length === 0 && <Empty testId="fc-workers-empty">{fcText('workersEmpty', locale)}</Empty>}
+      {view && view.queuedRemoteJobs > 0 && <p className="fc-small" data-testid="fc-workers-waiting">{view.queuedRemoteJobs} {fcText('workersWaiting', locale)}</p>}
+      {view && view.workers.length > 0 && (
+        <ul className="fc-workers">
+          {view.workers.map((w) => (
+            <li key={w.workerId} className="fc-worker" data-testid={`fc-worker-${w.workerId}`}>
+              <div className="fc-worker-head">
+                <span className="fc-mono">{w.workerId}</span>
+                <Pill code={w.state} group="workerState" locale={locale} />
+                <span className="fc-small">{fcText('workerLastSeen', locale)}: {formatDateTime(w.lastSeenAt, locale)}</span>
+              </div>
+              {w.leases.length === 0
+                ? <p className="fc-small">{fcText('workerNoLease', locale)}</p>
+                : (
+                  <ul className="fc-worker-leases">
+                    {w.leases.map((l) => {
+                      const lease = leaseText(Date.parse(l.leaseExpiresAt), snapshot.loadedAt, locale);
+                      return (
+                        <li key={l.jobId} data-testid={`fc-worker-lease-${l.jobId}`}>
+                          <span>{fcText('workerHolds', locale)}: {fcCode('workerKind', l.kind, locale)}{l.fanOutParentRunId ? ` · ${fcText('workerFanOutChild', locale)}` : ''}</span>
+                          <span className="fc-small">
+                            {fcText('workerAttempt', locale)} {l.attempt} {fcText('workerOf', locale)} {l.maxAttempts} · {fcText('workerHeartbeat', locale)} {formatDateTime(l.lastHeartbeatAt, locale)} · {fcText('leaseUntil', locale)} {lease.text}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              <Technical locale={locale} rows={[
+                w.technicalDetails.engines ? `engines: ${w.technicalDetails.engines.join(', ') || '—'}` : null,
+                ...w.leases.map((l) => `job: ${l.jobId} · run: ${l.researchRunId} · ${l.kind}${l.fanOutParentRunId ? ` · parent: ${l.fanOutParentRunId}` : ''}`),
+              ]} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {view && <p className="fc-small">{fcText('workerScope', locale)}</p>}
+    </section>
+  );
+}
+
 /* ---------------- blocked dependencies ---------------- */
 
 function BlockedSection({ snapshot, locale }: { snapshot: FlightControlSnapshot; locale: Locale }) {
@@ -471,6 +523,7 @@ export function FlightControlView(props: FlightControlViewProps) {
             <BlockedSection snapshot={snapshot} locale={locale} />
           </div>
           <JobsSection {...props} snapshot={snapshot} />
+          <RemoteWorkersSection snapshot={snapshot} locale={locale} />
           <FlightsSection snapshot={snapshot} locale={locale} />
         </>
       )}

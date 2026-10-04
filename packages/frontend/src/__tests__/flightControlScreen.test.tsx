@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   cancelResearchRunJob, controlResearchRun, getResearchRunJob,
-  type BytProjection, type GenesisCognitiveState, type ResearchRunControlResult, type ResearchRunQueueJob, type ResearchRunSummary, type ResearchRunView,
+  type BytProjection, type GenesisCognitiveState, type RemoteWorkersView, type ResearchRunControlResult, type ResearchRunQueueJob, type ResearchRunSummary, type ResearchRunView,
 } from '../core/backend/client';
 import { clearSession, setSession } from '../core/backend/session';
 import { activeNavId } from '../core/navigation';
@@ -132,7 +132,7 @@ describe('Flight Control renders the real server fields', () => {
     });
     const r = await loadFlightControl('tok', 'p1');
     expect(r.ok).toBe(true);
-    expect(calls.map((c) => `${c.method} ${c.url}`).sort()).toEqual(['GET /api/projects/p1/cognitive-state', 'GET /api/projects/p1/research-runs']);
+    expect(calls.map((c) => `${c.method} ${c.url}`).sort()).toEqual(['GET /api/projects/p1/cognitive-state', 'GET /api/projects/p1/remote-workers', 'GET /api/projects/p1/research-runs']);
     expect(calls.every((c) => c.auth === 'Bearer tok')).toBe(true);
   });
 
@@ -350,6 +350,85 @@ describe('Backend errors are shown as they are', () => {
     expect(partialHtml).toContain('Lista przebiegów nie przyszła z serwera.');
     expect(partialHtml).toMatch(/data-testid="fc-sum-runs"><dt>przebiegi<\/dt><dd>—<\/dd>/);
     expect(partialHtml).toContain('CHEMBL941');
+  });
+});
+
+const WORKERS: RemoteWorkersView = {
+  queuedRemoteJobs: 2,
+  scope: 'Leases come from the durable queue.',
+  workers: [
+    {
+      workerId: 'worker-remote-a', state: 'BUSY', lastSeenAt: '2026-10-04T00:10:00.000Z', technicalDetails: { engines: ['rdkit', 'pyscf'] },
+      leases: [{ jobId: 'job-rr-aaa', researchRunId: 'rr-1', kind: 'EXPERIMENT', fanOutParentRunId: 'rr-parent', attempt: 2, maxAttempts: 3, lastHeartbeatAt: '2026-10-04T00:10:00.000Z', leaseExpiresAt: '2026-10-04T00:10:30.000Z', leaseState: 'ACTIVE' }],
+    },
+    { workerId: 'worker-remote-b', state: 'IDLE', lastSeenAt: '2026-10-04T00:09:00.000Z', technicalDetails: { engines: null }, leases: [] },
+    {
+      workerId: 'worker-remote-c', state: 'LEASE_EXPIRED', lastSeenAt: '2026-10-04T00:01:00.000Z', technicalDetails: { engines: ['rdkit'] },
+      leases: [{ jobId: 'job-rr-ccc', researchRunId: 'rr-2', kind: 'ADVANCE', fanOutParentRunId: null, attempt: 1, maxAttempts: 3, lastHeartbeatAt: '2026-10-04T00:01:00.000Z', leaseExpiresAt: '2026-10-04T00:01:30.000Z', leaseState: 'EXPIRED' }],
+    },
+  ],
+};
+
+async function loadedWithWorkers(workers: RemoteWorkersView | { status: number; body: unknown }): Promise<FlightControlSnapshot> {
+  mockFetch({
+    'GET /api/projects/p1/cognitive-state': { body: { cognitiveState: cognitiveState() } },
+    'GET /api/projects/p1/research-runs': { body: { researchRuns: RUNS } },
+    'GET /api/projects/p1/remote-workers': 'workers' in workers ? { body: workers } : workers,
+  });
+  const r = await loadFlightControl('tok', 'p1', () => Date.parse('2026-10-04T00:10:10.000Z'));
+  if (!r.ok) throw new Error(`load failed: ${r.error}`);
+  return r.snapshot;
+}
+
+describe('Flight Control shows the remote workers', () => {
+  it('one row per worker with its state, lease and last heartbeat; engine names only under Technical details', async () => {
+    const calls = mockFetch({
+      'GET /api/projects/p1/cognitive-state': { body: { cognitiveState: cognitiveState() } },
+      'GET /api/projects/p1/research-runs': { body: { researchRuns: RUNS } },
+      'GET /api/projects/p1/remote-workers': { body: WORKERS },
+    });
+    const r = await loadFlightControl('tok', 'p1');
+    expect(r.ok).toBe(true);
+    expect(calls.find((c) => c.url.endsWith('/remote-workers'))?.auth).toBe('Bearer tok');
+    const snapshot = await loadedWithWorkers(WORKERS);
+    expect(snapshot.remoteWorkers?.workers).toHaveLength(3);
+    const html = renderToStaticMarkup(<FlightControlView {...viewProps(snapshot)} />);
+    const section = html.slice(html.indexOf('data-testid="fc-workers"'), html.indexOf('data-testid="fc-flights"'));
+    for (const id of ['worker-remote-a', 'worker-remote-b', 'worker-remote-c']) expect(section).toContain(`data-testid="fc-worker-${id}"`);
+    expect(section).toContain('pracuje');
+    expect(section).toContain('czeka na zadanie');
+    expect(section).toContain('dzierżawa wygasła, brak sygnału');
+    expect(section).toContain('dziecko rozgałęzienia');
+    expect(section).toContain('kilka eksperymentów po kolei');
+    expect(section).toContain('próba 2 z 3');
+    expect(section).toContain('nie trzyma żadnego zadania');
+    expect(section).toContain('2 zdalnych zadań czeka na pracownika');
+    expect(section).toContain('dzierżawa wygasła');
+    // No engine name outside <details class="fc-tech">.
+    const outside = section.replace(/<details class="fc-tech">[\s\S]*?<\/details>/g, '');
+    expect(outside).not.toMatch(/rdkit|pyscf/);
+    expect(section).toContain('engines: rdkit, pyscf');
+  });
+
+  it('an empty list and a failed request are told apart, and the rest of the screen still renders', async () => {
+    const empty = await loadedWithWorkers({ workers: [], queuedRemoteJobs: 0, scope: 'x' });
+    const emptyHtml = renderToStaticMarkup(<FlightControlView {...viewProps(empty)} />);
+    expect(emptyHtml).toContain('data-testid="fc-workers-empty"');
+    expect(emptyHtml).not.toContain('fc-workers-waiting');
+    const failed = await loadedWithWorkers({ status: 503, body: { error: 'unavailable' } });
+    expect(failed.remoteWorkers).toBeNull();
+    expect(failed.remoteWorkersFailure?.status).toBe(503);
+    const failedHtml = renderToStaticMarkup(<FlightControlView {...viewProps(failed)} />);
+    expect(failedHtml).toContain('data-testid="fc-workers-unavailable"');
+    expect(failedHtml).toContain('CHEMBL941');
+  });
+
+  it('English follows the language switch', async () => {
+    const snapshot = await loadedWithWorkers(WORKERS);
+    const html = renderToStaticMarkup(<FlightControlView {...viewProps(snapshot, { locale: 'en' })} />);
+    expect(html).toContain('Remote workers');
+    expect(html).toContain('attempt 2 of 3');
+    expect(html).toContain('waiting for a job');
   });
 });
 
